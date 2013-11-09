@@ -1,0 +1,117 @@
+#ifndef TOK
+#define TOK(X)
+#endif
+
+#ifndef PUNCTUATOR
+#define PUNCTUATOR(X,Y) TOK(X)
+#endif
+
+#ifndef KEYWORD
+#define KEYWORD(X) TOK(kw_ ## X)
+#endif
+
+//basic type
+#ifndef BTYPE
+#define BTYPE(X,SZ,SIGN) KEYWORD(X)
+#endif
+
+//floating point
+#ifndef FTYPE
+#define FTYPE(X,SZ) KEYWORD(X)
+#endif
+
+//vector types
+#ifndef VTYPE
+#define VTYPE(X,LEN,TYPE) KEYWORD(X)
+#endif
+
+//matrix types?
+
+TOK(none)
+TOK(eof)
+TOK(unknown)
+TOK(comment)
+TOK(identifier)
+TOK(floatNum)
+TOK(intNum)
+TOK(charstring)
+TOK(character)
+
+BTYPE(bool,1,false)
+BTYPE(char,1,false)
+BTYPE(short,2,false)
+BTYPE(int,4,false)
+BTYPE(long,8,false)
+FTYPE(float,4)
+FTYPE(double,8)
+
+VTYPE(vec4,4,float)
+
+KEYWORD(asm)
+KEYWORD(const)
+KEYWORD(extern)
+KEYWORD(enum)
+KEYWORD(for)
+KEYWORD(goto)
+KEYWORD(if)
+KEYWORD(else)
+KEYWORD(return)
+KEYWORD(struct)
+KEYWORD(static)
+KEYWORD(union)
+KEYWORD(void)
+KEYWORD(true)
+KEYWORD(false)
+KEYWORD(and)
+KEYWORD(or)
+KEYWORD(while)
+KEYWORD(switch)
+KEYWORD(pass)
+KEYWORD(once)
+KEYWORD(import)
+//to use
+KEYWORD(var)
+KEYWORD(module)
+KEYWORD(alias)
+
+PUNCTUATOR(plus, "+")
+PUNCTUATOR(plusplus, "++")
+PUNCTUATOR(minus, "-")
+PUNCTUATOR(minusminus, "--")
+PUNCTUATOR(star, "*")
+PUNCTUATOR(starstar, "**")
+PUNCTUATOR(slash, "/")
+PUNCTUATOR(amp, "&")
+PUNCTUATOR(ampamp, "&&")
+PUNCTUATOR(bar, "|")
+PUNCTUATOR(barbar, "||")
+PUNCTUATOR(caret, "^")
+PUNCTUATOR(percent, "%")
+PUNCTUATOR(bang, "!")
+PUNCTUATOR(tilde, "~")
+PUNCTUATOR(slashslash, "//")
+PUNCTUATOR(equal, "=")
+PUNCTUATOR(equalequal, "==")
+PUNCTUATOR(less, "<")
+PUNCTUATOR(lessless, "<<")
+PUNCTUATOR(lessequal, "<=")
+PUNCTUATOR(greater, ">")
+PUNCTUATOR(greaterequal, ">=")
+PUNCTUATOR(greatergreater, ">>")
+PUNCTUATOR(lparen, "(")
+PUNCTUATOR(rparen, ")")
+PUNCTUATOR(lbrace, "{")
+PUNCTUATOR(rbrace, "}")
+PUNCTUATOR(lbracket, "[")
+PUNCTUATOR(rbracket, "]")
+PUNCTUATOR(comma, ",")
+PUNCTUATOR(semicolon, ";")
+PUNCTUATOR(colon, ":")
+PUNCTUATOR(dot, ".")
+PUNCTUATOR(dotdot, "..")
+PUNCTUATOR(dotdotdot, "...")
+
+
+#undef TOK
+#undef PUNCTUATOR
+#undef KEYWORD

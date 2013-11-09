@@ -81,11 +81,19 @@ struct ASTQualType
 struct ASTPointerType;
 struct ASTType
 {
-    Identifier *identifier;
     ASTPointerType *pointerTy;
 
     ASTType() {}
     virtual size_t size() const = 0;
+};
+
+/*
+ * named types, as apposed to reference/pointer types
+ */
+struct ASTConcreteType : public ASTType
+{
+    Identifier *identifier;
+    ASTConcreteType(Identifier *id) : identifier(id) {}
 };
 
 struct ASTPointerType : public ASTType
@@ -102,16 +110,16 @@ struct ASTTypeSpec
     ASTTypeSpec(bool defaultSigned) : isSigned(defaultSigned) {}
 };
 
-struct ASTBasicType : public ASTType
+struct ASTBasicType : public ASTConcreteType
 {
     size_t sz;
     ASTTypeSpec typeSpec;
 
     virtual size_t size() const { return sz; }
-    ASTBasicType(size_t s, bool defaultSigned = false) : sz(s), typeSpec(defaultSigned) {}
+    ASTBasicType(Identifier *id, size_t s, bool defaultSigned = false) : ASTConcreteType(id), sz(s), typeSpec(defaultSigned) {}
 };
 
-struct ASTStructType : public ASTType
+struct ASTStructType : public ASTConcreteType
 {
     std::vector<std::pair<ASTType*, std::string> > members;
     virtual size_t size() const
@@ -122,7 +130,8 @@ struct ASTStructType : public ASTType
             sz += members[i].first->size();
         }
     }
-};
+    ASTStructType(Identifier *id) : ASTConcreteType(id) {}
+}; 
 
 struct Declaration
 {

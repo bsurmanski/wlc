@@ -75,8 +75,10 @@ struct Token
             case tok::comma:
                 return 1;
             case tok::barbar:
+            case tok::kw_or:
                 return 2;
             case tok::ampamp:
+            case tok::kw_and:
                     return 3;
             case tok::bar:
                     return 4;

@@ -5,5 +5,5 @@ int printf(^char str);
 
 int main()
 {
-    return 0
+    return 5 % 2
 }

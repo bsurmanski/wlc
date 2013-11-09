@@ -3,7 +3,7 @@
 
 void SymbolTable::addBuiltin()
 {
-#define BTYPE(X,SZ,SIGN) Identifier *id_##X = get(#X); id_##X->setDeclaration(new TypeDeclaration(id_##X, new ASTBasicType(SZ,SIGN)), Identifier::ID_TYPE);
+#define BTYPE(X,SZ,SIGN) Identifier *id_##X = get(#X); id_##X->setDeclaration(new TypeDeclaration(id_##X, new ASTBasicType(id_##X,SZ,SIGN)), Identifier::ID_TYPE);
 #include "tokenkinds.def"
 }
 

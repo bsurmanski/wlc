@@ -25,6 +25,10 @@
 #define VTYPE(X,LEN,TYPE) KEYWORD(X)
 #endif
 
+#ifndef RESERVE
+#define RESERVE(X) TOK(resv_ ## X)
+#endif
+
 //matrix types?
 
 TOK(none)
@@ -47,7 +51,6 @@ FTYPE(double,8)
 
 VTYPE(vec4,4,float)
 
-KEYWORD(asm)
 KEYWORD(const)
 KEYWORD(extern)
 KEYWORD(enum)
@@ -67,12 +70,18 @@ KEYWORD(or)
 KEYWORD(while)
 KEYWORD(switch)
 KEYWORD(pass)
-KEYWORD(once)
 KEYWORD(import)
-//to use
-KEYWORD(var)
-KEYWORD(module)
-KEYWORD(alias)
+
+// reserved words. hopefully will get around to implementing these
+RESERVE(asm) /* inline asm */
+RESERVE(once) /* declare that statement only happens once, ever. when first encountered  */
+RESERVE(var) /* statically checked automatic type variable var myvar = new MyStruct() */
+RESERVE(package) /* declare package like Java, (package com.mysite.mypackage) */
+RESERVE(number) /* for variable precission numbers */
+RESERVE(let) /* like D alias, and for constants (let a = 7) */
+RESERVE(implicit) /* for implicit conversions, apply to function */
+RESERVE(this)
+RESERVE(super)
 
 PUNCTUATOR(plus, "+")
 PUNCTUATOR(plusplus, "++")
@@ -115,3 +124,7 @@ PUNCTUATOR(dotdotdot, "...")
 #undef TOK
 #undef PUNCTUATOR
 #undef KEYWORD
+#undef RESERVE
+#undef BTYPE
+#undef VTYPE
+#undef FTYPE

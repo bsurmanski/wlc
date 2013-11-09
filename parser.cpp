@@ -122,7 +122,6 @@ Statement *ParseContext::parseStatement()
         case tok::kw_switch:
             return new ExpressionStatement(parseExpression());
 
-        case tok::kw_var:
         case tok::kw_int:
         case tok::kw_char:
         case tok::kw_short:

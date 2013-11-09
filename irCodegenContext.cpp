@@ -29,13 +29,13 @@ CGType IRCodegenContext::codegenType(ASTType *ty)
                 llvmty = Type::getInt64Ty(context);
                 break;
         }
-        return CGType(ASTQualType(ty->identifier), llvmty);
+        return CGType(ASTQualType(bty->identifier), llvmty);
     }
 
     if(ASTPointerType *pty = dynamic_cast<ASTPointerType*>(ty))
     {
         Type *llvmty = NULL; //XXX codegenType(pty->ptrTo)->getPointerTo();
-        return CGType(ASTQualType(ty->identifier), llvmty);
+        return CGType(ASTQualType(NULL), llvmty); //XXX
     }
 }
 
@@ -88,7 +88,7 @@ CGValue IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
 
     switch(exp->op)
     {
-    
+
     }
 }
 
@@ -96,11 +96,50 @@ CGValue IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 {
     CGValue lhs = codegenExpression(exp->lhs);
     CGValue rhs = codegenExpression(exp->rhs);
+    llvm::Value *val;
 
     switch(exp->op)
     {
+        case tok::comma:
+        case tok::barbar:
+        case tok::kw_or:
+        case tok::ampamp:
+        case tok::kw_and:
+        case tok::bar:
+        case tok::caret:
+        case tok::amp:
+        case tok::equalequal:
+        case tok::less:
+        case tok::lessequal:
+        case tok::greater:
+        case tok::greaterequal:
+                assert(false && "unimpl binop");
+            //TODO: all of these
+
         case tok::plus: 
-            return CGValue(lhs.type); //TODO: value
+            val = builder.CreateAdd(lhs.value, rhs.value);
+            return CGValue(lhs.type, val); //TODO: proper typing (for all below too)
+
+        case tok::minus:
+            val = builder.CreateSub(lhs.value, rhs.value);
+            return CGValue(lhs.type, val);
+
+        case tok::star:
+            val = builder.CreateMul(lhs.value, rhs.value);
+            return CGValue(lhs.type, val);
+
+        case tok::slash:
+            val = builder.CreateUDiv(lhs.value, rhs.value); //TODO: typed div
+            return CGValue(lhs.type, val);
+
+        case tok::percent:
+            val = builder.CreateURem(lhs.value, rhs.value);
+            return CGValue(lhs.type, val);
+
+
+
+        default:
+            return CGValue(NULL, NULL);
     }
 }
 

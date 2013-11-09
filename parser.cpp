@@ -106,6 +106,7 @@ Statement *ParseContext::parseDeclarationStatement()
     Declaration *decl;
 
     decl = parseDeclaration();
+    
     printf("New declaration: %s\n", decl->getName().c_str());
     //TODO: register decl
     return new DeclarationStatement(decl);
@@ -146,7 +147,7 @@ Declaration *ParseContext::parseDeclaration()
 {
     //TODO: parse function decl specs
 
-    ASTQualType rtype = parseType();
+    ASTQualType type = parseType();
 
     Token t_id = get();
     assert(t_id.is(tok::identifier));
@@ -155,10 +156,10 @@ Declaration *ParseContext::parseDeclaration()
 
     //TODO parse decl specs
 
-    vector<pair<ASTQualType, std::string> > args;
 
     if(peek().is(tok::lparen)) // function decl
     {
+        vector<pair<ASTQualType, std::string> > args;
         ignore(); // lparen 
         while(!peek().is(tok::rparen))
         {
@@ -175,16 +176,23 @@ Declaration *ParseContext::parseDeclaration()
         ignore(); //rparen
         Statement *stmt = parseStatement();
 
-        FunctionPrototype *proto = new FunctionPrototype(rtype, args);
+        FunctionPrototype *proto = new FunctionPrototype(type, args);
         Declaration *decl = new FunctionDeclaration(id, proto, stmt); //TODO: prototype, name
         id->setDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;
     }
 
+    Declaration *decl = new VariableDeclaration(type, id);
+    id->setDeclaration(decl, Identifier::ID_VARIABLE);
+
     if(peek().is(tok::equal))
     {
+        Expression *defaultValue = parseExpression();
         //TODO: default value
     }
+
+    //TODO: comma, multiple decl
+    return decl;
 }
 
 Expression *ParseContext::parseExpression()

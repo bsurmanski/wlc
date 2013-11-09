@@ -215,6 +215,10 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                 builder.CreateRetVoid();
             }
         }
+    } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl))
+    {
+        CGType vty = codegenType(vdecl->qualType);
+        builder.CreateAlloca(vty.type, 0, vdecl->getName());
     }
 }
 

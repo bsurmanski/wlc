@@ -13,6 +13,7 @@ struct Identifier
     {
         ID_UNKNOWN,
         ID_TYPE,
+        ID_VARIABLE,
         ID_FUNCTION,
         ID_PACKAGE,
         ID_CLASS,

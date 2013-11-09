@@ -66,7 +66,8 @@ CGValue IRCodegenContext::codegenExpression(Expression *exp)
             case NumericExpression::INT:
                 Value *llvmval = ConstantInt::get(Type::getInt32Ty(context), nexp->intValue);
                 //return CGValue(ASTQualType(), llvmval);//TODO
-                return CGValue(getScope()->lookup("int"), llvmval);
+                CGType ity = CGType(getScope()->lookup("int"), Type::getInt32Ty(context));
+                return CGValue(ity, llvmval);
                 //TODO: other types
         }
     }
@@ -79,7 +80,7 @@ CGValue IRCodegenContext::codegenExpression(Expression *exp)
         return codegenBinaryExpression(bexp);
     }
     //assert(false && "bad expression?");
-    return CGValue(NULL, NULL);
+    return CGValue();
 }
 
 CGValue IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
@@ -92,11 +93,31 @@ CGValue IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
     }
 }
 
+void IRCodegenContext::codegenResolveBinaryTypes(CGValue &v1, CGValue &v2, unsigned op)
+{
+    //if(ASTBasicType *bty1 = dynamic_cast v1.qual
+    if(ASTBasicType *bty1 = dynamic_cast<ASTBasicType*>(v1.qualTy().getBaseType()))
+    {
+        ASTBasicType *bty2 = dynamic_cast<ASTBasicType*>(v2.qualTy().getBaseType());
+        if(bty1->size() > bty2->size())
+        {
+            v2.type = v1.type;
+            v2.value = builder.CreateSExt(v2.value, v1.llvmTy()); //TODO: signedness
+        } else if(bty1->size() < bty2->size())
+        {
+            v1.type = v2.type;
+            v1.value = builder.CreateSExt(v1.value, v2.llvmTy());
+        }
+    }
+}
+
 CGValue IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 {
     CGValue lhs = codegenExpression(exp->lhs);
     CGValue rhs = codegenExpression(exp->rhs);
     llvm::Value *val;
+
+    codegenResolveBinaryTypes(lhs, rhs, exp->op);
 
     switch(exp->op)
     {
@@ -139,7 +160,7 @@ CGValue IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
 
         default:
-            return CGValue(NULL, NULL);
+            return CGValue(); //XXX: null val
     }
 }
 

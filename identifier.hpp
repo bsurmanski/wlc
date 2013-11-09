@@ -4,6 +4,8 @@
 
 #include <string>
 struct Declaration;
+struct ASTType;
+struct ASTBasicType;
 
 struct Identifier
 {
@@ -25,6 +27,8 @@ struct Identifier
     Identifier(std::string s, IDType t = ID_UNKNOWN) : type(t), name(s), declaration(NULL) {}
     void setDeclaration(Declaration *decl, IDType t = ID_UNKNOWN);
     std::string getName() { return name; }
+    ASTType *getType();
+    ASTBasicType *getBasicType();
 };
 
 #endif

@@ -7,18 +7,22 @@
 #include <llvm/IR/IRBuilder.h>
 #include <stack>
 
-struct CGValue
-{
-    ASTQualType type;
-    llvm::Value *value;
-    CGValue(ASTQualType ty, llvm::Value *v = NULL) : type(ty), value(v) {}
-};
-
 struct CGType
 {
     ASTQualType qual;
     llvm::Type *type;
     CGType(ASTQualType qu, llvm::Type *ty) : qual(qu), type(ty){}
+    CGType() {}
+};
+
+struct CGValue
+{
+    CGType type;
+    llvm::Value *value;
+    CGValue(CGType ty, llvm::Value *v = NULL) : type(ty), value(v) {}
+    CGValue() {}
+    llvm::Type *llvmTy() { return type.type; }
+    ASTQualType qualTy() { return type.qual; }
 };
 
 void IRCodegen(AST *ast);
@@ -44,6 +48,7 @@ class IRCodegenContext : public CodegenContext
     CGType codegenType(ASTQualType ty); //diferent name from above
     CGValue codegenExpression(Expression *exp);
     CGValue codegenBinaryExpression(BinaryExpression *exp);
+    void codegenResolveBinaryTypes(CGValue &v1, CGValue &v2, unsigned op);
     CGValue codegenUnaryExpression(UnaryExpression *exp);
     void codegenReturnStatement(ReturnStatement *exp);
     void codegenStatement(Statement *stmt);

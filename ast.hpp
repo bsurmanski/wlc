@@ -71,11 +71,15 @@ struct ASTQualType
     bool isExtern;
     bool isStatic;
     Identifier *identifier;
-    ASTQualType(Identifier *id) : identifier(id){}
+    ASTQualType(Identifier *id = NULL) : identifier(id){}
     ASTQualType(const ASTQualType &qt) :   isConst(qt.isConst), 
                                     isExtern(qt.isExtern),
                                     isStatic(qt.isStatic),
                                     identifier(qt.identifier) {}
+    ASTType *getBaseType()
+    {
+        return identifier->getType();
+    }
 };
 
 struct ASTPointerType;

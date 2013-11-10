@@ -137,6 +137,12 @@ struct ASTStructType : public ASTConcreteType
     ASTStructType(Identifier *id) : ASTConcreteType(id) {}
 }; 
 
+/***
+ *
+ * DECLARATIONS
+ *
+ ***/
+
 struct Declaration
 {
     Identifier *identifier;
@@ -172,34 +178,82 @@ struct TypeDeclaration : public Declaration
     TypeDeclaration(Identifier *id, ASTType *ty) : Declaration(id), type(ty) {}
 };
 
+/***
+ *
+ * EXPRESSIONS
+ *
+ ***/
+
 struct Expression
 {
+    enum ExpressionType
+    {
+        EXP_UNARY,
+        EXP_BINARY,
+        EXP_PRIMARY,
+        EXP_CALL,
+        EXP_POSTFIX,
+        EXP_INDEX,
+        EXP_MEMBER,
+        EXP_IDENTIFIER,
+        EXP_NUMERIC,
+        EXP_DECLARATION,
+        EXP_BLOCK,
+        EXP_IF,
+        EXP_WHILE,
+        EXP_FOR,
+        EXP_PASS,
+        EXP_SWITCH,
+        EXP_IMPORT,
+    };
     Expression() {}
-    virtual ~Expression(){}
+    virtual UnaryExpression *unaryExpression() { return NULL; }
+    virtual BinaryExpression *binaryExpression() { return NULL; }
+    virtual PrimaryExpression *primaryExpression() { return NULL; }
+    virtual CallExpression *callExpression() { return NULL; }
+    virtual PostfixExpression *postfixExpression() { return NULL; }
+    virtual IndexExpression *indexExpression() { return NULL; }
+    virtual MemberExpression *memberExpression() { return NULL; }
+    virtual IdentifierExpression *identifierExpression() { return NULL; }
+    virtual NumericExpression *numericExpression() { return NULL; }
+    virtual DeclarationExpression *declarationExpression() { return NULL; }
+    virtual BlockExpression *blockExpression() { return NULL; }
+    virtual IfExpression *ifExpression() { return NULL; }
+    virtual WhileExpression *whileExpression() { return NULL; }
+    virtual ForExpression *forExpression() { return NULL; }
+    virtual PassExpression *passExpression() { return NULL; }
+    virtual SwitchExpression *switchExpression() { return NULL; }
+    virtual ImportExpression *importExpression() { return NULL; }
+
+    //TODO: overrides
 };
 
 struct PostfixExpression : public Expression
 {
+    virtual PostfixExpression *postfixExpression() { return this; }
 };
 
 struct CallExpression : public PostfixExpression
 {
-    FunctionDeclaration *func;
+    virtual CallExpression *callExpression() { return this; }
+    Expression *function;
     std::vector<Expression *> args;
+    CallExpression(Expression *f, std::vector<Expression*> a) : function(f), args(a) {}
 };
 
 struct IndexExpression : public PostfixExpression
 {
-
+    virtual IndexExpression *indexExpression() { return this; }
 };
 
 struct MemberExpression : public PostfixExpression
 {
-
+    virtual MemberExpression *memberExpression() { return this; }
 };
 
 struct UnaryExpression : public Expression
 {
+    virtual UnaryExpression *unaryExpression() { return this; }
     Expression *lhs;
     unsigned op;
     UnaryExpression(unsigned o, Expression *l) : lhs(l), op(o) {}
@@ -207,6 +261,7 @@ struct UnaryExpression : public Expression
 
 struct BinaryExpression : public Expression
 {
+    virtual BinaryExpression *binaryExpression() { return this; }
     Expression *lhs;
     Expression *rhs;
     unsigned op;
@@ -214,7 +269,9 @@ struct BinaryExpression : public Expression
 };
 
 struct PrimaryExpression : public Expression
-{};
+{
+    virtual PrimaryExpression *primaryExpression() { return this; }
+};
 
 struct IdentifierExpression : public PrimaryExpression
 {
@@ -259,6 +316,7 @@ struct DeclarationExpression : public Expression
 
 struct Statement;
 // value of (bool) 0. if 'pass' is encountered, value of pass
+//TODO: probably shouldn't be an expression
 struct BlockExpression : public Expression
 {
     //TODO: sym table
@@ -300,6 +358,13 @@ struct ImportExpression : public Expression
 {
     TranslationUnit *import;
 };
+
+
+/***
+ *
+ * STATEMENTS
+ *
+ ***/
 
 struct Statement
 {

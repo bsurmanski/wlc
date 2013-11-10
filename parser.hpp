@@ -60,9 +60,9 @@ class ParseContext
     Statement *parseDeclarationStatement();
     Statement *parseStatement();
     Declaration *parseDeclaration();
-    Expression *parseExpression();
+    Expression *parseExpression(int prec = 0);
     Expression *parsePrimaryExpression();
-    Expression *parsePostfixExpression();
+    Expression *parsePostfixExpression(int prec = 0);
     Expression *parseUnaryExpression(int prec = 0);
     Expression *parseBinaryExpression(int prec = 0);
 };

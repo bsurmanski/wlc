@@ -121,6 +121,10 @@ Statement *ParseContext::parseStatement()
         case tok::kw_while:
         case tok::kw_for:
         case tok::kw_switch:
+        case tok::identifier:
+        case tok::intNum:
+        case tok::floatNum:
+        case tok::charstring:
             return new ExpressionStatement(parseExpression());
 
         case tok::kw_int:
@@ -195,12 +199,12 @@ Declaration *ParseContext::parseDeclaration()
     return decl;
 }
 
-Expression *ParseContext::parseExpression()
+Expression *ParseContext::parseExpression(int prec)
 {
-    return parseBinaryExpression();
+    return parseBinaryExpression(prec);
 }
 
-Expression *ParseContext::parsePostfixExpression()
+Expression *ParseContext::parsePostfixExpression(int prec)
 {
     Expression *exp = parsePrimaryExpression();
     if(peek().getPostfixPrecidence())
@@ -210,11 +214,19 @@ Expression *ParseContext::parsePostfixExpression()
              
         } else if(peek().is(tok::lparen)) // call
         {
+            ignore(); // ignore lparen
+            vector<Expression*> args;
+            while(peek().isNot(tok::rparen))
+            {
+                args.push_back(parseExpression(tok::comma)); 
+            }
+            ignore(); // ignore rparen
+            return new CallExpression(exp, args);
             //TODO: eat call 
         } else if(peek().is(tok::lbracket)) //index/slice
         {
             //TODO: eat index 
-        } else {assert(false && "somethings up");} //TODO: ++ and --
+        } else {assert(false && "this doesn't look like a postfix expresion to me!");} //TODO: ++ and --
     }
 
     //TODO: parse postfix of postfix. eg somecall()++;
@@ -223,10 +235,13 @@ Expression *ParseContext::parsePostfixExpression()
 
 Expression *ParseContext::parseUnaryExpression(int prec)
 {
-    if(peek().getUnaryPrecidence())
+    int op;
+    int opPrec;
+    if((opPrec = peek().getUnaryPrecidence()))
     {
-        int op = get().kind;
-        return new UnaryExpression(op, parseExpression());
+
+        op = get().kind;
+        return new UnaryExpression(op, parsePostfixExpression(opPrec));
     }
 
     return parsePostfixExpression();
@@ -272,16 +287,26 @@ Expression *ParseContext::parsePrimaryExpression()
         ignore(); // eat rbrace
         return new BlockExpression(stmts);
     }
+
+    if(peek().is(tok::identifier))
+    {
+        return new IdentifierExpression(scope->get(get().toString()));
+    }
 }
 
 Expression *ParseContext::parseBinaryExpression(int prec)
 {
     Expression *lhs = parseUnaryExpression();
 
-    if(peek().getBinaryPrecidence())
+    int op;
+    int opPrec;
+    while((opPrec = peek().getBinaryPrecidence()) > prec)
     {
-        int op = peek().kind;
-        return new BinaryExpression(op, lhs, parseBinaryExpression(get().getBinaryPrecidence())); 
+        op = peek().kind;
+        ignore();
+        Expression *rhs = parseBinaryExpression(opPrec);
+        assert(rhs && "invalid binary op, expected RHS");
+        lhs = new BinaryExpression(op, lhs, rhs); 
     }
 
     return lhs;

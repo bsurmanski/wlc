@@ -47,6 +47,7 @@ class IRCodegenContext : public CodegenContext
     CGType codegenType(ASTType *ty); 
     CGType codegenType(ASTQualType ty); //diferent name from above
     CGValue codegenExpression(Expression *exp);
+    CGValue codegenCallExpression(CallExpression *exp);
     CGValue codegenBinaryExpression(BinaryExpression *exp);
     void codegenResolveBinaryTypes(CGValue &v1, CGValue &v2, unsigned op);
     CGValue codegenUnaryExpression(UnaryExpression *exp);

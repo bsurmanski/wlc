@@ -78,9 +78,18 @@ CGValue IRCodegenContext::codegenExpression(Expression *exp)
     else if(BinaryExpression *bexp = dynamic_cast<BinaryExpression*>(exp))
     {
         return codegenBinaryExpression(bexp);
+    } else if(CallExpression *cexp = dynamic_cast<CallExpression*>(exp))
+    {
+        return codegenCallExpression(cexp);
     }
     //assert(false && "bad expression?");
     return CGValue();
+}
+
+CGValue IRCodegenContext::codegenCallExpression(CallExpression *exp)
+{
+    CGValue func = codegenExpression(exp->function);
+    //FunctionType *fty = dynamic_cast<FunctionType*>(func.llvmTy());
 }
 
 CGValue IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)

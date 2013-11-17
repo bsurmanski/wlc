@@ -2,21 +2,94 @@
 #include <stdlib.h>
 #include "token.hpp"
 
+// higher precidence means stronger binding, 0 means no binding
+int getBinaryPrecidence(tok::TokenKind tkind)
+{
+    switch(tkind)
+    {
+        case tok::comma:
+            return 1;
+        case tok::equal:
+                return 2;
+        case tok::barbar:
+        case tok::kw_or:
+            return 3;
+        case tok::ampamp:
+        case tok::kw_and:
+                return 4;
+        case tok::bar:
+                return 5;
+        case tok::caret:
+                return 6;
+        case tok::amp:
+                return 7;
+        case tok::equalequal:
+                return 8;
+        case tok::less:
+        case tok::lessequal:
+        case tok::greater:
+        case tok::greaterequal:
+                return 9;
+        case tok::lessless:
+        case tok::greatergreater:
+                return 10;
+        case tok::plus:
+        case tok::minus:
+                return 11;
+        case tok::star:
+        case tok::slash:
+        case tok::percent:
+                return 12;
+        default:
+                return 0;
+    }
+}
+
+int getPostfixPrecidence(tok::TokenKind tkind)
+{
+    switch(tkind)
+    {
+        case tok::dot:
+        case tok::lparen:
+        case tok::lbracket:
+        case tok::plusplus:
+        case tok::minusminus:
+            return 13;
+        default:
+            return 0;
+    }
+}
+
+int getUnaryPrecidence(tok::TokenKind tkind)
+{
+    switch(tkind)
+    {
+        case tok::plusplus:
+        case tok::minusminus:
+        case tok::plus:
+        case tok::minus:
+        case tok::bang:
+        case tok::tilde:
+        case tok::caret:
+        case tok::amp:
+            return 12;
+        default:
+            return 0;
+    }
+}
+
 Token::Token(TokenKind k, std::string st) : kind(k) 
 { 
-    data = NULL;
     if(kind == tok::charstring || kind == tok::identifier)
-        data = new std::string(st); 
+        strData = new std::string(st); 
     if(kind == tok::intNum)
     {
-        data = new uint64_t;
-        *(uint64_t*)data = atol(st.c_str()); //XXX on 64 bit machines, we can simply store in pointer
+        iData = atol(st.c_str());
     }
     if(kind == tok::floatNum)
     {
-        data = new double; //XXX on 64 bit machines, we can simply store in pointer
-        *(double*)data = 0.0;
-        //*(double*)data = atod(st.c_str());
+        fData = 0.0;
+        //floatData = atod(st.c_str());
     }
 }
 
@@ -25,20 +98,12 @@ Token::Token(const Token &other)
     kind = other.kind;
     characters = other.characters;
     newline = other.newline;
-    data = other.data;
-    /* TODO: copy data
-    if(other.data && kind == tok::charstring || kind == tok::identifier)
-    {
-        std::string *str = ((std::string*) other.data);
-        data = new std::string(*str); 
-    }*/
+    if(other.is(tok::charstring) || other.is(tok::identifier)) strData = new std::string(*other.strData);
+    else iData = other.iData;
 }
 
 Token::~Token() 
 { 
-    //if(kind == tok::charstring || kind == tok::identifier) 
-    //    delete ((std::string*) data); 
-    //TODO: delete data
 }
 
 void Token::dump()
@@ -80,7 +145,7 @@ std::string Token::toString()
 {
     if(is(tok::identifier))
     {
-        return *stringData();
+        return stringData();
     }
     return getSpelling();
 }

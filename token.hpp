@@ -17,15 +17,27 @@ namespace tok
 
 using namespace tok;
 
+// higher precidence means stronger binding, 0 means no binding
+int getBinaryPrecidence(tok::TokenKind tkind);
+int getPostfixPrecidence(tok::TokenKind tkind);
+int getUnaryPrecidence(tok::TokenKind tkind);
+
 struct Token
 {
     TokenKind kind; 
     unsigned short characters;
     bool newline;
-    void *data;
 
-    Token() : kind(tok::none), data(NULL) {}
-    Token(TokenKind k) : kind(k), data(NULL) {}
+
+    union
+    {
+        std::string *strData; // no union with classes? WHY!!! C++!!!!!!!
+        uint64_t iData;
+        double fData;
+    };
+
+    Token() : kind(tok::none), iData(0) {}
+    Token(TokenKind k) : kind(k), iData(0) {}
     Token(TokenKind k, std::string st);
     Token(const Token &other);
     ~Token();
@@ -38,11 +50,12 @@ struct Token
     bool isUnaryOp() { return getUnaryPrecidence(); }
     bool followsNewline() { return newline; }
 
-    std::string *stringData() { if(kind == tok::charstring || kind == tok::identifier) return (std::string *) data; return NULL; }
-    //TODO: parse other datatypes as int
-    uint64_t intData() { if(kind == tok::intNum) { return *(uint64_t*) data; } return 0; } 
-    //TODO: parse other datatypes as float
-    double floatData() { if(kind == tok::floatNum) { return *(double*) data; } return 0.0; } 
+    std::string stringData() { if(kind == tok::charstring || kind == tok::identifier) return *strData; 
+        return ""; }
+    //TODO: parse other datatypes as int?
+    uint64_t intData() { if(kind == tok::intNum) { return iData; } return 0; } 
+    //TODO: parse other datatypes as float?
+    double floatData() { if(kind == tok::floatNum) { return fData; } return 0.0; } 
 
     void setLength(short toklen) { characters = toklen; }
     std::string getSpelling();
@@ -67,79 +80,10 @@ struct Token
         }
     }
 
-    // higher precidence means stronger binding, 0 means no binding
-    int getBinaryPrecidence()
-    {
-        switch(kind)
-        {
-            case tok::comma:
-                return 1;
-            case tok::barbar:
-            case tok::kw_or:
-                return 2;
-            case tok::ampamp:
-            case tok::kw_and:
-                    return 3;
-            case tok::bar:
-                    return 4;
-            case tok::caret:
-                    return 5;
-            case tok::amp:
-                    return 6;
-            case tok::equalequal:
-                    return 7;
-            case tok::less:
-            case tok::lessequal:
-            case tok::greater:
-            case tok::greaterequal:
-                    return 8;
-            case tok::lessless:
-            case tok::greatergreater:
-                    return 9;
-            case tok::plus:
-            case tok::minus:
-                    return 10;
-            case tok::star:
-            case tok::slash:
-            case tok::percent:
-                    return 11;
-            default:
-                    return 0;
-        }
-    }
 
-    int getPostfixPrecidence()
-    {
-        switch(kind)
-        {
-            case tok::dot:
-            case tok::lparen:
-            case tok::lbracket:
-            case tok::plusplus:
-            case tok::minusminus:
-                return 13;
-            default:
-                return 0;
-        }
-    }
-
-    int getUnaryPrecidence()
-    {
-        switch(kind)
-        {
-            case tok::plusplus:
-            case tok::minusminus:
-            case tok::plus:
-            case tok::minus:
-            case tok::bang:
-            case tok::tilde:
-            case tok::caret:
-            case tok::amp:
-                return 12;
-            default:
-                return 0;
-        }
-    }
+    int getBinaryPrecidence() { return ::getBinaryPrecidence((TokenKind) kind); }
+    int getPostfixPrecidence() { return ::getPostfixPrecidence((TokenKind) kind); }
+    int getUnaryPrecidence() { return ::getUnaryPrecidence((TokenKind) kind); }
 
     std::string toString();
 };

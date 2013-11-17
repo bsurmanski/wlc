@@ -12,6 +12,7 @@
 #include <queue>
 #include <vector>
 #include <map>
+#include <stack>
 
 // wait, this doesn't really do anything anymore. all the parsing in ParseContext
 class Parser
@@ -32,30 +33,40 @@ class ParseContext
     Lexer *lexer;
     Parser *parser;
     TranslationUnit *unit;
-    SymbolTable *scope;
+    std::stack<SymbolTable*> scope;
 
     public:
-    ParseContext(Lexer *lex, Parser *parse, TranslationUnit *un) : lexer(lex), parser(parse), unit(un), scope(new SymbolTable) {}
-    ~ParseContext() { delete scope; }
+    ParseContext(Lexer *lex, Parser *parse, TranslationUnit *un) : lexer(lex), parser(parse), unit(un){}
+    ~ParseContext() { }
 
     protected:
     std::queue<Token> tqueue;
 
-    void push() { tqueue.push(get()); }
-    Token pop() { Token t; if(!tqueue.empty()){ t = tqueue.front(); tqueue.pop();} else { t = get();} return t; }
-
     void ignoreComments() { while(lexer->peek().kind == tok::comment) lexer->ignore(); }
-    Token get() { ignoreComments(); return lexer->get(); }
+    void push() { tqueue.push(getBuffer()); }
+    Token get() { Token t; if(!tqueue.empty()){ t = tqueue.front(); tqueue.pop();} else { ignoreComments(); t = lexer->get();} return t; }
     Token linePeek() { Token t = peek(); if(!t.followsNewline()) return t; return Token(tok::semicolon); }
-    Token peek() { ignoreComments(); return lexer->peek(); }
-    void ignore() { ignoreComments(); lexer->ignore(); }
+    Token peek() { 
+        if(!tqueue.empty()) return tqueue.front();
+        ignoreComments();
+        return lexer->peek(); 
+    }
+    void ignore() { if(!tqueue.empty()) { tqueue.pop(); return; } ignoreComments(); lexer->ignore(); }
+
+    Token getBuffer() { ignoreComments(); return lexer->get(); }
+    Token peekBuffer() { ignoreComments(); return lexer->peek(); }
+    void ignoreBuffer() { ignoreComments(); lexer->ignore(); }
     //void unGet(Token tok) { lexer->unGet(tok); }
-    bool eof() { return lexer->eof(); }
+    bool eof() { return tqueue.empty() && lexer->eof(); }
+
+    void pushScope(SymbolTable* tbl) { scope.push(tbl); }
+    SymbolTable *popScope() { SymbolTable *tbl = scope.top(); scope.pop(); return tbl;}
+    SymbolTable *getScope() { if(!scope.empty()) return scope.top(); return NULL; }
 
     public:
     TranslationUnit *parseTranslationUnit(const char *unitnm);
     void parseTopLevel(TranslationUnit *unit);
-    ASTQualType parseType();
+    ASTType *parseType();
     ImportExpression *parseImport();
     Statement *parseDeclarationStatement();
     Statement *parseStatement();

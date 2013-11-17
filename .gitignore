@@ -2,3 +2,5 @@
 .DS_Store
 a.out
 .dSYM
+*.dSYM
+out

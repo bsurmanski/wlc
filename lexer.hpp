@@ -10,8 +10,9 @@ class Lexer
 {
     protected:
     Token current;
+    unsigned line;
 
-    Lexer(){}
+    Lexer() : line(1) {}
     virtual int peekChar() = 0;
     virtual void ignoreChar() = 0;
     virtual int getChar() = 0;

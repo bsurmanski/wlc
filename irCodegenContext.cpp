@@ -9,105 +9,148 @@ using namespace std;
 using namespace llvm;
 
 
-CGType IRCodegenContext::codegenType(ASTType *ty)
+llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 {
-    if(ASTBasicType *bty = dynamic_cast<ASTBasicType*>(ty))
+    if(!ty->cgType)
     {
-        Type *llvmty = NULL;
-        switch(bty->sz)
+        llvm::Type *llvmty = NULL;
+        switch(ty->type)
         {
-            case 1:
+            case TYPE_CHAR:
                 llvmty = Type::getInt8Ty(context);
                 break;
-            case 2:
+            case TYPE_SHORT:
                 llvmty = Type::getInt16Ty(context);
                 break;
-            case 4:
+            case TYPE_INT:
                 llvmty = Type::getInt32Ty(context);
                 break;
-            case 8:
+            case TYPE_LONG:
                 llvmty = Type::getInt64Ty(context);
                 break;
+            case TYPE_VOID:
+                llvmty = Type::getVoidTy(context);
+                break;
+            case TYPE_POINTER:
+                llvmty = codegenType(ty->getReferencedTy())->getPointerTo();
+                break;
         }
-        return CGType(ASTQualType(bty->identifier), llvmty);
+        ty->cgType = llvmty;
     }
 
-    if(ASTPointerType *pty = dynamic_cast<ASTPointerType*>(ty))
-    {
-        Type *llvmty = NULL; //XXX codegenType(pty->ptrTo)->getPointerTo();
-        return CGType(ASTQualType(NULL), llvmty); //XXX
-    }
+    return (llvm::Type *) ty->cgType;
 }
 
-CGType IRCodegenContext::codegenType(ASTQualType ty)
+llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 {
-    if(TypeDeclaration *tdcl = dynamic_cast<TypeDeclaration*>(ty.identifier->declaration))
+    if(!value->cgValue)
     {
-        return codegenType(tdcl->type);
+    
+        //TODO
     }
 
-    assert(false && "unimpl type");
-    //TODO: struct
+    return (llvm::Value *) value->cgValue;
 }
 
-CGValue IRCodegenContext::codegenExpression(Expression *exp)
+ASTValue *IRCodegenContext::loadValue(ASTValue *value)
 {
-    if(BlockExpression *bexp = dynamic_cast<BlockExpression*>(exp))
+    ASTValue *loaded = new ASTValue(value->type->getPointerTy(), builder.CreateLoad(codegenValue(value)));
+    return loaded;
+}
+
+ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
+{
+    ASTValue *stored = new ASTValue(dest->type->getPointerTy(), builder.CreateStore(codegenValue(val), codegenValue(dest)));
+    return stored;
+}
+
+ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
+{
+    if(BlockExpression *bexp = exp->blockExpression())
     {
         for(int i = 0; i < bexp->statements.size(); i++)
         {
             codegenStatement(bexp->statements[i]);
         }
     } 
-    else if(NumericExpression *nexp = dynamic_cast<NumericExpression*>(exp))
+    else if(NumericExpression *nexp = exp->numericExpression())
     {
         switch(nexp->type)
         {
             case NumericExpression::INT:
-                Value *llvmval = ConstantInt::get(Type::getInt32Ty(context), nexp->intValue);
-                //return CGValue(ASTQualType(), llvmval);//TODO
-                CGType ity = CGType(getScope()->lookup("int"), Type::getInt32Ty(context));
-                return CGValue(ity, llvmval);
-                //TODO: other types
+                llvm::Value *llvmval = ConstantInt::get(Type::getInt32Ty(context), nexp->intValue);
+                ASTType *ty = ASTType::getIntTy();
+                return new ASTValue(ty, llvmval); //TODO: assign
         }
+    } 
+    else if(StringExpression *sexp = exp->stringExpression())
+    {
+        //TODO: IRBuilder doesn't seem to do globals
+        return new ASTValue(ASTType::getCharTy()->getPointerTy(), builder.CreateGlobalStringPtr(sexp->string));
     }
-    else if(UnaryExpression *uexp = dynamic_cast<UnaryExpression *>(exp))
+    else if(UnaryExpression *uexp = exp->unaryExpression())
     {
         return codegenUnaryExpression(uexp); 
     }
-    else if(BinaryExpression *bexp = dynamic_cast<BinaryExpression*>(exp))
+    else if(BinaryExpression *bexp = exp->binaryExpression())
     {
         return codegenBinaryExpression(bexp);
-    } else if(CallExpression *cexp = dynamic_cast<CallExpression*>(exp))
+    } else if(CallExpression *cexp = exp->callExpression())
     {
         return codegenCallExpression(cexp);
+    } else if(IdentifierExpression *iexp = exp->identifierExpression())
+    {
+        ///XXX work around for forward declarations of variables in parent scopes
+        if(!iexp->identifier()->getDeclaration()) iexp->id = getScope()->lookup(iexp->id->name);
+        if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(iexp->identifier()->getDeclaration()))
+        {
+            //ASTValue *ptrvalue = iexp->identifier()->value; //TODO: load value?
+            return loadValue(iexp->identifier()->value);
+            
+        } else if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(iexp->identifier()->getDeclaration()))
+        {
+            Function *llvmfunc = module->getFunction(fdecl->getName());
+            return new ASTValue(NULL, llvmfunc); //TODO: proper function CGType (llvmfunc->getFunctionType())
+        }
     }
     //assert(false && "bad expression?");
-    return CGValue();
+    return NULL; //TODO
 }
 
-CGValue IRCodegenContext::codegenCallExpression(CallExpression *exp)
+ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
-    CGValue func = codegenExpression(exp->function);
-    //FunctionType *fty = dynamic_cast<FunctionType*>(func.llvmTy());
+    ASTValue *func = codegenExpression(exp->function);
+    //assert(!func.llvmTy()->isFunctionTy() && "not callable!");
+    //FunctionType *fty = (FunctionType*) func.llvmTy();
+    //TODO: once proper type passing is done, check if callable above
+    vector<ASTValue*> cargs;
+    vector<Value*> llargs;
+    for(int i = 0; i < exp->args.size(); i++)
+    {
+        cargs.push_back(codegenExpression(exp->args[i]));
+        llargs.push_back(codegenValue(cargs[i]));
+    }
+    llvm::Value *value = builder.CreateCall(codegenValue(func), llargs);
+    return NULL; //TODO
 }
 
-CGValue IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
+ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
 {
-    CGValue lhs = codegenExpression(exp->lhs);
+    ASTValue *lhs = codegenExpression(exp->lhs);
 
     switch(exp->op)
     {
 
     }
+    return NULL;
 }
 
-void IRCodegenContext::codegenResolveBinaryTypes(CGValue &v1, CGValue &v2, unsigned op)
+void IRCodegenContext::codegenResolveBinaryTypes(ASTValue &v1, ASTValue &v2, unsigned op)
 {
-    //if(ASTBasicType *bty1 = dynamic_cast v1.qual
-    if(ASTBasicType *bty1 = dynamic_cast<ASTBasicType*>(v1.qualTy().getBaseType()))
+    /*
+    if(ASTBasicType *bty1 = dynamic_cast<ASTBasicType*>(v1.qualTy()))
     {
-        ASTBasicType *bty2 = dynamic_cast<ASTBasicType*>(v2.qualTy().getBaseType());
+        ASTBasicType *bty2 = dynamic_cast<ASTBasicType*>(v2.qualTy());
         if(bty1->size() > bty2->size())
         {
             v2.type = v1.type;
@@ -118,15 +161,34 @@ void IRCodegenContext::codegenResolveBinaryTypes(CGValue &v1, CGValue &v2, unsig
             v1.value = builder.CreateSExt(v1.value, v2.llvmTy());
         }
     }
+    */
+    //TODO: fix for ASTValue
 }
 
-CGValue IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
+ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 {
-    CGValue lhs = codegenExpression(exp->lhs);
-    CGValue rhs = codegenExpression(exp->rhs);
+    //TODO: bit messy
+    if(exp->op == tok::equal)
+    {
+        ASTValue *ret = NULL;
+        ASTValue *rhs = codegenExpression(exp->rhs);
+        if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->lhs))
+        {
+            storeValue(iexp->identifier()->value, rhs);
+        } else assert(false && "LHS must be LValue");
+
+        return ret;
+    }
+
+    ASTValue *lhs = codegenExpression(exp->lhs);
+    ASTValue *rhs = codegenExpression(exp->rhs);
     llvm::Value *val;
 
-    codegenResolveBinaryTypes(lhs, rhs, exp->op);
+    Value *lhs_val = codegenValue(lhs);
+    Value *rhs_val = codegenValue(rhs);
+
+    //codegenResolveBinaryTypes(lhs, rhs, exp->op);
+    //TODO: resolve types
 
     switch(exp->op)
     {
@@ -147,36 +209,34 @@ CGValue IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
             //TODO: all of these
 
         case tok::plus: 
-            val = builder.CreateAdd(lhs.value, rhs.value);
-            return CGValue(lhs.type, val); //TODO: proper typing (for all below too)
+            val = builder.CreateAdd(lhs_val, rhs_val);
+            return new ASTValue(lhs->type, val); //TODO: proper typing (for all below too)
 
         case tok::minus:
-            val = builder.CreateSub(lhs.value, rhs.value);
-            return CGValue(lhs.type, val);
+            val = builder.CreateSub(lhs_val, rhs_val);
+            return new ASTValue(lhs->type, val);
 
         case tok::star:
-            val = builder.CreateMul(lhs.value, rhs.value);
-            return CGValue(lhs.type, val);
+            val = builder.CreateMul(lhs_val, rhs_val);
+            return new ASTValue(lhs->type, val);
 
         case tok::slash:
-            val = builder.CreateUDiv(lhs.value, rhs.value); //TODO: typed div
-            return CGValue(lhs.type, val);
+            val = builder.CreateUDiv(lhs_val, rhs_val); //TODO: typed div
+            return new ASTValue(lhs->type, val);
 
         case tok::percent:
-            val = builder.CreateURem(lhs.value, rhs.value);
-            return CGValue(lhs.type, val);
-
-
+            val = builder.CreateURem(lhs_val, rhs_val);
+            return new ASTValue(lhs->type, val);
 
         default:
-            return CGValue(); //XXX: null val
+            return NULL; //XXX: null val
     }
 }
 
 void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
 {
-    CGValue value = codegenExpression(exp->expression);
-    builder.CreateRet(value.value);
+    ASTValue *value = codegenExpression(exp->expression);
+    builder.CreateRet(codegenValue(value));
     //return value;
 }
 
@@ -196,14 +256,14 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
 
 FunctionType *IRCodegenContext::codegenFunctionPrototype(FunctionPrototype *proto)
 {
-    CGType rty = codegenType(proto->returnType);
+    ASTType *rty = proto->returnType;
     vector<Type*> params;
     for(int i = 0; i < proto->parameters.size(); i++)
     {
-        params.push_back(codegenType(proto->parameters[i].first).type);
+        params.push_back(codegenType(proto->parameters[i].first));
     }
 
-    FunctionType *fty = FunctionType::get(rty.type, params, false); // XXX return, args, varargs 
+    FunctionType *fty = FunctionType::get(codegenType(rty), params, proto->vararg); // XXX return, args, varargs 
     return fty;
 }
 
@@ -211,23 +271,33 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 {
     if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(decl))
     {
-        FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
-        Function *func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
+        //FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
+        //Function *func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
+        Function *func = module->getFunction(fdecl->getName());
         if(fdecl->body)
         {
             BasicBlock *BB = BasicBlock::Create(context, "entry", func);
             builder.SetInsertPoint(BB);
             codegenStatement(fdecl->body);
 
-            if(fty->getReturnType() == Type::getVoidTy(context))
+            if(func->getReturnType() == Type::getVoidTy(context))
             {
                 builder.CreateRetVoid();
             }
         }
     } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl))
     {
-        CGType vty = codegenType(vdecl->qualType);
-        builder.CreateAlloca(vty.type, 0, vdecl->getName());
+        ASTType *vty = vdecl->type;
+        Value *llvmDecl = builder.CreateAlloca(codegenType(vty), 0, vdecl->getName());
+        
+        if(vdecl->value)
+        {
+            ASTValue *defaultValue = codegenExpression(vdecl->value);
+            builder.CreateStore(codegenValue(defaultValue), llvmDecl);
+            ASTValue *idValue = new ASTValue(vty, llvmDecl); //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
+            vdecl->identifier->value = idValue;
+            //TODO: maybe create a LValue field in CGValue?
+        }
     }
 }
 
@@ -235,10 +305,47 @@ Module *IRCodegenContext::codegenTranslationUnit(TranslationUnit *unit)
 {
     pushScope(unit->scope);
     module = new Module(unit->getName(), context);
-    for(int i = 0; i < unit->statements.size(); i++)
+
+
+    for(int i = 0; i < unit->imports.size(); i++) //TODO: import symbols. XXX what about recursive dependancies?
+    {}
+
+    for(int i = 0; i < unit->types.size(); i++) //XXX what about recursive types?
+    {}
+
+    // alloc globals before codegen'ing functions
+    for(int i = 0; i < unit->globals.size(); i++)
     {
-        codegenStatement(unit->statements[i]);
+        Identifier *id = unit->globals[i]->identifier; 
+        if(id->isVariable()) 
+        {
+            ASTType *idTy = id->getType();
+            //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
+            GlobalVariable *llvmval = new GlobalVariable(*module, 
+                    codegenType(idTy), 
+                    false,
+                    GlobalVariable::CommonLinkage,
+                    (llvm::Constant*) (unit->globals[i]->value ? codegenValue(codegenExpression(unit->globals[i]->value)) : 0),
+                    id->getName()); //TODO: proper global insertion
+            id->value = new ASTValue(idTy->getPointerTy(), llvmval);
+        } else if(id->isFunction())
+        {
+            //TODO: declare func 
+        }
     }
+
+    // declare functions prototypes
+    for(int i = 0; i < unit->functions.size(); i++)
+    {
+        FunctionDeclaration *fdecl = unit->functions[i];
+        FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
+        Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
+    }
+
+    // codegen function bodys
+    for(int i = 0; i < unit->functions.size(); i++)
+        codegenDeclaration(unit->functions[i]);
+
     module->dump();
     popScope();
     return module;

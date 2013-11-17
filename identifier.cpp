@@ -11,17 +11,16 @@ void Identifier::setDeclaration(Declaration *decl, IDType ty)
 
 ASTType *Identifier::getType()
 {
+    if(VariableDeclaration *vdcl = dynamic_cast<VariableDeclaration*>(declaration))
+    {
+        return vdcl->type;
+    }
+}
+
+ASTType *Identifier::declaredType()
+{
     if(TypeDeclaration *tdcl = dynamic_cast<TypeDeclaration*>(declaration))
     {
         return tdcl->type;
     }
-}
-
-ASTBasicType *Identifier::getBasicType() 
-{ 
-    if(ASTType *ty = getType())
-    {
-        return dynamic_cast<ASTBasicType *>(ty);
-    }
-    return NULL;
 }

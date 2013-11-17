@@ -16,49 +16,48 @@
 using namespace llvm;
 using namespace std;
 
-ASTQualType ParseContext::parseType()
+ASTType *ParseContext::parseType()
 {
+    ASTType *type = NULL;
     bool ptr = false;
-    while(peek().is(tok::caret)) { ptr = true; ignore(); }
     Token t = get();
     assert(t.is(tok::identifier) || t.isKeywordType());
-    Identifier *id = scope->lookup(t.toString());
-    /*
-    static ASTBasicType intTy(4);
-    static ASTBasicType charTy(1);
-    static ASTPointerType charPTy(&charTy);
-
-    bool ptr = false;
-
-
-    if(ptr && peek().is(tok::kw_char))
+    if(t.isKeywordType())
     {
-        ignore();
-        return &charPTy;
-    } else if(peek().is(tok::kw_char))
-    {
-        ignore();
-        return &charTy;
-    } else if(peek().is(tok::kw_int))
-    {
-        ignore();
-        return &intTy;
+       switch(t.kind)
+       {
+        case tok::kw_int:
+            type = ASTType::getIntTy(); break;
+        case tok::kw_char:
+            type = ASTType::getCharTy(); break;
+        case tok::kw_void:
+            type = ASTType::getVoidTy(); break;
+        default:
+            assert(false && "I haven't done this one yet...");
+       }
+    } else {
+        Identifier *id = getScope()->lookup(t.toString());
+        //TODO: do something with id...
     }
-    */
+    while(peek().is(tok::caret)) 
+    {
+        ignore();
+        type = type->getPointerTy();
+    }
 
-    //TODO: pointers again
-    return ASTQualType(id);
-
-    //assert(false && "unhandled type");
+    return type;
 }
 
 TranslationUnit *ParseContext::parseTranslationUnit(const char *unitnm)
 {
     TranslationUnit *unit = new TranslationUnit(NULL); //TODO: identifier
+    pushScope(unit->scope); //TODO: scope stack
     while(peek().isNot(tok::eof))
     {
         parseTopLevel(unit); // modifies t-unit
     }
+    popScope();
+    assert(!getScope() && "somethings up with scope!");
     return unit;
 }
 
@@ -66,11 +65,13 @@ TranslationUnit *ParseContext::parseTranslationUnit(const char *unitnm)
 void ParseContext::parseTopLevel(TranslationUnit *unit)
 {
     Statement *stmt;
+    Declaration *decl;
     switch(peek().kind)
     {
         case tok::kw_import:
             //TODO: add to symbol table
-            parseImport(); //TODO: find and import new translation unit
+            //TODO: find and import new translation unit
+            unit->imports.push_back(parseImport());
             break;
 
         case tok::semicolon:
@@ -78,8 +79,21 @@ void ParseContext::parseTopLevel(TranslationUnit *unit)
             break;
 
         default:
-            stmt = parseDeclarationStatement();
-            unit->statements.push_back(stmt);
+            //stmt = parseDeclarationStatement();
+            decl = parseDeclaration();
+            if(dynamic_cast<TypeDeclaration*>(decl))
+            {
+                unit->types.push_back((TypeDeclaration*) decl);
+            } else if(dynamic_cast<VariableDeclaration*>(decl))
+            {
+                unit->globals.push_back((VariableDeclaration*) decl);
+            } else if(dynamic_cast<FunctionDeclaration*>(decl))
+            {
+                unit->functions.push_back((FunctionDeclaration*) decl);
+            } else
+            {
+                assert(false && "what sort of global statement did i just parse?");
+            }
     }
 }
 
@@ -116,23 +130,28 @@ Statement *ParseContext::parseStatement()
 {
     switch(peek().kind)
     {
-        case tok::lbrace: // TODO: lbrace as statement instead of expression?
-        case tok::kw_if:
-        case tok::kw_while:
-        case tok::kw_for:
-        case tok::kw_switch:
-        case tok::identifier:
-        case tok::intNum:
-        case tok::floatNum:
-        case tok::charstring:
-            return new ExpressionStatement(parseExpression());
-
         case tok::kw_int:
         case tok::kw_char:
         case tok::kw_short:
         case tok::kw_float:
         case tok::kw_double:
-            return parseDeclarationStatement();
+                return parseDeclarationStatement();
+
+        case tok::identifier:
+            push();
+            if(peekBuffer().is(tok::identifier) || peekBuffer().is(tok::caret))
+                return parseDeclarationStatement();
+            goto PARSEEXP;
+        case tok::lbrace: // TODO: lbrace as statement instead of expression?
+        case tok::kw_if:
+        case tok::kw_while:
+        case tok::kw_for:
+        case tok::kw_switch:
+        case tok::intNum:
+        case tok::floatNum:
+        case tok::charstring:
+PARSEEXP:
+            return new ExpressionStatement(parseExpression());
 
         case tok::kw_return:
             ignore();
@@ -151,49 +170,67 @@ Declaration *ParseContext::parseDeclaration()
 {
     //TODO: parse function decl specs
 
-    ASTQualType type = parseType();
+    ASTType *type = parseType();
 
     Token t_id = get();
     assert(t_id.is(tok::identifier));
-    assert(!scope->contains(t_id.toString()) && "redeclaration!");
-    Identifier *id = scope->get(t_id.toString());
+    assert(!getScope()->contains(t_id.toString()) && "redeclaration!");
+    Identifier *id = getScope()->get(t_id.toString());
 
     //TODO parse decl specs
 
 
     if(peek().is(tok::lparen)) // function decl
     {
-        vector<pair<ASTQualType, std::string> > args;
+        vector<pair<ASTType*, std::string> > args;
         ignore(); // lparen 
+        bool vararg = false;
         while(!peek().is(tok::rparen))
         {
             //Token at_type = get();
-            ASTQualType aty = parseType();
+            if(peek().is(tok::dotdotdot))
+            {
+                vararg = true;
+                ignore();
+                assert(peek().is(tok::rparen) && "expected )");
+                break;
+            }
+
+            ASTType *aty = parseType();
             Token t_name = get();
-            args.push_back(pair<ASTQualType, std::string>(aty, t_name.toString()));
+            args.push_back(pair<ASTType*, std::string>(aty, t_name.toString()));
             if(peek().is(tok::comma))
             {
                 ignore();
                 continue;
+            } else
+            {
+                assert(peek().is(tok::rparen) && "expected , or )");
             }
         }
         ignore(); //rparen
-        Statement *stmt = parseStatement();
 
-        FunctionPrototype *proto = new FunctionPrototype(type, args);
-        Declaration *decl = new FunctionDeclaration(id, proto, stmt); //TODO: prototype, name
+        SymbolTable *funcScope = new SymbolTable(getScope());
+        pushScope(funcScope);
+        Statement *stmt = parseStatement();
+        popScope();
+
+        FunctionPrototype *proto = new FunctionPrototype(type, args, vararg);
+        Declaration *decl = new FunctionDeclaration(id, proto, funcScope, stmt);
         id->setDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;
     }
 
-    Declaration *decl = new VariableDeclaration(type, id);
-    id->setDeclaration(decl, Identifier::ID_VARIABLE);
 
+    Expression *defaultValue = NULL;
     if(peek().is(tok::equal))
     {
-        Expression *defaultValue = parseExpression();
-        //TODO: default value
+        ignore(); // ignore =
+        defaultValue = parseExpression();
     }
+
+    Declaration *decl = new VariableDeclaration(type, id, defaultValue);
+    id->setDeclaration(decl, Identifier::ID_VARIABLE);
 
     //TODO: comma, multiple decl
     return decl;
@@ -207,7 +244,7 @@ Expression *ParseContext::parseExpression(int prec)
 Expression *ParseContext::parsePostfixExpression(int prec)
 {
     Expression *exp = parsePrimaryExpression();
-    if(peek().getPostfixPrecidence())
+    if((peek().getPostfixPrecidence()) > prec)
     {
         if(peek().is(tok::dot)) // member
         {
@@ -218,7 +255,9 @@ Expression *ParseContext::parsePostfixExpression(int prec)
             vector<Expression*> args;
             while(peek().isNot(tok::rparen))
             {
-                args.push_back(parseExpression(tok::comma)); 
+                args.push_back(parseExpression(getBinaryPrecidence(tok::comma))); 
+                assert(peek().is(tok::comma) || peek().is(tok::rparen) && "expected , or )");
+                if(peek().is(tok::comma)) ignore(); // ignore comma or rparen
             }
             ignore(); // ignore rparen
             return new CallExpression(exp, args);
@@ -237,14 +276,14 @@ Expression *ParseContext::parseUnaryExpression(int prec)
 {
     int op;
     int opPrec;
-    if((opPrec = peek().getUnaryPrecidence()))
+    if((opPrec = peek().getUnaryPrecidence()) > prec)
     {
 
         op = get().kind;
         return new UnaryExpression(op, parsePostfixExpression(opPrec));
     }
 
-    return parsePostfixExpression();
+    return parsePostfixExpression(prec);
 }
 
 Expression *ParseContext::parsePrimaryExpression()
@@ -290,13 +329,13 @@ Expression *ParseContext::parsePrimaryExpression()
 
     if(peek().is(tok::identifier))
     {
-        return new IdentifierExpression(scope->get(get().toString()));
+        return new IdentifierExpression(getScope()->get(get().toString()));
     }
 }
 
 Expression *ParseContext::parseBinaryExpression(int prec)
 {
-    Expression *lhs = parseUnaryExpression();
+    Expression *lhs = parseUnaryExpression(prec);
 
     int op;
     int opPrec;
@@ -308,6 +347,7 @@ Expression *ParseContext::parseBinaryExpression(int prec)
         assert(rhs && "invalid binary op, expected RHS");
         lhs = new BinaryExpression(op, lhs, rhs); 
     }
+    assert(lhs && "somethings up");
 
     return lhs;
 }

@@ -67,7 +67,7 @@ Token Lexer::lexPunct()
             break;
         case '/':
             ignoreChar();
-            IFCONSUMEBREAK('/', kind = tok::slashslash);
+            IFCONSUMEBREAK('/', kind = tok::comment; while(peekChar() != '\n') ignoreChar(); );
             kind = tok::slash;
             break;
         case '=':
@@ -259,7 +259,11 @@ Token Lexer::lex()
     char c;
     while(isspace(c = peekChar()))
     {
-        if(c == '\n') ws = true;
+        if(c == '\n')
+        {
+            ws = true;
+            line++;
+        }
         ignoreChar();
     }
 

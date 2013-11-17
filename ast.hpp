@@ -16,6 +16,10 @@ struct DeclarationExpression;
 struct TranslationUnit;
 struct ASTType;
 struct Identifier;
+struct VariableDeclaration;
+struct FunctionDeclaration;
+struct ImportExpression;
+struct TypeDeclaration;
 
 //TODO: use
 struct Package
@@ -31,7 +35,10 @@ struct TranslationUnit
 {
     SymbolTable *scope;
     Identifier *identifier;
-    std::vector<Statement*> statements;
+    std::vector<ImportExpression*> imports; //TODO: aliased imports?
+    std::vector<TypeDeclaration*> types;
+    std::vector<VariableDeclaration*> globals;
+    std::vector<FunctionDeclaration*> functions;
     TranslationUnit(Identifier *id) : identifier(id), scope(new SymbolTable) {}
     ~TranslationUnit() { delete scope; }
     std::string getName() { return ""; }
@@ -43,52 +50,68 @@ struct AST
     std::map<std::string, TranslationUnit*> units;
 };
 
-//XXX ?
-struct ASTValue
-{
-    ASTType *type;
-    ASTValue(ASTType *ty) : type(ty) {}
-    virtual ~ASTValue(){}
-};
-
 struct FunctionDeclaration;
-
-struct ASTString : public ASTValue
-{
-    std::string value;
-    ASTString(std::string str) : ASTValue(NULL), value(str) {} //TODO astvalue (string)
-};
 
 struct ASTTypeQual
 {
     bool isConst;
-    ASTTypeQual() : isConst(false) {}
-};
-
-struct ASTQualType
-{
-    bool isConst;
     bool isExtern;
     bool isStatic;
-    Identifier *identifier;
-    ASTQualType(Identifier *id = NULL) : identifier(id){}
-    ASTQualType(const ASTQualType &qt) :   isConst(qt.isConst), 
-                                    isExtern(qt.isExtern),
-                                    isStatic(qt.isStatic),
-                                    identifier(qt.identifier) {}
-    ASTType *getBaseType()
-    {
-        return identifier->getType();
-    }
+    ASTTypeQual() : isConst(false), isExtern(false), isStatic(false) {}
+    ASTTypeQual(bool c, bool e, bool s) : isConst(c), isExtern(e), isStatic(s) {}
 };
 
+struct ASTConcreteType;
 struct ASTPointerType;
+
+enum ASTTypeEnum
+{
+    TYPE_VOID,
+    TYPE_CLASS,
+    TYPE_FUNCTION,
+    TYPE_POINTER,
+    TYPE_CHAR,
+    TYPE_SHORT,
+    TYPE_INT,
+    TYPE_LONG,
+};
 struct ASTType
 {
+    // XXX pointerTy leaks when used as pass by value TODO: pass by reference only
+    unsigned char type;
+    ASTTypeQual qual;
+    ASTType *unqual;
     ASTPointerType *pointerTy;
+    void *cgType;
 
-    ASTType() {}
-    virtual size_t size() const = 0;
+    union DOSTUFF
+    {
+        void *pointerInfo;
+        void *arrayInfo;
+        void *functionInfo;
+    };
+
+    ASTType(enum ASTTypeEnum ty) : type(ty), unqual(0), pointerTy(0), cgType(0)
+    {}
+
+    ASTType() : qual(), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
+    //ASTType(ASTTypeQual q) : qual(q), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
+    //virtual ~ASTType() { delete pointerTy; }
+    ASTPointerType *getPointerTy();
+    ASTType *getUnqual();
+    virtual ASTPointerType *asPointerTy() { return NULL;}
+    virtual ASTConcreteType *asConcreteTy() { return NULL;}
+    virtual ASTType *getReferencedTy() { return NULL; }
+    bool isPointerTy() { return false; }
+    virtual size_t size() const { return 0; };
+
+    static ASTType *voidTy;
+    static ASTType *intTy;
+    static ASTType *charTy;
+
+    static ASTType *getVoidTy();
+    static ASTType *getIntTy();
+    static ASTType *getCharTy();
 };
 
 /*
@@ -98,31 +121,26 @@ struct ASTConcreteType : public ASTType
 {
     Identifier *identifier;
     ASTConcreteType(Identifier *id) : identifier(id) {}
+    virtual ASTConcreteType *asConcreteTy() { return this; }
 };
 
 struct ASTPointerType : public ASTType
 {
     ASTType *ptrTo;
-    ASTPointerType(ASTType *ty) : ptrTo(ty) { if(!ty->pointerTy) ty->pointerTy = this; }
+    ASTPointerType(ASTType *ty) : ASTType(TYPE_POINTER), ptrTo(ty) { if(!ty->pointerTy) ty->pointerTy = this; }
+    virtual ASTType *getReferencedTy() { return ptrTo; }
     virtual size_t size() const { return sizeof(void*); }
+    virtual ASTPointerType *asPointerTy() { return this; }
 };
 
-struct ASTTypeSpec
+struct ASTValue
 {
-    bool isSigned;
-    ASTTypeSpec() : isSigned(false) {}
-    ASTTypeSpec(bool defaultSigned) : isSigned(defaultSigned) {}
+    ASTType *type;
+    void *cgValue;
+    ASTValue(ASTType *ty, void *cgv = NULL) : type(ty), cgValue(cgv) {}
 };
 
-struct ASTBasicType : public ASTConcreteType
-{
-    size_t sz;
-    ASTTypeSpec typeSpec;
-
-    virtual size_t size() const { return sz; }
-    ASTBasicType(Identifier *id, size_t s, bool defaultSigned = false) : ASTConcreteType(id), sz(s), typeSpec(defaultSigned) {}
-};
-
+/*
 struct ASTStructType : public ASTConcreteType
 {
     std::vector<std::pair<ASTType*, std::string> > members;
@@ -135,7 +153,7 @@ struct ASTStructType : public ASTConcreteType
         }
     }
     ASTStructType(Identifier *id) : ASTConcreteType(id) {}
-}; 
+}; */
 
 /***
  *
@@ -153,23 +171,26 @@ struct Declaration
 
 struct FunctionPrototype 
 {
-    ASTQualType returnType;
-    std::vector<std::pair<ASTQualType, std::string> > parameters;
-    FunctionPrototype(ASTQualType rty, std::vector<std::pair<ASTQualType, std::string> > param) : returnType(rty), parameters(param) {}
+    ASTType *returnType;
+    std::vector<std::pair<ASTType*, std::string> > parameters;
+    bool vararg;
+    FunctionPrototype(ASTType *rty, std::vector<std::pair<ASTType*, std::string> > param, bool varg = false) : returnType(rty), parameters(param), vararg(varg) {}
 };
 
 struct FunctionDeclaration : public Declaration
 {
     FunctionPrototype *prototype;
+    SymbolTable *scope; 
     Statement *body;
-    FunctionDeclaration(Identifier *id, FunctionPrototype *p, Statement *st) : Declaration(id), prototype(p), body(st) {}
+    FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st) : Declaration(id), prototype(p), scope(sc), body(st) {}
 };
 
 struct VariableDeclaration : public Declaration
 {
     //Identifier *type;
-    ASTQualType qualType;
-    VariableDeclaration(ASTQualType ty, Identifier *nm) : Declaration(nm), qualType(ty) {}
+    ASTType *type;
+    Expression *value; // initial value
+    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val) : Declaration(nm), type(ty), value(val) {}
 };
 
 struct TypeDeclaration : public Declaration
@@ -184,8 +205,28 @@ struct TypeDeclaration : public Declaration
  *
  ***/
 
+struct UnaryExpression; 
+struct BinaryExpression; 
+struct PrimaryExpression; 
+struct CallExpression; 
+struct PostfixExpression; 
+struct IndexExpression; 
+struct MemberExpression; 
+struct IdentifierExpression; 
+struct NumericExpression; 
+struct StringExpression; 
+struct DeclarationExpression; 
+struct BlockExpression; 
+struct IfExpression; 
+struct WhileExpression; 
+struct ForExpression; 
+struct PassExpression; 
+struct SwitchExpression; 
+struct ImportExpression; 
+
 struct Expression
 {
+    /*
     enum ExpressionType
     {
         EXP_UNARY,
@@ -206,6 +247,7 @@ struct Expression
         EXP_SWITCH,
         EXP_IMPORT,
     };
+    */
     Expression() {}
     virtual UnaryExpression *unaryExpression() { return NULL; }
     virtual BinaryExpression *binaryExpression() { return NULL; }
@@ -216,6 +258,7 @@ struct Expression
     virtual MemberExpression *memberExpression() { return NULL; }
     virtual IdentifierExpression *identifierExpression() { return NULL; }
     virtual NumericExpression *numericExpression() { return NULL; }
+    virtual StringExpression *stringExpression() { return NULL; }
     virtual DeclarationExpression *declarationExpression() { return NULL; }
     virtual BlockExpression *blockExpression() { return NULL; }
     virtual IfExpression *ifExpression() { return NULL; }
@@ -277,13 +320,18 @@ struct IdentifierExpression : public PrimaryExpression
 {
     Identifier *id;
     IdentifierExpression(Identifier *i) : id(i) {}
-    Identifier *identfier() { return id; }
+    Identifier *identifier() { return id; }
+    std::string getName() { return id->getName(); }
+    virtual IdentifierExpression *identifierExpression() { return this; }
 };
+
+//struct TypeExpression : public Expression
 
 struct StringExpression : public PrimaryExpression
 {
-    std::string *string;
-    StringExpression(std::string *str) : string(new std::string(*str)) {}
+    std::string string;
+    StringExpression(std::string str) : string(str) {}
+    virtual StringExpression *stringExpression() { return this; }
 };
 
 struct NumericExpression : public PrimaryExpression
@@ -307,11 +355,13 @@ struct NumericExpression : public PrimaryExpression
 
     NumericExpression(NumericType t, double val) : type(t), floatValue(val) {}
     NumericExpression(NumericType t, uint64_t val) : type(t), intValue(val) {}
+    virtual NumericExpression *numericExpression() { return this; }
 };
 
 struct DeclarationExpression : public Expression
 {
     Declaration *decl; 
+    virtual DeclarationExpression *declarationExpression() { return this; }
 };
 
 struct Statement;
@@ -322,6 +372,7 @@ struct BlockExpression : public Expression
     //TODO: sym table
     std::vector<Statement*> statements;
     BlockExpression(std::vector<Statement*> s) : statements(s) {}
+    virtual BlockExpression *blockExpression() { return this; }
 };
 
 // value of following expression, or (bool) 1 if not found
@@ -332,6 +383,7 @@ struct IfExpression : public Expression
     Expression *condition;
     Expression *body;
     Expression *elsebranch;
+    virtual IfExpression *ifExpression() { return this; }
 };
 
 // value same as if
@@ -339,6 +391,7 @@ struct WhileExpression : public Expression
 {
     Expression *condition;
     Expression *body;
+    virtual WhileExpression *whileExpression() { return this; }
 };
 
 struct ForExpression : public Expression
@@ -347,16 +400,19 @@ struct ForExpression : public Expression
     Expression *cond;
     Expression *update;
     Expression *body;
+    virtual ForExpression *forExpression() { return this; }
 };
 
 struct SwitchExpression : public Expression
 {
     //TODO
+    virtual SwitchExpression *switchExpression() { return this; }
 };
 
 struct ImportExpression : public Expression
 {
     TranslationUnit *import;
+    virtual ImportExpression *importExpression() { return this; }
 };
 
 

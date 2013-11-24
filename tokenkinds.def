@@ -65,18 +65,20 @@ KEYWORD(union)
 KEYWORD(void)
 KEYWORD(true)
 KEYWORD(false)
+KEYWORD(null)
 KEYWORD(and)
 KEYWORD(or)
 KEYWORD(while)
 KEYWORD(switch)
 KEYWORD(pass)
 KEYWORD(import)
+KEYWORD(package) /* declare package like Java, (package com.mysite.mypackage) */
 
 // reserved words. hopefully will get around to implementing these
+RESERVE(class)
 RESERVE(asm) /* inline asm */
 RESERVE(once) /* declare that statement only happens once, ever. when first encountered  */
 RESERVE(var) /* statically checked automatic type variable var myvar = new MyStruct() */
-RESERVE(package) /* declare package like Java, (package com.mysite.mypackage) */
 RESERVE(number) /* for variable precission numbers */
 RESERVE(let) /* like D alias, and for constants (let a = 7) */
 RESERVE(implicit) /* for implicit conversions, apply to function */

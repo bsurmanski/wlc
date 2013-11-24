@@ -71,6 +71,8 @@ class ParseContext
     Statement *parseDeclarationStatement();
     Statement *parseStatement();
     Declaration *parseDeclaration();
+    Expression *parseIfExpression();
+    Expression *parseWhileExpression();
     Expression *parseExpression(int prec = 0);
     Expression *parsePrimaryExpression();
     Expression *parsePostfixExpression(int prec = 0);

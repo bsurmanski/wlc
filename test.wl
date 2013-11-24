@@ -1,25 +1,37 @@
+package test
+
 import test2
 import thing.module
 
 int printf(char^ str, ...);
+long malloc(long sz);
 
-//char^ myString = "test1"
+char^ myString = "test1"
 
-int b = 10
+long iiii = 1
 
+struct mystruct
+{
+    int i
+    int j
+}
 
 int main()
 {
-    int a = 5 + b
-    a = a + 5
-    myfunc()
+    char^ mystr = "this is a string!"
+    myfunc(50, mystr)
     return 0
 }
 
-void myfunc()
+void myfunc(int i, char^ somestr)
 {
-    int a = 64
-    printf("Hello World! %d\n", a)
+    long sz = 8
+    while(sz > 5)
+    {
+        printf("Hello World! %d %s\n", sz, somestr)
+        sz = sz - 1
+        if(sz == 6) return
+    }
 }
 
 //char thangyglobal;

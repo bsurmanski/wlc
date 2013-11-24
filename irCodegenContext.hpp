@@ -37,6 +37,7 @@ class IRCodegenContext : public CodegenContext
     llvm::LLVMContext &context;
     llvm::IRBuilder<> builder;
     llvm::Module *module;
+    llvm::BasicBlock *breakLabel;
 
     IRCodegenContext() : context(llvm::getGlobalContext()), builder(context), module(NULL) {}
 
@@ -55,10 +56,14 @@ class IRCodegenContext : public CodegenContext
     ASTValue *storeValue(ASTValue *dest, ASTValue *val);
 
     ASTValue *codegenExpression(Expression *exp);
+    ASTValue *codegenIfExpression(IfExpression *exp);
+    ASTValue *codegenWhileExpression(WhileExpression *exp);
     ASTValue *codegenCallExpression(CallExpression *exp);
-    ASTValue *codegenBinaryExpression(BinaryExpression *exp);
-    void codegenResolveBinaryTypes(ASTValue &v1, ASTValue &v2, unsigned op);
+    ASTValue *codegenPostfixExpression(PostfixExpression *exp);
     ASTValue *codegenUnaryExpression(UnaryExpression *exp);
+    ASTValue *codegenBinaryExpression(BinaryExpression *exp);
+    void promoteType(ASTValue *val, ASTType *type);
+    void codegenResolveBinaryTypes(ASTValue *v1, ASTValue *v2, unsigned op);
     void codegenReturnStatement(ReturnStatement *exp);
     void codegenStatement(Statement *stmt);
     llvm::FunctionType *codegenFunctionPrototype(FunctionPrototype *proto);

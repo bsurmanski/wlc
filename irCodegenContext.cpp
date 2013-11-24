@@ -4,6 +4,7 @@
 #include "irCodegenContext.hpp"
 
 #include <iostream>
+#include <stdio.h>
 
 using namespace std;
 using namespace llvm;
@@ -16,6 +17,9 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
         llvm::Type *llvmty = NULL;
         switch(ty->type)
         {
+            case TYPE_BOOL:
+                llvmty = Type::getInt1Ty(context);
+                break;
             case TYPE_CHAR:
                 llvmty = Type::getInt8Ty(context);
                 break;
@@ -34,6 +38,9 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
             case TYPE_POINTER:
                 llvmty = codegenType(ty->getReferencedTy())->getPointerTo();
                 break;
+
+            default:
+                assert(false && "type not handled");
         }
         ty->cgType = llvmty;
     }
@@ -48,13 +55,17 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
     
         //TODO
     }
+    if(value->type->isPointer())
+    {
+        printf("LOWERING PTR\n"); 
+    }
 
     return (llvm::Value *) value->cgValue;
 }
 
 ASTValue *IRCodegenContext::loadValue(ASTValue *value)
 {
-    ASTValue *loaded = new ASTValue(value->type->getPointerTy(), builder.CreateLoad(codegenValue(value)));
+    ASTValue *loaded = new ASTValue(value->type, builder.CreateLoad(codegenValue(value)));
     return loaded;
 }
 
@@ -72,6 +83,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         {
             codegenStatement(bexp->statements[i]);
         }
+        return NULL; //TODO: value?
     } 
     else if(NumericExpression *nexp = exp->numericExpression())
     {
@@ -85,8 +97,20 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } 
     else if(StringExpression *sexp = exp->stringExpression())
     {
-        //TODO: IRBuilder doesn't seem to do globals
-        return new ASTValue(ASTType::getCharTy()->getPointerTy(), builder.CreateGlobalStringPtr(sexp->string));
+        Constant *strConstant = ConstantDataArray::getString(context, sexp->string);
+        GlobalVariable *GV = new GlobalVariable(*module, strConstant->getType(), true, GlobalValue::PrivateLinkage, strConstant);
+        vector<Value *> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
+
+        //TODO: make this an ARRAY (when arrays are added), so that it has an associated length
+        
+        return new ASTValue(ASTType::getCharTy()->getPointerTy(), val);
+    } 
+    else if(PostfixExpression *pexp = exp->postfixExpression())
+    {
+        return codegenPostfixExpression(pexp);    
     }
     else if(UnaryExpression *uexp = exp->unaryExpression())
     {
@@ -101,20 +125,83 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(IdentifierExpression *iexp = exp->identifierExpression())
     {
         ///XXX work around for forward declarations of variables in parent scopes
-        if(!iexp->identifier()->getDeclaration()) iexp->id = getScope()->lookup(iexp->id->name);
-        if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(iexp->identifier()->getDeclaration()))
+        if(iexp->identifier()->isUndeclared()) 
+        { 
+            iexp->id = getScope()->lookup(iexp->id->getName());
+            assert(!iexp->id->isUndeclared() && "undeclared variable in this scope!");
+        }
+        if(iexp->identifier()->isVariable())
         {
             //ASTValue *ptrvalue = iexp->identifier()->value; //TODO: load value?
-            return loadValue(iexp->identifier()->value);
+            return loadValue(iexp->identifier()->getValue());
             
-        } else if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(iexp->identifier()->getDeclaration()))
+        //} else if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(iexp->identifier()->getDeclaration()))
+        } else if(iexp->identifier()->isFunction())
         {
-            Function *llvmfunc = module->getFunction(fdecl->getName());
+            Function *llvmfunc = module->getFunction(iexp->identifier()->getName());
             return new ASTValue(NULL, llvmfunc); //TODO: proper function CGType (llvmfunc->getFunctionType())
         }
+    } else if(IfExpression *iexp = exp->ifExpression())
+    {
+        return codegenIfExpression(iexp);
+    } else if(WhileExpression *wexp = exp->whileExpression())
+    {
+        return codegenWhileExpression(wexp);
     }
-    //assert(false && "bad expression?");
+    assert(false && "bad expression?");
     return NULL; //TODO
+}
+
+ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
+{
+    ASTValue *cond = codegenExpression(exp->condition);
+    ASTValue *zero = new ASTValue(ASTType::getIntTy(), ConstantInt::get(Type::getInt32Ty(context), 0));
+    codegenResolveBinaryTypes(cond, zero, 0);
+    ASTValue *icond = new ASTValue(ASTType::getBoolTy(), builder.CreateICmpNE(codegenValue(cond), codegenValue(zero)));
+    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "true", builder.GetInsertBlock()->getParent());
+    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "false", builder.GetInsertBlock()->getParent());
+    llvm::BasicBlock *endif = BasicBlock::Create(context, "endif", builder.GetInsertBlock()->getParent());
+    builder.CreateCondBr(codegenValue(icond), ontrue, onfalse);
+
+    builder.SetInsertPoint(ontrue);
+    codegenStatement(exp->body);
+    builder.CreateBr(onfalse);
+
+    builder.SetInsertPoint(onfalse);
+    if(exp->elsebranch) codegenStatement(exp->elsebranch);
+    builder.CreateBr(endif);
+
+    builder.SetInsertPoint(endif);
+    return NULL;
+}
+
+ASTValue *IRCodegenContext::codegenWhileExpression(WhileExpression *exp)
+{
+    llvm::BasicBlock *whileBB = BasicBlock::Create(context, "while_condition", builder.GetInsertBlock()->getParent());
+    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "while_true", builder.GetInsertBlock()->getParent());
+    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "while_false", builder.GetInsertBlock()->getParent());
+    llvm::BasicBlock *endwhile = BasicBlock::Create(context, "endwhile", builder.GetInsertBlock()->getParent());
+
+    builder.CreateBr(whileBB);
+    builder.SetInsertPoint(whileBB);
+    ASTValue *cond = codegenExpression(exp->condition);
+    ASTValue *zero = new ASTValue(ASTType::getIntTy(), ConstantInt::get(Type::getInt32Ty(context), 0));
+    codegenResolveBinaryTypes(cond, zero, 0);
+    ASTValue *icond = new ASTValue(ASTType::getBoolTy(), builder.CreateICmpNE(codegenValue(cond), codegenValue(zero)));
+    builder.CreateCondBr(codegenValue(icond), ontrue, onfalse);
+
+    this->breakLabel = endwhile;
+    builder.SetInsertPoint(ontrue);
+    codegenStatement(exp->body);
+    builder.CreateBr(whileBB);
+
+    builder.SetInsertPoint(onfalse);
+    if(exp->elsebranch) codegenStatement(exp->elsebranch);
+    builder.CreateBr(endwhile);
+    this->breakLabel = NULL; //TODO: break label should be set to whatever it was previously, to allow for nested while
+
+    builder.SetInsertPoint(endwhile);
+    return NULL;
 }
 
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
@@ -127,42 +214,79 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     vector<Value*> llargs;
     for(int i = 0; i < exp->args.size(); i++)
     {
-        cargs.push_back(codegenExpression(exp->args[i]));
+        ASTValue *val = codegenExpression(exp->args[i]);
+        //promoteType(val, 
+        cargs.push_back(val);
         llargs.push_back(codegenValue(cargs[i]));
     }
     llvm::Value *value = builder.CreateCall(codegenValue(func), llargs);
-    return NULL; //TODO
+    return new ASTValue(NULL, value); //TODO
 }
 
 ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
 {
-    ASTValue *lhs = codegenExpression(exp->lhs);
+    ASTValue *lhs = codegenExpression(exp->lhs); // expression after unary op: eg in !a, lhs=a
 
+    ASTValue *val;
     switch(exp->op)
     {
-
+        case tok::plusplus:
+        case tok::minusminus:
+        case tok::plus:
+        case tok::minus:
+        case tok::bang:
+        case tok::tilde:
+        case tok::caret:
+        case tok::amp:
+        default:
+            assert(false && "unary codegen unimpl");
     }
     return NULL;
 }
 
-void IRCodegenContext::codegenResolveBinaryTypes(ASTValue &v1, ASTValue &v2, unsigned op)
+ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 {
-    /*
-    if(ASTBasicType *bty1 = dynamic_cast<ASTBasicType*>(v1.qualTy()))
+    if(CallExpression *cexp = exp->callExpression())
     {
-        ASTBasicType *bty2 = dynamic_cast<ASTBasicType*>(v2.qualTy());
-        if(bty1->size() > bty2->size())
+        return codegenCallExpression(cexp);
+    } else if(IndexExpression *iexp = exp->indexExpression())
+    {
+        ASTValue *arr = codegenExpression(iexp->lhs);
+        ASTValue *ind = codegenExpression(iexp->index);
+        //TODO: index array
+    }
+
+    assert(false && "postfix codegen unimpl");
+    return NULL;
+}
+
+
+void IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
+{
+    if(val->type->isInteger())
+    {
+        if(toType->isInteger())
         {
-            v2.type = v1.type;
-            v2.value = builder.CreateSExt(v2.value, v1.llvmTy()); //TODO: signedness
-        } else if(bty1->size() < bty2->size())
-        {
-            v1.type = v2.type;
-            v1.value = builder.CreateSExt(v1.value, v2.llvmTy());
+            val->cgValue = builder.CreateIntCast(codegenValue(val), codegenType(toType), false); //TODO: signedness
         }
     }
-    */
-    //TODO: fix for ASTValue
+    if(val->type->isPointer())
+    {
+    }
+}
+
+//XXX is op required?
+void IRCodegenContext::codegenResolveBinaryTypes(ASTValue *v1, ASTValue *v2, unsigned op)
+{
+    if(v1->type != v2->type)
+    {
+        if(v1->type->isStruct() || v2->type->isStruct())
+        {
+            assert(false && "cannot convert structs (yet)");
+        }
+        if(v1->type->size() > v2->type->size()) promoteType(v2, v1->type);
+        else if(v2->type->size() > v1->type->size()) promoteType(v1, v2->type);
+    }
 }
 
 ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
@@ -174,6 +298,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         ASTValue *rhs = codegenExpression(exp->rhs);
         if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->lhs))
         {
+            promoteType(rhs, iexp->identifier()->value->type);
             storeValue(iexp->identifier()->value, rhs);
         } else assert(false && "LHS must be LValue");
 
@@ -182,8 +307,9 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
     ASTValue *lhs = codegenExpression(exp->lhs);
     ASTValue *rhs = codegenExpression(exp->rhs);
-    llvm::Value *val;
+    codegenResolveBinaryTypes(lhs, rhs, exp->op);
 
+    llvm::Value *val;
     Value *lhs_val = codegenValue(lhs);
     Value *rhs_val = codegenValue(rhs);
 
@@ -193,19 +319,38 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     switch(exp->op)
     {
         case tok::comma:
+                assert(false && "unimpl binop");
         case tok::barbar:
         case tok::kw_or:
+            promoteType(lhs, ASTType::getBoolTy());
+            promoteType(rhs, ASTType::getBoolTy());
+            val = builder.CreateOr(codegenValue(lhs), codegenValue(rhs));
+            return new ASTValue(ASTType::getBoolTy(), val);
         case tok::ampamp:
         case tok::kw_and:
+            promoteType(lhs, ASTType::getBoolTy());
+            promoteType(rhs, ASTType::getBoolTy());
+            val = builder.CreateAnd(codegenValue(lhs), codegenValue(rhs));
+            return new ASTValue(ASTType::getBoolTy(), val);
         case tok::bar:
         case tok::caret:
         case tok::amp:
-        case tok::equalequal:
-        case tok::less:
-        case tok::lessequal:
-        case tok::greater:
-        case tok::greaterequal:
                 assert(false && "unimpl binop");
+        case tok::equalequal:
+                val = builder.CreateICmpEQ(lhs_val, rhs_val); //TODO: sign, float
+                return new ASTValue(ASTType::getBoolTy(), val);
+        case tok::less:
+                val = builder.CreateICmpULT(lhs_val, rhs_val); //TODO: sign, float
+                return new ASTValue(ASTType::getBoolTy(), val);
+        case tok::lessequal:
+                val = builder.CreateICmpULE(lhs_val, rhs_val); //TODO: sign, float
+                return new ASTValue(ASTType::getBoolTy(), val);
+        case tok::greater:
+                val = builder.CreateICmpUGT(lhs_val, rhs_val); //TODO: sign, float
+                return new ASTValue(ASTType::getBoolTy(), val);
+        case tok::greaterequal:
+                val = builder.CreateICmpUGE(lhs_val, rhs_val); //TODO: sign, float
+                return new ASTValue(ASTType::getBoolTy(), val);
             //TODO: all of these
 
         case tok::plus: 
@@ -228,15 +373,24 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
             val = builder.CreateURem(lhs_val, rhs_val);
             return new ASTValue(lhs->type, val);
 
+        case tok::dot:
+            //TODO: index into struct, GEP?
+
         default:
+            assert(false && "unimpl");
             return NULL; //XXX: null val
     }
 }
 
 void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
 {
-    ASTValue *value = codegenExpression(exp->expression);
-    builder.CreateRet(codegenValue(value));
+    if(exp->expression)
+    {
+        ASTValue *value = codegenExpression(exp->expression);
+        builder.CreateRet(codegenValue(value));
+        return;
+    }
+    builder.CreateRetVoid();
     //return value;
 }
 
@@ -278,12 +432,32 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         {
             BasicBlock *BB = BasicBlock::Create(context, "entry", func);
             builder.SetInsertPoint(BB);
+
+            pushScope(fdecl->scope);
+
+            int idx = 0;
+            for(Function::arg_iterator AI = func->arg_begin(); AI != func->arg_end(); AI++, idx++)
+            {
+                assert(fdecl->prototype->parameters.size() >= idx && "argument counts dont seem to match up...");
+                pair<ASTType*, std::string> param_i = fdecl->prototype->parameters[idx];
+                AI->setName(param_i.second);
+                ASTValue *alloca = new ASTValue(param_i.first, builder.CreateAlloca(codegenType(param_i.first), 0, param_i.second));
+                builder.CreateStore(AI, codegenValue(alloca));
+
+                Identifier *id = getScope()->getInScope(param_i.second);
+                id->setDeclaration(NULL, Identifier::ID_VARIABLE);
+                id->setValue(alloca);
+                //TODO: register value to scope
+            }
+
             codegenStatement(fdecl->body);
 
             if(func->getReturnType() == Type::getVoidTy(context))
             {
                 builder.CreateRetVoid();
             }
+
+            popScope();
         }
     } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl))
     {
@@ -293,6 +467,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         if(vdecl->value)
         {
             ASTValue *defaultValue = codegenExpression(vdecl->value);
+            promoteType(defaultValue, vty);
             builder.CreateStore(codegenValue(defaultValue), llvmDecl);
             ASTValue *idValue = new ASTValue(vty, llvmDecl); //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
             vdecl->identifier->value = idValue;

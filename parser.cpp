@@ -26,12 +26,16 @@ ASTType *ParseContext::parseType()
     {
        switch(t.kind)
        {
+       case tok::kw_bool:
+           type = ASTType::getBoolTy(); break;
         case tok::kw_int:
             type = ASTType::getIntTy(); break;
         case tok::kw_char:
             type = ASTType::getCharTy(); break;
         case tok::kw_void:
             type = ASTType::getVoidTy(); break;
+        case tok::kw_long:
+            type = ASTType::getLongTy(); break;
         default:
             assert(false && "I haven't done this one yet...");
        }
@@ -72,6 +76,11 @@ void ParseContext::parseTopLevel(TranslationUnit *unit)
             //TODO: add to symbol table
             //TODO: find and import new translation unit
             unit->imports.push_back(parseImport());
+            break;
+
+        case tok::kw_package:
+            unit->imports.push_back(parseImport());
+            //TODO: package instead of import
             break;
 
         case tok::semicolon:
@@ -133,8 +142,10 @@ Statement *ParseContext::parseStatement()
         case tok::kw_int:
         case tok::kw_char:
         case tok::kw_short:
+        case tok::kw_long:
         case tok::kw_float:
         case tok::kw_double:
+        case tok::kw_struct:
                 return parseDeclarationStatement();
 
         case tok::identifier:
@@ -149,15 +160,18 @@ Statement *ParseContext::parseStatement()
         case tok::kw_switch:
         case tok::intNum:
         case tok::floatNum:
+        case tok::kw_true:
+        case tok::kw_false:
+        case tok::kw_null:
         case tok::charstring:
 PARSEEXP:
             return new ExpressionStatement(parseExpression());
 
         case tok::kw_return:
             ignore();
-            if(!peek().followsNewline())
-                return new ReturnStatement(parseExpression()); //TODO: newline thing
-            return new ReturnStatement(NULL);
+            if(!peek().followsNewline()) //TODO: newline thing
+                return new ReturnStatement(parseExpression());
+            return new ReturnStatement(NULL); // does not parse past newline incase of return in if statement
 
         case tok::semicolon:
             ignore();
@@ -169,6 +183,25 @@ PARSEEXP:
 Declaration *ParseContext::parseDeclaration()
 {
     //TODO: parse function decl specs
+    if(peek().is(tok::kw_struct)) //parse struct
+    {
+        ignore(); // eat "struct"
+        Token t_id = get();
+        assert(t_id.is(tok::identifier));
+        assert(!getScope()->contains(t_id.toString()) && "redeclaration (struct)!");
+        Identifier *id = getScope()->get(t_id.toString());
+        assert(peek().is(tok::lbrace) && "expected lbrace");
+        ignore(); // eat lbrace
+        vector<Declaration*> members;
+        while(peek().isNot(tok::rbrace))
+        {
+            Declaration *d = parseDeclaration(); 
+            members.push_back(d);
+        }
+        ignore(); //eat rbrace
+        return new StructDeclaration(id, NULL, members);
+        //return new TypeDeclaration(); 
+    }
 
     ASTType *type = parseType();
 
@@ -178,7 +211,6 @@ Declaration *ParseContext::parseDeclaration()
     Identifier *id = getScope()->get(t_id.toString());
 
     //TODO parse decl specs
-
 
     if(peek().is(tok::lparen)) // function decl
     {
@@ -221,7 +253,6 @@ Declaration *ParseContext::parseDeclaration()
         return decl;
     }
 
-
     Expression *defaultValue = NULL;
     if(peek().is(tok::equal))
     {
@@ -236,8 +267,60 @@ Declaration *ParseContext::parseDeclaration()
     return decl;
 }
 
+Expression *ParseContext::parseIfExpression()
+{
+    Expression *cond = NULL;
+    Statement *body = NULL;
+    Statement *els = NULL;
+    assert(peek().is(tok::kw_if) && "expected if");
+    ignore(); // ignore if
+    assert(peek().is(tok::lparen) && "expected lparen");
+    ignore(); // ignore lparen
+    cond = parseExpression();
+    assert(peek().is(tok::rparen) && "expected rparen");
+    ignore(); // ignore rparen
+    body = parseStatement();
+    if(peek().is(tok::kw_else))
+    {
+        ignore(); // else kw
+        els = parseStatement();
+    }
+
+    return new IfExpression(cond, body, els);
+}
+
+Expression *ParseContext::parseWhileExpression()
+{
+    Expression *cond = NULL;
+    Statement *body = NULL;
+    Statement *els = NULL;
+    assert(peek().is(tok::kw_while) && "expected while");
+    ignore(); // ignore if
+    assert(peek().is(tok::lparen) && "expected lparen");
+    ignore(); // ignore lparen
+    cond = parseExpression();
+    assert(peek().is(tok::rparen) && "expected rparen");
+    ignore(); // ignore rparen
+    body = parseStatement();
+    if(peek().is(tok::kw_else))
+    {
+        ignore(); // else kw
+        els = parseStatement();
+    }
+
+    return new WhileExpression(cond, body, els);
+}
+
 Expression *ParseContext::parseExpression(int prec)
 {
+    if(peek().is(tok::kw_if))
+    {
+        return parseIfExpression();    
+    } else if(peek().is(tok::kw_while))
+    {
+        return parseWhileExpression(); 
+    }
+
     return parseBinaryExpression(prec);
 }
 
@@ -246,10 +329,7 @@ Expression *ParseContext::parsePostfixExpression(int prec)
     Expression *exp = parsePrimaryExpression();
     if((peek().getPostfixPrecidence()) > prec)
     {
-        if(peek().is(tok::dot)) // member
-        {
-             
-        } else if(peek().is(tok::lparen)) // call
+        if(peek().is(tok::lparen)) // call
         {
             ignore(); // ignore lparen
             vector<Expression*> args;
@@ -261,10 +341,13 @@ Expression *ParseContext::parsePostfixExpression(int prec)
             }
             ignore(); // ignore rparen
             return new CallExpression(exp, args);
-            //TODO: eat call 
         } else if(peek().is(tok::lbracket)) //index/slice
         {
-            //TODO: eat index 
+            ignore();
+            Expression *index = parseExpression();
+            assert(peek().is(tok::rbracket) && "expected ]");
+            ignore();
+            return new IndexExpression(exp, index);
         } else {assert(false && "this doesn't look like a postfix expresion to me!");} //TODO: ++ and --
     }
 
@@ -301,6 +384,22 @@ Expression *ParseContext::parsePrimaryExpression()
     if(peek().is(tok::floatNum))
     {
         return new NumericExpression(NumericExpression::DOUBLE, get().floatData());
+    }
+    
+    if(peek().is(tok::kw_true))
+    {
+        ignore();
+        return new NumericExpression(NumericExpression::INT, (uint64_t) 1L); //TODO: bool type
+    } 
+    if(peek().is(tok::kw_false))
+    {
+        ignore();
+        return new NumericExpression(NumericExpression::INT, (uint64_t) 0L); //TODO: bool
+    }
+    if(peek().is(tok::kw_null))
+    {
+        ignore();
+        return new NumericExpression(NumericExpression::INT, (uint64_t) 0L); //TODO: void^
     }
 
     //TODO: eat char constant
@@ -339,15 +438,16 @@ Expression *ParseContext::parseBinaryExpression(int prec)
 
     int op;
     int opPrec;
-    while((opPrec = peek().getBinaryPrecidence()) > prec)
+    while((opPrec = linePeek().getBinaryPrecidence()) > prec)
     {
-        op = peek().kind;
+        op = linePeek().kind;
         ignore();
         Expression *rhs = parseBinaryExpression(opPrec);
         assert(rhs && "invalid binary op, expected RHS");
         lhs = new BinaryExpression(op, lhs, rhs); 
     }
-    assert(lhs && "somethings up");
+    //assert(lhs && "somethings up");
+    if(!lhs) printf("!lhs? might not be expression\n");
 
     return lhs;
 }

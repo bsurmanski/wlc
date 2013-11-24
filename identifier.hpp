@@ -16,6 +16,7 @@ struct Identifier
         ID_VARIABLE,
         ID_FUNCTION,
         ID_PACKAGE,
+        ID_MODULE,
         ID_CLASS,
         ID_STRUCT,
         ID_ALIAS,
@@ -24,6 +25,7 @@ struct Identifier
     IDType type;
     std::string name;
     Declaration *declaration;
+    ASTValue *ref; // pointer to declared variable
     ASTValue *value;
 
     Identifier(std::string s, IDType t = ID_UNKNOWN) : type(t), name(s), declaration(NULL), value(NULL) {}
@@ -32,10 +34,15 @@ struct Identifier
     std::string getName() { return name; }
     ASTType *getType();
     ASTType *declaredType();
+    ASTValue *getReference();
+    ASTValue *getValue();
+    void setValue(ASTValue *value);
     bool isUndeclared() { return type == ID_UNKNOWN; }
     bool isVariable() { return type == ID_VARIABLE; }
     bool isFunction() { return type == ID_FUNCTION; }
     bool isStruct() { return type == ID_STRUCT; }
+    bool isPackage() { return type == ID_PACKAGE; }
+    bool isModule() { return type = ID_MODULE; }
 
 };
 

@@ -13,6 +13,19 @@ bool SymbolTable::contains(std::string str)
     return symbols.count(str) || (parent && parent->contains(str));
 }
 
+Identifier *SymbolTable::getInScope(std::string str)
+{
+    if(symbols.count(str))
+    {
+        return symbols[str];
+    } else
+    {
+        Identifier *id = new Identifier(str);
+        symbols[str] = id;
+        return id;
+    }
+}
+
 Identifier *SymbolTable::get(std::string str)
 {
     Identifier *id = lookup(str);

@@ -24,3 +24,18 @@ ASTType *Identifier::declaredType()
         return tdcl->type;
     }
 }
+
+ASTValue *Identifier::getReference()
+{
+    return ref;
+}
+
+ASTValue *Identifier::getValue()
+{
+    return value; //TODO: do something... 
+}
+
+void Identifier::setValue(ASTValue *val)
+{
+    value = val;
+}

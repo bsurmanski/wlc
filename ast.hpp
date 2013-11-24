@@ -1,6 +1,7 @@
 #ifndef _AST_HPP
 #define _AST_HPP
 
+#include <assert.h>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -25,8 +26,9 @@ struct TypeDeclaration;
 struct Package
 {
     SymbolTable *scope;
+    Identifier *parent;
     Identifier *identifier;
-    std::vector<TranslationUnit*> units;
+    //std::vector<TranslationUnit*> units;
     Identifier *getIdentifier() { return identifier; }
 };
 
@@ -63,25 +65,32 @@ struct ASTTypeQual
 
 struct ASTConcreteType;
 struct ASTPointerType;
+struct ASTArrayType;
 
 enum ASTTypeEnum
 {
     TYPE_VOID,
-    TYPE_CLASS,
-    TYPE_FUNCTION,
-    TYPE_POINTER,
+    TYPE_BOOL,
     TYPE_CHAR,
     TYPE_SHORT,
     TYPE_INT,
     TYPE_LONG,
+    TYPE_FLOAT,
+    TYPE_DOUBLE,
+    TYPE_STRUCT,
+    TYPE_UNION,
+    TYPE_CLASS,
+    TYPE_FUNCTION,
+    TYPE_POINTER,
+    TYPE_ARRAY,
+    TYPE_VEC,
 };
 struct ASTType
 {
     // XXX pointerTy leaks when used as pass by value TODO: pass by reference only
-    unsigned char type;
-    ASTTypeQual qual;
-    ASTType *unqual;
+    ASTTypeEnum type;
     ASTPointerType *pointerTy;
+    //ASTArrayType *arrayTy;
     void *cgType;
 
     union DOSTUFF
@@ -91,27 +100,50 @@ struct ASTType
         void *functionInfo;
     };
 
-    ASTType(enum ASTTypeEnum ty) : type(ty), unqual(0), pointerTy(0), cgType(0)
+    ASTType(enum ASTTypeEnum ty) : type(ty), pointerTy(0), cgType(0)
     {}
 
-    ASTType() : qual(), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
+    ASTType() : pointerTy(NULL), cgType(NULL) {}
     //ASTType(ASTTypeQual q) : qual(q), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
     //virtual ~ASTType() { delete pointerTy; }
-    ASTPointerType *getPointerTy();
     ASTType *getUnqual();
+    ASTPointerType *getPointerTy();
+    ASTArrayType *getArrayTy(int len); //TODO: different lengths are different types??
     virtual ASTPointerType *asPointerTy() { return NULL;}
     virtual ASTConcreteType *asConcreteTy() { return NULL;}
     virtual ASTType *getReferencedTy() { return NULL; }
-    bool isPointerTy() { return false; }
-    virtual size_t size() const { return 0; };
+    virtual size_t size() const 
+    {
+        switch(type)
+        {
+            case TYPE_CHAR: 
+            case TYPE_BOOL: return 1;
+            case TYPE_SHORT: return 2;
+            case TYPE_INT: return 3;
+            case TYPE_LONG: return 4;
+            default: assert(false && "havent sized this type yet"); return 0; //TODO
+        }
+    };
+
+    bool isAggregate() { return type == TYPE_STRUCT || type == TYPE_UNION || type == TYPE_CLASS; }
+    bool isClass() { return type == TYPE_CLASS; }
+    bool isStruct() { return type == TYPE_STRUCT; }
+    bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT || type == TYPE_INT || type == TYPE_LONG; }
+    bool isFloating() { return type == TYPE_FLOAT || type == TYPE_DOUBLE; }
+    bool isVector() { return type == TYPE_VEC; }
+    bool isPointer() { return this && type == TYPE_POINTER; } //TODO: shouldnt test for this
 
     static ASTType *voidTy;
-    static ASTType *intTy;
+    static ASTType *boolTy;
     static ASTType *charTy;
+    static ASTType *intTy;
+    static ASTType *longTy;
 
     static ASTType *getVoidTy();
+    static ASTType *getBoolTy();
     static ASTType *getIntTy();
     static ASTType *getCharTy();
+    static ASTType *getLongTy();
 };
 
 /*
@@ -133,27 +165,27 @@ struct ASTPointerType : public ASTType
     virtual ASTPointerType *asPointerTy() { return this; }
 };
 
+struct ASTArrayType : public ASTType
+{
+    ASTType *ptrTo;
+    uint64_t length;
+    virtual ASTType *getReferencedTy() { return ptrTo; }
+    //ASTArrayType(ASTType *ty, int len) : ASTType(TYPE_ARRAY), ptrTo(ty) { if(!ty->arrayTy) ty->arrayTy = this; }
+};
+
+struct ASTStructType : public ASTConcreteType
+{
+    std::vector<std::pair<Identifier *, Identifier *> > members; // <type, name>
+    ASTStructType(Identifier *id, std::vector<std::pair<Identifier*,Identifier*> > m) : 
+        ASTConcreteType(id), members(m) {}
+};
+
 struct ASTValue
 {
     ASTType *type;
     void *cgValue;
     ASTValue(ASTType *ty, void *cgv = NULL) : type(ty), cgValue(cgv) {}
 };
-
-/*
-struct ASTStructType : public ASTConcreteType
-{
-    std::vector<std::pair<ASTType*, std::string> > members;
-    virtual size_t size() const
-    {
-        size_t sz = 0;
-        for(int i = 0; i < members.size(); i++)
-        {
-            sz += members[i].first->size();
-        }
-    }
-    ASTStructType(Identifier *id) : ASTConcreteType(id) {}
-}; */
 
 /***
  *
@@ -199,6 +231,12 @@ struct TypeDeclaration : public Declaration
     TypeDeclaration(Identifier *id, ASTType *ty) : Declaration(id), type(ty) {}
 };
 
+struct StructDeclaration : public TypeDeclaration
+{
+    std::vector<Declaration*> members;
+    StructDeclaration(Identifier *id, ASTType *ty, std::vector<Declaration*> m) : TypeDeclaration(id, ty), members(m) {}
+};
+
 /***
  *
  * EXPRESSIONS
@@ -211,7 +249,6 @@ struct PrimaryExpression;
 struct CallExpression; 
 struct PostfixExpression; 
 struct IndexExpression; 
-struct MemberExpression; 
 struct IdentifierExpression; 
 struct NumericExpression; 
 struct StringExpression; 
@@ -255,7 +292,6 @@ struct Expression
     virtual CallExpression *callExpression() { return NULL; }
     virtual PostfixExpression *postfixExpression() { return NULL; }
     virtual IndexExpression *indexExpression() { return NULL; }
-    virtual MemberExpression *memberExpression() { return NULL; }
     virtual IdentifierExpression *identifierExpression() { return NULL; }
     virtual NumericExpression *numericExpression() { return NULL; }
     virtual StringExpression *stringExpression() { return NULL; }
@@ -287,11 +323,9 @@ struct CallExpression : public PostfixExpression
 struct IndexExpression : public PostfixExpression
 {
     virtual IndexExpression *indexExpression() { return this; }
-};
-
-struct MemberExpression : public PostfixExpression
-{
-    virtual MemberExpression *memberExpression() { return this; }
+    Expression *lhs;
+    Expression *index;
+    IndexExpression(Expression *l, Expression *i) : lhs(l), index(i) {}
 };
 
 struct UnaryExpression : public Expression
@@ -381,19 +415,23 @@ struct BlockExpression : public Expression
 struct IfExpression : public Expression
 {
     Expression *condition;
-    Expression *body;
-    Expression *elsebranch;
+    Statement *body;
+    Statement *elsebranch;
     virtual IfExpression *ifExpression() { return this; }
+    IfExpression(Expression *c, Statement *b, Statement *e) : condition(c), body(b), elsebranch(e) {}
 };
 
 // value same as if
 struct WhileExpression : public Expression
 {
     Expression *condition;
-    Expression *body;
+    Statement *body;
+    Statement *elsebranch;
     virtual WhileExpression *whileExpression() { return this; }
+    WhileExpression(Expression *c, Statement *b, Statement *e) : condition(c), body(b), elsebranch(e) {}
 };
 
+//TODO: for
 struct ForExpression : public Expression
 {
     Expression *decl;

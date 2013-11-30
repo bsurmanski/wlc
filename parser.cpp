@@ -28,25 +28,75 @@ ASTType *ParseContext::parseType()
        {
        case tok::kw_bool:
            type = ASTType::getBoolTy(); break;
-        case tok::kw_int:
-            type = ASTType::getIntTy(); break;
+
+        case tok::kw_int8:
         case tok::kw_char:
             type = ASTType::getCharTy(); break;
-        case tok::kw_void:
-            type = ASTType::getVoidTy(); break;
+        case tok::kw_uint8:
+        case tok::kw_uchar:
+            type = ASTType::getUCharTy(); break;
+
+        case tok::kw_int16:
+        case tok::kw_short:
+            type = ASTType::getShortTy(); break;
+        case tok::kw_uint16:
+        case tok::kw_ushort:
+            type = ASTType::getUShortTy(); break;
+
+        case tok::kw_int32:
+        case tok::kw_int:
+            type = ASTType::getIntTy(); break;
+        case tok::kw_uint32:
+        case tok::kw_uint:
+            type = ASTType::getUIntTy(); break;
+
+        case tok::kw_int64:
         case tok::kw_long:
             type = ASTType::getLongTy(); break;
+        case tok::kw_uint64:
+        case tok::kw_ulong:
+            type = ASTType::getULongTy(); break;
+
+        case tok::kw_float:
+        case tok::kw_float32:
+            type = ASTType::getFloatTy(); break;
+        case tok::kw_float64:
+        case tok::kw_double:
+            type = ASTType::getDoubleTy(); break;
+        case tok::kw_void:
+            type = ASTType::getVoidTy(); break;
         default:
             assert(false && "I haven't done this one yet...");
-       }
+       } //TODO: signedness
     } else {
         Identifier *id = getScope()->lookup(t.toString());
+        return id->declaredType();
         //TODO: do something with id...
     }
-    while(peek().is(tok::caret)) 
+
+    while(true)
     {
-        ignore();
-        type = type->getPointerTy();
+        if(peek().is(tok::caret))
+        {
+            ignore(); // eat [
+            type = type->getPointerTy();
+            continue;
+        }
+
+        if(peek().is(tok::lbracket)) // XXX should this be parsed as part of the type, or as a postfix expression?
+        {
+            ignore();
+            type = type->getArrayTy();
+            if(peek().isNot(tok::rbracket))
+            {
+                parseExpression(); //TODO: array size
+            }
+            assert(peek().is(tok::rbracket) && "expected ]");
+            ignore(); // eat ]
+            continue;
+        }
+
+        break; // if no post-modifiers are found, exit loop
     }
 
     return type;
@@ -139,14 +189,10 @@ Statement *ParseContext::parseStatement()
 {
     switch(peek().kind)
     {
-        case tok::kw_int:
-        case tok::kw_char:
-        case tok::kw_short:
-        case tok::kw_long:
-        case tok::kw_float:
-        case tok::kw_double:
-        case tok::kw_struct:
-                return parseDeclarationStatement();
+#define BTYPE(X,SZ,SN) case tok::kw_##X:
+#define FTYPE(X,SZ) case tok::kw_##X:
+#include "tokenkinds.def"
+        return parseDeclarationStatement();
 
         case tok::identifier:
             push();
@@ -164,6 +210,8 @@ Statement *ParseContext::parseStatement()
         case tok::kw_false:
         case tok::kw_null:
         case tok::charstring:
+        case tok::amp:
+        case tok::caret:
 PARSEEXP:
             return new ExpressionStatement(parseExpression());
 
@@ -199,7 +247,11 @@ Declaration *ParseContext::parseDeclaration()
             members.push_back(d);
         }
         ignore(); //eat rbrace
-        return new StructDeclaration(id, NULL, members);
+        StructTypeInfo *sti = new StructTypeInfo(id, members); //TODO: use info
+        StructDeclaration *sdecl = new StructDeclaration(id, NULL, members);
+        id->declaredType()->setTypeInfo(sti, TYPE_STRUCT);
+        id->setDeclaration(sdecl, Identifier::ID_STRUCT);
+        return sdecl;
         //return new TypeDeclaration(); 
     }
 
@@ -359,11 +411,10 @@ Expression *ParseContext::parseUnaryExpression(int prec)
 {
     int op;
     int opPrec;
-    if((opPrec = peek().getUnaryPrecidence()) > prec)
+    if((opPrec = peek().getUnaryPrecidence()) >= prec && opPrec)
     {
-
         op = get().kind;
-        return new UnaryExpression(op, parsePostfixExpression(opPrec));
+        return new UnaryExpression(op, parseUnaryExpression(opPrec));
     }
 
     return parsePostfixExpression(prec);

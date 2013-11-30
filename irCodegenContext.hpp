@@ -45,8 +45,10 @@ class IRCodegenContext : public CodegenContext
     protected:
     std::stack<SymbolTable*> scope;
 
+    llvm::Type *codegenStructType(ASTType *ty);
     llvm::Type *codegenType(ASTType *ty);
     llvm::Value *codegenValue(ASTValue *v);
+    llvm::Value *codegenLValue(ASTValue *v);
 
     void pushScope(SymbolTable* tbl) { scope.push(tbl); }
     SymbolTable *popScope() { SymbolTable *tbl = scope.top(); scope.pop(); return tbl;}
@@ -62,8 +64,8 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);
     ASTValue *codegenUnaryExpression(UnaryExpression *exp);
     ASTValue *codegenBinaryExpression(BinaryExpression *exp);
-    void promoteType(ASTValue *val, ASTType *type);
-    void codegenResolveBinaryTypes(ASTValue *v1, ASTValue *v2, unsigned op);
+    ASTValue *promoteType(ASTValue *val, ASTType *type);
+    void codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, unsigned op);
     void codegenReturnStatement(ReturnStatement *exp);
     void codegenStatement(Statement *stmt);
     llvm::FunctionType *codegenFunctionPrototype(FunctionPrototype *proto);

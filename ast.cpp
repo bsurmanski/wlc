@@ -1,24 +1,48 @@
 #include "ast.hpp"
 
-ASTPointerType *ASTType::getPointerTy() 
+ASTType *ASTType::getPointerTy() 
 { 
-    if(!pointerTy) pointerTy = new ASTPointerType(this); 
+    if(!pointerTy)
+    {
+        ASTType *pty = new ASTType(TYPE_POINTER);
+        pty->setTypeInfo(new PointerTypeInfo(this));
+        pointerTy = pty;
+    }
     return pointerTy; 
 } 
 
-ASTArrayType *getArrayTy(int len)
+ASTType *ASTType::getArrayTy() 
+{ 
+    if(!arrayTy)
+    {
+        ASTType *pty = new ASTType(TYPE_ARRAY);
+        pty->setTypeInfo(new ArrayTypeInfo(this));
+        arrayTy = pty;
+    }
+    return arrayTy; 
+} 
+
+/*
+ASTType *ASTType::getArrayTy(int len)
 {
     return NULL;
 }
+*/
 
-//static
-ASTType *ASTType::voidTy = 0;
-ASTType *ASTType::intTy = 0;
-ASTType *ASTType::boolTy = 0;
-ASTType *ASTType::charTy = 0;
-ASTType *ASTType::longTy = 0;
-ASTType *ASTType::getVoidTy() { if(!voidTy) voidTy = new ASTType(TYPE_VOID); return voidTy; }
-ASTType *ASTType::getIntTy() { if(!intTy) intTy = new ASTType(TYPE_INT); return intTy; }
-ASTType *ASTType::getCharTy() { if(!charTy) charTy = new ASTType(TYPE_CHAR); return charTy; }
-ASTType *ASTType::getLongTy() { if(!longTy) longTy = new ASTType(TYPE_LONG); return longTy; }
-ASTType *ASTType::getBoolTy() { if(!boolTy) boolTy = new ASTType(TYPE_BOOL); return boolTy; }
+#define DECLTY(TY,NM) ASTType *ASTType::NM = 0; ASTType *ASTType::get##NM() { if(!NM) NM = new ASTType(TY); return NM; }
+    DECLTY(TYPE_VOID, VoidTy)
+    DECLTY(TYPE_BOOL, BoolTy)
+
+    DECLTY(TYPE_CHAR, CharTy)
+    DECLTY(TYPE_SHORT, ShortTy)
+    DECLTY(TYPE_INT, IntTy)
+    DECLTY(TYPE_LONG, LongTy)
+
+    DECLTY(TYPE_UCHAR, UCharTy)
+    DECLTY(TYPE_USHORT, UShortTy)
+    DECLTY(TYPE_UINT, UIntTy)
+    DECLTY(TYPE_ULONG, ULongTy)
+
+    DECLTY(TYPE_FLOAT, FloatTy)
+    DECLTY(TYPE_DOUBLE, DoubleTy)
+#undef DECLTY

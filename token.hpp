@@ -65,15 +65,9 @@ struct Token
     {
         switch(kind)
         {
-            case tok::kw_void:
-            case tok::kw_bool:
-            case tok::kw_char:
-            case tok::kw_short:
-            case tok::kw_int:
-            case tok::kw_long:
-            case tok::kw_float:
-            case tok::kw_double:
-                return true;
+#define BTYPE(X,SZ,SN) case tok::kw_##X: return true;
+#define FTYPE(X,SZ) case tok::kw_##X: return true;
+#include"tokenkinds.def"
 
             default:
                 return false;

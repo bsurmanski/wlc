@@ -26,9 +26,13 @@ struct Identifier
     std::string name;
     Declaration *declaration;
     ASTValue *ref; // pointer to declared variable
-    ASTValue *value;
+    union
+    {
+        ASTValue *astValue;
+        ASTType *astType;
+    };
 
-    Identifier(std::string s, IDType t = ID_UNKNOWN) : type(t), name(s), declaration(NULL), value(NULL) {}
+    Identifier(std::string s, IDType t = ID_UNKNOWN) : type(t), name(s), declaration(NULL), astValue(NULL) {}
     void setDeclaration(Declaration *decl, IDType t = ID_UNKNOWN);
     Declaration *getDeclaration() { return declaration; }
     std::string getName() { return name; }

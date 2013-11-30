@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "token.hpp"
 
 // higher precidence means stronger binding, 0 means no binding
@@ -83,15 +84,14 @@ Token::Token(TokenKind k, std::string st) : kind(k)
 { 
     if(kind == tok::charstring || kind == tok::identifier)
         strData = new std::string(st); 
-    if(kind == tok::intNum)
+    else if(kind == tok::intNum)
     {
         iData = atol(st.c_str());
     }
-    if(kind == tok::floatNum)
+    else if(kind == tok::floatNum)
     {
-        fData = 0.0;
-        //floatData = atod(st.c_str());
-    }
+        fData = strtod(st.c_str(), NULL);
+    } else { assert(false && "havent bothered with conversion of this constant type yet..."); }
 }
 
 Token::Token(const Token &other)

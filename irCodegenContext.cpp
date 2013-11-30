@@ -10,6 +10,22 @@ using namespace std;
 using namespace llvm;
 
 
+llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
+{
+    assert(ty->isStruct() && "must be struct");
+    StructTypeInfo *sti = (StructTypeInfo*) ty->info;
+    std::vector<Type*> structVec;
+    for(int i = 0; i < sti->members.size(); i++)
+    {
+        if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(sti->members[i]))
+        {
+            structVec.push_back(codegenType(vd->type)); 
+        } else { assert(false && "this cant be declared in a struct (yet?)"); }
+    }
+    ty->cgType = StructType::create(structVec, sti->identifier->getName());
+    return(llvm::Type*) ty->cgType;
+}
+
 llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 {
     if(!ty->cgType)
@@ -21,16 +37,26 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 llvmty = Type::getInt1Ty(context);
                 break;
             case TYPE_CHAR:
+            case TYPE_UCHAR:
                 llvmty = Type::getInt8Ty(context);
                 break;
             case TYPE_SHORT:
+            case TYPE_USHORT:
                 llvmty = Type::getInt16Ty(context);
                 break;
             case TYPE_INT:
+            case TYPE_UINT:
                 llvmty = Type::getInt32Ty(context);
                 break;
             case TYPE_LONG:
+            case TYPE_ULONG:
                 llvmty = Type::getInt64Ty(context);
+                break;
+            case TYPE_FLOAT:
+                llvmty = Type::getFloatTy(context);
+                break;
+            case TYPE_DOUBLE:
+                llvmty = Type::getDoubleTy(context);
                 break;
             case TYPE_VOID:
                 llvmty = Type::getVoidTy(context);
@@ -38,7 +64,8 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
             case TYPE_POINTER:
                 llvmty = codegenType(ty->getReferencedTy())->getPointerTo();
                 break;
-
+            case TYPE_STRUCT:
+                return codegenStructType(ty);
             default:
                 assert(false && "type not handled");
         }
@@ -52,26 +79,34 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 {
     if(!value->cgValue)
     {
-    
         //TODO
+        assert(false && "gen value...");
     }
-    if(value->type->isPointer())
+
+    if(value->isLValue())
     {
-        printf("LOWERING PTR\n"); 
+        //ASTValue *loaded = new ASTValue(value->type, builder.CreateLoad(codegenValue(value)));
+        return builder.CreateLoad(codegenLValue(value));
     }
 
     return (llvm::Value *) value->cgValue;
 }
 
-ASTValue *IRCodegenContext::loadValue(ASTValue *value)
+llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
 {
-    ASTValue *loaded = new ASTValue(value->type, builder.CreateLoad(codegenValue(value)));
-    return loaded;
+    assert(value->isLValue() && "rvalue used in lvalue context!");
+    if(!value->cgValue)
+    {
+        //TODO
+        assert(false && "gen value...");
+    }
+
+    return (llvm::Value*) value->cgValue;
 }
 
 ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 {
-    ASTValue *stored = new ASTValue(dest->type->getPointerTy(), builder.CreateStore(codegenValue(val), codegenValue(dest)));
+    ASTValue *stored = new ASTValue(dest->type, builder.CreateStore(codegenValue(val), codegenLValue(dest)));
     return stored;
 }
 
@@ -87,11 +122,17 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } 
     else if(NumericExpression *nexp = exp->numericExpression())
     {
+        llvm::Value *llvmval;
+        ASTType *ty;
         switch(nexp->type)
         {
             case NumericExpression::INT:
-                llvm::Value *llvmval = ConstantInt::get(Type::getInt32Ty(context), nexp->intValue);
-                ASTType *ty = ASTType::getIntTy();
+                llvmval = ConstantInt::get(Type::getInt32Ty(context), nexp->intValue);
+                ty = ASTType::getIntTy();
+                return new ASTValue(ty, llvmval); //TODO: assign
+            case NumericExpression::DOUBLE:
+                llvmval = ConstantFP::get(Type::getDoubleTy(context), nexp->floatValue);
+                ty = ASTType::getDoubleTy();
                 return new ASTValue(ty, llvmval); //TODO: assign
         }
     } 
@@ -133,13 +174,16 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         if(iexp->identifier()->isVariable())
         {
             //ASTValue *ptrvalue = iexp->identifier()->value; //TODO: load value?
-            return loadValue(iexp->identifier()->getValue());
+            return iexp->identifier()->getValue();
             
         //} else if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(iexp->identifier()->getDeclaration()))
         } else if(iexp->identifier()->isFunction())
         {
             Function *llvmfunc = module->getFunction(iexp->identifier()->getName());
             return new ASTValue(NULL, llvmfunc); //TODO: proper function CGType (llvmfunc->getFunctionType())
+        } else if(iexp->identifier()->isStruct())
+        {
+
         }
     } else if(IfExpression *iexp = exp->ifExpression())
     {
@@ -155,9 +199,10 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
 ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
 {
     ASTValue *cond = codegenExpression(exp->condition);
-    ASTValue *zero = new ASTValue(ASTType::getIntTy(), ConstantInt::get(Type::getInt32Ty(context), 0));
-    codegenResolveBinaryTypes(cond, zero, 0);
-    ASTValue *icond = new ASTValue(ASTType::getBoolTy(), builder.CreateICmpNE(codegenValue(cond), codegenValue(zero)));
+    //ASTValue *zero = new ASTValue(ASTType::getIntTy(), ConstantInt::get(Type::getInt32Ty(context), 0));
+    //codegenResolveBinaryTypes(&cond, &zero, 0);
+    //ASTValue *icond = new ASTValue(ASTType::getBoolTy(), builder.CreateICmpNE(codegenValue(cond), codegenValue(zero)));
+    ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
     llvm::BasicBlock *ontrue = BasicBlock::Create(context, "true", builder.GetInsertBlock()->getParent());
     llvm::BasicBlock *onfalse = BasicBlock::Create(context, "false", builder.GetInsertBlock()->getParent());
     llvm::BasicBlock *endif = BasicBlock::Create(context, "endif", builder.GetInsertBlock()->getParent());
@@ -185,9 +230,14 @@ ASTValue *IRCodegenContext::codegenWhileExpression(WhileExpression *exp)
     builder.CreateBr(whileBB);
     builder.SetInsertPoint(whileBB);
     ASTValue *cond = codegenExpression(exp->condition);
-    ASTValue *zero = new ASTValue(ASTType::getIntTy(), ConstantInt::get(Type::getInt32Ty(context), 0));
-    codegenResolveBinaryTypes(cond, zero, 0);
-    ASTValue *icond = new ASTValue(ASTType::getBoolTy(), builder.CreateICmpNE(codegenValue(cond), codegenValue(zero)));
+    ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
+
+    /*if(icond->getType() != ASTType::getBoolTy())
+    {
+        ASTValue *zero = new ASTValue(ASTType::getIntTy(), ConstantInt::get(Type::getInt32Ty(context), 0));
+        codegenResolveBinaryTypes(&cond, &zero, 0);
+        icond = new ASTValue(ASTType::getBoolTy(), builder.CreateICmpNE(codegenValue(cond), codegenValue(zero)));
+    }*/
     builder.CreateCondBr(codegenValue(icond), ontrue, onfalse);
 
     this->breakLabel = endwhile;
@@ -215,7 +265,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     for(int i = 0; i < exp->args.size(); i++)
     {
         ASTValue *val = codegenExpression(exp->args[i]);
-        //promoteType(val, 
+        //XXX promote value?
         cargs.push_back(val);
         llargs.push_back(codegenValue(cargs[i]));
     }
@@ -237,7 +287,11 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
         case tok::bang:
         case tok::tilde:
         case tok::caret:
+            assert(lhs->getType()->isPointer() && "can only dereference pointer type");
+            return new ASTValue(lhs->getType()->getReferencedTy(), codegenValue(lhs), true);
         case tok::amp:
+            assert(lhs->isLValue() && "can only take reference of lvalue");
+            return new ASTValue(lhs->getType()->getPointerTy(), codegenLValue(lhs), false);
         default:
             assert(false && "unary codegen unimpl");
     }
@@ -261,125 +315,225 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 }
 
 
-void IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
+ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
 {
-    if(val->type->isInteger())
+    if(val->type != toType)
     {
-        if(toType->isInteger())
+        if(val->type->isInteger())
         {
-            val->cgValue = builder.CreateIntCast(codegenValue(val), codegenType(toType), false); //TODO: signedness
+            if(toType->isBool())
+            {
+                ASTValue zero(val->getType(), ConstantInt::get(codegenType(val->getType()), 0));
+                return new ASTValue(ASTType::getBoolTy(), builder.CreateICmpNE(codegenValue(val), codegenValue(&zero)));
+            }
+
+            if(toType->isInteger())
+            {
+                return new ASTValue(toType, builder.CreateIntCast(codegenValue(val), codegenType(toType), false)); //TODO: signedness
+            }
+        } else if(val->type->isFloating())
+        {
+            if(toType->isFloating())
+            {
+                return new ASTValue(toType, builder.CreateFPCast(codegenValue(val), codegenType(toType)));
+            } else if(toType->isInteger())
+            {
+                return new ASTValue(toType, builder.CreateFPToUI(codegenValue(val), codegenType(toType)));
+            }
         }
-    }
-    if(val->type->isPointer())
-    {
+        if(val->type->isPointer())
+        {
+        }
     }
 }
 
 //XXX is op required?
-void IRCodegenContext::codegenResolveBinaryTypes(ASTValue *v1, ASTValue *v2, unsigned op)
+//XXX The way i do this with pointers is kinda silly, also, leaky?
+void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, unsigned op)
 {
-    if(v1->type != v2->type)
+    if((*v1)->type != (*v2)->type)
     {
-        if(v1->type->isStruct() || v2->type->isStruct())
+        if((*v1)->type->isStruct() || (*v2)->type->isStruct())
         {
             assert(false && "cannot convert structs (yet)");
         }
-        if(v1->type->size() > v2->type->size()) promoteType(v2, v1->type);
-        else if(v2->type->size() > v1->type->size()) promoteType(v1, v2->type);
+        if((*v1)->type->size() > (*v2)->type->size()) *v2 = promoteType(*v2, (*v1)->type);
+        else if((*v2)->type->size() > (*v1)->type->size()) *v1 = promoteType(*v1, (*v2)->type);
     }
 }
 
 ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 {
     //TODO: bit messy
-    if(exp->op == tok::equal)
+    if(exp->op == tok::dot)
     {
-        ASTValue *ret = NULL;
-        ASTValue *rhs = codegenExpression(exp->rhs);
-        if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->lhs))
-        {
-            promoteType(rhs, iexp->identifier()->value->type);
-            storeValue(iexp->identifier()->value, rhs);
-        } else assert(false && "LHS must be LValue");
-
-        return ret;
+            ASTValue *lhs = codegenExpression(exp->lhs);
+            /*
+            if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->lhs))
+            {
+                lhs = iexp->identifier()->getValue(); 
+            } else assert(false && "expected struct identifier");
+            */
+            if(lhs->getType()->isStruct()) printf("DOT STRUCT\n");
+            if(IdentifierExpression *rexp = dynamic_cast<IdentifierExpression*>(exp->rhs))
+            {
+                StructTypeInfo *sti = (StructTypeInfo*) lhs->getType()->getTypeInfo();
+                int offset = 0;
+                for(int i = 0; i < sti->members.size(); i++)
+                {
+                    if(sti->members[i]->identifier->getName() == rexp->identifier()->getName()) // XXX better way to compare equality?
+                    {
+                        ASTType *ty = ASTType::getIntTy(); //TODO
+                        std::vector<Value*> gep;
+                        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), offset)); //TODO proper struct GEP
+                        Value *llval = builder.CreateInBoundsGEP(codegenLValue(lhs), gep);
+                        return new ASTValue(ty, llval, true);
+                    }
+                    offset++; // TODO: add size of member
+                }
+            } else assert(false && "rhs must be identifier");
+            assert(false && "member not in struct");
+        return NULL;
     }
 
     ASTValue *lhs = codegenExpression(exp->lhs);
     ASTValue *rhs = codegenExpression(exp->rhs);
-    codegenResolveBinaryTypes(lhs, rhs, exp->op);
+    if(!exp->op != tok::equal) //XXX
+        codegenResolveBinaryTypes(&lhs, &rhs, exp->op);
 
     llvm::Value *val;
-    Value *lhs_val = codegenValue(lhs);
-    Value *rhs_val = codegenValue(rhs);
+#define lhs_val codegenValue(lhs)
+#define rhs_val codegenValue(rhs)
 
-    //codegenResolveBinaryTypes(lhs, rhs, exp->op);
-    //TODO: resolve types
-
+    ASTType *TYPE = lhs->getType();
     switch(exp->op)
     {
+        //ASSIGN
+        case tok::equal:
+            if(!lhs->isLValue()) assert(false && "LHS must be LValue");
+            rhs = promoteType(rhs, TYPE); //TODO: merge with decl assign
+            storeValue(lhs, rhs);
+            return rhs;
+
+        // I dont know, do something with a comma eventually
         case tok::comma:
                 assert(false && "unimpl binop");
+
+        // LOGIC OPS
         case tok::barbar:
         case tok::kw_or:
-            promoteType(lhs, ASTType::getBoolTy());
-            promoteType(rhs, ASTType::getBoolTy());
+            TYPE = ASTType::getBoolTy();
+            lhs = promoteType(lhs, TYPE);
+            rhs = promoteType(rhs, TYPE);
             val = builder.CreateOr(codegenValue(lhs), codegenValue(rhs));
-            return new ASTValue(ASTType::getBoolTy(), val);
+            return new ASTValue(TYPE, val);
         case tok::ampamp:
         case tok::kw_and:
-            promoteType(lhs, ASTType::getBoolTy());
-            promoteType(rhs, ASTType::getBoolTy());
+            TYPE = ASTType::getBoolTy();
+            lhs = promoteType(lhs, TYPE);
+            rhs = promoteType(rhs, TYPE);
             val = builder.CreateAnd(codegenValue(lhs), codegenValue(rhs));
-            return new ASTValue(ASTType::getBoolTy(), val);
+            return new ASTValue(TYPE, val);
+
+        // BITWISE OPS
         case tok::bar:
+            val = builder.CreateOr(codegenValue(lhs), codegenValue(rhs));
+            return new ASTValue(TYPE, val);
         case tok::caret:
+            val = builder.CreateXor(codegenValue(lhs), codegenValue(rhs));
+            return new ASTValue(TYPE, val);
         case tok::amp:
-                assert(false && "unimpl binop");
+            val = builder.CreateAnd(codegenValue(lhs), codegenValue(rhs));
+            return new ASTValue(TYPE, val);
+
+        // COMPARE OPS
         case tok::equalequal:
-                val = builder.CreateICmpEQ(lhs_val, rhs_val); //TODO: sign, float
+                if(TYPE->isFloating())
+                    val = builder.CreateFCmp(CmpInst::FCMP_OEQ, lhs_val, rhs_val);
+                else // sign not required, irrelivant for equality
+                    val = builder.CreateICmp(CmpInst::ICMP_EQ, lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
         case tok::less:
-                val = builder.CreateICmpULT(lhs_val, rhs_val); //TODO: sign, float
+                if(TYPE->isFloating())
+                    val = builder.CreateFCmpOLT(lhs_val, rhs_val);
+                else if(TYPE->isSigned())
+                    val = builder.CreateICmpSLT(lhs_val, rhs_val); 
+                else
+                    val = builder.CreateICmpULT(lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
         case tok::lessequal:
-                val = builder.CreateICmpULE(lhs_val, rhs_val); //TODO: sign, float
+                if(TYPE->isFloating())
+                    val = builder.CreateFCmpOLE(lhs_val, rhs_val);
+                else if(TYPE->isSigned())
+                    val = builder.CreateICmpSLE(lhs_val, rhs_val); 
+                else
+                    val = builder.CreateICmpULE(lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
         case tok::greater:
-                val = builder.CreateICmpUGT(lhs_val, rhs_val); //TODO: sign, float
+                if(TYPE->isFloating())
+                    val = builder.CreateFCmpOGT(lhs_val, rhs_val);
+                else if(TYPE->isSigned())
+                    val = builder.CreateICmpSGT(lhs_val, rhs_val);
+                else
+                    val = builder.CreateICmpUGT(lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
         case tok::greaterequal:
-                val = builder.CreateICmpUGE(lhs_val, rhs_val); //TODO: sign, float
+                if(TYPE->isFloating())
+                    val = builder.CreateFCmpOGE(lhs_val, rhs_val);
+                else if(TYPE->isSigned())
+                    val = builder.CreateICmpSGE(lhs_val, rhs_val);
+                else
+                    val = builder.CreateICmpUGE(lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
-            //TODO: all of these
 
+        // ARITHMETIC OPS
         case tok::plus: 
-            val = builder.CreateAdd(lhs_val, rhs_val);
-            return new ASTValue(lhs->type, val); //TODO: proper typing (for all below too)
+            if(TYPE->isFloating())
+                val = builder.CreateFAdd(lhs_val, rhs_val);
+            else
+                val = builder.CreateAdd(lhs_val, rhs_val);
+            return new ASTValue(TYPE, val); //TODO: proper typing (for all below too)
 
         case tok::minus:
-            val = builder.CreateSub(lhs_val, rhs_val);
-            return new ASTValue(lhs->type, val);
+            if(TYPE->isFloating())
+                val = builder.CreateFSub(lhs_val, rhs_val);
+            else
+                val = builder.CreateSub(lhs_val, rhs_val);
+            return new ASTValue(TYPE, val);
 
         case tok::star:
-            val = builder.CreateMul(lhs_val, rhs_val);
-            return new ASTValue(lhs->type, val);
+            if(TYPE->isFloating())
+                val = builder.CreateFMul(lhs_val, rhs_val);
+            else //TODO: signed?
+                val = builder.CreateMul(lhs_val, rhs_val);
+            return new ASTValue(TYPE, val);
 
         case tok::slash:
-            val = builder.CreateUDiv(lhs_val, rhs_val); //TODO: typed div
-            return new ASTValue(lhs->type, val);
+            if(TYPE->isFloating())
+                val = builder.CreateFDiv(lhs_val, rhs_val);
+            else if(TYPE->isSigned())
+                val = builder.CreateSDiv(lhs_val, rhs_val);
+            else 
+                val = builder.CreateUDiv(lhs_val, rhs_val);
+            return new ASTValue(TYPE, val);
 
         case tok::percent:
-            val = builder.CreateURem(lhs_val, rhs_val);
-            return new ASTValue(lhs->type, val);
-
-        case tok::dot:
-            //TODO: index into struct, GEP?
+            if(TYPE->isFloating())
+                val = builder.CreateFRem(lhs_val, rhs_val);
+            else if(TYPE->isSigned())
+                val = builder.CreateSRem(lhs_val, rhs_val);
+            else
+                val = builder.CreateURem(lhs_val, rhs_val);
+            return new ASTValue(TYPE, val);
 
         default:
             assert(false && "unimpl");
             return NULL; //XXX: null val
     }
+
+#undef lhs_val
+#undef rhs_val
 }
 
 void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
@@ -441,8 +595,8 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                 assert(fdecl->prototype->parameters.size() >= idx && "argument counts dont seem to match up...");
                 pair<ASTType*, std::string> param_i = fdecl->prototype->parameters[idx];
                 AI->setName(param_i.second);
-                ASTValue *alloca = new ASTValue(param_i.first, builder.CreateAlloca(codegenType(param_i.first), 0, param_i.second));
-                builder.CreateStore(AI, codegenValue(alloca));
+                ASTValue *alloca = new ASTValue(param_i.first, builder.CreateAlloca(codegenType(param_i.first), 0, param_i.second), true);
+                builder.CreateStore(AI, codegenLValue(alloca));
 
                 Identifier *id = getScope()->getInScope(param_i.second);
                 id->setDeclaration(NULL, Identifier::ID_VARIABLE);
@@ -464,15 +618,27 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         ASTType *vty = vdecl->type;
         Value *llvmDecl = builder.CreateAlloca(codegenType(vty), 0, vdecl->getName());
         
+        ASTValue *idValue = new ASTValue(vty, llvmDecl, true); //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
         if(vdecl->value)
         {
             ASTValue *defaultValue = codegenExpression(vdecl->value);
-            promoteType(defaultValue, vty);
-            builder.CreateStore(codegenValue(defaultValue), llvmDecl);
-            ASTValue *idValue = new ASTValue(vty, llvmDecl); //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
-            vdecl->identifier->value = idValue;
+            //promoteType(defaultValue, vty);
+            //builder.CreateStore(codegenValue(defaultValue), llvmDecl);
+            defaultValue = promoteType(defaultValue, vty);
+            storeValue(idValue, defaultValue);
             //TODO: maybe create a LValue field in CGValue?
         }
+        vdecl->identifier->setValue(idValue);
+    } else if(StructDeclaration *sdecl = dynamic_cast<StructDeclaration*>(sdecl))
+    {
+        /*
+        std::vector<Type*> arr;
+        arr.push_back(Type::getInt32Ty(context));
+        arr.push_back(Type::getInt32Ty(context));
+        StructType *st = StructType::get(context, arr);
+        //sdecl->identifier->setType(st);
+        printf("CG struct decl\n"); 
+        */
     }
 }
 
@@ -486,7 +652,10 @@ Module *IRCodegenContext::codegenTranslationUnit(TranslationUnit *unit)
     {}
 
     for(int i = 0; i < unit->types.size(); i++) //XXX what about recursive types?
-    {}
+    {
+        Declaration *decl = unit->types[i];
+        codegenDeclaration(decl);
+    }
 
     // alloc globals before codegen'ing functions
     for(int i = 0; i < unit->globals.size(); i++)
@@ -502,7 +671,7 @@ Module *IRCodegenContext::codegenTranslationUnit(TranslationUnit *unit)
                     GlobalVariable::CommonLinkage,
                     (llvm::Constant*) (unit->globals[i]->value ? codegenValue(codegenExpression(unit->globals[i]->value)) : 0),
                     id->getName()); //TODO: proper global insertion
-            id->value = new ASTValue(idTy->getPointerTy(), llvmval);
+            id->setValue(new ASTValue(idTy, llvmval, true));
         } else if(id->isFunction())
         {
             //TODO: declare func 

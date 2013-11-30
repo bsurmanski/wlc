@@ -19,10 +19,9 @@ ASTType *Identifier::getType()
 
 ASTType *Identifier::declaredType()
 {
-    if(TypeDeclaration *tdcl = dynamic_cast<TypeDeclaration*>(declaration))
-    {
-        return tdcl->type;
-    }
+    assert(type == ID_STRUCT || type == ID_UNKNOWN && "this doesnt look like a type");
+    if(!astType) astType = new ASTType();
+    return astType;
 }
 
 ASTValue *Identifier::getReference()
@@ -32,10 +31,10 @@ ASTValue *Identifier::getReference()
 
 ASTValue *Identifier::getValue()
 {
-    return value; //TODO: do something... 
+    return astValue; //TODO: do something... 
 }
 
 void Identifier::setValue(ASTValue *val)
 {
-    value = val;
+    astValue = val;
 }

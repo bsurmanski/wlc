@@ -213,11 +213,18 @@ Token Lexer::lexString()
 Token Lexer::lexNumber()
 {
     //TODO hexstrings fp, etc
+    bool fp = false;
     string numstr;
-    while(isdigit(peekChar()))
+    while(isdigit(peekChar()) || peekChar() == '.')
     {
+        if(peekChar() == '.')
+        {
+            assert(!fp && "invalid numeric constant");
+            fp = true;
+        }
         numstr += getChar();
     }
+    if(fp) return Token(tok::floatNum, numstr);
     return Token(tok::intNum, numstr);
 }
 

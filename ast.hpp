@@ -63,10 +63,6 @@ struct ASTTypeQual
     ASTTypeQual(bool c, bool e, bool s) : isConst(c), isExtern(e), isStatic(s) {}
 };
 
-struct ASTConcreteType;
-struct ASTPointerType;
-struct ASTArrayType;
-
 enum ASTTypeEnum
 {
     TYPE_VOID,
@@ -75,6 +71,10 @@ enum ASTTypeEnum
     TYPE_SHORT,
     TYPE_INT,
     TYPE_LONG,
+    TYPE_UCHAR,
+    TYPE_USHORT,
+    TYPE_UINT,
+    TYPE_ULONG,
     TYPE_FLOAT,
     TYPE_DOUBLE,
     TYPE_STRUCT,
@@ -84,21 +84,57 @@ enum ASTTypeEnum
     TYPE_POINTER,
     TYPE_ARRAY,
     TYPE_VEC,
+    TYPE_UNKNOWN
 };
+
+struct TypeInfo
+{
+    virtual ~TypeInfo() {}
+    virtual ASTType *getReferenceTy() { return NULL; }
+};
+
+struct PointerTypeInfo : public TypeInfo
+{
+    ASTType *ptrTo; 
+    virtual ASTType *getReferenceTy() { return ptrTo; }
+    PointerTypeInfo(ASTType *pto) : ptrTo(pto) {}
+};
+
+struct ArrayTypeInfo : public TypeInfo
+{
+    ASTType *arrayOf; 
+    virtual ASTType *getReferenceTy() { return arrayOf; }
+    ArrayTypeInfo(ASTType *pto) : arrayOf(pto) {}
+};
+
+struct StructTypeInfo : public TypeInfo
+{
+    Identifier *identifier;
+    std::vector<Declaration*> members; // <type, name>
+    StructTypeInfo(Identifier *id, std::vector<Declaration*> m) : identifier(id), members(m){}
+};
+
+struct AliasTypeInfo : public TypeInfo
+{
+    Identifier *identifier;
+    ASTType *alias;
+    AliasTypeInfo(Identifier *id, ASTType *a) :identifier(id), alias(a) {}
+};
+
 struct ASTType
 {
-    // XXX pointerTy leaks when used as pass by value TODO: pass by reference only
     ASTTypeEnum type;
-    ASTPointerType *pointerTy;
-    //ASTArrayType *arrayTy;
+    ASTType *pointerTy;
+    ASTType *arrayTy;
     void *cgType;
 
-    union DOSTUFF
+    TypeInfo *info;
+    void setTypeInfo(TypeInfo *i, ASTTypeEnum en = TYPE_UNKNOWN)
     {
-        void *pointerInfo;
-        void *arrayInfo;
-        void *functionInfo;
-    };
+        info = i; 
+        if(en != TYPE_UNKNOWN) type = en;
+    }
+    TypeInfo *getTypeInfo() { return info; }
 
     ASTType(enum ASTTypeEnum ty) : type(ty), pointerTy(0), cgType(0)
     {}
@@ -106,12 +142,9 @@ struct ASTType
     ASTType() : pointerTy(NULL), cgType(NULL) {}
     //ASTType(ASTTypeQual q) : qual(q), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
     //virtual ~ASTType() { delete pointerTy; }
-    ASTType *getUnqual();
-    ASTPointerType *getPointerTy();
-    ASTArrayType *getArrayTy(int len); //TODO: different lengths are different types??
-    virtual ASTPointerType *asPointerTy() { return NULL;}
-    virtual ASTConcreteType *asConcreteTy() { return NULL;}
-    virtual ASTType *getReferencedTy() { return NULL; }
+    //ASTType *getUnqual();
+    ASTType *getPointerTy();
+    ASTType *getArrayTy();
     virtual size_t size() const 
     {
         switch(type)
@@ -125,30 +158,41 @@ struct ASTType
         }
     };
 
+    ASTType *getReferencedTy() { return info->getReferenceTy(); }
     bool isAggregate() { return type == TYPE_STRUCT || type == TYPE_UNION || type == TYPE_CLASS; }
     bool isClass() { return type == TYPE_CLASS; }
     bool isStruct() { return type == TYPE_STRUCT; }
-    bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT || type == TYPE_INT || type == TYPE_LONG; }
+    bool isBool() { return type == TYPE_BOOL; }
+    bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT || type == TYPE_INT || type == TYPE_LONG || 
+        type == TYPE_UCHAR || type == TYPE_USHORT || type == TYPE_UINT || type == TYPE_ULONG; }
+    bool isSigned() { return type == TYPE_CHAR || type == TYPE_SHORT || type == TYPE_INT || type == TYPE_LONG; }
     bool isFloating() { return type == TYPE_FLOAT || type == TYPE_DOUBLE; }
     bool isVector() { return type == TYPE_VEC; }
-    bool isPointer() { return this && type == TYPE_POINTER; } //TODO: shouldnt test for this
+    bool isPointer() { return this && type == TYPE_POINTER; } //TODO: shouldnt need to test for this
 
-    static ASTType *voidTy;
-    static ASTType *boolTy;
-    static ASTType *charTy;
-    static ASTType *intTy;
-    static ASTType *longTy;
+#define DECLTY(NM) static ASTType *NM; static ASTType *get##NM();
+    DECLTY(VoidTy)
+    DECLTY(BoolTy)
 
-    static ASTType *getVoidTy();
-    static ASTType *getBoolTy();
-    static ASTType *getIntTy();
-    static ASTType *getCharTy();
-    static ASTType *getLongTy();
+    DECLTY(CharTy)
+    DECLTY(ShortTy)
+    DECLTY(IntTy)
+    DECLTY(LongTy)
+
+    DECLTY(UCharTy)
+    DECLTY(UShortTy)
+    DECLTY(UIntTy)
+    DECLTY(ULongTy)
+
+    DECLTY(FloatTy)
+    DECLTY(DoubleTy)
+#undef DECLTY
 };
 
 /*
  * named types, as apposed to reference/pointer types
  */
+/*
 struct ASTConcreteType : public ASTType
 {
     Identifier *identifier;
@@ -178,13 +222,21 @@ struct ASTStructType : public ASTConcreteType
     std::vector<std::pair<Identifier *, Identifier *> > members; // <type, name>
     ASTStructType(Identifier *id, std::vector<std::pair<Identifier*,Identifier*> > m) : 
         ASTConcreteType(id), members(m) {}
+}; */
+
+struct ASTValueInfo
+{
+    virtual ~ASTValueInfo(){}
 };
 
 struct ASTValue
 {
+    bool lValue;
     ASTType *type;
     void *cgValue;
-    ASTValue(ASTType *ty, void *cgv = NULL) : type(ty), cgValue(cgv) {}
+    ASTType *getType() { return type; }
+    ASTValue(ASTType *ty, void *cgv = NULL, bool lv = false) : type(ty), cgValue(cgv), lValue(lv) {}
+    bool isLValue() { return lValue; }
 };
 
 /***
@@ -488,6 +540,7 @@ struct PassStatement : public Statement
 {
     // XXX will assign to special variable '$', which is created on blockExpression entry. essentially, assigning on pass
     // can be transformed into if(true) $ = val; else $ = val2; x = $;
+    // ... maybe
 };
 
 /*

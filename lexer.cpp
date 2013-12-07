@@ -17,7 +17,7 @@ std::string Token::toString()
         return *((string*) data);
     } else if(isKeyword())
     {
-        return keywords[kind - KW_BEGIN]; 
+        return keywords[kind - KW_BEGIN];
     } else if(isOp())
     {
         return operators[kind - OP_BEGIN];
@@ -32,7 +32,7 @@ Token Lexer::lexWord()
     string tokstr;
     while(isalnum(peekChar()))
     {
-        curChar = getChar(); 
+        curChar = getChar();
         tokstr += curChar;
     }
 
@@ -202,7 +202,7 @@ Token Lexer::lexString()
             escape = true;
             continue;
         }
-        
+
         escape = false;
         tokstr += curChar;
     }
@@ -233,7 +233,7 @@ Token Lexer::getTok()
 
     if(eofChar())
     {
-        return Token(tok::eof); 
+        return Token(tok::eof);
     }
 
     char c = peekChar();
@@ -261,7 +261,7 @@ Token Lexer::getTok()
 }
 
 Token Lexer::lex()
-{   
+{
     bool ws = false;
     char c;
     while(isspace(c = peekChar()))

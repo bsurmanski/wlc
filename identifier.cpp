@@ -31,7 +31,7 @@ ASTValue *Identifier::getReference()
 
 ASTValue *Identifier::getValue()
 {
-    return astValue; //TODO: do something... 
+    return astValue; //TODO: do something...
 }
 
 void Identifier::setValue(ASTValue *val)

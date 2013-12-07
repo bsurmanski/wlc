@@ -91,9 +91,14 @@ KEYWORD(while)
 KEYWORD(switch)
 KEYWORD(pass)
 KEYWORD(import)
+KEYWORD(include)
+KEYWORD(label)
 KEYWORD(package) /* declare package like Java, (package com.mysite.mypackage) */
+KEYWORD(break)
+KEYWORD(continue)
 
 // reserved words. hopefully will get around to implementing these
+RESERVE(foreach)
 RESERVE(class)
 RESERVE(asm) /* inline asm */
 RESERVE(once) /* declare that statement only happens once, ever. when first encountered  */

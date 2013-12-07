@@ -1,34 +1,28 @@
 #include "ast.hpp"
 
-ASTType *ASTType::getPointerTy() 
-{ 
+ASTType *ASTType::getPointerTy()
+{
     if(!pointerTy)
     {
         ASTType *pty = new ASTType(TYPE_POINTER);
         pty->setTypeInfo(new PointerTypeInfo(this));
         pointerTy = pty;
     }
-    return pointerTy; 
-} 
+    return pointerTy;
+}
 
-ASTType *ASTType::getArrayTy() 
-{ 
+ASTType *ASTType::getArrayTy()
+{
     if(!arrayTy)
     {
         ASTType *pty = new ASTType(TYPE_ARRAY);
         pty->setTypeInfo(new ArrayTypeInfo(this));
         arrayTy = pty;
     }
-    return arrayTy; 
-} 
-
-/*
-ASTType *ASTType::getArrayTy(int len)
-{
-    return NULL;
+    return arrayTy;
 }
-*/
 
+// declare all of the static ASTType instances, and their getter methods
 #define DECLTY(TY,NM) ASTType *ASTType::NM = 0; ASTType *ASTType::get##NM() { if(!NM) NM = new ASTType(TY); return NM; }
     DECLTY(TYPE_VOID, VoidTy)
     DECLTY(TYPE_BOOL, BoolTy)

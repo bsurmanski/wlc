@@ -8,9 +8,15 @@ void SymbolTable::addBuiltin()
 //#include "tokenkinds.def"
 }
 
+
 bool SymbolTable::contains(std::string str)
 {
     return symbols.count(str) || (parent && parent->contains(str));
+}
+
+void SymbolTable::addSibling(SymbolTable *t)
+{
+    siblings.push_back(t);
 }
 
 Identifier *SymbolTable::getInScope(std::string str)
@@ -39,20 +45,36 @@ Identifier *SymbolTable::get(std::string str)
     return id;
 }
 
-Identifier *SymbolTable::lookup(std::string str)
+Identifier *SymbolTable::lookup(std::string str, bool imports)
 {
+    Identifier *ret = NULL;
+    Identifier *id = NULL;
     if(symbols.count(str))
     {
         // XXX work around for multiple declarations, and forward declarations
-        if(symbols[str]->isUndeclared()) 
+        if(symbols[str]->isUndeclared())
         {
-            Identifier *parentLookup = parent->lookup(str);
-            if(!parentLookup->isUndeclared()) return parentLookup;
+            id = parent->lookup(str);
+            if(id && !id->isUndeclared()) ret = id;
         }
-        return symbols[str];
-    } else if (parent)
+        ret = symbols[str];
+    } 
+
+    if((!ret || ret->isUndeclared()) && parent)
     {
-        return parent->lookup(str); 
+        id = parent->lookup(str);
+        if(id && !id->isUndeclared()) ret = id;
     }
-    return NULL;
+
+
+    if((!ret || ret->isUndeclared()) && imports)
+    {
+        for(int i = 0; i < siblings.size() && !ret; i++)
+        {
+            id = siblings[i]->lookup(str, false);
+            if(id && !id->isUndeclared()) ret = id;
+        }
+    }
+
+    return ret;
 }

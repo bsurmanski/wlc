@@ -18,6 +18,7 @@ int getBinaryPrecidence(tok::TokenKind tkind)
         case tok::ampamp:
         case tok::kw_and:
                 return 4;
+        case tok::colon: // cast
         case tok::bar:
                 return 5;
         case tok::caret:
@@ -80,10 +81,10 @@ int getUnaryPrecidence(tok::TokenKind tkind)
     }
 }
 
-Token::Token(TokenKind k, std::string st) : kind(k) 
-{ 
+Token::Token(TokenKind k, std::string st) : kind(k)
+{
     if(kind == tok::charstring || kind == tok::identifier)
-        strData = new std::string(st); 
+        strData = new std::string(st);
     else if(kind == tok::intNum)
     {
         iData = atol(st.c_str());
@@ -103,8 +104,8 @@ Token::Token(const Token &other)
     else iData = other.iData;
 }
 
-Token::~Token() 
-{ 
+Token::~Token()
+{
 }
 
 void Token::dump()
@@ -135,10 +136,10 @@ std::string Token::getSpelling()
     switch (kind)
     {
 #define TOK(X) case X: return #X;
-#define PUNCTUATOR(X,Y) case tok::X: return Y;    
+#define PUNCTUATOR(X,Y) case tok::X: return Y;
 #define KEYWORD(X) case kw_ ## X: return #X;
 #include "tokenkinds.def"
-    
+
     }
 }
 

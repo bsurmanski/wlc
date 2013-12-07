@@ -3,7 +3,7 @@
 
 #include "ast.hpp"
 
-class CodegenContext 
+class CodegenContext
 {
     protected:
     CodegenContext(){}

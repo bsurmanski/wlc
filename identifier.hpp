@@ -20,15 +20,19 @@ struct Identifier
         ID_CLASS,
         ID_STRUCT,
         ID_ALIAS,
+        ID_LABEL,
     };
 
     IDType type;
     std::string name;
     Declaration *declaration;
-    ASTValue *ref; // pointer to declared variable
     union
     {
-        ASTValue *astValue;
+        struct
+        {
+            ASTValue *astValue;
+            ASTValue *ref; // pointer to declared variable
+        };
         ASTType *astType;
     };
 

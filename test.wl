@@ -1,14 +1,20 @@
 package test
 
-import test2
-import thing.module
-
 int printf(char^ str, ...);
 long malloc(long sz);
 
+import "testimport.wl"
+
+
 int main()
 {
-    char i = 1000
-    if(i) printf("Its printing!\n")
+    MyStruct st;
+    for(int i = 0; i < 10; i++)
+    {
+        printf("WHOA %d\n", i)
+        continue
+        printf("uhoh")
+    }
     return 0
+
 }

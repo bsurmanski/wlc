@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <stdlib.h>
+#include <limits.h>
 
 #include "symbolTable.hpp"
 #include "identifier.hpp"
@@ -17,10 +19,14 @@ struct DeclarationExpression;
 struct TranslationUnit;
 struct ASTType;
 struct Identifier;
+struct LabelDeclaration;
 struct VariableDeclaration;
 struct FunctionDeclaration;
 struct ImportExpression;
+struct PackageExpression;
 struct TypeDeclaration;
+
+//TODO: switch, dowhile
 
 //TODO: use
 struct Package
@@ -28,27 +34,72 @@ struct Package
     SymbolTable *scope;
     Identifier *parent;
     Identifier *identifier;
-    //std::vector<TranslationUnit*> units;
+    void *cgValue;
+
+    Package() : identifier(NULL), scope(NULL), cgValue(NULL) {}
+    Package(Identifier *id) : identifier(id), scope(NULL), cgValue(NULL) {
+        if(id) id->type = Identifier::ID_PACKAGE;
+        //TODO: scope should have parent?
+    }
+    virtual ~Package() { if(scope) delete scope; }
+
     Identifier *getIdentifier() { return identifier; }
+    SymbolTable *getScope() { if(!scope) scope = new SymbolTable; return scope; } //TODO: subscope of parent
+
+    std::vector<Package*> children;
+
+    void setParent(Package *p)
+    {
+        parent = p->getIdentifier();
+    }
+
+    void addPackage(Package *p) {
+        //scope->add(str, p->getIdentifier());
+        p->setParent(this);
+        children.push_back(p);
+    }
+
+    Identifier *lookup(std::string str) { return getScope()->lookup(str); }
+
+    virtual bool isTranslationUnit() { return false; }
 };
 
 // also Module
-struct TranslationUnit
+struct TranslationUnit : public Package
 {
-    SymbolTable *scope;
-    Identifier *identifier;
     std::vector<ImportExpression*> imports; //TODO: aliased imports?
+    std::vector<TranslationUnit*> importUnits; //TODO: aliased imports?
     std::vector<TypeDeclaration*> types;
     std::vector<VariableDeclaration*> globals;
     std::vector<FunctionDeclaration*> functions;
-    TranslationUnit(Identifier *id) : identifier(id), scope(new SymbolTable) {}
-    ~TranslationUnit() { delete scope; }
+    TranslationUnit(Identifier *id) : Package(id) {}
+    ~TranslationUnit() { }
+    virtual bool isTranslationUnit() { return true; }
     std::string getName() { return ""; }
 };
 
 struct AST
 {
-    //TODO: packages
+    Package *root;
+    AST() { root = new Package; }
+    ~AST() { delete root; }
+    Package *getRootPackage() { return root; }
+    TranslationUnit *getUnit(std::string str) 
+    { 
+        char APATH[PATH_MAX + 1];
+        realpath(str.c_str(), APATH);
+        std::string astr = std::string(str);
+        if(units.count(astr)) return units[astr]; return NULL; 
+    }
+    void addUnit(std::string str, TranslationUnit *u)
+    {
+        char APATH[PATH_MAX + 1];
+        realpath(str.c_str(), APATH);
+        std::string astr = std::string(str);
+        assert(!units.count(astr) && "reimport of translation unit!");
+        units[str] = u; 
+    }
+
     std::map<std::string, TranslationUnit*> units;
 };
 
@@ -95,23 +146,26 @@ struct TypeInfo
 
 struct PointerTypeInfo : public TypeInfo
 {
-    ASTType *ptrTo; 
+    ASTType *ptrTo;
     virtual ASTType *getReferenceTy() { return ptrTo; }
     PointerTypeInfo(ASTType *pto) : ptrTo(pto) {}
 };
 
 struct ArrayTypeInfo : public TypeInfo
 {
-    ASTType *arrayOf; 
+    ASTType *arrayOf;
     virtual ASTType *getReferenceTy() { return arrayOf; }
     ArrayTypeInfo(ASTType *pto) : arrayOf(pto) {}
 };
 
 struct StructTypeInfo : public TypeInfo
 {
+    bool packed;
+    SymbolTable *scope;
     Identifier *identifier;
     std::vector<Declaration*> members; // <type, name>
-    StructTypeInfo(Identifier *id, std::vector<Declaration*> m) : identifier(id), members(m){}
+    StructTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
+        identifier(id), scope(sc), members(m), packed(false){}
 };
 
 struct AliasTypeInfo : public TypeInfo
@@ -131,7 +185,7 @@ struct ASTType
     TypeInfo *info;
     void setTypeInfo(TypeInfo *i, ASTTypeEnum en = TYPE_UNKNOWN)
     {
-        info = i; 
+        info = i;
         if(en != TYPE_UNKNOWN) type = en;
     }
     TypeInfo *getTypeInfo() { return info; }
@@ -145,11 +199,11 @@ struct ASTType
     //ASTType *getUnqual();
     ASTType *getPointerTy();
     ASTType *getArrayTy();
-    virtual size_t size() const 
+    virtual size_t size() const
     {
         switch(type)
         {
-            case TYPE_CHAR: 
+            case TYPE_CHAR:
             case TYPE_BOOL: return 1;
             case TYPE_SHORT: return 2;
             case TYPE_INT: return 3;
@@ -163,7 +217,7 @@ struct ASTType
     bool isClass() { return type == TYPE_CLASS; }
     bool isStruct() { return type == TYPE_STRUCT; }
     bool isBool() { return type == TYPE_BOOL; }
-    bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT || type == TYPE_INT || type == TYPE_LONG || 
+    bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT || type == TYPE_INT || type == TYPE_LONG ||
         type == TYPE_UCHAR || type == TYPE_USHORT || type == TYPE_UINT || type == TYPE_ULONG; }
     bool isSigned() { return type == TYPE_CHAR || type == TYPE_SHORT || type == TYPE_INT || type == TYPE_LONG; }
     bool isFloating() { return type == TYPE_FLOAT || type == TYPE_DOUBLE; }
@@ -188,41 +242,6 @@ struct ASTType
     DECLTY(DoubleTy)
 #undef DECLTY
 };
-
-/*
- * named types, as apposed to reference/pointer types
- */
-/*
-struct ASTConcreteType : public ASTType
-{
-    Identifier *identifier;
-    ASTConcreteType(Identifier *id) : identifier(id) {}
-    virtual ASTConcreteType *asConcreteTy() { return this; }
-};
-
-struct ASTPointerType : public ASTType
-{
-    ASTType *ptrTo;
-    ASTPointerType(ASTType *ty) : ASTType(TYPE_POINTER), ptrTo(ty) { if(!ty->pointerTy) ty->pointerTy = this; }
-    virtual ASTType *getReferencedTy() { return ptrTo; }
-    virtual size_t size() const { return sizeof(void*); }
-    virtual ASTPointerType *asPointerTy() { return this; }
-};
-
-struct ASTArrayType : public ASTType
-{
-    ASTType *ptrTo;
-    uint64_t length;
-    virtual ASTType *getReferencedTy() { return ptrTo; }
-    //ASTArrayType(ASTType *ty, int len) : ASTType(TYPE_ARRAY), ptrTo(ty) { if(!ty->arrayTy) ty->arrayTy = this; }
-};
-
-struct ASTStructType : public ASTConcreteType
-{
-    std::vector<std::pair<Identifier *, Identifier *> > members; // <type, name>
-    ASTStructType(Identifier *id, std::vector<std::pair<Identifier*,Identifier*> > m) : 
-        ASTConcreteType(id), members(m) {}
-}; */
 
 struct ASTValueInfo
 {
@@ -253,7 +272,7 @@ struct Declaration
     virtual std::string getName() { if(identifier) return identifier->getName(); return ""; }
 };
 
-struct FunctionPrototype 
+struct FunctionPrototype
 {
     ASTType *returnType;
     std::vector<std::pair<ASTType*, std::string> > parameters;
@@ -264,9 +283,14 @@ struct FunctionPrototype
 struct FunctionDeclaration : public Declaration
 {
     FunctionPrototype *prototype;
-    SymbolTable *scope; 
+    SymbolTable *scope;
     Statement *body;
     FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st) : Declaration(id), prototype(p), scope(sc), body(st) {}
+};
+
+struct LabelDeclaration : public Declaration
+{
+    LabelDeclaration(Identifier *id) : Declaration(id) {}
 };
 
 struct VariableDeclaration : public Declaration
@@ -295,23 +319,24 @@ struct StructDeclaration : public TypeDeclaration
  *
  ***/
 
-struct UnaryExpression; 
-struct BinaryExpression; 
-struct PrimaryExpression; 
-struct CallExpression; 
-struct PostfixExpression; 
-struct IndexExpression; 
-struct IdentifierExpression; 
-struct NumericExpression; 
-struct StringExpression; 
-struct DeclarationExpression; 
-struct BlockExpression; 
-struct IfExpression; 
-struct WhileExpression; 
-struct ForExpression; 
-struct PassExpression; 
-struct SwitchExpression; 
-struct ImportExpression; 
+struct UnaryExpression;
+struct BinaryExpression;
+struct PrimaryExpression;
+struct CallExpression;
+struct PostfixExpression;
+struct IndexExpression;
+struct IdentifierExpression;
+struct NumericExpression;
+struct StringExpression;
+struct DeclarationExpression;
+struct BlockExpression;
+struct IfExpression;
+struct WhileExpression;
+struct ForExpression;
+struct PassExpression;
+struct SwitchExpression;
+struct ImportExpression;
+struct PackageExpression;
 
 struct Expression
 {
@@ -355,9 +380,11 @@ struct Expression
     virtual PassExpression *passExpression() { return NULL; }
     virtual SwitchExpression *switchExpression() { return NULL; }
     virtual ImportExpression *importExpression() { return NULL; }
+    virtual PackageExpression *packageExpression() { return NULL; }
 
     //TODO: overrides
 };
+
 
 struct PostfixExpression : public Expression
 {
@@ -379,6 +406,14 @@ struct IndexExpression : public PostfixExpression
     Expression *index;
     IndexExpression(Expression *l, Expression *i) : lhs(l), index(i) {}
 };
+
+struct PostfixOpExpression : public PostfixExpression
+{
+    int op;
+    Expression *lhs;
+    PostfixOpExpression(Expression *l, int o) : lhs(l), op(o) {}
+};
+
 
 struct UnaryExpression : public Expression
 {
@@ -446,11 +481,13 @@ struct NumericExpression : public PrimaryExpression
 
 struct DeclarationExpression : public Expression
 {
-    Declaration *decl; 
+    Declaration *decl;
     virtual DeclarationExpression *declarationExpression() { return this; }
 };
 
 struct Statement;
+
+
 // value of (bool) 0. if 'pass' is encountered, value of pass
 //TODO: probably shouldn't be an expression
 struct BlockExpression : public Expression
@@ -483,26 +520,41 @@ struct WhileExpression : public Expression
     WhileExpression(Expression *c, Statement *b, Statement *e) : condition(c), body(b), elsebranch(e) {}
 };
 
-//TODO: for
 struct ForExpression : public Expression
 {
-    Expression *decl;
-    Expression *cond;
-    Expression *update;
-    Expression *body;
+    Statement *decl;
+    Expression *condition;
+    Statement *update;
+    Statement *body;
+    Statement *elsebranch;
     virtual ForExpression *forExpression() { return this; }
+    ForExpression(Statement *d, Expression *c, Statement *u, Statement *b, Statement *e) : decl(d), condition(c), update(u), body(b), elsebranch(e) {}
 };
 
 struct SwitchExpression : public Expression
 {
     //TODO
+    Expression *_switch;
+    std::vector<Expression*> cases;
+    std::vector<Statement*> statements;
     virtual SwitchExpression *switchExpression() { return this; }
 };
 
+struct PackageExpression : public Expression
+{
+    Expression *package;
+    virtual PackageExpression *packageExpression() { return this; }
+    PackageExpression(Expression *p) : package(p) {}
+};
+
+// import <STRING> |
+// import <IDENTIFIER>
 struct ImportExpression : public Expression
 {
-    TranslationUnit *import;
+    Expression *expression;
+    TranslationUnit *unit;
     virtual ImportExpression *importExpression() { return this; }
+    ImportExpression(Expression *im, TranslationUnit *u) : expression(im), unit(u) { }
 };
 
 
@@ -515,6 +567,25 @@ struct ImportExpression : public Expression
 struct Statement
 {
     virtual ~Statement(){}
+};
+
+struct BreakStatement : Statement
+{};
+
+struct ContinueStatement : Statement
+{};
+
+
+struct LabelStatement : Statement
+{
+    Identifier *identifier;
+    LabelStatement(Identifier *id) : identifier(id) {}
+};
+
+struct GotoStatement : Statement
+{
+    Identifier *identifier;
+    GotoStatement(Identifier *id) : identifier(id) {}
 };
 
 struct DeclarationStatement : public Statement
@@ -536,7 +607,7 @@ struct ReturnStatement : public Statement
     ReturnStatement(Expression *exp) : expression(exp) {}
 };
 
-struct PassStatement : public Statement 
+struct PassStatement : public Statement
 {
     // XXX will assign to special variable '$', which is created on blockExpression entry. essentially, assigning on pass
     // can be transformed into if(true) $ = val; else $ = val2; x = $;
@@ -544,9 +615,9 @@ struct PassStatement : public Statement
 };
 
 /*
- * once 
- * { 
- *  DOSTUFF 
+ * once
+ * {
+ *  DOSTUFF
  * }; : DOSTUFF will only happen once, on first encounter of the once statement
  */
 struct OnceStatement : public Statement

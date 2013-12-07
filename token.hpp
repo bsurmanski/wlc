@@ -24,7 +24,7 @@ int getUnaryPrecidence(tok::TokenKind tkind);
 
 struct Token
 {
-    TokenKind kind; 
+    TokenKind kind;
     unsigned short characters;
     bool newline;
 
@@ -50,12 +50,12 @@ struct Token
     bool isUnaryOp() { return getUnaryPrecidence(); }
     bool followsNewline() { return newline; }
 
-    std::string stringData() { if(kind == tok::charstring || kind == tok::identifier) return *strData; 
+    std::string stringData() { if(kind == tok::charstring || kind == tok::identifier) return *strData;
         return ""; }
     //TODO: parse other datatypes as int?
-    uint64_t intData() { if(kind == tok::intNum) { return iData; } return 0; } 
+    uint64_t intData() { if(kind == tok::intNum) { return iData; } return 0; }
     //TODO: parse other datatypes as float?
-    double floatData() { if(kind == tok::floatNum) { return fData; } return 0.0; } 
+    double floatData() { if(kind == tok::floatNum) { return fData; } return 0.0; }
 
     void setLength(short toklen) { characters = toklen; }
     std::string getSpelling();

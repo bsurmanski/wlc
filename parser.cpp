@@ -104,8 +104,11 @@ ASTType *ParseContext::parseType()
 
 TranslationUnit *ParseContext::parseTranslationUnit(const char *unitnm)
 {
-    TranslationUnit *unit = new TranslationUnit(NULL); //TODO: identifier
-    pushScope(unit->scope); //TODO: scope stack
+    TranslationUnit *unit = new TranslationUnit(currentPackage()->getScope()->lookup(unitnm)); //TODO: identifier
+    this->unit = unit;
+    currentPackage()->addPackage(unit);
+
+    pushScope(unit->getScope());
     while(peek().isNot(tok::eof))
     {
         parseTopLevel(unit); // modifies t-unit
@@ -128,9 +131,12 @@ void ParseContext::parseTopLevel(TranslationUnit *unit)
             unit->imports.push_back(parseImport());
             break;
 
+        case tok::kw_include:
+            parseInclude();
+
         case tok::kw_package:
-            unit->imports.push_back(parseImport());
-            //TODO: package instead of import
+            ignore();
+            new PackageExpression(parseExpression()); //TODO: do something with expr
             break;
 
         case tok::semicolon:
@@ -156,22 +162,49 @@ void ParseContext::parseTopLevel(TranslationUnit *unit)
     }
 }
 
+void ParseContext::parseInclude()
+{
+    ignore();
+    Expression *includeExpression = parseExpression();
+    if(StringExpression *sexp = dynamic_cast<StringExpression*>(includeExpression))
+    {
+        ifstream stream(sexp->string.c_str());
+        Lexer *incLexer = new StreamLexer(stream);
+        Lexer *currentLexer = lexer;
+        lexer = incLexer;
+        //while(peek().isNot(tok::eof))
+        //{
+        //    parseTopLevel(unit); //TODO: support inlined includes (inside functions and stuff)
+        //}
+        //TODO: include not yet supported
+        assert(false && "include not yet impl");
+        lexer = currentLexer;
+        delete incLexer;
+    } else assert(false && "unknown include directive");
+}
+
 ImportExpression *ParseContext::parseImport()
 {
-    cout << "import not impl; ignoring" << endl;
-    ignore(); // ignore import 
-    if(linePeek().is(tok::dot))
-    {
-        // relative path
-        ignore(); // dot
+    ignore(); // ignore import
+    Expression *importExpression = parseExpression();
+
+    TranslationUnit *importedUnit = NULL;
+    //XXX deffer importing to end of TU parse? Would allow 'package' expression and subsequent imports to work as expected, I imagine
+    if(StringExpression *sexp = dynamic_cast<StringExpression*>(importExpression))
+    { 
+        importedUnit = parser->getAST()->getUnit(sexp->string);
+        if(!importedUnit) // This TU hasnt been loaded from file yet, DOIT
+        {
+            importedUnit = parser->parseFile(sexp->string.c_str()); //TODO: identifier
+            parser->getAST()->addUnit(sexp->string, importedUnit);
+        }
     }
-    ignore(); // ignore id
-    while(linePeek().is(tok::dot))
-    {
-        ignore(); // ignore dot
-        ignore(); // ignore id
-    }
-    return new ImportExpression;
+
+    assert(importedUnit && "failed to import translationUnit");
+
+    unit->importUnits.push_back(importedUnit); //TODO: check if in import list first
+    getScope()->addSibling(importedUnit->getScope());
+    return new ImportExpression(importExpression, importedUnit);
 }
 
 Statement *ParseContext::parseDeclarationStatement()
@@ -179,7 +212,7 @@ Statement *ParseContext::parseDeclarationStatement()
     Declaration *decl;
 
     decl = parseDeclaration();
-    
+
     printf("New declaration: %s\n", decl->getName().c_str());
     //TODO: register decl
     return new DeclarationStatement(decl);
@@ -192,7 +225,6 @@ Statement *ParseContext::parseStatement()
 #define BTYPE(X,SZ,SN) case tok::kw_##X:
 #define FTYPE(X,SZ) case tok::kw_##X:
 #include "tokenkinds.def"
-        return parseDeclarationStatement();
 
         case tok::identifier:
             push();
@@ -200,6 +232,7 @@ Statement *ParseContext::parseStatement()
                 return parseDeclarationStatement();
             goto PARSEEXP;
         case tok::lbrace: // TODO: lbrace as statement instead of expression?
+        case tok::kw_import:
         case tok::kw_if:
         case tok::kw_while:
         case tok::kw_for:
@@ -212,6 +245,9 @@ Statement *ParseContext::parseStatement()
         case tok::charstring:
         case tok::amp:
         case tok::caret:
+        case tok::plusplus:
+        case tok::minusminus:
+        case tok::lparen:
 PARSEEXP:
             return new ExpressionStatement(parseExpression());
 
@@ -220,6 +256,24 @@ PARSEEXP:
             if(!peek().followsNewline()) //TODO: newline thing
                 return new ReturnStatement(parseExpression());
             return new ReturnStatement(NULL); // does not parse past newline incase of return in if statement
+
+        case tok::kw_label:
+            ignore();
+            assert(peek().is(tok::identifier) && "expected identifier following label");
+            return new LabelStatement(getScope()->get(get().toString()));
+
+        case tok::kw_goto:
+            ignore();
+            assert(peek().is(tok::identifier) && "expected identifier following goto");
+            return new GotoStatement(getScope()->get(get().toString()));
+
+        case tok::kw_continue:
+            ignore();
+            return new ContinueStatement;
+            
+        case tok::kw_break:
+            ignore();
+            return new BreakStatement;
 
         case tok::semicolon:
             ignore();
@@ -239,20 +293,25 @@ Declaration *ParseContext::parseDeclaration()
         assert(!getScope()->contains(t_id.toString()) && "redeclaration (struct)!");
         Identifier *id = getScope()->get(t_id.toString());
         assert(peek().is(tok::lbrace) && "expected lbrace");
+
+        SymbolTable *tbl = new SymbolTable(getScope()); 
+        pushScope(tbl);
         ignore(); // eat lbrace
         vector<Declaration*> members;
         while(peek().isNot(tok::rbrace))
         {
-            Declaration *d = parseDeclaration(); 
+            Declaration *d = parseDeclaration();
             members.push_back(d);
         }
         ignore(); //eat rbrace
-        StructTypeInfo *sti = new StructTypeInfo(id, members); //TODO: use info
+        popScope();
+
+        StructTypeInfo *sti = new StructTypeInfo(id, tbl, members); //TODO: use info
         StructDeclaration *sdecl = new StructDeclaration(id, NULL, members);
         id->declaredType()->setTypeInfo(sti, TYPE_STRUCT);
         id->setDeclaration(sdecl, Identifier::ID_STRUCT);
         return sdecl;
-        //return new TypeDeclaration(); 
+        //return new TypeDeclaration();
     }
 
     ASTType *type = parseType();
@@ -267,7 +326,7 @@ Declaration *ParseContext::parseDeclaration()
     if(peek().is(tok::lparen)) // function decl
     {
         vector<pair<ASTType*, std::string> > args;
-        ignore(); // lparen 
+        ignore(); // lparen
         bool vararg = false;
         while(!peek().is(tok::rparen))
         {
@@ -326,11 +385,13 @@ Expression *ParseContext::parseIfExpression()
     Statement *els = NULL;
     assert(peek().is(tok::kw_if) && "expected if");
     ignore(); // ignore if
-    assert(peek().is(tok::lparen) && "expected lparen");
-    ignore(); // ignore lparen
+
+    assert(peek().is(tok::lparen) && "expected (");
+    ignore();
     cond = parseExpression();
-    assert(peek().is(tok::rparen) && "expected rparen");
-    ignore(); // ignore rparen
+    assert(peek().is(tok::rparen) && "expected )");
+    ignore();
+
     body = parseStatement();
     if(peek().is(tok::kw_else))
     {
@@ -347,13 +408,16 @@ Expression *ParseContext::parseWhileExpression()
     Statement *body = NULL;
     Statement *els = NULL;
     assert(peek().is(tok::kw_while) && "expected while");
-    ignore(); // ignore if
-    assert(peek().is(tok::lparen) && "expected lparen");
-    ignore(); // ignore lparen
+    ignore(); // ignore while
+
+    assert(peek().is(tok::lparen) && "expected (");
+    ignore();
     cond = parseExpression();
-    assert(peek().is(tok::rparen) && "expected rparen");
-    ignore(); // ignore rparen
+    assert(peek().is(tok::rparen) && "expected )");
+    ignore();
+
     body = parseStatement();
+
     if(peek().is(tok::kw_else))
     {
         ignore(); // else kw
@@ -363,17 +427,58 @@ Expression *ParseContext::parseWhileExpression()
     return new WhileExpression(cond, body, els);
 }
 
-Expression *ParseContext::parseExpression(int prec)
+Expression *ParseContext::parseForExpression()
 {
-    if(peek().is(tok::kw_if))
+    Statement *decl = NULL;
+    Expression *cond = NULL;
+    Statement *upd = NULL;
+    Statement *body = NULL;
+    Statement *els = NULL;
+
+    assert(peek().is(tok::kw_for) && "expected for");
+    ignore(); // ignore for
+
+    assert(peek().is(tok::lparen) && "expected (");
+    ignore();
+
+    decl = parseStatement();
+    assert(peek().is(tok::semicolon) && "expected semicolon");
+    ignore();
+
+    cond = parseExpression();
+    assert(peek().is(tok::semicolon) && "expected semicolon after for condition");
+    ignore();
+
+    upd = parseStatement();
+    assert(peek().is(tok::rparen) && "expected )");
+    ignore();
+
+    body = parseStatement();
+
+    if(peek().is(tok::kw_else))
     {
-        return parseIfExpression();    
-    } else if(peek().is(tok::kw_while))
-    {
-        return parseWhileExpression(); 
+        ignore();
+        els = parseStatement();
     }
 
-    return parseBinaryExpression(prec);
+    return new ForExpression(decl, cond, upd, body, els);
+}
+
+Expression *ParseContext::parseExpression(int prec)
+{
+    switch(peek().kind)
+    {
+        case tok::kw_if:
+            return parseIfExpression();
+        case tok::kw_while:
+            return parseWhileExpression();
+        case tok::kw_for:
+            return parseForExpression();
+        case tok::kw_import:
+            return parseImport();
+        default:
+        return parseBinaryExpression(prec);
+    }
 }
 
 Expression *ParseContext::parsePostfixExpression(int prec)
@@ -387,7 +492,7 @@ Expression *ParseContext::parsePostfixExpression(int prec)
             vector<Expression*> args;
             while(peek().isNot(tok::rparen))
             {
-                args.push_back(parseExpression(getBinaryPrecidence(tok::comma))); 
+                args.push_back(parseExpression(getBinaryPrecidence(tok::comma)));
                 assert(peek().is(tok::comma) || peek().is(tok::rparen) && "expected , or )");
                 if(peek().is(tok::comma)) ignore(); // ignore comma or rparen
             }
@@ -400,7 +505,15 @@ Expression *ParseContext::parsePostfixExpression(int prec)
             assert(peek().is(tok::rbracket) && "expected ]");
             ignore();
             return new IndexExpression(exp, index);
-        } else {assert(false && "this doesn't look like a postfix expresion to me!");} //TODO: ++ and --
+        } else if(peek().is(tok::plusplus))
+        {
+            ignore(); // ignore ++
+            return new PostfixOpExpression(exp, tok::plusplus);
+        } else if(peek().is(tok::minusminus))
+        {
+            ignore(); // ignore --
+            return new PostfixOpExpression(exp, tok::minusminus);
+        } else {assert(false && "this doesn't look like a postfix expresion to me!");}
     }
 
     //TODO: parse postfix of postfix. eg somecall()++;
@@ -411,7 +524,7 @@ Expression *ParseContext::parseUnaryExpression(int prec)
 {
     int op;
     int opPrec;
-    if((opPrec = peek().getUnaryPrecidence()) >= prec && opPrec)
+    if((opPrec = peek().getUnaryPrecidence()) > prec)
     {
         op = get().kind;
         return new UnaryExpression(op, parseUnaryExpression(opPrec));
@@ -436,12 +549,12 @@ Expression *ParseContext::parsePrimaryExpression()
     {
         return new NumericExpression(NumericExpression::DOUBLE, get().floatData());
     }
-    
+
     if(peek().is(tok::kw_true))
     {
         ignore();
         return new NumericExpression(NumericExpression::INT, (uint64_t) 1L); //TODO: bool type
-    } 
+    }
     if(peek().is(tok::kw_false))
     {
         ignore();
@@ -479,7 +592,8 @@ Expression *ParseContext::parsePrimaryExpression()
 
     if(peek().is(tok::identifier))
     {
-        return new IdentifierExpression(getScope()->get(get().toString()));
+        Identifier *id = getScope()->get(get().toString());
+        return new IdentifierExpression(id);
     }
 }
 
@@ -495,7 +609,7 @@ Expression *ParseContext::parseBinaryExpression(int prec)
         ignore();
         Expression *rhs = parseBinaryExpression(opPrec);
         assert(rhs && "invalid binary op, expected RHS");
-        lhs = new BinaryExpression(op, lhs, rhs); 
+        lhs = new BinaryExpression(op, lhs, rhs);
     }
     //assert(lhs && "somethings up");
     if(!lhs) printf("!lhs? might not be expression\n");
@@ -503,14 +617,40 @@ Expression *ParseContext::parseBinaryExpression(int prec)
     return lhs;
 }
 
-void Parser::parseFile(const char *filenm)
+/*
+void Parser::resolveImports(TranslationUnit *u)
+{
+    for(int i = 0; i < u->imports.size(); i++)
+    {
+        ImportExpression *imp = u->imports[i];
+        if(StringExpression *sexp = dynamic_cast<StringExpression*>(imp->expression))
+        {
+            TranslationUnit *importedUnit = getUnit(sexp->string);
+            if(!importedUnit)
+            {
+                ifstream stream(sexp->string.c_str());
+                Lexer *lexer = new StreamLexer(stream);
+                ParseContext context(lexer, this, ast->getRootPackage());
+                TranslationUnit *unit = context.parseTranslationUnit(sexp->string.c_str()); //TODO: identifier, XXX cache already parsed TU's
+                u->importUnits.push_back(unit);
+                u->getScope()->addSibling(unit->getScope());
+                ast->addUnit(unit);
+            }
+        }
+    }
+}*/
+
+TranslationUnit *Parser::parseFile(const char *filenm)
 {
     ifstream stream(filenm);
     Lexer *lexer = new StreamLexer(stream);
-    ParseContext context(lexer, this, NULL);
-
-    TranslationUnit *unit = context.parseTranslationUnit(NULL); //TODO: identifier
-    ast->units[filenm] = unit; //TODO: symbol table
-
+    ParseContext context(lexer, this, ast->getRootPackage());
+    TranslationUnit *unit = context.parseTranslationUnit(filenm); //TODO: identifier
+    //resolveImports(unit);
     delete lexer;
+    return unit;
+
+    //ast->getRootPackage()->addPackage("", unit);
+    //ast->units[filenm] = unit; //TODO: symbol table
+
 }

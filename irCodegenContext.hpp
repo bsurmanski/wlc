@@ -7,28 +7,6 @@
 #include <llvm/IR/IRBuilder.h>
 #include <stack>
 
-/*
-struct CGType
-{
-    ASTType *type;
-    llvm::Type *llvmType;
-    CGType(ASTType *ty, llvm::Type *llvmty) : type(ty), llvmType(llvmty){}
-    CGType() : type(NULL) {}
-    ASTType *qualTy() { return type; }
-    llvm::Type *llvmTy() { return llvmType; }
-}; 
-
-struct CGValue
-{
-    CGType *type;
-    llvm::Value *value;
-    CGValue(CGType *ty, llvm::Value *v = NULL) : type(ty), value(v) {}
-    CGValue() : value(NULL) {}
-    llvm::Value *llvmValue() { return value; }
-    llvm::Type *llvmTy() { return type->llvmTy(); }
-    ASTType *qualTy() { return type->qualTy(); }
-};*/
-
 void IRCodegen(AST *ast);
 
 class IRCodegenContext : public CodegenContext
@@ -38,6 +16,8 @@ class IRCodegenContext : public CodegenContext
     llvm::IRBuilder<> builder;
     llvm::Module *module;
     llvm::BasicBlock *breakLabel;
+    llvm::BasicBlock *continueLabel;
+    TranslationUnit *unit;
 
     IRCodegenContext() : context(llvm::getGlobalContext()), builder(context), module(NULL) {}
 
@@ -60,17 +40,20 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenExpression(Expression *exp);
     ASTValue *codegenIfExpression(IfExpression *exp);
     ASTValue *codegenWhileExpression(WhileExpression *exp);
+    ASTValue *codegenForExpression(ForExpression *exp);
     ASTValue *codegenCallExpression(CallExpression *exp);
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);
     ASTValue *codegenUnaryExpression(UnaryExpression *exp);
     ASTValue *codegenBinaryExpression(BinaryExpression *exp);
     ASTValue *promoteType(ASTValue *val, ASTType *type);
+    void codegenImport(ImportExpression *e);
     void codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, unsigned op);
     void codegenReturnStatement(ReturnStatement *exp);
     void codegenStatement(Statement *stmt);
     llvm::FunctionType *codegenFunctionPrototype(FunctionPrototype *proto);
     void codegenDeclaration(Declaration *decl);
-    llvm::Module *codegenTranslationUnit(TranslationUnit *unit);
+    llvm::Module *codegenTranslationUnit(TranslationUnit *unit, bool declare);
+    void codegenPackage(Package *p, bool declare);
 };
 
 #endif

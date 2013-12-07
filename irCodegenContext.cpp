@@ -3,6 +3,7 @@
 #include "token.hpp"
 #include "irCodegenContext.hpp"
 
+#include <fstream>
 #include <iostream>
 #include <stdio.h>
 
@@ -19,7 +20,7 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
     {
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(sti->members[i]))
         {
-            structVec.push_back(codegenType(vd->type)); 
+            structVec.push_back(codegenType(vd->type));
         } else { assert(false && "this cant be declared in a struct (yet?)"); }
     }
     ty->cgType = StructType::create(structVec, sti->identifier->getName());
@@ -110,6 +111,13 @@ ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
     return stored;
 }
 
+ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
+{
+    assert(lval->isLValue() && "must be lvalue to load");
+    ASTValue *loaded = new ASTValue(lval->type, codegenValue(lval));
+    return loaded;
+}
+
 ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
 {
     if(BlockExpression *bexp = exp->blockExpression())
@@ -119,7 +127,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
             codegenStatement(bexp->statements[i]);
         }
         return NULL; //TODO: value?
-    } 
+    }
     else if(NumericExpression *nexp = exp->numericExpression())
     {
         llvm::Value *llvmval;
@@ -135,7 +143,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
                 ty = ASTType::getDoubleTy();
                 return new ASTValue(ty, llvmval); //TODO: assign
         }
-    } 
+    }
     else if(StringExpression *sexp = exp->stringExpression())
     {
         Constant *strConstant = ConstantDataArray::getString(context, sexp->string);
@@ -146,16 +154,16 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
 
         //TODO: make this an ARRAY (when arrays are added), so that it has an associated length
-        
+
         return new ASTValue(ASTType::getCharTy()->getPointerTy(), val);
-    } 
+    }
     else if(PostfixExpression *pexp = exp->postfixExpression())
     {
-        return codegenPostfixExpression(pexp);    
+        return codegenPostfixExpression(pexp);
     }
     else if(UnaryExpression *uexp = exp->unaryExpression())
     {
-        return codegenUnaryExpression(uexp); 
+        return codegenUnaryExpression(uexp);
     }
     else if(BinaryExpression *bexp = exp->binaryExpression())
     {
@@ -166,16 +174,17 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(IdentifierExpression *iexp = exp->identifierExpression())
     {
         ///XXX work around for forward declarations of variables in parent scopes
-        if(iexp->identifier()->isUndeclared()) 
-        { 
+        if(iexp->identifier()->isUndeclared())
+        {
             iexp->id = getScope()->lookup(iexp->id->getName());
+            //TODO
             assert(!iexp->id->isUndeclared() && "undeclared variable in this scope!");
         }
         if(iexp->identifier()->isVariable())
         {
             //ASTValue *ptrvalue = iexp->identifier()->value; //TODO: load value?
             return iexp->identifier()->getValue();
-            
+
         //} else if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(iexp->identifier()->getDeclaration()))
         } else if(iexp->identifier()->isFunction())
         {
@@ -191,6 +200,12 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(WhileExpression *wexp = exp->whileExpression())
     {
         return codegenWhileExpression(wexp);
+    } else if(ForExpression *fexp = exp->forExpression())
+    {
+        return codegenForExpression(fexp);
+    }else if(ImportExpression *iexp = exp->importExpression())
+    {
+        return NULL; //TODO: should it return something? probably. Some sort of const package ptr or something...
     }
     assert(false && "bad expression?");
     return NULL; //TODO
@@ -254,6 +269,47 @@ ASTValue *IRCodegenContext::codegenWhileExpression(WhileExpression *exp)
     return NULL;
 }
 
+ASTValue *IRCodegenContext::codegenForExpression(ForExpression *exp)
+{
+    llvm::BasicBlock *forBB = BasicBlock::Create(context, "for_condition", builder.GetInsertBlock()->getParent());
+    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "for_true", builder.GetInsertBlock()->getParent());
+    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "for_false", builder.GetInsertBlock()->getParent());
+    llvm::BasicBlock *forupdate = BasicBlock::Create(context, "forupdate", builder.GetInsertBlock()->getParent());
+    llvm::BasicBlock *endfor = BasicBlock::Create(context, "endfor", builder.GetInsertBlock()->getParent());
+
+    if(exp->decl) codegenStatement(exp->decl);
+
+    builder.CreateBr(forBB);
+    builder.SetInsertPoint(forBB);
+
+    if(exp->condition)
+    {
+        ASTValue *cond = codegenExpression(exp->condition);
+        ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
+        builder.CreateCondBr(codegenValue(icond), ontrue, onfalse);
+    } else builder.CreateBr(ontrue);
+
+    BasicBlock *OLDBREAK = this->breakLabel; // TODO: ugly
+    BasicBlock *OLDCONTINUE = this->continueLabel; //TODO: still ugly
+    this->breakLabel = endfor;
+    this->continueLabel = forupdate;
+    builder.SetInsertPoint(ontrue);
+    if(exp->body) codegenStatement(exp->body);
+    builder.CreateBr(forupdate);
+    builder.SetInsertPoint(forupdate);
+    if(exp->update) codegenStatement(exp->update);
+    builder.CreateBr(forBB);
+
+    builder.SetInsertPoint(onfalse);
+    if(exp->elsebranch) codegenStatement(exp->elsebranch);
+    builder.CreateBr(endfor);
+    this->breakLabel = OLDBREAK;
+    this->continueLabel = OLDCONTINUE;
+
+    builder.SetInsertPoint(endfor);
+    return NULL;
+}
+
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *func = codegenExpression(exp->function);
@@ -281,11 +337,24 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
     switch(exp->op)
     {
         case tok::plusplus:
+            assert(lhs->isLValue() && "can only increment LValue");
+            val = new ASTValue(lhs->getType(),
+                    builder.CreateAdd(codegenValue(lhs),
+                        ConstantInt::get(codegenType(lhs->getType()), 1)));
+            storeValue(lhs, val);
+            return val;
         case tok::minusminus:
+            assert(lhs->isLValue() && "can only decrement LValue");
+            val = new ASTValue(lhs->getType(),
+                    builder.CreateSub(codegenValue(lhs),
+                        ConstantInt::get(codegenType(lhs->getType()), 1)));
+            storeValue(lhs, val);
+            return val;
         case tok::plus:
         case tok::minus:
         case tok::bang:
         case tok::tilde:
+            assert(false && "unimpl unary codegen");
         case tok::caret:
             assert(lhs->getType()->isPointer() && "can only dereference pointer type");
             return new ASTValue(lhs->getType()->getReferencedTy(), codegenValue(lhs), true);
@@ -308,6 +377,28 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         ASTValue *arr = codegenExpression(iexp->lhs);
         ASTValue *ind = codegenExpression(iexp->index);
         //TODO: index array
+    } else if(PostfixOpExpression *e = dynamic_cast<PostfixOpExpression*>(exp))
+    {
+        ASTValue *old;
+        ASTValue *val;
+        ASTValue *lhs = codegenExpression(e->lhs);
+        switch(e->op)
+        {
+            case tok::plusplus:
+            old = loadValue(lhs);
+            val = new ASTValue(lhs->getType(),
+                    builder.CreateAdd(codegenValue(lhs),
+                        ConstantInt::get(codegenType(lhs->getType()), 1)));
+            storeValue(lhs, val);
+            return old;
+            case tok::minusminus:
+            old = loadValue(lhs);
+            val = new ASTValue(lhs->getType(),
+                    builder.CreateSub(codegenValue(lhs),
+                        ConstantInt::get(codegenType(lhs->getType()), 1)));
+            storeValue(lhs, val);
+            return old;
+        }
     }
 
     assert(false && "postfix codegen unimpl");
@@ -345,6 +436,7 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
         {
         }
     }
+    return val; // no conversion? failed converson?
 }
 
 //XXX is op required?
@@ -368,12 +460,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     if(exp->op == tok::dot)
     {
             ASTValue *lhs = codegenExpression(exp->lhs);
-            /*
-            if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->lhs))
-            {
-                lhs = iexp->identifier()->getValue(); 
-            } else assert(false && "expected struct identifier");
-            */
+
             if(lhs->getType()->isStruct()) printf("DOT STRUCT\n");
             if(IdentifierExpression *rexp = dynamic_cast<IdentifierExpression*>(exp->rhs))
             {
@@ -381,20 +468,34 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                 int offset = 0;
                 for(int i = 0; i < sti->members.size(); i++)
                 {
-                    if(sti->members[i]->identifier->getName() == rexp->identifier()->getName()) // XXX better way to compare equality?
+                    // XXX better way to compare equality?
+                    if(sti->members[i]->identifier->getName() == rexp->identifier()->getName())
                     {
-                        ASTType *ty = ASTType::getIntTy(); //TODO
-                        std::vector<Value*> gep;
-                        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), offset)); //TODO proper struct GEP
-                        Value *llval = builder.CreateInBoundsGEP(codegenLValue(lhs), gep);
-                        return new ASTValue(ty, llval, true);
+                        if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(sti->members[i]))
+                        {
+                            //TODO proper struct GEP
+
+                            ASTType *ty = vdecl->type;
+                            std::vector<Value*> gep;
+                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), offset));
+                            Value *llval = builder.CreateInBoundsGEP(codegenLValue(lhs), gep);
+                            return new ASTValue(ty, llval, true);
+                        } else assert(false && "this should not be in a struct (right now)");
                     }
-                    offset++; // TODO: add size of member
+                    offset++;
                 }
             } else assert(false && "rhs must be identifier");
             assert(false && "member not in struct");
         return NULL;
+    } else if(exp->op == tok::colon) //cast op
+    {
+        ASTValue *rhs = codegenExpression(exp->rhs);
+        if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->lhs))
+        {
+            ASTType *ty = iexp->identifier()->declaredType();
+            return promoteType(rhs, ty);
+        } else assert(false && "need to cast to type");
     }
 
     ASTValue *lhs = codegenExpression(exp->lhs);
@@ -458,7 +559,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                 if(TYPE->isFloating())
                     val = builder.CreateFCmpOLT(lhs_val, rhs_val);
                 else if(TYPE->isSigned())
-                    val = builder.CreateICmpSLT(lhs_val, rhs_val); 
+                    val = builder.CreateICmpSLT(lhs_val, rhs_val);
                 else
                     val = builder.CreateICmpULT(lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
@@ -466,7 +567,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                 if(TYPE->isFloating())
                     val = builder.CreateFCmpOLE(lhs_val, rhs_val);
                 else if(TYPE->isSigned())
-                    val = builder.CreateICmpSLE(lhs_val, rhs_val); 
+                    val = builder.CreateICmpSLE(lhs_val, rhs_val);
                 else
                     val = builder.CreateICmpULE(lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
@@ -488,7 +589,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                 return new ASTValue(ASTType::getBoolTy(), val);
 
         // ARITHMETIC OPS
-        case tok::plus: 
+        case tok::plus:
             if(TYPE->isFloating())
                 val = builder.CreateFAdd(lhs_val, rhs_val);
             else
@@ -514,7 +615,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                 val = builder.CreateFDiv(lhs_val, rhs_val);
             else if(TYPE->isSigned())
                 val = builder.CreateSDiv(lhs_val, rhs_val);
-            else 
+            else
                 val = builder.CreateUDiv(lhs_val, rhs_val);
             return new ASTValue(TYPE, val);
 
@@ -527,6 +628,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                 val = builder.CreateURem(lhs_val, rhs_val);
             return new ASTValue(TYPE, val);
 
+        case tok::starstar:
         default:
             assert(false && "unimpl");
             return NULL; //XXX: null val
@@ -550,6 +652,7 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
 
 void IRCodegenContext::codegenStatement(Statement *stmt)
 {
+    if(!stmt) return;
     if(ExpressionStatement *estmt = dynamic_cast<ExpressionStatement*>(stmt))
     {
         codegenExpression(estmt->expression);
@@ -559,7 +662,34 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     } else if (ReturnStatement *rstmt = dynamic_cast<ReturnStatement*>(stmt))
     {
         codegenReturnStatement(rstmt);
-    }
+    } else if(LabelStatement *lstmt = dynamic_cast<LabelStatement*>(stmt))
+    {
+        if(!lstmt->identifier->getValue())
+            lstmt->identifier->setValue(new ASTValue(NULL, BasicBlock::Create(context, lstmt->identifier->getName(), builder.GetInsertBlock()->getParent())));
+        llvm::BasicBlock *BB = (llvm::BasicBlock*) lstmt->identifier->getValue()->cgValue;
+        builder.CreateBr(BB);
+        builder.SetInsertPoint(BB);
+        lstmt->identifier->setValue(new ASTValue(NULL, BB)); //TODO: cg value?
+    } else if(GotoStatement *gstmt = dynamic_cast<GotoStatement*>(stmt))
+    {
+        if(!gstmt->identifier->getValue())
+            gstmt->identifier->setValue(new ASTValue(NULL, BasicBlock::Create(context, gstmt->identifier->getName(), builder.GetInsertBlock()->getParent())));
+        llvm::BasicBlock *BB = (llvm::BasicBlock*) gstmt->identifier->getValue()->cgValue;
+        builder.CreateBr(BB);
+        BasicBlock *PG = BasicBlock::Create(context, "", builder.GetInsertBlock()->getParent()); // post GOTO block
+        builder.SetInsertPoint(PG);
+    } else if(BreakStatement *bstmt = dynamic_cast<BreakStatement*>(stmt))
+    {
+        assert(breakLabel && "break doesnt make sense here!");
+        builder.CreateBr(breakLabel);
+        builder.SetInsertPoint(BasicBlock::Create(context, "", builder.GetInsertBlock()->getParent()));
+    } else if(ContinueStatement *cstmt = dynamic_cast<ContinueStatement*>(stmt))
+    {
+        assert(continueLabel && "continue doesnt make sense here!");
+        builder.CreateBr(continueLabel);
+        builder.SetInsertPoint(BasicBlock::Create(context, "", builder.GetInsertBlock()->getParent()));
+    } else assert(false && "i dont know what kind of statmeent this isssss");
+
 }
 
 FunctionType *IRCodegenContext::codegenFunctionPrototype(FunctionPrototype *proto)
@@ -571,7 +701,7 @@ FunctionType *IRCodegenContext::codegenFunctionPrototype(FunctionPrototype *prot
         params.push_back(codegenType(proto->parameters[i].first));
     }
 
-    FunctionType *fty = FunctionType::get(codegenType(rty), params, proto->vararg); // XXX return, args, varargs 
+    FunctionType *fty = FunctionType::get(codegenType(rty), params, proto->vararg); // XXX return, args, varargs
     return fty;
 }
 
@@ -617,7 +747,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     {
         ASTType *vty = vdecl->type;
         Value *llvmDecl = builder.CreateAlloca(codegenType(vty), 0, vdecl->getName());
-        
+
         ASTValue *idValue = new ASTValue(vty, llvmDecl, true); //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
         if(vdecl->value)
         {
@@ -629,80 +759,111 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             //TODO: maybe create a LValue field in CGValue?
         }
         vdecl->identifier->setValue(idValue);
-    } else if(StructDeclaration *sdecl = dynamic_cast<StructDeclaration*>(sdecl))
+    } else if(StructDeclaration *sdecl = dynamic_cast<StructDeclaration*>(decl))
     {
+        //XXX should be generated in the Declaration stuff of the package?
         /*
         std::vector<Type*> arr;
         arr.push_back(Type::getInt32Ty(context));
         arr.push_back(Type::getInt32Ty(context));
         StructType *st = StructType::get(context, arr);
         //sdecl->identifier->setType(st);
-        printf("CG struct decl\n"); 
+        printf("CG struct decl\n");
         */
     }
 }
 
-Module *IRCodegenContext::codegenTranslationUnit(TranslationUnit *unit)
+Module *IRCodegenContext::codegenTranslationUnit(TranslationUnit *u, bool declareOnly)
 {
+    this->unit = u; //TODO: revert to old tunit once done?
     pushScope(unit->scope);
-    module = new Module(unit->getName(), context);
+    //if(u->cgValue) return (llvm::Module*) u->cgValue; //XXX already codegend
+    if(!u->cgValue)
+        u->cgValue = new Module(u->getName(), context);
+    module = (llvm::Module*) u->cgValue;
 
 
-    for(int i = 0; i < unit->imports.size(); i++) //TODO: import symbols. XXX what about recursive dependancies?
-    {}
-
-    for(int i = 0; i < unit->types.size(); i++) //XXX what about recursive types?
+    /*
+    for(int i = 0; i < u->imports.size(); i++) //TODO: import symbols.
     {
-        Declaration *decl = unit->types[i];
-        codegenDeclaration(decl);
+        codegenTranslationUnit(u->importUnits[i]);
     }
+    this->unit = u; //TODO: revert to old tunit once done?
+    module = (llvm::Module*) u->cgValue;
+    */
 
-    // alloc globals before codegen'ing functions
-    for(int i = 0; i < unit->globals.size(); i++)
+    if(declareOnly)
     {
-        Identifier *id = unit->globals[i]->identifier; 
-        if(id->isVariable()) 
+
+        for(int i = 0; i < unit->types.size(); i++) //XXX what about recursive types?
         {
-            ASTType *idTy = id->getType();
-            //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
-            GlobalVariable *llvmval = new GlobalVariable(*module, 
-                    codegenType(idTy), 
-                    false,
-                    GlobalVariable::CommonLinkage,
-                    (llvm::Constant*) (unit->globals[i]->value ? codegenValue(codegenExpression(unit->globals[i]->value)) : 0),
-                    id->getName()); //TODO: proper global insertion
-            id->setValue(new ASTValue(idTy, llvmval, true));
-        } else if(id->isFunction())
+            Declaration *decl = unit->types[i];
+            codegenDeclaration(decl);
+        }
+
+        // alloc globals before codegen'ing functions
+        for(int i = 0; i < unit->globals.size(); i++)
         {
-            //TODO: declare func 
+            Identifier *id = unit->globals[i]->identifier;
+            if(id->isVariable())
+            {
+                ASTType *idTy = id->getType();
+                //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
+                GlobalVariable *llvmval = new GlobalVariable(*module,
+                        codegenType(idTy),
+                        false,
+                        GlobalVariable::CommonLinkage,
+                        (llvm::Constant*) (unit->globals[i]->value ? codegenValue(codegenExpression(unit->globals[i]->value)) : 0),
+                        id->getName()); //TODO: proper global insertion
+                id->setValue(new ASTValue(idTy, llvmval, true));
+            } else if(id->isFunction())
+            {
+                //TODO: declare func
+            }
+        }
+
+        // declare functions prototypes
+        for(int i = 0; i < unit->functions.size(); i++)
+        {
+            FunctionDeclaration *fdecl = unit->functions[i];
+            FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
+            Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
+        }
+    } else
+    {
+        // codegen function bodys
+        for(int i = 0; i < unit->functions.size(); i++)
+            codegenDeclaration(unit->functions[i]);
+
+        ((llvm::Module*) u->cgValue)->dump();
+    }
+    popScope();
+    return (llvm::Module*) u->cgValue;
+}
+
+void IRCodegenContext::codegenPackage(Package *p, bool declareOnly)
+{
+    if(p->isTranslationUnit()) // leaf in package tree
+    {
+        codegenTranslationUnit((TranslationUnit*) p, declareOnly);
+    } else // generate all leaves ...
+    {
+        for(int i = 0; i < p->children.size(); i++)
+        {
+            codegenPackage(p->children[i], true);
+        }
+
+        if(!declareOnly)
+        for(int i = 0; i < p->children.size(); i++)
+        {
+            codegenPackage(p->children[i], false);
         }
     }
-
-    // declare functions prototypes
-    for(int i = 0; i < unit->functions.size(); i++)
-    {
-        FunctionDeclaration *fdecl = unit->functions[i];
-        FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
-        Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
-    }
-
-    // codegen function bodys
-    for(int i = 0; i < unit->functions.size(); i++)
-        codegenDeclaration(unit->functions[i]);
-
-    module->dump();
-    popScope();
-    return module;
 }
 
 void IRCodegenContext::codegenAST(AST *ast)
 {
-    std::map<std::string, TranslationUnit*>::iterator it;
-    for(it = ast->units.begin(); it != ast->units.end(); it++)
-    {
-        //TODO: something with module
-        codegenTranslationUnit(it->second);
-    }
+    codegenPackage(ast->getRootPackage(), false);
 }
 
 void IRCodegen(AST *ast)

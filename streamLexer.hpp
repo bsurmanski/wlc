@@ -50,7 +50,7 @@ class StreamLexer : public Lexer
     void unGet(Token tok)
     {
         stream->seekg(-current.characters, std::ios_base::cur);
-        current = tok; 
+        current = tok;
     }
     */
 

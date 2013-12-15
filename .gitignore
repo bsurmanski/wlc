@@ -4,3 +4,7 @@ a.out
 .dSYM
 *.dSYM
 out
+wlc
+program
+llvmir
+obj

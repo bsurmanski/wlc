@@ -86,8 +86,7 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 
     if(value->isLValue())
     {
-        //ASTValue *loaded = new ASTValue(value->type, builder.CreateLoad(codegenValue(value)));
-        return builder.CreateLoad(codegenLValue(value));
+        return builder.CreateAlignedLoad(codegenLValue(value), 4);
     }
 
     return (llvm::Value *) value->cgValue;
@@ -188,7 +187,8 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         //} else if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(iexp->identifier()->getDeclaration()))
         } else if(iexp->identifier()->isFunction())
         {
-            Function *llvmfunc = module->getFunction(iexp->identifier()->getName());
+            //Value *llvmfunc = module->getFunction(iexp->identifier()->getName());
+            Value *llvmfunc = (Value*) ((FunctionDeclaration*) iexp->identifier()->declaration)->cgValue;
             return new ASTValue(NULL, llvmfunc); //TODO: proper function CGType (llvmfunc->getFunctionType())
         } else if(iexp->identifier()->isStruct())
         {
@@ -461,9 +461,10 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     {
             ASTValue *lhs = codegenExpression(exp->lhs);
 
-            if(lhs->getType()->isStruct()) printf("DOT STRUCT\n");
             if(IdentifierExpression *rexp = dynamic_cast<IdentifierExpression*>(exp->rhs))
             {
+                if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(), codegenValue(lhs), true);
+                assert(lhs->getType()->isStruct() && "can only index struct!");
                 StructTypeInfo *sti = (StructTypeInfo*) lhs->getType()->getTypeInfo();
                 int offset = 0;
                 for(int i = 0; i < sti->members.size(); i++)
@@ -725,7 +726,9 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                 assert(fdecl->prototype->parameters.size() >= idx && "argument counts dont seem to match up...");
                 pair<ASTType*, std::string> param_i = fdecl->prototype->parameters[idx];
                 AI->setName(param_i.second);
-                ASTValue *alloca = new ASTValue(param_i.first, builder.CreateAlloca(codegenType(param_i.first), 0, param_i.second), true);
+                AllocaInst *alloc = builder.CreateAlloca(codegenType(param_i.first), 0, param_i.second);
+                alloc->setAlignment(4);
+                ASTValue *alloca = new ASTValue(param_i.first, alloc, true);
                 builder.CreateStore(AI, codegenLValue(alloca));
 
                 Identifier *id = getScope()->getInScope(param_i.second);
@@ -746,7 +749,8 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl))
     {
         ASTType *vty = vdecl->type;
-        Value *llvmDecl = builder.CreateAlloca(codegenType(vty), 0, vdecl->getName());
+        AllocaInst *llvmDecl = builder.CreateAlloca(codegenType(vty), 0, vdecl->getName());
+        llvmDecl->setAlignment(4);
 
         ASTValue *idValue = new ASTValue(vty, llvmDecl, true); //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
         if(vdecl->value)
@@ -809,10 +813,11 @@ Module *IRCodegenContext::codegenTranslationUnit(TranslationUnit *u, bool declar
             {
                 ASTType *idTy = id->getType();
                 //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
+                GlobalValue::LinkageTypes linkage = unit->globals[i]->external ? GlobalValue::ExternalLinkage : GlobalValue::WeakAnyLinkage;
                 GlobalVariable *llvmval = new GlobalVariable(*module,
                         codegenType(idTy),
                         false,
-                        GlobalVariable::CommonLinkage,
+                        linkage,
                         (llvm::Constant*) (unit->globals[i]->value ? codegenValue(codegenExpression(unit->globals[i]->value)) : 0),
                         id->getName()); //TODO: proper global insertion
                 id->setValue(new ASTValue(idTy, llvmval, true));
@@ -827,7 +832,10 @@ Module *IRCodegenContext::codegenTranslationUnit(TranslationUnit *u, bool declar
         {
             FunctionDeclaration *fdecl = unit->functions[i];
             FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
-            Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
+            if(fdecl->body)
+            fdecl->cgValue = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
+            else
+            fdecl->cgValue = Function::Create(fty, Function::ExternalWeakLinkage, fdecl->getName(), module);
         }
     } else
     {
@@ -835,7 +843,7 @@ Module *IRCodegenContext::codegenTranslationUnit(TranslationUnit *u, bool declar
         for(int i = 0; i < unit->functions.size(); i++)
             codegenDeclaration(unit->functions[i]);
 
-        ((llvm::Module*) u->cgValue)->dump();
+        //((llvm::Module*) u->cgValue)->dump();
     }
     popScope();
     return (llvm::Module*) u->cgValue;
@@ -845,7 +853,8 @@ void IRCodegenContext::codegenPackage(Package *p, bool declareOnly)
 {
     if(p->isTranslationUnit()) // leaf in package tree
     {
-        codegenTranslationUnit((TranslationUnit*) p, declareOnly);
+        std::string err;
+        linker.linkInModule(codegenTranslationUnit((TranslationUnit*) p, declareOnly), (unsigned) Linker::DestroySource, &err);
     } else // generate all leaves ...
     {
         for(int i = 0; i < p->children.size(); i++)
@@ -864,6 +873,7 @@ void IRCodegenContext::codegenPackage(Package *p, bool declareOnly)
 void IRCodegenContext::codegenAST(AST *ast)
 {
     codegenPackage(ast->getRootPackage(), false);
+    linker.getModule()->dump();
 }
 
 void IRCodegen(AST *ast)

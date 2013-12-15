@@ -70,7 +70,7 @@ ASTType *ParseContext::parseType()
        } //TODO: signedness
     } else {
         Identifier *id = getScope()->lookup(t.toString());
-        return id->declaredType();
+        type = id->declaredType();
         //TODO: do something with id...
     }
 
@@ -78,7 +78,8 @@ ASTType *ParseContext::parseType()
     {
         if(peek().is(tok::caret))
         {
-            ignore(); // eat [
+            ignore(); // eat ^
+            if(type == ASTType::getVoidTy()) type = ASTType::getCharTy(); // cannot have void*, use char*
             type = type->getPointerTy();
             continue;
         }
@@ -102,21 +103,6 @@ ASTType *ParseContext::parseType()
     return type;
 }
 
-TranslationUnit *ParseContext::parseTranslationUnit(const char *unitnm)
-{
-    TranslationUnit *unit = new TranslationUnit(currentPackage()->getScope()->lookup(unitnm)); //TODO: identifier
-    this->unit = unit;
-    currentPackage()->addPackage(unit);
-
-    pushScope(unit->getScope());
-    while(peek().isNot(tok::eof))
-    {
-        parseTopLevel(unit); // modifies t-unit
-    }
-    popScope();
-    assert(!getScope() && "somethings up with scope!");
-    return unit;
-}
 
 // parse top level expression and apply to translation unit
 void ParseContext::parseTopLevel(TranslationUnit *unit)
@@ -195,8 +181,9 @@ ImportExpression *ParseContext::parseImport()
         importedUnit = parser->getAST()->getUnit(sexp->string);
         if(!importedUnit) // This TU hasnt been loaded from file yet, DOIT
         {
-            importedUnit = parser->parseFile(sexp->string.c_str()); //TODO: identifier
+            importedUnit = new TranslationUnit(NULL);  //TODO: identifier
             parser->getAST()->addUnit(sexp->string, importedUnit);
+            parser->parseFile(importedUnit, sexp->string.c_str());
         }
     }
 
@@ -226,6 +213,7 @@ Statement *ParseContext::parseStatement()
 #define FTYPE(X,SZ) case tok::kw_##X:
 #include "tokenkinds.def"
 
+        case tok::kw_extern:
         case tok::identifier:
             push();
             if(peekBuffer().is(tok::identifier) || peekBuffer().is(tok::caret))
@@ -284,6 +272,9 @@ PARSEEXP:
 
 Declaration *ParseContext::parseDeclaration()
 {
+    bool external = false;
+    if(peek().is(tok::kw_extern)) { external = true; ignore(); }
+
     //TODO: parse function decl specs
     if(peek().is(tok::kw_struct)) //parse struct
     {
@@ -371,7 +362,7 @@ Declaration *ParseContext::parseDeclaration()
         defaultValue = parseExpression();
     }
 
-    Declaration *decl = new VariableDeclaration(type, id, defaultValue);
+    Declaration *decl = new VariableDeclaration(type, id, defaultValue, external);
     id->setDeclaration(decl, Identifier::ID_VARIABLE);
 
     //TODO: comma, multiple decl
@@ -617,38 +608,30 @@ Expression *ParseContext::parseBinaryExpression(int prec)
     return lhs;
 }
 
-/*
-void Parser::resolveImports(TranslationUnit *u)
+void ParseContext::parseTranslationUnit(TranslationUnit *unit, const char *unitnm)
 {
-    for(int i = 0; i < u->imports.size(); i++)
-    {
-        ImportExpression *imp = u->imports[i];
-        if(StringExpression *sexp = dynamic_cast<StringExpression*>(imp->expression))
-        {
-            TranslationUnit *importedUnit = getUnit(sexp->string);
-            if(!importedUnit)
-            {
-                ifstream stream(sexp->string.c_str());
-                Lexer *lexer = new StreamLexer(stream);
-                ParseContext context(lexer, this, ast->getRootPackage());
-                TranslationUnit *unit = context.parseTranslationUnit(sexp->string.c_str()); //TODO: identifier, XXX cache already parsed TU's
-                u->importUnits.push_back(unit);
-                u->getScope()->addSibling(unit->getScope());
-                ast->addUnit(unit);
-            }
-        }
-    }
-}*/
+    //TranslationUnit *unit = parser->getAST()->getUnit(unitnm);
+    //TranslationUnit *unit = new TranslationUnit(currentPackage()->getScope()->lookup(unitnm)); //TODO: identifier
+    this->unit = unit;
+    currentPackage()->addPackage(unit);
 
-TranslationUnit *Parser::parseFile(const char *filenm)
+    pushScope(unit->getScope());
+    while(peek().isNot(tok::eof))
+    {
+        parseTopLevel(unit); // modifies t-unit
+    }
+    popScope();
+    assert(!getScope() && "somethings up with scope!");
+}
+
+void Parser::parseFile(TranslationUnit *unit, const char *filenm)
 {
     ifstream stream(filenm);
     Lexer *lexer = new StreamLexer(stream);
     ParseContext context(lexer, this, ast->getRootPackage());
-    TranslationUnit *unit = context.parseTranslationUnit(filenm); //TODO: identifier
+    context.parseTranslationUnit(unit, filenm); //TODO: identifier
     //resolveImports(unit);
     delete lexer;
-    return unit;
 
     //ast->getRootPackage()->addPackage("", unit);
     //ast->units[filenm] = unit; //TODO: symbol table

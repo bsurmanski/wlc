@@ -30,11 +30,10 @@ Token Lexer::lexWord()
 {
     char curChar;
     string tokstr;
-    while(isalnum(peekChar()))
-    {
+    do {
         curChar = getChar();
         tokstr += curChar;
-    }
+    } while(isalnum(peekChar()) || peekChar() == '_');
 
 #define KEYWORD(X) if(#X == tokstr) return Token(tok::kw_##X);
 #include "tokenkinds.def"
@@ -238,7 +237,7 @@ Token Lexer::getTok()
 
     char c = peekChar();
 
-    if(isalpha(c))
+    if(isalpha(c) || c == '_')
     {
         return lexWord();
     }

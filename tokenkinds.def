@@ -98,6 +98,7 @@ KEYWORD(break)
 KEYWORD(continue)
 
 // reserved words. hopefully will get around to implementing these
+RESERVE(defer) /* for deferring code until function exit. defer <STATEMENT>*/
 RESERVE(foreach)
 RESERVE(class)
 RESERVE(asm) /* inline asm */

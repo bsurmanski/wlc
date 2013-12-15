@@ -89,7 +89,10 @@ struct AST
         char APATH[PATH_MAX + 1];
         realpath(str.c_str(), APATH);
         std::string astr = std::string(str);
-        if(units.count(astr)) return units[astr]; return NULL; 
+        if(units.count(astr)) return units[astr]; 
+        //TranslationUnit *nunit = new TranslationUnit(NULL); //TODO: identifier ?
+        //return nunit; 
+        return NULL;
     }
     void addUnit(std::string str, TranslationUnit *u)
     {
@@ -266,8 +269,9 @@ struct ASTValue
 
 struct Declaration
 {
+    bool external;
     Identifier *identifier;
-    Declaration(Identifier *id) : identifier(id) {}
+    Declaration(Identifier *id, bool ext = false) : identifier(id), external(ext) {}
     virtual ~Declaration(){}
     virtual std::string getName() { if(identifier) return identifier->getName(); return ""; }
 };
@@ -285,7 +289,8 @@ struct FunctionDeclaration : public Declaration
     FunctionPrototype *prototype;
     SymbolTable *scope;
     Statement *body;
-    FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st) : Declaration(id), prototype(p), scope(sc), body(st) {}
+    void *cgValue;
+    FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st) : Declaration(id), prototype(p), scope(sc), body(st), cgValue(NULL) {}
 };
 
 struct LabelDeclaration : public Declaration
@@ -298,7 +303,7 @@ struct VariableDeclaration : public Declaration
     //Identifier *type;
     ASTType *type;
     Expression *value; // initial value
-    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val) : Declaration(nm), type(ty), value(val) {}
+    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, bool ext = false) : Declaration(nm, ext), type(ty), value(val) {}
 };
 
 struct TypeDeclaration : public Declaration

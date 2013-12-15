@@ -5,12 +5,17 @@ using namespace std;
 #include "parser.hpp"
 #include "streamLexer.hpp"
 #include "irCodegenContext.hpp"
+#include <llvm/Linker.h>
 
 int main(int argc, char **argv)
 {
     Parser parser;
-    parser.parseFile("test.wl");
     AST *ast = parser.getAST();
-    IRCodegen(ast);
+    TranslationUnit *unit = new TranslationUnit(NULL); //TODO
+    ast->addUnit("test.wl", unit);
+    parser.parseFile(unit, "test.wl");
+    IRCodegenContext cg;
+    cg.codegenAST(ast);
+    //llvm::Linker linker(cg.module);
     return 0;
 }

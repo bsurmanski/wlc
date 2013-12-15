@@ -5,6 +5,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/Linker.h>
 #include <stack>
 
 void IRCodegen(AST *ast);
@@ -17,9 +18,10 @@ class IRCodegenContext : public CodegenContext
     llvm::Module *module;
     llvm::BasicBlock *breakLabel;
     llvm::BasicBlock *continueLabel;
+    llvm::Linker linker;
     TranslationUnit *unit;
 
-    IRCodegenContext() : context(llvm::getGlobalContext()), builder(context), module(NULL) {}
+    IRCodegenContext() : context(llvm::getGlobalContext()), builder(context), module(NULL), linker(new llvm::Module("", context)) {}
 
     void codegenAST(AST *ast);
     protected:

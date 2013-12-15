@@ -21,7 +21,7 @@ class Parser
 
     public:
         Parser() { ast = new AST(); }
-        TranslationUnit *parseFile(const char *filenm);
+        void parseFile(TranslationUnit *u, const char *filenm);
         void resolveImports(TranslationUnit *u);
         void parseString(const char *str);
         AST *getAST() { return ast; }
@@ -72,7 +72,7 @@ class ParseContext
     //Lexer *getLexer() { if(!lexers.empty()) return lexer.top(); return NULL; }
 
     public:
-    TranslationUnit *parseTranslationUnit(const char *unitnm);
+    void parseTranslationUnit(TranslationUnit *u, const char *unitnm);
     void parseTopLevel(TranslationUnit *unit);
     ASTType *parseType();
     void parseInclude();

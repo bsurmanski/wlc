@@ -4,7 +4,9 @@
 
 void Identifier::setDeclaration(Declaration *decl, IDType ty)
 {
-    assert(!declaration && "redefinition");
+    FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(declaration);
+    if(!fdecl || (fdecl && fdecl->body))
+        assert(!declaration && "redefinition");
     declaration = decl;
     type = ty;
 }

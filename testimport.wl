@@ -1,3 +1,6 @@
+
+import "test.wl"
+
 int myimportedint = 10
 
 struct MyStruct
@@ -8,3 +11,5 @@ struct MyStruct
     char c
     char d
 }
+
+int printf(char^ str, ...);

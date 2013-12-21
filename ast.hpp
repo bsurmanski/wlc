@@ -420,6 +420,12 @@ struct PostfixOpExpression : public PostfixExpression
     PostfixOpExpression(Expression *l, int o) : lhs(l), op(o) {}
 };
 
+struct DotExpression : public PostfixExpression
+{
+    Expression *lhs;
+    Identifier *rhs;
+    DotExpression(Expression *l, Identifier *r) : lhs(l), rhs(r) {}
+};
 
 struct UnaryExpression : public Expression
 {
@@ -461,6 +467,7 @@ struct StringExpression : public PrimaryExpression
     virtual StringExpression *stringExpression() { return this; }
 };
 
+// XXX super ugly. Maybe just hold an ASTValue* or something instead of this mess?
 struct NumericExpression : public PrimaryExpression
 {
     enum NumericType
@@ -472,6 +479,7 @@ struct NumericExpression : public PrimaryExpression
     };
 
     NumericType type;
+    ASTType *astType;
 
     union
     {
@@ -480,8 +488,8 @@ struct NumericExpression : public PrimaryExpression
         char charValue;
     };
 
-    NumericExpression(NumericType t, double val) : type(t), floatValue(val) {}
-    NumericExpression(NumericType t, uint64_t val) : type(t), intValue(val) {}
+    NumericExpression(NumericType t, ASTType* ty, double val) : type(t),  astType(ty), floatValue(val) {}
+    NumericExpression(NumericType t, ASTType *ty, uint64_t val) : type(t), astType(ty), intValue(val) {}
     virtual NumericExpression *numericExpression() { return this; }
 };
 

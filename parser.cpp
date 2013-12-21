@@ -481,7 +481,7 @@ Expression *ParseContext::parseExpression(int prec)
 Expression *ParseContext::parsePostfixExpression(int prec)
 {
     Expression *exp = parsePrimaryExpression();
-    if((peek().getPostfixPrecidence()) > prec)
+    while((peek().getPostfixPrecidence()) > prec)
     {
         if(peek().is(tok::lparen)) // call
         {
@@ -494,22 +494,29 @@ Expression *ParseContext::parsePostfixExpression(int prec)
                 if(peek().is(tok::comma)) ignore(); // ignore comma or rparen
             }
             ignore(); // ignore rparen
-            return new CallExpression(exp, args);
+            exp = new CallExpression(exp, args);
         } else if(peek().is(tok::lbracket)) //index/slice
         {
             ignore();
             Expression *index = parseExpression();
             assert(peek().is(tok::rbracket) && "expected ]");
             ignore();
-            return new IndexExpression(exp, index);
-        } else if(peek().is(tok::plusplus))
+            exp = new IndexExpression(exp, index);
+        } else if(peek().is(tok::dot))
+        {
+            ignore(); //ignore .
+            //TODO: bit silly, since it we are using id in current scope, instead of struct scope
+            Identifier *id = getScope()->get(get().toString());
+            exp = new DotExpression(exp, id);
+        }
+        else if(peek().is(tok::plusplus))
         {
             ignore(); // ignore ++
-            return new PostfixOpExpression(exp, tok::plusplus);
+            exp = new PostfixOpExpression(exp, tok::plusplus);
         } else if(peek().is(tok::minusminus))
         {
             ignore(); // ignore --
-            return new PostfixOpExpression(exp, tok::minusminus);
+            exp = new PostfixOpExpression(exp, tok::minusminus);
         } else {assert(false && "this doesn't look like a postfix expresion to me!");}
     }
 
@@ -539,28 +546,33 @@ Expression *ParseContext::parsePrimaryExpression()
 
     if(peek().is(tok::intNum))
     {
-        return new NumericExpression(NumericExpression::INT, get().intData());
+        return new NumericExpression(NumericExpression::INT, ASTType::getIntTy(), 
+                get().intData());
     }
 
     if(peek().is(tok::floatNum))
     {
-        return new NumericExpression(NumericExpression::DOUBLE, get().floatData());
+        return new NumericExpression(NumericExpression::DOUBLE, ASTType::getDoubleTy(),
+                get().floatData());
     }
 
     if(peek().is(tok::kw_true))
     {
         ignore();
-        return new NumericExpression(NumericExpression::INT, (uint64_t) 1L); //TODO: bool type
+        return new NumericExpression(NumericExpression::INT, ASTType::getBoolTy(), 
+                (uint64_t) 1L); //TODO: bool type
     }
     if(peek().is(tok::kw_false))
     {
         ignore();
-        return new NumericExpression(NumericExpression::INT, (uint64_t) 0L); //TODO: bool
+        return new NumericExpression(NumericExpression::INT, ASTType::getBoolTy(), 
+                (uint64_t) 0L); //TODO: bool
     }
     if(peek().is(tok::kw_null))
     {
         ignore();
-        return new NumericExpression(NumericExpression::INT, (uint64_t) 0L); //TODO: void^
+        return new NumericExpression(NumericExpression::INT, ASTType::getVoidTy()->getPointerTy(), 
+                (uint64_t) 0L); //TODO: void^
     }
 
     //TODO: eat char constant
@@ -604,7 +616,7 @@ Expression *ParseContext::parseBinaryExpression(int prec)
     {
         op = linePeek().kind;
         ignore();
-        Expression *rhs = parseBinaryExpression(opPrec);
+        Expression *rhs = parseExpression(opPrec);
         assert(rhs && "invalid binary op, expected RHS");
         lhs = new BinaryExpression(op, lhs, rhs);
     }

@@ -42,8 +42,6 @@ int getBinaryPrecidence(tok::TokenKind tkind)
         case tok::slash:
         case tok::percent:
                 return 12;
-        case tok::dot:
-                return 13;
         default:
                 return 0;
     }
@@ -57,6 +55,7 @@ int getPostfixPrecidence(tok::TokenKind tkind)
         case tok::lbracket:
         case tok::plusplus:
         case tok::minusminus:
+        case tok::dot:
             return 13;
         default:
             return 0;

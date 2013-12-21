@@ -6,14 +6,13 @@ long ^malloc(int sz);
 
 import "sdl.wl"
 
-SDL_Surface^ surf
+SDL_Surface^ surf = null
 
 void update()
 {
     int i
     int j
     surf.pixels[1] = 1
-    $
     for(i = 0; i < 320; ++i)
     {
         //for(j = 0; j < 240; j++)

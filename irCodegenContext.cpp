@@ -148,12 +148,22 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         switch(nexp->type)
         {
             case NumericExpression::INT:
-                llvmval = ConstantInt::get(Type::getInt32Ty(context), nexp->intValue);
-                ty = ASTType::getIntTy();
+                if(nexp->astType->isPointer())
+                {
+                    if(!nexp->intValue)
+                    {
+                        llvmval = ConstantPointerNull::get((PointerType*) codegenType(nexp->astType));
+                        ty = nexp->astType;
+                    }
+                } else
+                {
+                    llvmval = ConstantInt::get(codegenType(nexp->astType), nexp->intValue);
+                    ty = nexp->astType;
+                }
                 return new ASTValue(ty, llvmval); //TODO: assign
             case NumericExpression::DOUBLE:
-                llvmval = ConstantFP::get(Type::getDoubleTy(context), nexp->floatValue);
-                ty = ASTType::getDoubleTy();
+                llvmval = ConstantFP::get(codegenType(nexp->astType), nexp->floatValue);
+                ty = nexp->astType;
                 return new ASTValue(ty, llvmval); //TODO: assign
         }
     }
@@ -433,8 +443,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             //TODO: index array
             ASTType *indexedType = arr->getType()->getReferencedTy(); 
             Value *val = builder.CreateInBoundsGEP(codegenValue(arr), codegenValue(ind));
-            val = builder.CreateLoad(val);
-            return new ASTValue(indexedType, val);
+            return new ASTValue(indexedType, val, true);
         } else assert(false && "attempt to index non-pointer/array type");
     } else if(PostfixOpExpression *e = dynamic_cast<PostfixOpExpression*>(exp))
     {
@@ -458,6 +467,38 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             storeValue(lhs, val);
             return old;
         }
+    } else if(DotExpression *dexp = dynamic_cast<DotExpression*>(exp))
+    {
+            ASTValue *lhs = codegenExpression(dexp->lhs);
+
+            Identifier *id = dexp->rhs;
+            if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(), 
+                    codegenValue(lhs), true);
+            assert(lhs->getType()->isStruct() && "can only index struct!");
+            StructTypeInfo *sti = (StructTypeInfo*) lhs->getType()->getTypeInfo();
+            int offset = 0;
+            for(int i = 0; i < sti->members.size(); i++)
+            {
+                // XXX better way to compare equality?
+                if(sti->members[i]->identifier->getName() == id->getName())
+                {
+                    if(VariableDeclaration *vdecl = 
+                            dynamic_cast<VariableDeclaration*>(sti->members[i]))
+                    {
+                        //TODO proper struct GEP
+
+                        ASTType *ty = vdecl->type;
+                        std::vector<Value*> gep;
+                        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), offset));
+                        Value *llval = builder.CreateInBoundsGEP(codegenLValue(lhs), gep);
+                        return new ASTValue(ty, llval, true);
+                    } else assert(false && "this should not be in a struct (right now)");
+                }
+                offset++;
+            }
+            assert(false && "member not in struct");
+        return NULL;
     }
 
     assert(false && "postfix codegen unimpl");
@@ -530,38 +571,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     //TODO: bit messy
     if(exp->op == tok::dot)
     {
-            ASTValue *lhs = codegenExpression(exp->lhs);
-
-            if(IdentifierExpression *rexp = dynamic_cast<IdentifierExpression*>(exp->rhs))
-            {
-                if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(), 
-                        codegenValue(lhs), true);
-                assert(lhs->getType()->isStruct() && "can only index struct!");
-                StructTypeInfo *sti = (StructTypeInfo*) lhs->getType()->getTypeInfo();
-                int offset = 0;
-                for(int i = 0; i < sti->members.size(); i++)
-                {
-                    // XXX better way to compare equality?
-                    if(sti->members[i]->identifier->getName() == rexp->identifier()->getName())
-                    {
-                        if(VariableDeclaration *vdecl = 
-                                dynamic_cast<VariableDeclaration*>(sti->members[i]))
-                        {
-                            //TODO proper struct GEP
-
-                            ASTType *ty = vdecl->type;
-                            std::vector<Value*> gep;
-                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), offset));
-                            Value *llval = builder.CreateInBoundsGEP(codegenLValue(lhs), gep);
-                            return new ASTValue(ty, llval, true);
-                        } else assert(false && "this should not be in a struct (right now)");
-                    }
-                    offset++;
-                }
-            } else assert(false && "rhs must be identifier");
-            assert(false && "member not in struct");
-        return NULL;
+        assert(false && "this should not be a binop");
     } else if(exp->op == tok::colon) //cast op
     {
         ASTValue *rhs = codegenExpression(exp->rhs);
@@ -574,7 +584,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
     ASTValue *lhs = codegenExpression(exp->lhs);
     ASTValue *rhs = codegenExpression(exp->rhs);
-    if(!exp->op != tok::equal) //XXX
+    if(exp->op != tok::equal) //XXX messy
         codegenResolveBinaryTypes(&lhs, &rhs, exp->op);
 
     llvm::Value *val;

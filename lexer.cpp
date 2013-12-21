@@ -46,7 +46,7 @@ Token Lexer::lexWord()
 Token Lexer::lexPunct()
 {
 #define IFCONSUMEBREAK(X,Y) if(peekChar() == X){ ignoreChar(); Y; break; }
-    tok::TokenKind kind;
+    tok::TokenKind kind = tok::unknown;
     switch(peekChar())
     {
         case '+':
@@ -66,7 +66,22 @@ Token Lexer::lexPunct()
             break;
         case '/':
             ignoreChar();
-            IFCONSUMEBREAK('/', kind = tok::comment; while(peekChar() != '\n') ignoreChar(); );
+            IFCONSUMEBREAK('/', kind = tok::comment; while(peekChar() != '\n' && !eofChar()) ignoreChar(); );
+            if(peekChar() == '*')
+            {
+                ignoreChar();
+                while(peekChar() != '*' && !eofChar())
+                {
+                    ignore();
+                    if(peekChar() == '/') 
+                    {
+                        ignore();
+                        break;
+                    }
+                }
+                kind = tok::comment;
+                break;
+            }
             kind = tok::slash;
             break;
         case '=':
@@ -104,11 +119,11 @@ Token Lexer::lexPunct()
             break;
         case '[':
             ignoreChar();
-            kind == tok::lbracket;
+            kind = tok::lbracket;
             break;
         case ']':
             ignoreChar();
-            kind == tok::rbracket;
+            kind = tok::rbracket;
             break;
         case ',':
             ignoreChar();

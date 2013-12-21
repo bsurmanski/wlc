@@ -13,7 +13,7 @@ obj: llvmir
 	llc llvmir --filetype=obj -o obj -mtriple="x86_64-unknown-linux"
 
 program: obj
-	ld obj /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o -lc -lm -o program -dynamic-linker /lib64/ld-linux-x86-64.so.2
+	ld obj /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o -lc -lm -lSDL -o program -dynamic-linker /lib64/ld-linux-x86-64.so.2
 
 clean:
 	rm -f llvmir 

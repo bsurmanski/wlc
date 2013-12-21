@@ -55,6 +55,7 @@ class IRCodegenContext : public CodegenContext
     llvm::FunctionType *codegenFunctionPrototype(FunctionPrototype *proto);
     void codegenDeclaration(Declaration *decl);
     llvm::Module *codegenTranslationUnit(TranslationUnit *unit, bool declare);
+    void codegenIncludeUnit(TranslationUnit *current, TranslationUnit *inc);
     void codegenPackage(Package *p, bool declare);
 };
 

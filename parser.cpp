@@ -67,9 +67,10 @@ ASTType *ParseContext::parseType()
             type = ASTType::getVoidTy(); break;
         default:
             assert(false && "I haven't done this one yet...");
-       } //TODO: signedness
+       }
     } else {
-        Identifier *id = getScope()->lookup(t.toString());
+        //TODO: should be get so structs dont need fwd decl?
+        Identifier *id = getScope()->lookup(t.toString()); 
         type = id->declaredType();
         //TODO: do something with id...
     }
@@ -279,23 +280,28 @@ Declaration *ParseContext::parseDeclaration()
     if(peek().is(tok::kw_struct)) //parse struct
     {
         ignore(); // eat "struct"
-        Token t_id = get();
+
+        Token t_id = get(); // eat ID
         assert(t_id.is(tok::identifier));
         assert(!getScope()->contains(t_id.toString()) && "redeclaration (struct)!");
         Identifier *id = getScope()->get(t_id.toString());
-        assert(peek().is(tok::lbrace) && "expected lbrace");
+        assert(peek().is(tok::lbrace) || peek().is(tok::semicolon) && "expected lbrace");
 
-        SymbolTable *tbl = new SymbolTable(getScope()); 
-        pushScope(tbl);
-        ignore(); // eat lbrace
+        SymbolTable *tbl = NULL;
         vector<Declaration*> members;
-        while(peek().isNot(tok::rbrace))
+        if(peek().is(tok::lbrace))
         {
-            Declaration *d = parseDeclaration();
-            members.push_back(d);
-        }
-        ignore(); //eat rbrace
-        popScope();
+            ignore(); // eat lbrace
+            tbl = new SymbolTable(getScope()); 
+            pushScope(tbl);
+            while(peek().isNot(tok::rbrace))
+            {
+                Declaration *d = parseDeclaration();
+                members.push_back(d);
+            }
+            ignore(); //eat rbrace
+            popScope();
+        } else ignore(); // eat semicolon
 
         StructTypeInfo *sti = new StructTypeInfo(id, tbl, members); //TODO: use info
         StructDeclaration *sdecl = new StructDeclaration(id, NULL, members);

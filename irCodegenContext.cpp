@@ -729,6 +729,7 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
     {
         ASTValue *value = codegenExpression(exp->expression);
         builder.CreateRet(codegenValue(value));
+        //TODO: cast to proper type
         return;
     }
     builder.CreateRetVoid();

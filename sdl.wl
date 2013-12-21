@@ -74,6 +74,8 @@ struct SDL_Surface
 int SDL_SWSURFACE = 0
 
 SDL_Surface^ SDL_SetVideoMode(int w, int h, int bpp, int flags);
+SDL_Surface^ SDL_CreateRGBSurface(uint flags, int width, int height, int depth,
+                                  int32 rmask, int32 gmask, int32 bmask, int32 amask);
 int SDL_Flip(SDL_Surface^ surf);
 
 // SDL_timer.h

@@ -207,9 +207,13 @@ struct ASTType
         switch(type)
         {
             case TYPE_CHAR:
+            case TYPE_UCHAR:
             case TYPE_BOOL: return 1;
+            case TYPE_USHORT:
             case TYPE_SHORT: return 2;
+            case TYPE_UINT:
             case TYPE_INT: return 3;
+            case TYPE_ULONG:
             case TYPE_LONG: return 4;
             default: assert(false && "havent sized this type yet"); return 0; //TODO
         }
@@ -220,9 +224,11 @@ struct ASTType
     bool isClass() { return type == TYPE_CLASS; }
     bool isStruct() { return type == TYPE_STRUCT; }
     bool isBool() { return type == TYPE_BOOL; }
-    bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT || type == TYPE_INT || type == TYPE_LONG ||
+    bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT || 
+        type == TYPE_INT || type == TYPE_LONG ||
         type == TYPE_UCHAR || type == TYPE_USHORT || type == TYPE_UINT || type == TYPE_ULONG; }
-    bool isSigned() { return type == TYPE_CHAR || type == TYPE_SHORT || type == TYPE_INT || type == TYPE_LONG; }
+    bool isSigned() { return type == TYPE_CHAR || type == TYPE_SHORT || 
+        type == TYPE_INT || type == TYPE_LONG; }
     bool isFloating() { return type == TYPE_FLOAT || type == TYPE_DOUBLE; }
     bool isVector() { return type == TYPE_VEC; }
     bool isArray() { return type == TYPE_ARRAY; }

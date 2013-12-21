@@ -377,12 +377,13 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     for(int i = 0; i < exp->args.size(); i++)
     {
         ASTValue *val = codegenExpression(exp->args[i]);
-        //XXX promote value?
-        cargs.push_back(promoteType(val, ftype->parameters[i].first));
+        if(!ftype->vararg || ftype->parameters[i].first)
+            val = promoteType(val, ftype->parameters[i].first);
+        cargs.push_back(val);
         llargs.push_back(codegenValue(cargs[i]));
     }
     llvm::Value *value = builder.CreateCall(codegenValue(func), llargs);
-    return new ASTValue(rtype, value); //TODO
+    return new ASTValue(rtype, value);
 }
 
 ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)

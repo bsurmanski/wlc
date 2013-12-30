@@ -4,6 +4,9 @@ int printf(char^ str, ...);
 long ^malloc(int sz);
 void ^memcpy(void^ dest, void^ src, long n);
 int rand();
+void srand(uint seed);
+
+int RAND_MAX = 2147483647
 
 import "sdl.wl"
 
@@ -13,7 +16,7 @@ SDL_Surface^ back = null
 bool pixelIsWhite(SDL_Surface^ s, int i, int j)
 {
     bool ret = s.pixels[i * s.format.BytesPerPixel + j * s.pitch]
-    return ret
+    return bool: ret
 }
 
 void setPixel(SDL_Surface^ s, int i, int j, int val)
@@ -23,7 +26,7 @@ void setPixel(SDL_Surface^ s, int i, int j, int val)
 
 void update()
 {
-    int n = 0 //neighbors
+    int n = 0 // neighbors
     for(int j = 1; j < 240; j++)
     {
         for(int i = 1; i < 320; ++i)
@@ -52,6 +55,7 @@ void randomize(SDL_Surface ^s)
     {
         for(int i = 0; i < 320; ++i)
         {
+            int set;
             setPixel(s, i, j, rand())
         }
     }
@@ -63,13 +67,17 @@ int main(int argc, char^^ argv)
     back = SDL_CreateRGBSurface(SDL_SWSURFACE, 320, 240, surf.format.BitsPerPixel, 
                                 surf.format.Rmask, surf.format.Gmask, surf.format.Bmask, 
                                 surf.format.Amask)
+    srand(100)
     randomize(back)
     randomize(surf)
     char^ title = "Life"
     SDL_WM_SetCaption(title, null)
 
+    int iii = 5
+    float j = float: iii
+
     int8 spc = 0
-    while(!spc)
+    while(!spc) 
     {
         SDL_PumpEvents();
         int8^ keystate = SDL_GetKeyState(0)
@@ -81,4 +89,3 @@ int main(int argc, char^^ argv)
 
     return 0
 }
-

@@ -8,8 +8,9 @@
 #include "lexer.hpp"
 #include "ast.hpp"
 #include "symbolTable.hpp"
+#include "sourceLocation.hpp"
 
-#include <queue>
+#include <deque>
 #include <vector>
 #include <map>
 #include <stack>
@@ -43,22 +44,30 @@ class ParseContext
     ~ParseContext() { }
 
     protected:
-    std::queue<Token> tqueue;
+    std::deque<Token> tqueue;
 
     void ignoreComments() { while(lexer->peek().kind == tok::comment) lexer->ignore(); }
-    void push() { tqueue.push(getBuffer()); }
-    Token get() { Token t; if(!tqueue.empty()){ t = tqueue.front(); tqueue.pop();} else { ignoreComments(); t = lexer->get();} return t; }
+    //void push() { tqueue.push(getBuffer()); }
+    Token get() { Token t; if(!tqueue.empty()){ t = tqueue.front(); tqueue.pop_front();} else { ignoreComments(); t = lexer->get();} return t; }
     Token linePeek() { Token t = peek(); if(!t.followsNewline()) return t; return Token(tok::semicolon); }
     Token peek() {
         if(!tqueue.empty()) return tqueue.front();
         ignoreComments();
         return lexer->peek();
     }
-    void ignore() { if(!tqueue.empty()) { tqueue.pop(); return; } ignoreComments(); lexer->ignore(); }
+    void ignore() { if(!tqueue.empty()) { tqueue.pop_front(); return; } ignoreComments(); lexer->ignore(); }
 
-    Token getBuffer() { ignoreComments(); return lexer->get(); }
-    Token peekBuffer() { ignoreComments(); return lexer->peek(); }
-    void ignoreBuffer() { ignoreComments(); lexer->ignore(); }
+    Token lookAhead(int i = 0) { // lookAhead(0) is equivilent to peek()
+        while(tqueue.size() < i+1) {
+            ignoreComments(); 
+            tqueue.push_back(lexer->get());
+        }
+        return tqueue.at(i);
+    }
+
+    //Token getBuffer() { ignoreComments(); return lexer->get(); }
+    //Token peekBuffer() { ignoreComments(); return lexer->peek(); }
+    //void ignoreBuffer() { ignoreComments(); lexer->ignore(); }
     //void unGet(Token tok) { lexer->unGet(tok); }
     bool eof() { return tqueue.empty() && lexer->eof(); }
 
@@ -83,6 +92,7 @@ class ParseContext
     Expression *parseIfExpression();
     Expression *parseWhileExpression();
     Expression *parseForExpression();
+    Expression *parseCastExpression(int prec = 0);
     Expression *parseExpression(int prec = 0);
     Expression *parsePrimaryExpression();
     Expression *parsePostfixExpression(int prec = 0);

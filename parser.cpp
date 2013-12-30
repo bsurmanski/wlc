@@ -208,6 +208,7 @@ Statement *ParseContext::parseDeclarationStatement()
 
 Statement *ParseContext::parseStatement()
 {
+    int n = 1; //lookahead
     switch(peek().kind)
     {
 #define BTYPE(X,SZ,SN) case tok::kw_##X:
@@ -216,9 +217,16 @@ Statement *ParseContext::parseStatement()
 
         case tok::kw_extern:
         case tok::identifier:
-            push();
-            if(peekBuffer().is(tok::identifier) || peekBuffer().is(tok::caret))
+            while(lookAhead(n).is(tok::caret)) //XXX duplicated logic in parseExpression
+                n++;
+            if(lookAhead(n).is(tok::colon))
+            {
+                goto PARSEEXP;
+            }
+            if(lookAhead(n).is(tok::identifier))
+            {
                 return parseDeclarationStatement();
+            }
             goto PARSEEXP;
         case tok::lbrace: // TODO: lbrace as statement instead of expression?
         case tok::kw_import:
@@ -461,8 +469,24 @@ Expression *ParseContext::parseForExpression()
     return new ForExpression(decl, cond, upd, body, els);
 }
 
+Expression *ParseContext::parseCastExpression(int prec)
+{
+    ASTType *type = parseType();
+    assert(peek().is(tok::colon) && "expected colon for cast operator!");
+    ignore();
+    return new CastExpression(type, parseExpression(12));
+}
+
 Expression *ParseContext::parseExpression(int prec)
 {
+    int n = 1; //look ahead
+    while(lookAhead(n).is(tok::caret))
+        n++;
+    if(lookAhead(n).is(tok::colon))
+    {
+        return parseCastExpression(prec);
+    }
+
     switch(peek().kind)
     {
         case tok::kw_if:
@@ -505,9 +529,7 @@ Expression *ParseContext::parsePostfixExpression(int prec)
         } else if(peek().is(tok::dot))
         {
             ignore(); //ignore .
-            //TODO: bit silly, since it we are using id in current scope, instead of struct scope
-            Identifier *id = getScope()->get(get().toString());
-            exp = new DotExpression(exp, id);
+            exp = new DotExpression(exp, get().toString());
         }
         else if(peek().is(tok::plusplus))
         {

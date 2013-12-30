@@ -11,6 +11,7 @@
 
 #include "symbolTable.hpp"
 #include "identifier.hpp"
+#include "sourceLocation.hpp"
 
 struct Statement;
 struct Declaration;
@@ -349,6 +350,7 @@ struct PassExpression;
 struct SwitchExpression;
 struct ImportExpression;
 struct PackageExpression;
+struct CastExpression;
 
 struct Expression
 {
@@ -393,8 +395,17 @@ struct Expression
     virtual SwitchExpression *switchExpression() { return NULL; }
     virtual ImportExpression *importExpression() { return NULL; }
     virtual PackageExpression *packageExpression() { return NULL; }
+    virtual CastExpression *castExpression() { return NULL; }
 
     //TODO: overrides
+};
+
+struct CastExpression : public Expression
+{
+    ASTType *type;
+    Expression *expression;
+    virtual CastExpression *castExpression() { return this; }
+    CastExpression(ASTType *ty, Expression *exp) : type(ty), expression(exp) {}
 };
 
 
@@ -429,8 +440,8 @@ struct PostfixOpExpression : public PostfixExpression
 struct DotExpression : public PostfixExpression
 {
     Expression *lhs;
-    Identifier *rhs;
-    DotExpression(Expression *l, Identifier *r) : lhs(l), rhs(r) {}
+    std::string rhs;
+    DotExpression(Expression *l, std::string r) : lhs(l), rhs(r) {}
 };
 
 struct UnaryExpression : public Expression
@@ -587,6 +598,7 @@ struct ImportExpression : public Expression
 struct Statement
 {
     virtual ~Statement(){}
+    SourceLocation loc;
 };
 
 struct BreakStatement : Statement

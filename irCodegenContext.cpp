@@ -233,6 +233,9 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     {
         //TODO: should it return something? probably. Some sort of const package ptr or something...
         return NULL; 
+    } else if(CastExpression *cexp = exp->castExpression())
+    {
+        return promoteType(codegenExpression(cexp->expression), cexp->type);
     }
     assert(false && "bad expression?");
     return NULL; //TODO
@@ -472,7 +475,6 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
     {
             ASTValue *lhs = codegenExpression(dexp->lhs);
 
-            Identifier *id = dexp->rhs;
             if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(), 
                     codegenValue(lhs), true);
             assert(lhs->getType()->isStruct() && "can only index struct!");
@@ -481,7 +483,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             for(int i = 0; i < sti->members.size(); i++)
             {
                 // XXX better way to compare equality?
-                if(sti->members[i]->identifier->getName() == id->getName())
+                if(sti->members[i]->identifier->getName() == dexp->rhs)
                 {
                     if(VariableDeclaration *vdecl = 
                             dynamic_cast<VariableDeclaration*>(sti->members[i]))
@@ -528,6 +530,15 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
             if(toType->isPointer())
             {
                 return new ASTValue(toType, builder.CreatePointerCast(codegenValue(val), codegenType(toType)));
+            }
+
+            if(toType->isFloating())
+            {
+                if(val->type->isSigned())
+                return new ASTValue(toType, builder.CreateUIToFP(codegenValue(val),
+                            codegenType(toType)), false);
+                return new ASTValue(toType, builder.CreateSIToFP(codegenValue(val), 
+                            codegenType(toType)), false);
             }
         } else if(val->type->isFloating())
         {

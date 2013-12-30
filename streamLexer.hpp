@@ -63,6 +63,11 @@ class StreamLexer : public Lexer
         if(current.kind == tok::none || current.kind == tok::eof) return false;
         return true;
     }
+
+    virtual SourceLocation getLocation()
+    {
+        return SourceLocation(NULL, line);
+    }
 };
 
 #endif

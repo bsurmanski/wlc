@@ -5,6 +5,7 @@
 #include <fstream>
 
 #include "token.hpp"
+#include "sourceLocation.hpp"
 
 class Lexer
 {
@@ -45,6 +46,7 @@ class Lexer
     }
 
     virtual bool advance() = 0;
+    virtual SourceLocation getLocation() = 0;
 
     Token lex();
     Token getTok();

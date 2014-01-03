@@ -1,0 +1,9 @@
+structs are anologous to C structs. packing and allignment included
+
+for packed and alligned structs use syntax like struct(packed, allign(4)) { ... }
+    this way keywords are conditional
+
+classes are allowed to reorganize members for proper packing
+
+long cast with :: for statements like a = int:: b + c
+    or maybe just have a cast assign a := b + c

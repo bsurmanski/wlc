@@ -55,7 +55,7 @@ void randomize(SDL_Surface ^s)
     {
         for(int i = 0; i < 320; ++i)
         {
-            int set;
+            int set
             setPixel(s, i, j, rand())
         }
     }

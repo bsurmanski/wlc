@@ -35,7 +35,7 @@ struct Package
     SymbolTable *scope;
     Identifier *parent;
     Identifier *identifier;
-    void *cgValue;
+    void *cgValue; // opaque pointer to specific codegen information
 
     Package() : identifier(NULL), scope(NULL), cgValue(NULL) {}
     Package(Identifier *id) : identifier(id), scope(NULL), cgValue(NULL) {
@@ -73,7 +73,8 @@ struct TranslationUnit : public Package
     std::vector<TypeDeclaration*> types;
     std::vector<VariableDeclaration*> globals;
     std::vector<FunctionDeclaration*> functions;
-    TranslationUnit(Identifier *id) : Package(id) {}
+    std::string filenm;
+    TranslationUnit(Identifier *id, std::string fn = "") : Package(id), filenm(fn) {}
     ~TranslationUnit() { }
     virtual bool isTranslationUnit() { return true; }
     std::string getName() { return ""; }

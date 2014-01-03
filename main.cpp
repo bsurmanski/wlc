@@ -11,7 +11,7 @@ int main(int argc, char **argv)
 {
     Parser parser;
     AST *ast = parser.getAST();
-    TranslationUnit *unit = new TranslationUnit(NULL); //TODO
+    TranslationUnit *unit = new TranslationUnit(NULL, "test.wl"); //TODO
     ast->addUnit("test.wl", unit);
     parser.parseFile(unit, "test.wl");
     IRCodegenContext cg;

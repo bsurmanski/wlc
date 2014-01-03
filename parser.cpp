@@ -182,7 +182,7 @@ ImportExpression *ParseContext::parseImport()
         importedUnit = parser->getAST()->getUnit(sexp->string);
         if(!importedUnit) // This TU hasnt been loaded from file yet, DOIT
         {
-            importedUnit = new TranslationUnit(NULL);  //TODO: identifier
+            importedUnit = new TranslationUnit(NULL, sexp->string);  //TODO: identifier
             parser->getAST()->addUnit(sexp->string, importedUnit);
             parser->parseFile(importedUnit, sexp->string.c_str());
         }

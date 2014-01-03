@@ -99,7 +99,7 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 
     if(value->isLValue())
     {
-        return builder.CreateAlignedLoad(codegenLValue(value), 4);
+        return ir->CreateAlignedLoad(codegenLValue(value), 4);
     }
 
     return (llvm::Value *) value->cgValue;
@@ -120,7 +120,7 @@ llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
 ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 {
     ASTValue *stored = new ASTValue(dest->type, 
-            builder.CreateStore(codegenValue(val), codegenLValue(dest)));
+            ir->CreateStore(codegenValue(val), codegenLValue(dest)));
     return stored;
 }
 
@@ -246,41 +246,41 @@ ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
     ASTValue *cond = codegenExpression(exp->condition);
     //ASTValue *zero = new ASTValue(ASTType::getIntTy(), ConstantInt::get(Type::getInt32Ty(context), 0));
     //codegenResolveBinaryTypes(&cond, &zero, 0);
-    //ASTValue *icond = new ASTValue(ASTType::getBoolTy(), builder.CreateICmpNE(codegenValue(cond), codegenValue(zero)));
+    //ASTValue *icond = new ASTValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(cond), codegenValue(zero)));
     ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
     llvm::BasicBlock *ontrue = BasicBlock::Create(context, "true", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *onfalse = BasicBlock::Create(context, "false", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *endif = BasicBlock::Create(context, "endif", 
-            builder.GetInsertBlock()->getParent());
-    builder.CreateCondBr(codegenValue(icond), ontrue, onfalse);
+            ir->GetInsertBlock()->getParent());
+    ir->CreateCondBr(codegenValue(icond), ontrue, onfalse);
 
-    builder.SetInsertPoint(ontrue);
+    ir->SetInsertPoint(ontrue);
     codegenStatement(exp->body);
-    builder.CreateBr(onfalse);
+    ir->CreateBr(onfalse);
 
-    builder.SetInsertPoint(onfalse);
+    ir->SetInsertPoint(onfalse);
     if(exp->elsebranch) codegenStatement(exp->elsebranch);
-    builder.CreateBr(endif);
+    ir->CreateBr(endif);
 
-    builder.SetInsertPoint(endif);
+    ir->SetInsertPoint(endif);
     return NULL;
 }
 
 ASTValue *IRCodegenContext::codegenWhileExpression(WhileExpression *exp)
 {
     llvm::BasicBlock *whileBB = BasicBlock::Create(context, "while_condition", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *ontrue = BasicBlock::Create(context, "while_true", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *onfalse = BasicBlock::Create(context, "while_false", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *endwhile = BasicBlock::Create(context, "endwhile", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
 
-    builder.CreateBr(whileBB);
-    builder.SetInsertPoint(whileBB);
+    ir->CreateBr(whileBB);
+    ir->SetInsertPoint(whileBB);
     ASTValue *cond = codegenExpression(exp->condition);
     ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
 
@@ -288,69 +288,69 @@ ASTValue *IRCodegenContext::codegenWhileExpression(WhileExpression *exp)
     {
         ASTValue *zero = new ASTValue(ASTType::getIntTy(), ConstantInt::get(Type::getInt32Ty(context), 0));
         codegenResolveBinaryTypes(&cond, &zero, 0);
-        icond = new ASTValue(ASTType::getBoolTy(), builder.CreateICmpNE(codegenValue(cond), codegenValue(zero)));
+        icond = new ASTValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(cond), codegenValue(zero)));
     }*/
-    builder.CreateCondBr(codegenValue(icond), ontrue, onfalse);
+    ir->CreateCondBr(codegenValue(icond), ontrue, onfalse);
 
     this->breakLabel = endwhile;
-    builder.SetInsertPoint(ontrue);
+    ir->SetInsertPoint(ontrue);
     codegenStatement(exp->body);
-    builder.CreateBr(whileBB);
+    ir->CreateBr(whileBB);
 
-    builder.SetInsertPoint(onfalse);
+    ir->SetInsertPoint(onfalse);
     if(exp->elsebranch) codegenStatement(exp->elsebranch);
-    builder.CreateBr(endwhile);
+    ir->CreateBr(endwhile);
 
     //TODO: break label should be set to whatever it was previously, to allow for nested while
     this->breakLabel = NULL; 
 
-    builder.SetInsertPoint(endwhile);
+    ir->SetInsertPoint(endwhile);
     return NULL;
 }
 
 ASTValue *IRCodegenContext::codegenForExpression(ForExpression *exp)
 {
     llvm::BasicBlock *forBB = BasicBlock::Create(context, "for_condition", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *ontrue = BasicBlock::Create(context, "for_true", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *onfalse = BasicBlock::Create(context, "for_false", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *forupdate = BasicBlock::Create(context, "forupdate", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *endfor = BasicBlock::Create(context, "endfor", 
-            builder.GetInsertBlock()->getParent());
+            ir->GetInsertBlock()->getParent());
 
     if(exp->decl) codegenStatement(exp->decl);
 
-    builder.CreateBr(forBB);
-    builder.SetInsertPoint(forBB);
+    ir->CreateBr(forBB);
+    ir->SetInsertPoint(forBB);
 
     if(exp->condition)
     {
         ASTValue *cond = codegenExpression(exp->condition);
         ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
-        builder.CreateCondBr(codegenValue(icond), ontrue, onfalse);
-    } else builder.CreateBr(ontrue);
+        ir->CreateCondBr(codegenValue(icond), ontrue, onfalse);
+    } else ir->CreateBr(ontrue);
 
     BasicBlock *OLDBREAK = this->breakLabel; // TODO: ugly
     BasicBlock *OLDCONTINUE = this->continueLabel; //TODO: still ugly
     this->breakLabel = endfor;
     this->continueLabel = forupdate;
-    builder.SetInsertPoint(ontrue);
+    ir->SetInsertPoint(ontrue);
     if(exp->body) codegenStatement(exp->body);
-    builder.CreateBr(forupdate);
-    builder.SetInsertPoint(forupdate);
+    ir->CreateBr(forupdate);
+    ir->SetInsertPoint(forupdate);
     if(exp->update) codegenStatement(exp->update);
-    builder.CreateBr(forBB);
+    ir->CreateBr(forBB);
 
-    builder.SetInsertPoint(onfalse);
+    ir->SetInsertPoint(onfalse);
     if(exp->elsebranch) codegenStatement(exp->elsebranch);
-    builder.CreateBr(endfor);
+    ir->CreateBr(endfor);
     this->breakLabel = OLDBREAK;
     this->continueLabel = OLDCONTINUE;
 
-    builder.SetInsertPoint(endfor);
+    ir->SetInsertPoint(endfor);
     return NULL;
 }
 
@@ -385,7 +385,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         cargs.push_back(val);
         llargs.push_back(codegenValue(cargs[i]));
     }
-    llvm::Value *value = builder.CreateCall(codegenValue(func), llargs);
+    llvm::Value *value = ir->CreateCall(codegenValue(func), llargs);
     return new ASTValue(rtype, value);
 }
 
@@ -399,14 +399,14 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
         case tok::plusplus:
             assert(lhs->isLValue() && "can only increment LValue");
             val = new ASTValue(lhs->getType(),
-                    builder.CreateAdd(codegenValue(lhs),
+                    ir->CreateAdd(codegenValue(lhs),
                         ConstantInt::get(codegenType(lhs->getType()), 1)));
             storeValue(lhs, val);
             return val;
         case tok::minusminus:
             assert(lhs->isLValue() && "can only decrement LValue");
             val = new ASTValue(lhs->getType(),
-                    builder.CreateSub(codegenValue(lhs),
+                    ir->CreateSub(codegenValue(lhs),
                         ConstantInt::get(codegenType(lhs->getType()), 1)));
             storeValue(lhs, val);
             return val;
@@ -416,7 +416,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
             assert(false && "unimpl unary codegen");
         case tok::bang:
             val = promoteType(lhs, ASTType::getBoolTy());
-            return new ASTValue(ASTType::getBoolTy(), builder.CreateNot(codegenValue(val))); 
+            return new ASTValue(ASTType::getBoolTy(), ir->CreateNot(codegenValue(val))); 
         case tok::caret:
             assert(lhs->getType()->isPointer() && "can only dereference pointer type");
             return new ASTValue(lhs->getType()->getReferencedTy(), codegenValue(lhs), true);
@@ -446,7 +446,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         {
             //TODO: index array
             ASTType *indexedType = arr->getType()->getReferencedTy(); 
-            Value *val = builder.CreateInBoundsGEP(codegenValue(arr), codegenValue(ind));
+            Value *val = ir->CreateInBoundsGEP(codegenValue(arr), codegenValue(ind));
             return new ASTValue(indexedType, val, true);
         } else assert(false && "attempt to index non-pointer/array type");
     } else if(PostfixOpExpression *e = dynamic_cast<PostfixOpExpression*>(exp))
@@ -459,14 +459,14 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             case tok::plusplus:
             old = loadValue(lhs);
             val = new ASTValue(lhs->getType(),
-                    builder.CreateAdd(codegenValue(lhs),
+                    ir->CreateAdd(codegenValue(lhs),
                         ConstantInt::get(codegenType(lhs->getType()), 1)));
             storeValue(lhs, val);
             return old;
             case tok::minusminus:
             old = loadValue(lhs);
             val = new ASTValue(lhs->getType(),
-                    builder.CreateSub(codegenValue(lhs),
+                    ir->CreateSub(codegenValue(lhs),
                         ConstantInt::get(codegenType(lhs->getType()), 1)));
             storeValue(lhs, val);
             return old;
@@ -494,7 +494,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                         std::vector<Value*> gep;
                         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
                         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), offset));
-                        Value *llval = builder.CreateInBoundsGEP(codegenLValue(lhs), gep);
+                        Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
                         return new ASTValue(ty, llval, true);
                     } else assert(false && "this should not be in a struct (right now)");
                 }
@@ -518,36 +518,36 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
             if(toType->isBool())
             {
                 ASTValue zero(val->getType(), ConstantInt::get(codegenType(val->getType()), 0));
-                return new ASTValue(ASTType::getBoolTy(), builder.CreateICmpNE(codegenValue(val),
+                return new ASTValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(val),
                             codegenValue(&zero)));
             }
 
             if(toType->isInteger())
             {
-                return new ASTValue(toType, builder.CreateIntCast(codegenValue(val), 
+                return new ASTValue(toType, ir->CreateIntCast(codegenValue(val), 
                             codegenType(toType), false)); //TODO: signedness
             }
             if(toType->isPointer())
             {
-                return new ASTValue(toType, builder.CreatePointerCast(codegenValue(val), codegenType(toType)));
+                return new ASTValue(toType, ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
             }
 
             if(toType->isFloating())
             {
                 if(val->type->isSigned())
-                return new ASTValue(toType, builder.CreateUIToFP(codegenValue(val),
+                return new ASTValue(toType, ir->CreateUIToFP(codegenValue(val),
                             codegenType(toType)), false);
-                return new ASTValue(toType, builder.CreateSIToFP(codegenValue(val), 
+                return new ASTValue(toType, ir->CreateSIToFP(codegenValue(val), 
                             codegenType(toType)), false);
             }
         } else if(val->type->isFloating())
         {
             if(toType->isFloating())
             {
-                return new ASTValue(toType, builder.CreateFPCast(codegenValue(val), codegenType(toType)));
+                return new ASTValue(toType, ir->CreateFPCast(codegenValue(val), codegenType(toType)));
             } else if(toType->isInteger())
             {
-                return new ASTValue(toType, builder.CreateFPToUI(codegenValue(val), 
+                return new ASTValue(toType, ir->CreateFPToUI(codegenValue(val), 
                             codegenType(toType)));
             }
         }
@@ -556,7 +556,7 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
             if(toType->isPointer())
             {
                 return new ASTValue(toType, 
-                        builder.CreatePointerCast(codegenValue(val), codegenType(toType)));
+                        ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
             }
         }
     }
@@ -623,105 +623,105 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
             TYPE = ASTType::getBoolTy();
             lhs = promoteType(lhs, TYPE);
             rhs = promoteType(rhs, TYPE);
-            val = builder.CreateOr(codegenValue(lhs), codegenValue(rhs));
+            val = ir->CreateOr(codegenValue(lhs), codegenValue(rhs));
             return new ASTValue(TYPE, val);
         case tok::ampamp:
         case tok::kw_and:
             TYPE = ASTType::getBoolTy();
             lhs = promoteType(lhs, TYPE);
             rhs = promoteType(rhs, TYPE);
-            val = builder.CreateAnd(codegenValue(lhs), codegenValue(rhs));
+            val = ir->CreateAnd(codegenValue(lhs), codegenValue(rhs));
             return new ASTValue(TYPE, val);
 
         // BITWISE OPS
         case tok::bar:
-            val = builder.CreateOr(codegenValue(lhs), codegenValue(rhs));
+            val = ir->CreateOr(codegenValue(lhs), codegenValue(rhs));
             return new ASTValue(TYPE, val);
         case tok::caret:
-            val = builder.CreateXor(codegenValue(lhs), codegenValue(rhs));
+            val = ir->CreateXor(codegenValue(lhs), codegenValue(rhs));
             return new ASTValue(TYPE, val);
         case tok::amp:
-            val = builder.CreateAnd(codegenValue(lhs), codegenValue(rhs));
+            val = ir->CreateAnd(codegenValue(lhs), codegenValue(rhs));
             return new ASTValue(TYPE, val);
 
         // COMPARE OPS
         case tok::equalequal:
                 if(TYPE->isFloating())
-                    val = builder.CreateFCmp(CmpInst::FCMP_OEQ, lhs_val, rhs_val);
+                    val = ir->CreateFCmp(CmpInst::FCMP_OEQ, lhs_val, rhs_val);
                 else // sign not required, irrelivant for equality
-                    val = builder.CreateICmp(CmpInst::ICMP_EQ, lhs_val, rhs_val);
+                    val = ir->CreateICmp(CmpInst::ICMP_EQ, lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
         case tok::less:
                 if(TYPE->isFloating())
-                    val = builder.CreateFCmpOLT(lhs_val, rhs_val);
+                    val = ir->CreateFCmpOLT(lhs_val, rhs_val);
                 else if(TYPE->isSigned())
-                    val = builder.CreateICmpSLT(lhs_val, rhs_val);
+                    val = ir->CreateICmpSLT(lhs_val, rhs_val);
                 else
-                    val = builder.CreateICmpULT(lhs_val, rhs_val);
+                    val = ir->CreateICmpULT(lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
         case tok::lessequal:
                 if(TYPE->isFloating())
-                    val = builder.CreateFCmpOLE(lhs_val, rhs_val);
+                    val = ir->CreateFCmpOLE(lhs_val, rhs_val);
                 else if(TYPE->isSigned())
-                    val = builder.CreateICmpSLE(lhs_val, rhs_val);
+                    val = ir->CreateICmpSLE(lhs_val, rhs_val);
                 else
-                    val = builder.CreateICmpULE(lhs_val, rhs_val);
+                    val = ir->CreateICmpULE(lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
         case tok::greater:
                 if(TYPE->isFloating())
-                    val = builder.CreateFCmpOGT(lhs_val, rhs_val);
+                    val = ir->CreateFCmpOGT(lhs_val, rhs_val);
                 else if(TYPE->isSigned())
-                    val = builder.CreateICmpSGT(lhs_val, rhs_val);
+                    val = ir->CreateICmpSGT(lhs_val, rhs_val);
                 else
-                    val = builder.CreateICmpUGT(lhs_val, rhs_val);
+                    val = ir->CreateICmpUGT(lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
         case tok::greaterequal:
                 if(TYPE->isFloating())
-                    val = builder.CreateFCmpOGE(lhs_val, rhs_val);
+                    val = ir->CreateFCmpOGE(lhs_val, rhs_val);
                 else if(TYPE->isSigned())
-                    val = builder.CreateICmpSGE(lhs_val, rhs_val);
+                    val = ir->CreateICmpSGE(lhs_val, rhs_val);
                 else
-                    val = builder.CreateICmpUGE(lhs_val, rhs_val);
+                    val = ir->CreateICmpUGE(lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
 
         // ARITHMETIC OPS
         case tok::plus:
             if(TYPE->isFloating())
-                val = builder.CreateFAdd(lhs_val, rhs_val);
+                val = ir->CreateFAdd(lhs_val, rhs_val);
             else
-                val = builder.CreateAdd(lhs_val, rhs_val);
+                val = ir->CreateAdd(lhs_val, rhs_val);
             return new ASTValue(TYPE, val); //TODO: proper typing (for all below too)
 
         case tok::minus:
             if(TYPE->isFloating())
-                val = builder.CreateFSub(lhs_val, rhs_val);
+                val = ir->CreateFSub(lhs_val, rhs_val);
             else
-                val = builder.CreateSub(lhs_val, rhs_val);
+                val = ir->CreateSub(lhs_val, rhs_val);
             return new ASTValue(TYPE, val);
 
         case tok::star:
             if(TYPE->isFloating())
-                val = builder.CreateFMul(lhs_val, rhs_val);
+                val = ir->CreateFMul(lhs_val, rhs_val);
             else //TODO: signed?
-                val = builder.CreateMul(lhs_val, rhs_val);
+                val = ir->CreateMul(lhs_val, rhs_val);
             return new ASTValue(TYPE, val);
 
         case tok::slash:
             if(TYPE->isFloating())
-                val = builder.CreateFDiv(lhs_val, rhs_val);
+                val = ir->CreateFDiv(lhs_val, rhs_val);
             else if(TYPE->isSigned())
-                val = builder.CreateSDiv(lhs_val, rhs_val);
+                val = ir->CreateSDiv(lhs_val, rhs_val);
             else
-                val = builder.CreateUDiv(lhs_val, rhs_val);
+                val = ir->CreateUDiv(lhs_val, rhs_val);
             return new ASTValue(TYPE, val);
 
         case tok::percent:
             if(TYPE->isFloating())
-                val = builder.CreateFRem(lhs_val, rhs_val);
+                val = ir->CreateFRem(lhs_val, rhs_val);
             else if(TYPE->isSigned())
-                val = builder.CreateSRem(lhs_val, rhs_val);
+                val = ir->CreateSRem(lhs_val, rhs_val);
             else
-                val = builder.CreateURem(lhs_val, rhs_val);
+                val = ir->CreateURem(lhs_val, rhs_val);
             return new ASTValue(TYPE, val);
 
         case tok::starstar:
@@ -739,11 +739,11 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
     if(exp->expression)
     {
         ASTValue *value = codegenExpression(exp->expression);
-        builder.CreateRet(codegenValue(value));
+        ir->CreateRet(codegenValue(value));
         //TODO: cast to proper type
         return;
     }
-    builder.CreateRetVoid();
+    ir->CreateRetVoid();
     //return value;
 }
 
@@ -763,31 +763,31 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     {
         if(!lstmt->identifier->getValue())
             lstmt->identifier->setValue(new ASTValue(NULL, BasicBlock::Create(context, 
-                            lstmt->identifier->getName(), builder.GetInsertBlock()->getParent())));
+                            lstmt->identifier->getName(), ir->GetInsertBlock()->getParent())));
         llvm::BasicBlock *BB = (llvm::BasicBlock*) lstmt->identifier->getValue()->cgValue;
-        builder.CreateBr(BB);
-        builder.SetInsertPoint(BB);
+        ir->CreateBr(BB);
+        ir->SetInsertPoint(BB);
         lstmt->identifier->setValue(new ASTValue(NULL, BB)); //TODO: cg value?
     } else if(GotoStatement *gstmt = dynamic_cast<GotoStatement*>(stmt))
     {
         if(!gstmt->identifier->getValue())
             gstmt->identifier->setValue(new ASTValue(NULL, BasicBlock::Create(context, 
-                            gstmt->identifier->getName(), builder.GetInsertBlock()->getParent())));
+                            gstmt->identifier->getName(), ir->GetInsertBlock()->getParent())));
         llvm::BasicBlock *BB = (llvm::BasicBlock*) gstmt->identifier->getValue()->cgValue;
-        builder.CreateBr(BB);
+        ir->CreateBr(BB);
        // post GOTO block 
-        BasicBlock *PG = BasicBlock::Create(context, "", builder.GetInsertBlock()->getParent()); 
-        builder.SetInsertPoint(PG);
+        BasicBlock *PG = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()); 
+        ir->SetInsertPoint(PG);
     } else if(BreakStatement *bstmt = dynamic_cast<BreakStatement*>(stmt))
     {
         assert(breakLabel && "break doesnt make sense here!");
-        builder.CreateBr(breakLabel);
-        builder.SetInsertPoint(BasicBlock::Create(context, "", builder.GetInsertBlock()->getParent()));
+        ir->CreateBr(breakLabel);
+        ir->SetInsertPoint(BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()));
     } else if(ContinueStatement *cstmt = dynamic_cast<ContinueStatement*>(stmt))
     {
         assert(continueLabel && "continue doesnt make sense here!");
-        builder.CreateBr(continueLabel);
-        builder.SetInsertPoint(BasicBlock::Create(context, "", builder.GetInsertBlock()->getParent()));
+        ir->CreateBr(continueLabel);
+        ir->SetInsertPoint(BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()));
     } else assert(false && "i dont know what kind of statmeent this isssss");
 
 }
@@ -815,7 +815,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         if(fdecl->body)
         {
             BasicBlock *BB = BasicBlock::Create(context, "entry", func);
-            builder.SetInsertPoint(BB);
+            ir->SetInsertPoint(BB);
 
             pushScope(fdecl->scope);
 
@@ -826,10 +826,10 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                         "argument counts dont seem to match up...");
                 pair<ASTType*, std::string> param_i = fdecl->prototype->parameters[idx];
                 AI->setName(param_i.second);
-                AllocaInst *alloc = builder.CreateAlloca(codegenType(param_i.first), 0, param_i.second);
+                AllocaInst *alloc = ir->CreateAlloca(codegenType(param_i.first), 0, param_i.second);
                 alloc->setAlignment(4);
                 ASTValue *alloca = new ASTValue(param_i.first, alloc, true);
-                builder.CreateStore(AI, codegenLValue(alloca));
+                ir->CreateStore(AI, codegenLValue(alloca));
 
                 Identifier *id = getScope()->getInScope(param_i.second);
                 id->setDeclaration(NULL, Identifier::ID_VARIABLE);
@@ -841,7 +841,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
             if(func->getReturnType() == Type::getVoidTy(context))
             {
-                builder.CreateRetVoid();
+                ir->CreateRetVoid();
             }
 
             popScope();
@@ -849,7 +849,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl))
     {
         ASTType *vty = vdecl->type;
-        AllocaInst *llvmDecl = builder.CreateAlloca(codegenType(vty), 0, vdecl->getName());
+        AllocaInst *llvmDecl = ir->CreateAlloca(codegenType(vty), 0, vdecl->getName());
         llvmDecl->setAlignment(4);
 
         //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
@@ -858,7 +858,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         {
             ASTValue *defaultValue = codegenExpression(vdecl->value);
             //promoteType(defaultValue, vty);
-            //builder.CreateStore(codegenValue(defaultValue), llvmDecl);
+            //ir->CreateStore(codegenValue(defaultValue), llvmDecl);
             defaultValue = promoteType(defaultValue, vty);
             storeValue(idValue, defaultValue);
             //TODO: maybe create a LValue field in CGValue?
@@ -878,7 +878,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     }
 }
 
-void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationUnit *inc)
+void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc)
 {
     /*
     for(int i = 0; i < unit->types.size(); i++) //XXX what about recursive types?
@@ -896,7 +896,7 @@ void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationU
             ASTType *idTy = id->getType();
             //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
             GlobalValue::LinkageTypes linkage = GlobalValue::WeakAnyLinkage;
-            GlobalVariable *llvmval = new GlobalVariable(*(Module*) current->cgValue,
+            GlobalVariable *llvmval = new GlobalVariable(*current->module,
                     codegenType(idTy),
                     false,
                     linkage,
@@ -916,23 +916,24 @@ void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationU
         FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
         fdecl->cgValue = Function::Create(fty, 
                 Function::ExternalWeakLinkage, 
-                fdecl->getName(), (Module*) current->cgValue);
+                fdecl->getName(), current->module);
+
+        //di->createFunction(
     }
 }
 
-Module *IRCodegenContext::codegenTranslationUnit(TranslationUnit *u, bool declareOnly)
+void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 {
-    this->unit = u; //TODO: revert to old tunit once done?
+    this->unit = u->self; //TODO: revert to old tunit once done?
+    this->module = (Module*) u->self->cgValue;
+    this->di = &u->di;
+
     pushScope(unit->scope);
     //if(u->cgValue) return (llvm::Module*) u->cgValue; //XXX already codegend
-    if(!u->cgValue)
-        u->cgValue = new Module(u->getName(), context);
-    module = (llvm::Module*) u->cgValue;
 
-
-    for(int i = 0; i < u->imports.size(); i++) //TODO: import symbols.
+    for(int i = 0; i < unit->imports.size(); i++) //TODO: import symbols.
     {
-        codegenIncludeUnit(u, u->importUnits[i]);
+        codegenIncludeUnit(u, unit->importUnits[i]);
     }
 
     /*
@@ -983,28 +984,30 @@ Module *IRCodegenContext::codegenTranslationUnit(TranslationUnit *u, bool declar
     //fprintf(stderr, "~~~~~~");
     //((llvm::Module*) u->cgValue)->dump();
     //fprintf(stderr, "~~~~~~");
-    return (llvm::Module*) u->cgValue;
 }
 
-void IRCodegenContext::codegenPackage(Package *p, bool declareOnly)
+void IRCodegenContext::codegenPackage(Package *p)
 {
     if(p->isTranslationUnit()) // leaf in package tree
     {
         std::string err;
-        linker.linkInModule(codegenTranslationUnit((TranslationUnit*) p, declareOnly), 
-                (unsigned) Linker::DestroySource, &err);
+        Module *m = new Module("", context);
+        p->cgValue = m;
+        IRTranslationUnit u((TranslationUnit*)p, m);
+        codegenTranslationUnit(&u);
+        linker.linkInModule(m, (unsigned) Linker::DestroySource, &err);
     } else // generate all leaves ...
     {
         for(int i = 0; i < p->children.size(); i++)
         {
-            codegenPackage(p->children[i], false);
+            codegenPackage(p->children[i]);
         }
     }
 }
 
 void IRCodegenContext::codegenAST(AST *ast)
 {
-    codegenPackage(ast->getRootPackage(), false);
+    codegenPackage(ast->getRootPackage());
     linker.getModule()->dump();
 }
 

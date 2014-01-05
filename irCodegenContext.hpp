@@ -10,76 +10,28 @@
 #include <llvm/Linker.h>
 #include <stack>
 
+#include "irDebug.hpp"
+
 #define CGSTR "wlc 0.1 - Jan 2014"
 
 void IRCodegen(AST *ast);
 
-class IRTranslationUnit
-{
-    public:
-    TranslationUnit *self;
-    llvm::Module *module;
-    llvm::DIBuilder di; //debug info
-    llvm::DICompileUnit dunit;
-    IRTranslationUnit(TranslationUnit *u, llvm::Module *m) : 
-        self(u), module(m), 
-        di(*module) 
-    {
-        di.createCompileUnit(0, u->filenm, "DIR", CGSTR, false, "", 0);
-
-        // add debug for basic types
-        // TODO: do something with this??
-        di.createBasicType("char", 8, 8, llvm::dwarf::DW_ATE_signed_char);
-        di.createBasicType("uchar", 8, 8, llvm::dwarf::DW_ATE_unsigned_char);
-        di.createBasicType("int8", 8, 8, llvm::dwarf::DW_ATE_signed);
-        di.createBasicType("uint8", 8, 8, llvm::dwarf::DW_ATE_unsigned);
-        di.createBasicType("int16", 16, 16, llvm::dwarf::DW_ATE_signed);
-        di.createBasicType("uint16", 16, 16, llvm::dwarf::DW_ATE_unsigned);
-        di.createBasicType("int32", 32, 32, llvm::dwarf::DW_ATE_signed);
-        di.createBasicType("uint32", 32, 32, llvm::dwarf::DW_ATE_unsigned);
-        di.createBasicType("int64", 64, 64, llvm::dwarf::DW_ATE_signed);
-        di.createBasicType("uint64", 64, 64, llvm::dwarf::DW_ATE_unsigned);
-        di.createBasicType("float32", 32, 32, llvm::dwarf::DW_ATE_float);
-        di.createBasicType("float64", 64, 64, llvm::dwarf::DW_ATE_float);
-    }
-};
-
-class IRValue
-{
-    llvm::Value *irvalue;
-    ASTValue *astvalue;
-    llvm::DIDescriptor debug;
-    IRValue(ASTValue &v) {}
-    llvm::DIDescriptor getDebug() { return debug; }
-    void setDebug(llvm::DIDescriptor d) { debug = d; }
-};
-
-class IRType
-{
-    llvm::Type *irtype;
-    ASTType *asttype;
-    llvm::DIType debug;
-    IRType(ASTType *t) {}
-    ASTType *astType() { return asttype; }
-    llvm::DIType getDebug() { return debug; }
-    void setDebug(llvm::DIType d) { debug = d; }
-}; 
-
+class IRDebug;
 class IRCodegenContext : public CodegenContext
 {
     public:
     llvm::LLVMContext &context;
     llvm::IRBuilder<> *ir;
-    llvm::DIBuilder *di;
     llvm::Module *module;
     llvm::BasicBlock *breakLabel;
     llvm::BasicBlock *continueLabel;
     llvm::Linker linker;
     TranslationUnit *unit;
+    IRDebug *debug;
 
     IRCodegenContext() : context(llvm::getGlobalContext()), 
     ir(new llvm::IRBuilder<>(context)), 
-    di(NULL), module(NULL), linker(new llvm::Module("", context)) {}
+     module(NULL), linker(new llvm::Module("", context)) {}
 
     void codegenAST(AST *ast);
     protected:
@@ -90,9 +42,18 @@ class IRCodegenContext : public CodegenContext
     llvm::Value *codegenValue(ASTValue *v);
     llvm::Value *codegenLValue(ASTValue *v);
 
+    //debug
+    llvm::DIDescriptor diScope(){ return scope.top()->debug; }
+
+    public:
+    //scope
     void pushScope(SymbolTable* tbl) { scope.push(tbl); }
     SymbolTable *popScope() { SymbolTable *tbl = scope.top(); scope.pop(); return tbl;}
     SymbolTable *getScope() { return scope.top(); }
+    Identifier *lookup(std::string str){ return scope.top()->lookup(str); }
+    Identifier *getInScope(std::string str) { return scope.top()->getInScope(str); }
+
+    protected:
 
     ASTValue *loadValue(ASTValue *val);
     ASTValue *storeValue(ASTValue *dest, ASTValue *val);
@@ -112,8 +73,8 @@ class IRCodegenContext : public CodegenContext
     void codegenStatement(Statement *stmt);
     llvm::FunctionType *codegenFunctionPrototype(FunctionPrototype *proto);
     void codegenDeclaration(Declaration *decl);
-    void codegenTranslationUnit(IRTranslationUnit *unit);
-    void codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc);
+    void codegenTranslationUnit(TranslationUnit *unit);
+    void codegenIncludeUnit(TranslationUnit *current, TranslationUnit *inc);
     void codegenPackage(Package *p);
 };
 

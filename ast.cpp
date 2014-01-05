@@ -1,5 +1,18 @@
 #include "ast.hpp"
 
+size_t StructTypeInfo::getSize()
+{
+    size_t sz = 0;
+    VariableDeclaration *vd;
+    for(int i = 0; i < members.size(); i++)
+    {
+        vd = members[i]->variableDeclaration();
+        assert(vd && "expected variable decl, found something else");
+        sz += vd->type->size();
+    }
+    return sz;
+}
+
 ASTType *ASTType::getPointerTy()
 {
     if(!pointerTy)

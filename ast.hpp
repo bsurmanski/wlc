@@ -147,6 +147,8 @@ struct TypeInfo
 {
     virtual ~TypeInfo() {}
     virtual ASTType *getReferenceTy() { return NULL; }
+    virtual std::string getName() { return ""; }
+    virtual size_t getSize() { return 0; }
 };
 
 struct PointerTypeInfo : public TypeInfo
@@ -163,6 +165,7 @@ struct ArrayTypeInfo : public TypeInfo
     ArrayTypeInfo(ASTType *pto) : arrayOf(pto) {}
 };
 
+struct VariableDeclaration;
 struct StructTypeInfo : public TypeInfo
 {
     bool packed;
@@ -171,6 +174,8 @@ struct StructTypeInfo : public TypeInfo
     std::vector<Declaration*> members; // <type, name>
     StructTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
         identifier(id), scope(sc), members(m), packed(false){}
+    std::string getName() { return identifier->getName(); }
+    virtual size_t getSize();
 };
 
 struct AliasTypeInfo : public TypeInfo
@@ -180,12 +185,14 @@ struct AliasTypeInfo : public TypeInfo
     AliasTypeInfo(Identifier *id, ASTType *a) :identifier(id), alias(a) {}
 };
 
+#include <llvm/DebugInfo.h> //XXX
 struct ASTType
 {
     ASTTypeEnum type;
     ASTType *pointerTy;
     ASTType *arrayTy;
-    void *cgType;
+    llvm::Type *cgType; //TODO: should not have llvm in here!
+    llvm::DIType diType; //TODO: whatever, prototype
 
     TypeInfo *info;
     void setTypeInfo(TypeInfo *i, ASTTypeEnum en = TYPE_UNKNOWN)
@@ -204,7 +211,7 @@ struct ASTType
     //ASTType *getUnqual();
     ASTType *getPointerTy();
     ASTType *getArrayTy();
-    virtual size_t size() const
+    size_t size() const
     {
         switch(type)
         {
@@ -214,12 +221,19 @@ struct ASTType
             case TYPE_USHORT:
             case TYPE_SHORT: return 2;
             case TYPE_UINT:
-            case TYPE_INT: return 3;
+            case TYPE_INT: return 4;
             case TYPE_ULONG:
-            case TYPE_LONG: return 4;
+            case TYPE_LONG: return 8;
+            case TYPE_STRUCT: return info->getSize();
+            case TYPE_POINTER: return 8;
             default: assert(false && "havent sized this type yet"); return 0; //TODO
         }
     };
+
+    std::string getName()
+    {
+        return info->getName();
+    }
 
     ASTType *getReferencedTy() { return info->getReferenceTy(); }
     bool isAggregate() { return type == TYPE_STRUCT || type == TYPE_UNION || type == TYPE_CLASS; }
@@ -264,9 +278,11 @@ struct ASTValue
 {
     bool lValue;
     ASTType *type;
-    void *cgValue;
+    llvm::Value *cgValue; //XXX
+    llvm::DIVariable debug; //XXX
     ASTType *getType() { return type; }
-    ASTValue(ASTType *ty, void *cgv = NULL, bool lv = false) : type(ty), cgValue(cgv), lValue(lv) {}
+    ASTValue(ASTType *ty, void *cgv = NULL, bool lv = false) : type(ty), 
+        cgValue((llvm::Value*) cgv), lValue(lv) {}
     bool isLValue() { return lValue; }
 };
 
@@ -283,6 +299,9 @@ struct Declaration
     Declaration(Identifier *id, bool ext = false) : identifier(id), external(ext) {}
     virtual ~Declaration(){}
     virtual std::string getName() { if(identifier) return identifier->getName(); return ""; }
+
+    virtual FunctionDeclaration *functionDeclaration() { return NULL; }
+    virtual VariableDeclaration *variableDeclaration() { return NULL; }
 };
 
 struct FunctionPrototype
@@ -295,11 +314,13 @@ struct FunctionPrototype
 
 struct FunctionDeclaration : public Declaration
 {
+    llvm::DISubprogram diSubprogram;
     FunctionPrototype *prototype;
     SymbolTable *scope;
     Statement *body;
     void *cgValue;
     FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st) : Declaration(id), prototype(p), scope(sc), body(st), cgValue(NULL) {}
+    virtual FunctionDeclaration *functionDeclaration() { return this; }
 };
 
 struct LabelDeclaration : public Declaration
@@ -313,6 +334,7 @@ struct VariableDeclaration : public Declaration
     ASTType *type;
     Expression *value; // initial value
     VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, bool ext = false) : Declaration(nm, ext), type(ty), value(val) {}
+    virtual VariableDeclaration *variableDeclaration() { return this; }
 };
 
 struct TypeDeclaration : public Declaration

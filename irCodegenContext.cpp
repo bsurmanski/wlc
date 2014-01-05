@@ -74,6 +74,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 break;
             case TYPE_STRUCT:
                 llvmty = codegenStructType(ty);
+                //TODO
                 break;
             default:
                 assert(false && "type not handled");
@@ -200,7 +201,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         ///XXX work around for forward declarations of variables in parent scopes
         if(iexp->identifier()->isUndeclared())
         {
-            iexp->id = getScope()->lookup(iexp->id->getName());
+            iexp->id = lookup(iexp->id->getName());
             //TODO
             assert(!iexp->id->isUndeclared() && "undeclared variable in this scope!");
         }
@@ -831,7 +832,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                 ASTValue *alloca = new ASTValue(param_i.first, alloc, true);
                 ir->CreateStore(AI, codegenLValue(alloca));
 
-                Identifier *id = getScope()->getInScope(param_i.second);
+                Identifier *id = getInScope(param_i.second);
                 id->setDeclaration(NULL, Identifier::ID_VARIABLE);
                 id->setValue(alloca);
                 //TODO: register value to scope
@@ -878,7 +879,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     }
 }
 
-void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc)
+void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationUnit *inc)
 {
     /*
     for(int i = 0; i < unit->types.size(); i++) //XXX what about recursive types?
@@ -896,7 +897,7 @@ void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, Translatio
             ASTType *idTy = id->getType();
             //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
             GlobalValue::LinkageTypes linkage = GlobalValue::WeakAnyLinkage;
-            GlobalVariable *llvmval = new GlobalVariable(*current->module,
+            GlobalVariable *llvmval = new GlobalVariable(*(Module*)current->cgValue,
                     codegenType(idTy),
                     false,
                     linkage,
@@ -916,17 +917,17 @@ void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, Translatio
         FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
         fdecl->cgValue = Function::Create(fty, 
                 Function::ExternalWeakLinkage, 
-                fdecl->getName(), current->module);
+                fdecl->getName(), (Module*)current->cgValue);
 
         //di->createFunction(
     }
 }
 
-void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
+void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
 {
-    this->unit = u->self; //TODO: revert to old tunit once done?
-    this->module = (Module*) u->self->cgValue;
-    this->di = &u->di;
+    this->unit = u; //TODO: revert to old tunit once done?
+    this->module = (Module*) u->cgValue;
+    this->debug = new IRDebug(this, u);
 
     pushScope(unit->scope);
     //if(u->cgValue) return (llvm::Module*) u->cgValue; //XXX already codegend
@@ -975,15 +976,19 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
         fdecl->cgValue = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
         else
         fdecl->cgValue = Function::Create(fty, Function::ExternalWeakLinkage, fdecl->getName(), module);
+
+        debug->createFunction(fdecl);
     }
         // codegen function bodys
     for(int i = 0; i < unit->functions.size(); i++)
         codegenDeclaration(unit->functions[i]);
 
     popScope();
+    
     //fprintf(stderr, "~~~~~~");
     //((llvm::Module*) u->cgValue)->dump();
     //fprintf(stderr, "~~~~~~");
+    delete debug;
 }
 
 void IRCodegenContext::codegenPackage(Package *p)
@@ -993,8 +998,7 @@ void IRCodegenContext::codegenPackage(Package *p)
         std::string err;
         Module *m = new Module("", context);
         p->cgValue = m;
-        IRTranslationUnit u((TranslationUnit*)p, m);
-        codegenTranslationUnit(&u);
+        codegenTranslationUnit((TranslationUnit *) p);
         linker.linkInModule(m, (unsigned) Linker::DestroySource, &err);
     } else // generate all leaves ...
     {

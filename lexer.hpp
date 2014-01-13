@@ -47,6 +47,7 @@ class Lexer
 
     virtual bool advance() = 0;
     virtual SourceLocation getLocation() = 0;
+    virtual unsigned getLine() { return line; }
 
     Token lex();
     Token getTok();

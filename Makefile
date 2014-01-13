@@ -10,7 +10,7 @@ llvmir: test.wl wlc
 	./wlc 2> llvmir
 
 obj: llvmir 
-	llc llvmir --filetype=obj -o obj -mtriple="x86_64-unknown-linux"
+	llc llvmir --filetype=obj -o obj -mtriple="x86_64-unknown-linux" -O0
 
 program: obj
 	ld obj /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o -lc -lm -lSDL -o program -dynamic-linker /lib64/ld-linux-x86-64.so.2

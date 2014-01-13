@@ -294,9 +294,10 @@ struct ASTValue
 
 struct Declaration
 {
-    bool external;
     Identifier *identifier;
-    Declaration(Identifier *id, bool ext = false) : identifier(id), external(ext) {}
+    int line;
+    bool external;
+    Declaration(Identifier *id, int ln = 0, bool ext = false) : identifier(id), line(ln), external(ext) {}
     virtual ~Declaration(){}
     virtual std::string getName() { if(identifier) return identifier->getName(); return ""; }
 
@@ -319,13 +320,14 @@ struct FunctionDeclaration : public Declaration
     SymbolTable *scope;
     Statement *body;
     void *cgValue;
-    FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st) : Declaration(id), prototype(p), scope(sc), body(st), cgValue(NULL) {}
+    FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st, int ln = 0) : Declaration(id, ln), prototype(p), scope(sc), body(st), cgValue(NULL) {}
     virtual FunctionDeclaration *functionDeclaration() { return this; }
+    SymbolTable *getScope() { return scope; }
 };
 
 struct LabelDeclaration : public Declaration
 {
-    LabelDeclaration(Identifier *id) : Declaration(id) {}
+    LabelDeclaration(Identifier *id, int ln = 0) : Declaration(id, ln) {}
 };
 
 struct VariableDeclaration : public Declaration
@@ -333,20 +335,20 @@ struct VariableDeclaration : public Declaration
     //Identifier *type;
     ASTType *type;
     Expression *value; // initial value
-    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, bool ext = false) : Declaration(nm, ext), type(ty), value(val) {}
+    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, int ln = 0, bool ext = false) : Declaration(nm, ln, ext), type(ty), value(val) {}
     virtual VariableDeclaration *variableDeclaration() { return this; }
 };
 
 struct TypeDeclaration : public Declaration
 {
     ASTType *type;
-    TypeDeclaration(Identifier *id, ASTType *ty) : Declaration(id), type(ty) {}
+    TypeDeclaration(Identifier *id, ASTType *ty, int ln = 0) : Declaration(id, ln), type(ty) {}
 };
 
 struct StructDeclaration : public TypeDeclaration
 {
     std::vector<Declaration*> members;
-    StructDeclaration(Identifier *id, ASTType *ty, std::vector<Declaration*> m) : TypeDeclaration(id, ty), members(m) {}
+    StructDeclaration(Identifier *id, ASTType *ty, std::vector<Declaration*> m, int ln = 0) : TypeDeclaration(id, ty, ln), members(m) {}
 };
 
 /***

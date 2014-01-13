@@ -10,6 +10,7 @@
 #include "ast.hpp"
 
 #define CGSTR "wlc 0.1 - Jan 2014"
+#define PROJDIR "/home/brandon/PROJECTS/C/term/wlc"
 
 class IRCodegenContext;
 class IRDebug
@@ -23,8 +24,8 @@ class IRDebug
         IRDebug(IRCodegenContext *c, TranslationUnit *u) : context(c), unit(u), 
              di(*(llvm::Module*)unit->cgValue) 
         {
-            di.createCompileUnit(0, u->filenm, "DIR", CGSTR, false, "", 0); 
-            diFile = di.createFile(u->filenm, "DIR");
+            di.createCompileUnit(0, u->filenm, PROJDIR, CGSTR, false, "", 0); 
+            diFile = di.createFile(u->filenm, PROJDIR);
         }
 
         ~IRDebug()

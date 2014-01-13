@@ -19,7 +19,7 @@ bool pixelIsWhite(SDL_Surface^ s, int i, int j)
     return bool: ret
 }
 
-void setPixel(SDL_Surface^ s, int i, int j, int val)
+void setPixel(SDL_Surface^ s, int i, int j, int val) 
 {
     s.pixels[i * s.format.BytesPerPixel + j * s.pitch] = val
 }

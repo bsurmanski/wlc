@@ -19,12 +19,13 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
     vector<Value *> vec;
     for(int i = 0; i < sti->members.size(); i++)
     {
-        
+        //TODO: members 
     }
 
     DIArray arr = di.getOrCreateArray(vec);
 
-    return di.createStructType(currentScope(), //TODO: defined scope
+    llvm::DIDescriptor DIContext(currentFile());
+    return di.createStructType(DIContext, //TODO: defined scope
             ty->getName(), 
             currentFile(), //TODO: defined file 
             0, 
@@ -112,10 +113,20 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
 {
     //if(!f->diSubprogram)
     {
-    f->diSubprogram = di.createFunction(currentScope(), f->getName(), f->getName(),
+    llvm::DIDescriptor DIContext(currentFile());
+    f->diSubprogram = di.createFunction(
+            DIContext, //f->getScope()->getDebug(), 
+            f->getName(),
+            f->getName(),
             currentFile(), 
-            0, //TODO
-            createPrototype(f->prototype), false, true, 0, 0, false, (Function*) f->cgValue);
+            f->line, //TODO
+            createPrototype(f->prototype), 
+            false, //is local
+            f->body, //is definition
+            f->line,
+            0, //flags
+            false, //isoptimized
+            (Function*) f->cgValue);
     }
     return f->diSubprogram;
 }

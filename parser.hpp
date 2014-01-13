@@ -22,7 +22,7 @@ class Parser
 
     public:
         Parser() { ast = new AST(); }
-        void parseFile(TranslationUnit *u, const char *filenm);
+        void parseFile(TranslationUnit *u, std::string filenm);
         void resolveImports(TranslationUnit *u);
         void parseString(const char *str);
         AST *getAST() { return ast; }

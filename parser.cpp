@@ -184,7 +184,7 @@ ImportExpression *ParseContext::parseImport()
         {
             importedUnit = new TranslationUnit(NULL, sexp->string);  //TODO: identifier
             parser->getAST()->addUnit(sexp->string, importedUnit);
-            parser->parseFile(importedUnit, sexp->string.c_str());
+            parser->parseFile(importedUnit, sexp->string);
         }
     }
 
@@ -281,6 +281,7 @@ PARSEEXP:
 
 Declaration *ParseContext::parseDeclaration()
 {
+    int line = lexer->getLine();
     bool external = false;
     if(peek().is(tok::kw_extern)) { external = true; ignore(); }
 
@@ -312,7 +313,7 @@ Declaration *ParseContext::parseDeclaration()
         } else ignore(); // eat semicolon
 
         StructTypeInfo *sti = new StructTypeInfo(id, tbl, members); //TODO: use info
-        StructDeclaration *sdecl = new StructDeclaration(id, NULL, members);
+        StructDeclaration *sdecl = new StructDeclaration(id, NULL, members, line);
         id->declaredType()->setTypeInfo(sti, TYPE_STRUCT);
         id->setDeclaration(sdecl, Identifier::ID_STRUCT);
         return sdecl;
@@ -364,7 +365,7 @@ Declaration *ParseContext::parseDeclaration()
         popScope();
 
         FunctionPrototype *proto = new FunctionPrototype(type, args, vararg);
-        Declaration *decl = new FunctionDeclaration(id, proto, funcScope, stmt);
+        Declaration *decl = new FunctionDeclaration(id, proto, funcScope, stmt, line);
         id->setDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;
     }
@@ -376,7 +377,7 @@ Declaration *ParseContext::parseDeclaration()
         defaultValue = parseExpression();
     }
 
-    Declaration *decl = new VariableDeclaration(type, id, defaultValue, external);
+    Declaration *decl = new VariableDeclaration(type, id, defaultValue, line, external);
     id->setDeclaration(decl, Identifier::ID_VARIABLE);
 
     //TODO: comma, multiple decl
@@ -664,12 +665,12 @@ void ParseContext::parseTranslationUnit(TranslationUnit *unit, const char *unitn
     assert(!getScope() && "somethings up with scope!");
 }
 
-void Parser::parseFile(TranslationUnit *unit, const char *filenm)
+void Parser::parseFile(TranslationUnit *unit, std::string filenm)
 {
-    ifstream stream(filenm);
+    ifstream stream(filenm.c_str());
     Lexer *lexer = new StreamLexer(stream);
     ParseContext context(lexer, this, ast->getRootPackage());
-    context.parseTranslationUnit(unit, filenm); //TODO: identifier
+    context.parseTranslationUnit(unit, filenm.c_str()); //TODO: identifier
     //resolveImports(unit);
     delete lexer;
 

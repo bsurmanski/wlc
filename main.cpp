@@ -22,9 +22,17 @@ void compile(WLParams params)
         AST *ast = parser.getAST();
         for(int i = 0; i < params.files.size(); i++)
         {
-            TranslationUnit *unit = new TranslationUnit(NULL, params.files[i]); //TODO
-            ast->addUnit(params.files[i], unit);
-            parser.parseFile(unit, params.files[i]);
+            if(!ast->getUnit(params.files[i])) // check if file already parsed
+            {
+                TranslationUnit *unit = new TranslationUnit(NULL, params.files[i]); //TODO
+                unit->expl = true;
+                ast->addUnit(params.files[i], unit);
+                parser.parseFile(unit, params.files[i]);
+            } else
+            {
+                TranslationUnit *u = ast->getUnit(params.files[i]);
+                u->expl = true;
+            }
         }
         IRCodegenContext cg;
         cg.codegenAST(ast);

@@ -10,6 +10,12 @@
 using namespace std;
 using namespace llvm;
 
+void IRCodegenContext::dwarfStopPoint(int ln)
+{
+    llvm::DebugLoc loc = llvm::DebugLoc::get(ln, 1, diScope());
+    ir->SetCurrentDebugLocation(loc);
+}
+
 
 llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
 {
@@ -818,7 +824,8 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             BasicBlock *BB = BasicBlock::Create(context, "entry", func);
             ir->SetInsertPoint(BB);
 
-            pushScope(fdecl->scope);
+            pushScope(fdecl->scope, fdecl->diSubprogram);
+            dwarfStopPoint(decl->line);
 
             int idx = 0;
             for(Function::arg_iterator AI = func->arg_begin(); AI != func->arg_end(); AI++, idx++)
@@ -929,7 +936,7 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
     this->module = (Module*) u->cgValue;
     this->debug = new IRDebug(this, u);
 
-    pushScope(unit->scope);
+    pushScope(unit->scope, llvm::DIDescriptor()); //TODO: debug
     //if(u->cgValue) return (llvm::Module*) u->cgValue; //XXX already codegend
 
     for(int i = 0; i < unit->imports.size(); i++) //TODO: import symbols.
@@ -1012,6 +1019,7 @@ void IRCodegenContext::codegenPackage(Package *p)
 void IRCodegenContext::codegenAST(AST *ast)
 {
     codegenPackage(ast->getRootPackage());
+    linker.getModule()->MaterializeAll();
     linker.getModule()->dump();
 }
 

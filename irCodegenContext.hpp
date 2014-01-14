@@ -47,13 +47,15 @@ class IRCodegenContext : public CodegenContext
 
     public:
     //scope
-    void pushScope(SymbolTable* tbl) { scope.push(tbl); }
+    void pushScope(SymbolTable* tbl, llvm::DIDescriptor debug) { tbl->setDebug(debug); scope.push(tbl);}
     SymbolTable *popScope() { SymbolTable *tbl = scope.top(); scope.pop(); return tbl;}
     SymbolTable *getScope() { return scope.top(); }
     Identifier *lookup(std::string str){ return scope.top()->lookup(str); }
     Identifier *getInScope(std::string str) { return scope.top()->getInScope(str); }
 
     protected:
+
+    void dwarfStopPoint(int ln);
 
     ASTValue *loadValue(ASTValue *val);
     ASTValue *storeValue(ASTValue *dest, ASTValue *val);

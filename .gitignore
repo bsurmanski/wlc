@@ -3,6 +3,8 @@
 a.out
 .dSYM
 *.dSYM
+*.o
+*.ll
 out
 wlc
 program

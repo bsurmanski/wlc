@@ -74,7 +74,8 @@ struct TranslationUnit : public Package
     std::vector<VariableDeclaration*> globals;
     std::vector<FunctionDeclaration*> functions;
     std::string filenm;
-    TranslationUnit(Identifier *id, std::string fn = "") : Package(id), filenm(fn) {}
+    bool expl; // explicitly requested for compile. eg, not included
+    TranslationUnit(Identifier *id, std::string fn = "") : Package(id), filenm(fn), expl(false) {}
     ~TranslationUnit() { }
     virtual bool isTranslationUnit() { return true; }
     std::string getName() { return ""; }
@@ -83,6 +84,8 @@ struct TranslationUnit : public Package
 struct AST
 {
     Package *root;
+    std::map<std::string, TranslationUnit*> units;
+
     AST() { root = new Package; }
     ~AST() { delete root; }
     Package *getRootPackage() { return root; }
@@ -104,8 +107,6 @@ struct AST
         assert(!units.count(astr) && "reimport of translation unit!");
         units[str] = u; 
     }
-
-    std::map<std::string, TranslationUnit*> units;
 };
 
 struct FunctionDeclaration;

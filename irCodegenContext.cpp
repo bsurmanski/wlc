@@ -910,7 +910,12 @@ void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationU
                     linkage,
                     (llvm::Constant*) NULL,
                     id->getName()); //TODO: proper global insertion
-            id->setValue(new ASTValue(idTy, llvmval, true));
+            
+            ASTValue *gv = new ASTValue(idTy, llvmval, true);
+
+            //debug->createGlobal(inc->globals[i], gv);
+
+            id->setValue(gv);
         } else if(id->isFunction())
         {
             //TODO: declare func
@@ -967,7 +972,11 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
                     (llvm::Constant*) (unit->globals[i]->value ? codegenValue(codegenExpression(unit->globals[i]->value)) : 0),
                     id->getName()); //TODO: proper global insertion
 
-            id->setValue(new ASTValue(idTy, llvmval, true));
+            ASTValue *gv = new ASTValue(idTy, llvmval, true);
+            id->setValue(gv);
+
+            debug->createGlobal(unit->globals[i], gv);
+
         } else if(id->isFunction())
         {
             //TODO: declare func

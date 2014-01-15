@@ -167,6 +167,7 @@ struct ArrayTypeInfo : public TypeInfo
 };
 
 struct VariableDeclaration;
+struct StructDeclaration;
 struct StructTypeInfo : public TypeInfo
 {
     bool packed;
@@ -177,6 +178,7 @@ struct StructTypeInfo : public TypeInfo
         identifier(id), scope(sc), members(m), packed(false){}
     std::string getName() { return identifier->getName(); }
     virtual size_t getSize();
+    StructDeclaration *getDeclaration() { return (StructDeclaration*) identifier->getDeclaration(); }
 };
 
 struct AliasTypeInfo : public TypeInfo
@@ -338,6 +340,7 @@ struct VariableDeclaration : public Declaration
     Expression *value; // initial value
     VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, int ln = 0, bool ext = false) : Declaration(nm, ln, ext), type(ty), value(val) {}
     virtual VariableDeclaration *variableDeclaration() { return this; }
+    ASTType *getType() { return type; }
 };
 
 struct TypeDeclaration : public Declaration

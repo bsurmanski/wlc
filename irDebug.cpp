@@ -28,10 +28,10 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
     return di.createStructType(DIContext, //TODO: defined scope
             ty->getName(), 
             currentFile(), //TODO: defined file 
-            0, 
+            sti->getDeclaration()->line, //line num
             ty->size(),
             ty->size(),
-            0, 
+            0, // flags
             llvm::DIType(),
             arr
             ); 
@@ -129,4 +129,14 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
             (Function*) f->cgValue);
     }
     return f->diSubprogram;
+}
+
+llvm::DIGlobalVariable IRDebug::createGlobal(VariableDeclaration *decl, ASTValue *val)
+{
+    return di.createGlobalVariable(decl->identifier->getName(), 
+            currentFile(), 
+            decl->line,
+            createType(decl->getType()),
+            false, //TODO: local to unit?
+            (Value*) val->cgValue);
 }

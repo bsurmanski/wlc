@@ -41,6 +41,7 @@ class IRDebug
         llvm::DIType createType(ASTType *t);
         llvm::DICompositeType createPrototype(FunctionPrototype *p);
         llvm::DISubprogram createFunction(FunctionDeclaration *f);
+        llvm::DIGlobalVariable createGlobal(VariableDeclaration *decl, ASTValue *val);
 };
 
 #endif

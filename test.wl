@@ -12,6 +12,7 @@ import "sdl.wl"
 
 SDL_Surface^ surf = null
 SDL_Surface^ back = null
+void^ testval = null
 
 bool pixelIsWhite(SDL_Surface^ s, int i, int j)
 {

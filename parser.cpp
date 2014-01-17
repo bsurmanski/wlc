@@ -281,7 +281,6 @@ PARSEEXP:
 
 Declaration *ParseContext::parseDeclaration()
 {
-    int line = lexer->getLine();
     bool external = false;
     if(peek().is(tok::kw_extern)) { external = true; ignore(); }
 
@@ -313,7 +312,7 @@ Declaration *ParseContext::parseDeclaration()
         } else ignore(); // eat semicolon
 
         StructTypeInfo *sti = new StructTypeInfo(id, tbl, members); //TODO: use info
-        StructDeclaration *sdecl = new StructDeclaration(id, NULL, members, line);
+        StructDeclaration *sdecl = new StructDeclaration(id, NULL, members, t_id.loc);
         id->declaredType()->setTypeInfo(sti, TYPE_STRUCT);
         id->setDeclaration(sdecl, Identifier::ID_STRUCT);
         return sdecl;
@@ -365,7 +364,7 @@ Declaration *ParseContext::parseDeclaration()
         popScope();
 
         FunctionPrototype *proto = new FunctionPrototype(type, args, vararg);
-        Declaration *decl = new FunctionDeclaration(id, proto, funcScope, stmt, line);
+        Declaration *decl = new FunctionDeclaration(id, proto, funcScope, stmt, t_id.loc);
         id->setDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;
     }
@@ -377,7 +376,7 @@ Declaration *ParseContext::parseDeclaration()
         defaultValue = parseExpression();
     }
 
-    Declaration *decl = new VariableDeclaration(type, id, defaultValue, line, external);
+    Declaration *decl = new VariableDeclaration(type, id, defaultValue, t_id.loc, external);
     id->setDeclaration(decl, Identifier::ID_VARIABLE);
 
     //TODO: comma, multiple decl
@@ -480,6 +479,7 @@ Expression *ParseContext::parseCastExpression(int prec)
 
 Expression *ParseContext::parseExpression(int prec)
 {
+    int line = lexer->getLine();
     int n = 1; //look ahead
     while(lookAhead(n).is(tok::caret))
         n++;

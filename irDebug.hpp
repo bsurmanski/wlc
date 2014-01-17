@@ -44,4 +44,6 @@ class IRDebug
         llvm::DIGlobalVariable createGlobal(VariableDeclaration *decl, ASTValue *val);
 };
 
+void createIdentMetadata(llvm::Module *m);
+
 #endif

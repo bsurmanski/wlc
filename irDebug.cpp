@@ -5,12 +5,21 @@
 using namespace std;
 using namespace llvm;
 
+// added due to requirement debug info in LLVM 3.4
+void createIdentMetadata(llvm::Module *m)
+{
+    llvm::NamedMDNode *identMD = m->getOrInsertNamedMetadata("llvm.ident");
+    llvm::Value *identNode = { llvm::MDString::get(m->getContext(), CGSTR) };
+    identMD->addOperand(llvm::MDNode::get(m->getContext(), identNode));
+
+    m->addModuleFlag(llvm::Module::Warning, "Dwarf Version", 4);
+    m->addModuleFlag(llvm::Module::Error, "Debug Info Version", llvm::DEBUG_METADATA_VERSION);
+}
 
 llvm::DIDescriptor IRDebug::currentScope()
 {
     return context->getScope()->getDebug();
 }
-
 
 llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
 {
@@ -28,7 +37,7 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
     return di.createStructType(DIContext, //TODO: defined scope
             ty->getName(), 
             currentFile(), //TODO: defined file 
-            sti->getDeclaration()->line, //line num
+            sti->getDeclaration()->loc.line, //line num
             ty->size(),
             ty->size(),
             0, // flags
@@ -119,11 +128,11 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
             f->getName(),
             f->getName(),
             currentFile(), 
-            f->line, //TODO
+            f->loc.line, //TODO
             createPrototype(f->prototype), 
             false, //is local
             f->body, //is definition
-            f->line,
+            f->loc.line,
             0, //flags
             false, //isoptimized
             (Function*) f->cgValue);
@@ -135,7 +144,7 @@ llvm::DIGlobalVariable IRDebug::createGlobal(VariableDeclaration *decl, ASTValue
 {
     return di.createGlobalVariable(decl->identifier->getName(), 
             currentFile(), 
-            decl->line,
+            decl->loc.line,
             createType(decl->getType()),
             false, //TODO: local to unit?
             (Value*) val->cgValue);

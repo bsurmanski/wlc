@@ -825,7 +825,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             ir->SetInsertPoint(BB);
 
             pushScope(fdecl->scope, fdecl->diSubprogram);
-            dwarfStopPoint(decl->line);
+            dwarfStopPoint(decl->loc.line);
 
             int idx = 0;
             for(Function::arg_iterator AI = func->arg_begin(); AI != func->arg_end(); AI++, idx++)
@@ -912,10 +912,7 @@ void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationU
                     id->getName()); //TODO: proper global insertion
             
             ASTValue *gv = new ASTValue(idTy, llvmval, true);
-
-            //debug->createGlobal(inc->globals[i], gv);
-
-            id->setValue(gv);
+            id->setValue(gv); //TODO: is id declared across modules? should value only be set in local module?
         } else if(id->isFunction())
         {
             //TODO: declare func
@@ -1028,6 +1025,7 @@ void IRCodegenContext::codegenPackage(Package *p)
 void IRCodegenContext::codegenAST(AST *ast)
 {
     codegenPackage(ast->getRootPackage());
+    createIdentMetadata(linker.getModule());
     linker.getModule()->MaterializeAll();
     linker.getModule()->dump();
 }

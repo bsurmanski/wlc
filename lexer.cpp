@@ -288,7 +288,10 @@ Token Lexer::lex()
         ignoreChar();
     }
 
+    SourceLocation loc(NULL, this->line);
+
     Token tok = getTok();
     tok.newline = ws;
+    tok.loc = loc;
     return tok;
 }

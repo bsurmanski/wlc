@@ -33,6 +33,8 @@ class IRCodegenContext : public CodegenContext
     ir(new llvm::IRBuilder<>(context)), 
      module(NULL), linker(new llvm::Module("", context)) {}
 
+    llvm::LLVMContext& getLLVMContext() { return context; }
+
     void codegenAST(AST *ast);
     protected:
     std::stack<SymbolTable*> scope;

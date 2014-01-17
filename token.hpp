@@ -5,6 +5,8 @@
 #include <string>
 #include <stdint.h>
 
+#include "sourceLocation.hpp"
+
 namespace tok
 {
     enum TokenKind
@@ -27,6 +29,7 @@ struct Token
     TokenKind kind;
     unsigned short characters;
     bool newline;
+    SourceLocation loc;
 
 
     union

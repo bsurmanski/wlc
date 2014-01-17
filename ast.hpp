@@ -298,9 +298,9 @@ struct ASTValue
 struct Declaration
 {
     Identifier *identifier;
-    int line;
+    SourceLocation loc;
     bool external;
-    Declaration(Identifier *id, int ln = 0, bool ext = false) : identifier(id), line(ln), external(ext) {}
+    Declaration(Identifier *id, SourceLocation l, bool ext = false) : identifier(id), loc(l), external(ext) {}
     virtual ~Declaration(){}
     virtual std::string getName() { if(identifier) return identifier->getName(); return ""; }
 
@@ -323,14 +323,14 @@ struct FunctionDeclaration : public Declaration
     SymbolTable *scope;
     Statement *body;
     void *cgValue;
-    FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st, int ln = 0) : Declaration(id, ln), prototype(p), scope(sc), body(st), cgValue(NULL) {}
+    FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st, SourceLocation loc) : Declaration(id, loc), prototype(p), scope(sc), body(st), cgValue(NULL) {}
     virtual FunctionDeclaration *functionDeclaration() { return this; }
     SymbolTable *getScope() { return scope; }
 };
 
 struct LabelDeclaration : public Declaration
 {
-    LabelDeclaration(Identifier *id, int ln = 0) : Declaration(id, ln) {}
+    LabelDeclaration(Identifier *id, SourceLocation loc) : Declaration(id, loc) {}
 };
 
 struct VariableDeclaration : public Declaration
@@ -338,7 +338,7 @@ struct VariableDeclaration : public Declaration
     //Identifier *type;
     ASTType *type;
     Expression *value; // initial value
-    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, int ln = 0, bool ext = false) : Declaration(nm, ln, ext), type(ty), value(val) {}
+    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) : Declaration(nm, loc, ext), type(ty), value(val) {}
     virtual VariableDeclaration *variableDeclaration() { return this; }
     ASTType *getType() { return type; }
 };
@@ -346,13 +346,13 @@ struct VariableDeclaration : public Declaration
 struct TypeDeclaration : public Declaration
 {
     ASTType *type;
-    TypeDeclaration(Identifier *id, ASTType *ty, int ln = 0) : Declaration(id, ln), type(ty) {}
+    TypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) : Declaration(id, loc), type(ty) {}
 };
 
 struct StructDeclaration : public TypeDeclaration
 {
     std::vector<Declaration*> members;
-    StructDeclaration(Identifier *id, ASTType *ty, std::vector<Declaration*> m, int ln = 0) : TypeDeclaration(id, ty, ln), members(m) {}
+    StructDeclaration(Identifier *id, ASTType *ty, std::vector<Declaration*> m, SourceLocation loc) : TypeDeclaration(id, ty, loc), members(m) {}
 };
 
 /***
@@ -405,7 +405,11 @@ struct Expression
         EXP_IMPORT,
     };
     */
-    Expression() {}
+
+    int line;
+    void setLine(int ln) { line = ln; }
+
+    Expression(int ln = 0) : line(ln) {}
     virtual UnaryExpression *unaryExpression() { return NULL; }
     virtual BinaryExpression *binaryExpression() { return NULL; }
     virtual PrimaryExpression *primaryExpression() { return NULL; }
@@ -434,7 +438,7 @@ struct CastExpression : public Expression
     ASTType *type;
     Expression *expression;
     virtual CastExpression *castExpression() { return this; }
-    CastExpression(ASTType *ty, Expression *exp) : type(ty), expression(exp) {}
+    CastExpression(ASTType *ty, Expression *exp, int ln = 0) : Expression(ln), type(ty), expression(exp){}
 };
 
 

@@ -7,8 +7,9 @@ struct SourceLocation
 {
     TranslationUnit *unit;
     int line;
-    SourceLocation() : unit(NULL), line(0) {}
-    SourceLocation(TranslationUnit *u, int l) : unit(u), line(l) {}
+    int ch;
+    SourceLocation() : unit(NULL), line(1), ch(1) {}
+    SourceLocation(TranslationUnit *u, int l, int cha = 1) : unit(u), line(l), ch(cha) {}
 };
 
 #endif

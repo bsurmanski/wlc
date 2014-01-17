@@ -99,6 +99,7 @@ Token::Token(const Token &other)
     kind = other.kind;
     characters = other.characters;
     newline = other.newline;
+    loc = other.loc;
     if(other.is(tok::charstring) || other.is(tok::identifier)) strData = new std::string(*other.strData);
     else iData = other.iData;
 }

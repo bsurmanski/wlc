@@ -31,6 +31,7 @@ struct Token
     bool newline;
     SourceLocation loc;
 
+    SourceLocation getLocation() { return loc; }
 
     union
     {

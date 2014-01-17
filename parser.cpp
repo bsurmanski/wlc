@@ -110,6 +110,7 @@ void ParseContext::parseTopLevel(TranslationUnit *unit)
 {
     Statement *stmt;
     Declaration *decl;
+    SourceLocation l = peek().getLocation();
     switch(peek().kind)
     {
         case tok::kw_import:
@@ -199,16 +200,18 @@ Statement *ParseContext::parseDeclarationStatement()
 {
     Declaration *decl;
 
+    SourceLocation loc = peek().getLocation();
     decl = parseDeclaration();
 
     printf("New declaration: %s\n", decl->getName().c_str());
     //TODO: register decl
-    return new DeclarationStatement(decl);
+    return new DeclarationStatement(decl, loc);
 }
 
 Statement *ParseContext::parseStatement()
 {
     int n = 1; //lookahead
+    SourceLocation loc = peek().getLocation();
     switch(peek().kind)
     {
 #define BTYPE(X,SZ,SN) case tok::kw_##X:
@@ -246,31 +249,31 @@ Statement *ParseContext::parseStatement()
         case tok::minusminus:
         case tok::lparen:
 PARSEEXP:
-            return new ExpressionStatement(parseExpression());
+            return new ExpressionStatement(parseExpression(), loc);
 
         case tok::kw_return:
             ignore();
             if(!peek().followsNewline()) //TODO: newline thing
-                return new ReturnStatement(parseExpression());
-            return new ReturnStatement(NULL); // does not parse past newline incase of return in if statement
+                return new ReturnStatement(parseExpression(), loc);
+            return new ReturnStatement(NULL, loc); // does not parse past newline incase of return in if statement
 
         case tok::kw_label:
             ignore();
             assert(peek().is(tok::identifier) && "expected identifier following label");
-            return new LabelStatement(getScope()->get(get().toString()));
+            return new LabelStatement(getScope()->get(get().toString()), loc);
 
         case tok::kw_goto:
             ignore();
             assert(peek().is(tok::identifier) && "expected identifier following goto");
-            return new GotoStatement(getScope()->get(get().toString()));
+            return new GotoStatement(getScope()->get(get().toString()), loc);
 
         case tok::kw_continue:
             ignore();
-            return new ContinueStatement;
+            return new ContinueStatement(loc);
             
         case tok::kw_break:
             ignore();
-            return new BreakStatement;
+            return new BreakStatement(loc);
 
         case tok::semicolon:
             ignore();

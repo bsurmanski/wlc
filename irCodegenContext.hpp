@@ -58,6 +58,7 @@ class IRCodegenContext : public CodegenContext
     protected:
 
     void dwarfStopPoint(int ln);
+    void dwarfStopPoint(SourceLocation l);
 
     ASTValue *loadValue(ASTValue *val);
     ASTValue *storeValue(ASTValue *dest, ASTValue *val);

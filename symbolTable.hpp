@@ -19,7 +19,7 @@ struct SymbolTable
     void setDebug(llvm::DIDescriptor d) { debug = d; }
     llvm::DIDescriptor getDebug() { return debug; }
 
-    SymbolTable(SymbolTable *par = NULL) : parent(par) { if(!par) addBuiltin(); }
+    SymbolTable(SymbolTable *par = NULL) : parent(par), debug(0) { if(!par) addBuiltin(); }
     SymbolIterator begin() { return symbols.begin(); }
     SymbolIterator end() { return symbols.end(); }
     void addSibling(SymbolTable *t);

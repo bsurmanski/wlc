@@ -13,9 +13,16 @@ using namespace llvm;
 void IRCodegenContext::dwarfStopPoint(int ln)
 {
     llvm::DebugLoc loc = llvm::DebugLoc::get(ln, 1, diScope());
+    assert(!loc.isUnknown() && "unknown debug location");
     ir->SetCurrentDebugLocation(loc);
 }
 
+void IRCodegenContext::dwarfStopPoint(SourceLocation l)
+{
+    llvm::DebugLoc loc = llvm::DebugLoc::get(l.line, l.ch, diScope());
+    assert(!loc.isUnknown() && "unknown debug location");
+    ir->SetCurrentDebugLocation(loc);
+}
 
 llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
 {
@@ -819,13 +826,16 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         //FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
         //Function *func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
         Function *func = module->getFunction(fdecl->getName());
+        func->addFnAttr("no-frame-pointer-elim", "true");
         if(fdecl->body)
         {
             BasicBlock *BB = BasicBlock::Create(context, "entry", func);
             ir->SetInsertPoint(BB);
 
+            dwarfStopPoint(decl->loc);
+            debug->createFunction(fdecl);
             pushScope(fdecl->scope, fdecl->diSubprogram);
-            dwarfStopPoint(decl->loc.line);
+            dwarfStopPoint(decl->loc);
 
             int idx = 0;
             for(Function::arg_iterator AI = func->arg_begin(); AI != func->arg_end(); AI++, idx++)
@@ -842,6 +852,10 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                 Identifier *id = getInScope(param_i.second);
                 id->setDeclaration(NULL, Identifier::ID_VARIABLE);
                 id->setValue(alloca);
+
+                //register debug params
+                //TODO variable decl loc
+                debug->createVariable(param_i.second, alloca, BB, decl->loc, true);
                 //TODO: register value to scope
             }
 
@@ -856,6 +870,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         }
     } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl))
     {
+        dwarfStopPoint(vdecl->loc);
         ASTType *vty = vdecl->type;
         AllocaInst *llvmDecl = ir->CreateAlloca(codegenType(vty), 0, vdecl->getName());
         llvmDecl->setAlignment(4);
@@ -869,6 +884,8 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             //ir->CreateStore(codegenValue(defaultValue), llvmDecl);
             defaultValue = promoteType(defaultValue, vty);
             storeValue(idValue, defaultValue);
+
+            debug->createVariable(vdecl->getName(), idValue, ir->GetInsertBlock(), vdecl->loc);
             //TODO: maybe create a LValue field in CGValue?
         }
         vdecl->identifier->setValue(idValue);
@@ -927,8 +944,6 @@ void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationU
         fdecl->cgValue = Function::Create(fty, 
                 Function::ExternalWeakLinkage, 
                 fdecl->getName(), (Module*)current->cgValue);
-
-        //di->createFunction(
     }
 }
 
@@ -938,7 +953,7 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
     this->module = (Module*) u->cgValue;
     this->debug = new IRDebug(this, u);
 
-    pushScope(unit->scope, llvm::DIDescriptor()); //TODO: debug
+    pushScope(unit->scope, debug->diUnit); //TODO: debug
     //if(u->cgValue) return (llvm::Module*) u->cgValue; //XXX already codegend
 
     for(int i = 0; i < unit->imports.size(); i++) //TODO: import symbols.
@@ -972,6 +987,7 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
             ASTValue *gv = new ASTValue(idTy, llvmval, true);
             id->setValue(gv);
 
+            dwarfStopPoint(unit->globals[i]->loc);
             debug->createGlobal(unit->globals[i], gv);
 
         } else if(id->isFunction())
@@ -989,8 +1005,6 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
         fdecl->cgValue = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
         else
         fdecl->cgValue = Function::Create(fty, Function::ExternalWeakLinkage, fdecl->getName(), module);
-
-        debug->createFunction(fdecl);
     }
         // codegen function bodys
     for(int i = 0; i < unit->functions.size(); i++)

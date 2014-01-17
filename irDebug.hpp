@@ -20,11 +20,12 @@ class IRDebug
         TranslationUnit *unit;
         llvm::DIBuilder di;
         llvm::DIFile diFile;
+        llvm::DICompileUnit diUnit;
 
         IRDebug(IRCodegenContext *c, TranslationUnit *u) : context(c), unit(u), 
              di(*(llvm::Module*)unit->cgValue) 
         {
-            di.createCompileUnit(0, u->filenm, PROJDIR, CGSTR, false, "", 0); 
+            diUnit = di.createCompileUnit(0, u->filenm, PROJDIR, CGSTR, false, "", 0); 
             diFile = di.createFile(u->filenm, PROJDIR);
         }
 
@@ -42,6 +43,8 @@ class IRDebug
         llvm::DICompositeType createPrototype(FunctionPrototype *p);
         llvm::DISubprogram createFunction(FunctionDeclaration *f);
         llvm::DIGlobalVariable createGlobal(VariableDeclaration *decl, ASTValue *val);
+        llvm::DIVariable createVariable(std::string nm, ASTValue *v, 
+                llvm::BasicBlock *bb, SourceLocation loc, bool isArg = false);
 };
 
 void createIdentMetadata(llvm::Module *m);

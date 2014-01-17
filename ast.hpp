@@ -630,50 +630,57 @@ struct ImportExpression : public Expression
 
 struct Statement
 {
+    Statement(SourceLocation l) : loc(l) {}
     virtual ~Statement(){}
     SourceLocation loc;
+    SourceLocation getLocation() { return loc; }
 };
 
 struct BreakStatement : Statement
-{};
+{
+    BreakStatement(SourceLocation l) : Statement(l) {}
+};
 
 struct ContinueStatement : Statement
-{};
+{
+    ContinueStatement(SourceLocation l) : Statement(l) {}
+};
 
 
 struct LabelStatement : Statement
 {
     Identifier *identifier;
-    LabelStatement(Identifier *id) : identifier(id) {}
+    LabelStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
 };
 
 struct GotoStatement : Statement
 {
     Identifier *identifier;
-    GotoStatement(Identifier *id) : identifier(id) {}
+    GotoStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
 };
 
 struct DeclarationStatement : public Statement
 {
     Declaration *declaration;
-    DeclarationStatement(Declaration *decl) : declaration(decl) {}
+    DeclarationStatement(Declaration *decl, SourceLocation l) : Statement(l), declaration(decl) {}
 };
 
 struct ExpressionStatement : public Statement
 {
     Expression *expression;
-    ExpressionStatement(Expression *exp) : expression(exp){}
+    ExpressionStatement(Expression *exp, SourceLocation l) : Statement(l), expression(exp){}
 };
 
 // also works like pass. will assign to $ ?
 struct ReturnStatement : public Statement
 {
     Expression *expression;
-    ReturnStatement(Expression *exp) : expression(exp) {}
+    ReturnStatement(Expression *exp, SourceLocation l) : Statement(l), expression(exp) {}
 };
 
 struct PassStatement : public Statement
 {
+    PassStatement(SourceLocation l) : Statement(l){}
     // XXX will assign to special variable '$', which is created on blockExpression entry. essentially, assigning on pass
     // can be transformed into if(true) $ = val; else $ = val2; x = $;
     // ... maybe
@@ -688,6 +695,7 @@ struct PassStatement : public Statement
 struct OnceStatement : public Statement
 {
     Statement *stmt;
+    OnceStatement(SourceLocation l) : Statement(l) {}
 };
 
 #endif

@@ -12,7 +12,7 @@ void createIdentMetadata(llvm::Module *m)
     llvm::Value *identNode = { llvm::MDString::get(m->getContext(), CGSTR) };
     identMD->addOperand(llvm::MDNode::get(m->getContext(), identNode));
 
-    m->addModuleFlag(llvm::Module::Warning, "Dwarf Version", 4);
+    m->addModuleFlag(llvm::Module::Warning, "Dwarf Version", 4); //TODO: dwarf version as param?
     m->addModuleFlag(llvm::Module::Error, "Debug Info Version", llvm::DEBUG_METADATA_VERSION);
 }
 
@@ -136,6 +136,10 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
             0, //flags
             false, //isoptimized
             (Function*) f->cgValue);
+
+    for(int i = 0; i < f->prototype->parameters.size(); i++)
+    {
+    }
     }
     return f->diSubprogram;
 }
@@ -148,4 +152,20 @@ llvm::DIGlobalVariable IRDebug::createGlobal(VariableDeclaration *decl, ASTValue
             createType(decl->getType()),
             false, //TODO: local to unit?
             (Value*) val->cgValue);
+}
+
+llvm::DIVariable IRDebug::createVariable(std::string nm, ASTValue *v, BasicBlock *bb, SourceLocation loc, bool isArg)
+{
+    //TODO: name, line, type
+    DIVariable div = di.createLocalVariable(
+                isArg ? dwarf::DW_TAG_arg_variable : dwarf::DW_TAG_auto_variable,
+                currentScope(),
+                nm,
+                currentFile(),
+                loc.line,
+                createType(v->getType()),
+                false);
+
+    di.insertDeclare((llvm::Value*) v->cgValue, div, bb);
+    return div;
 }

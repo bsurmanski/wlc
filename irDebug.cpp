@@ -154,18 +154,21 @@ llvm::DIGlobalVariable IRDebug::createGlobal(VariableDeclaration *decl, ASTValue
             (Value*) val->cgValue);
 }
 
-llvm::DIVariable IRDebug::createVariable(std::string nm, ASTValue *v, BasicBlock *bb, SourceLocation loc, bool isArg)
+llvm::Instruction *IRDebug::createVariable(std::string nm, ASTValue *v, BasicBlock *bb, SourceLocation loc, int argn)
 {
     //TODO: name, line, type
-    DIVariable div = di.createLocalVariable(
-                isArg ? dwarf::DW_TAG_arg_variable : dwarf::DW_TAG_auto_variable,
+    vector<Value*> addr;
+
+    DIVariable div = di.createComplexVariable(
+                argn ? dwarf::DW_TAG_arg_variable : dwarf::DW_TAG_auto_variable,
                 currentScope(),
                 nm,
                 currentFile(),
                 loc.line,
                 createType(v->getType()),
+                addr,
                 false);
 
-    di.insertDeclare((llvm::Value*) v->cgValue, div, bb);
-    return div;
+    Instruction *idinst = di.insertDeclare((llvm::Value*) v->cgValue, div, bb);
+    return idinst;
 }

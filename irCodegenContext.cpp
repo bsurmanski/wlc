@@ -371,6 +371,7 @@ ASTValue *IRCodegenContext::codegenForExpression(ForExpression *exp)
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *func = codegenExpression(exp->function);
+    assert(func && "unknown expression");
     //assert(!func.llvmTy()->isFunctionTy() && "not callable!");
     //FunctionType *fty = (FunctionType*) func.llvmTy();
     //TODO: once proper type passing is done, check if callable above
@@ -387,7 +388,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
             rtype = fdecl->prototype->returnType;
             ftype = fdecl->prototype;
         }
-    }
+    } else { assert(false && "unknown function type?"); }
 
     vector<ASTValue*> cargs;
     vector<Value*> llargs;
@@ -844,20 +845,24 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                         "argument counts dont seem to match up...");
                 pair<ASTType*, std::string> param_i = fdecl->prototype->parameters[idx];
                 AI->setName(param_i.second);
-                AllocaInst *alloc = ir->CreateAlloca(codegenType(param_i.first), 0, param_i.second);
+                AllocaInst *alloc = new AllocaInst(codegenType(param_i.first), 0, param_i.second, BB);
+                    //ir->CreateAlloca(codegenType(param_i.first), 0, param_i.second);
                 alloc->setAlignment(4);
                 ASTValue *alloca = new ASTValue(param_i.first, alloc, true);
-                ir->CreateStore(AI, codegenLValue(alloca));
+                new StoreInst(AI, codegenLValue(alloca), BB);
+                //ir->CreateStore(AI, codegenLValue(alloca));
 
                 Identifier *id = getInScope(param_i.second);
                 id->setDeclaration(NULL, Identifier::ID_VARIABLE);
                 id->setValue(alloca);
 
                 //register debug params
-                //TODO variable decl loc
-                debug->createVariable(param_i.second, alloca, BB, decl->loc, true);
+                //XXX hacky with Instruction, and setDebugLoc manually
+                Instruction *ainst = debug->createVariable(param_i.second, alloca, BB, decl->loc, idx+1);
+                ainst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
                 //TODO: register value to scope
             }
+
 
             codegenStatement(fdecl->body);
 
@@ -885,7 +890,9 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             defaultValue = promoteType(defaultValue, vty);
             storeValue(idValue, defaultValue);
 
-            debug->createVariable(vdecl->getName(), idValue, ir->GetInsertBlock(), vdecl->loc);
+            Instruction *vinst = debug->createVariable(vdecl->getName(), 
+                    idValue, ir->GetInsertBlock(), vdecl->loc);
+            vinst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
             //TODO: maybe create a LValue field in CGValue?
         }
         vdecl->identifier->setValue(idValue);

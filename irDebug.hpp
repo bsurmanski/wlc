@@ -43,8 +43,8 @@ class IRDebug
         llvm::DICompositeType createPrototype(FunctionPrototype *p);
         llvm::DISubprogram createFunction(FunctionDeclaration *f);
         llvm::DIGlobalVariable createGlobal(VariableDeclaration *decl, ASTValue *val);
-        llvm::DIVariable createVariable(std::string nm, ASTValue *v, 
-                llvm::BasicBlock *bb, SourceLocation loc, bool isArg = false);
+        llvm::Instruction *createVariable(std::string nm, ASTValue *v, 
+                llvm::BasicBlock *bb, SourceLocation loc, int argn = 0);
 };
 
 void createIdentMetadata(llvm::Module *m);

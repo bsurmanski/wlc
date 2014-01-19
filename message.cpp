@@ -28,8 +28,11 @@ void emit_message(int level, std::string msg, SourceLocation loc)
 {
     if(level > errLvl) errLvl = level;
 
-    if(!loc.isUnknown())
-        cout << loc.line << ":"; //TODO: filename
+    if(loc.filenm)
+        cout << loc.filenm << ":";
+
+    if(loc.line)
+        cout << loc.line << ": ";
 
     switch(level)
     {

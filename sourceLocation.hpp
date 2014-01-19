@@ -5,12 +5,12 @@ struct TranslationUnit;
 
 struct SourceLocation
 {
-    TranslationUnit *unit;
+    const char *filenm;
     int line;
     int ch;
     bool isUnknown() { return !line && !ch; }
-    SourceLocation() : unit(NULL), line(1), ch(1) {}
-    SourceLocation(TranslationUnit *u, int l, int cha = 1) : unit(u), line(l), ch(cha) {}
+    SourceLocation() : filenm(NULL), line(1), ch(1) {}
+    SourceLocation(const char *fn, int l, int cha = 1) : filenm(fn), line(l), ch(cha) {}
 };
 
 struct SourceSlice

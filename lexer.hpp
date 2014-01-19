@@ -13,14 +13,17 @@ class Lexer
     Token current;
     unsigned line;
     unsigned ch;
+    const char *filenm; // current filenm
 
-    Lexer() : line(1), ch(1) {}
+    Lexer() : filenm(NULL), line(1), ch(1) {}
     virtual int peekChar() = 0;
     virtual void ignoreChar() = 0;
     virtual int getChar() = 0;
     virtual bool eofChar() = 0;
 
     public:
+
+    void setFilename(const char *fn) { filenm = fn; }
 
     virtual Token peek()
     {

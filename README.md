@@ -30,7 +30,7 @@ roughly in order of planned implementation
 * unions
 * enums
 * vector types
-* classes (in an extension language called 'OWL'; equivilent of C to C++)
+* classes (in an extension language called 'OWL'; similar to the idea of C++ from C)
 * generic
 
 ## FAQ
@@ -52,8 +52,9 @@ to follow as the function body. example:
     int printf(char^ fmt, ...);
 
 ### Why not use C style casting?
-C casting requires many brackets. Brackets are annoying. I tried to reduce the number of
-brackets required while coding. Also, WL does not require a forward reference for types;
+C casting requires many parenthises. Parentheses are annoying. I tried to reduce the number of
+brackets required while coding. In this sense, there are fewer moments in which you must go
+back and add that missing left parenthesis. Also, WL does not require a forward reference for types;
 If there is none, it would be ambiguous if the cast statement is a cast, or a bracketed statement
 (or alternatively, would require a further lookahead to see if an operator or identifier follows).
 Also, I believe it will be easier and more intuitive to learn the idea of casting with the new syntax.
@@ -98,16 +99,19 @@ the '->' operator is *ugly*. WL uses a '.' instead. example:
 Headers are nice in that they declare the interface to a module. But unfortnately, when
 generics are added, it starts to get more complicated. Anyone who has used generic's in
 C++ can see that quickly it gets very messy, with most code ending up in a header. No
-longer is a header a declaration of interface, it *is* the source file. It is possible
-that WL will 
+longer is a header a declaration of interface, it *is* the source file. Additionally, 
+these day many people just end up using some sort of IDE, which in itself provides an view
+of module interfaces.  It is possible that WL will eventually add generated headers, but
+that would be somewhere in the future.
 
-Although WL currently does not have generics, it is a planned feature.
+Although WL currently does not have generics, it is a planned feature (sometime in the
+future).
 
 ### Why LLVM?
 Using LLVM allows me to focus on the syntax and functionality of the language, and eschew
 all optimization and backend logic. This allows me to develop the language much faster and
 easier. Furthermore, LLVM's optimization and platform support is likely much better than 
-what I would be able to do.
+what I would ever be able to do within reasonable contraints.
 
 ### Why not modify clang?
 WL's syntax is different enough that modifying clang would be a significant effort.

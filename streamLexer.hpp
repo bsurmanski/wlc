@@ -66,7 +66,7 @@ class StreamLexer : public Lexer
 
     virtual SourceLocation getLocation()
     {
-        return SourceLocation(NULL, line);
+        return SourceLocation(filenm, line);
     }
 };
 

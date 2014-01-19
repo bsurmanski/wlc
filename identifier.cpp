@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "message.hpp"
 
 #include <assert.h>
 
@@ -6,7 +7,10 @@ void Identifier::setDeclaration(Declaration *decl, IDType ty)
 {
     FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(declaration);
     if(!fdecl || (fdecl && fdecl->body))
-        assert(!declaration && "redefinition");
+        if(declaration) 
+        {
+            emit_message(msg::FATAL, "redefinition");
+        }
     declaration = decl;
     type = ty;
 }
@@ -21,7 +25,10 @@ ASTType *Identifier::getType()
 
 ASTType *Identifier::declaredType()
 {
-    assert(type == ID_STRUCT || type == ID_UNKNOWN && "this doesnt look like a type");
+    if(type != ID_STRUCT && type != ID_UNKNOWN) {
+        emit_message(msg::FAILURE, "this doesnt look like a type");
+        return NULL;
+    }
     if(!astType) astType = new ASTType();
     return astType;
 }

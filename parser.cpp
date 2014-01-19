@@ -72,6 +72,10 @@ ASTType *ParseContext::parseType()
     } else {
         //TODO: should be get so structs dont need fwd decl?
         Identifier *id = getScope()->lookup(t.toString()); 
+        if(!id) {
+            emit_message(msg::ERROR, "unknown type or variable", t.loc);
+            return NULL;
+        }
         type = id->declaredType();
         //TODO: do something with id...
     }
@@ -736,6 +740,7 @@ void Parser::parseFile(TranslationUnit *unit, std::string filenm)
 {
     ifstream stream(filenm.c_str());
     Lexer *lexer = new StreamLexer(stream);
+    lexer->setFilename(filenm.c_str());
     ParseContext context(lexer, this, ast->getRootPackage());
     context.parseTranslationUnit(unit, filenm.c_str()); //TODO: identifier
     //resolveImports(unit);

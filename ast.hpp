@@ -406,10 +406,10 @@ struct Expression
     };
     */
 
-    int line;
-    void setLine(int ln) { line = ln; }
+    void setLocation(SourceLocation l) { loc = l; }
+    SourceLocation loc;
 
-    Expression(int ln = 0) : line(ln) {}
+    Expression(SourceLocation l = SourceLocation()) : loc(l) {}
     virtual UnaryExpression *unaryExpression() { return NULL; }
     virtual BinaryExpression *binaryExpression() { return NULL; }
     virtual PrimaryExpression *primaryExpression() { return NULL; }
@@ -438,12 +438,14 @@ struct CastExpression : public Expression
     ASTType *type;
     Expression *expression;
     virtual CastExpression *castExpression() { return this; }
-    CastExpression(ASTType *ty, Expression *exp, int ln = 0) : Expression(ln), type(ty), expression(exp){}
+    CastExpression(ASTType *ty, Expression *exp, SourceLocation l = SourceLocation()) : 
+        Expression(l), type(ty), expression(exp){}
 };
 
 
 struct PostfixExpression : public Expression
 {
+    PostfixExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
     virtual PostfixExpression *postfixExpression() { return this; }
 };
 
@@ -452,7 +454,8 @@ struct CallExpression : public PostfixExpression
     virtual CallExpression *callExpression() { return this; }
     Expression *function;
     std::vector<Expression *> args;
-    CallExpression(Expression *f, std::vector<Expression*> a) : function(f), args(a) {}
+    CallExpression(Expression *f, std::vector<Expression*> a, SourceLocation l = SourceLocation()) :
+        PostfixExpression(l), function(f), args(a) {}
 };
 
 struct IndexExpression : public PostfixExpression
@@ -460,21 +463,24 @@ struct IndexExpression : public PostfixExpression
     virtual IndexExpression *indexExpression() { return this; }
     Expression *lhs;
     Expression *index;
-    IndexExpression(Expression *l, Expression *i) : lhs(l), index(i) {}
+    IndexExpression(Expression *l, Expression *i, SourceLocation lo = SourceLocation()) :
+        PostfixExpression(lo), lhs(l), index(i) {}
 };
 
 struct PostfixOpExpression : public PostfixExpression
 {
     int op;
     Expression *lhs;
-    PostfixOpExpression(Expression *l, int o) : lhs(l), op(o) {}
+    PostfixOpExpression(Expression *l, int o, SourceLocation lo = SourceLocation()) : 
+        PostfixExpression(lo), lhs(l), op(o) {}
 };
 
 struct DotExpression : public PostfixExpression
 {
     Expression *lhs;
     std::string rhs;
-    DotExpression(Expression *l, std::string r) : lhs(l), rhs(r) {}
+    DotExpression(Expression *l, std::string r, SourceLocation lo = SourceLocation()) :
+        PostfixExpression(lo), lhs(l), rhs(r) {}
 };
 
 struct UnaryExpression : public Expression
@@ -482,7 +488,8 @@ struct UnaryExpression : public Expression
     virtual UnaryExpression *unaryExpression() { return this; }
     Expression *lhs;
     unsigned op;
-    UnaryExpression(unsigned o, Expression *l) : lhs(l), op(o) {}
+    UnaryExpression(unsigned o, Expression *l, SourceLocation lo = SourceLocation()) :
+        Expression(lo), lhs(l), op(o) {}
 };
 
 struct BinaryExpression : public Expression
@@ -491,18 +498,21 @@ struct BinaryExpression : public Expression
     Expression *lhs;
     Expression *rhs;
     unsigned op;
-    BinaryExpression(unsigned o, Expression *l, Expression *r) : lhs(l), rhs(r), op(o) {}
+    BinaryExpression(unsigned o, Expression *l, Expression *r, SourceLocation lo = SourceLocation()) :
+        Expression(lo), lhs(l), rhs(r), op(o) {}
 };
 
 struct PrimaryExpression : public Expression
 {
+    PrimaryExpression(SourceLocation l = SourceLocation()) : Expression(l){}
     virtual PrimaryExpression *primaryExpression() { return this; }
 };
 
 struct IdentifierExpression : public PrimaryExpression
 {
     Identifier *id;
-    IdentifierExpression(Identifier *i) : id(i) {}
+    IdentifierExpression(Identifier *i, SourceLocation l = SourceLocation()) :
+        PrimaryExpression(l), id(i) {}
     Identifier *identifier() { return id; }
     std::string getName() { return id->getName(); }
     virtual IdentifierExpression *identifierExpression() { return this; }
@@ -513,7 +523,8 @@ struct IdentifierExpression : public PrimaryExpression
 struct StringExpression : public PrimaryExpression
 {
     std::string string;
-    StringExpression(std::string str) : string(str) {}
+    StringExpression(std::string str, SourceLocation l = SourceLocation()) : 
+        PrimaryExpression(l), string(str) {}
     virtual StringExpression *stringExpression() { return this; }
 };
 
@@ -538,14 +549,17 @@ struct NumericExpression : public PrimaryExpression
         char charValue;
     };
 
-    NumericExpression(NumericType t, ASTType* ty, double val) : type(t),  astType(ty), floatValue(val) {}
-    NumericExpression(NumericType t, ASTType *ty, uint64_t val) : type(t), astType(ty), intValue(val) {}
+    NumericExpression(NumericType t, ASTType* ty, double val, SourceLocation l = SourceLocation()) :
+        PrimaryExpression(l), type(t),  astType(ty), floatValue(val) {}
+    NumericExpression(NumericType t, ASTType *ty, uint64_t val, SourceLocation l = SourceLocation()) :
+        PrimaryExpression(l), type(t), astType(ty), intValue(val) {}
     virtual NumericExpression *numericExpression() { return this; }
 };
 
 struct DeclarationExpression : public Expression
 {
     Declaration *decl;
+    DeclarationExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
     virtual DeclarationExpression *declarationExpression() { return this; }
 };
 
@@ -558,7 +572,8 @@ struct BlockExpression : public Expression
 {
     //TODO: sym table
     std::vector<Statement*> statements;
-    BlockExpression(std::vector<Statement*> s) : statements(s) {}
+    BlockExpression(std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
+        Expression(l), statements(s) {}
     virtual BlockExpression *blockExpression() { return this; }
 };
 
@@ -571,7 +586,8 @@ struct IfExpression : public Expression
     Statement *body;
     Statement *elsebranch;
     virtual IfExpression *ifExpression() { return this; }
-    IfExpression(Expression *c, Statement *b, Statement *e) : condition(c), body(b), elsebranch(e) {}
+    IfExpression(Expression *c, Statement *b, Statement *e, SourceLocation l = SourceLocation()) : 
+        Expression(l), condition(c), body(b), elsebranch(e) {}
 };
 
 // value same as if
@@ -581,7 +597,8 @@ struct WhileExpression : public Expression
     Statement *body;
     Statement *elsebranch;
     virtual WhileExpression *whileExpression() { return this; }
-    WhileExpression(Expression *c, Statement *b, Statement *e) : condition(c), body(b), elsebranch(e) {}
+    WhileExpression(Expression *c, Statement *b, Statement *e, SourceLocation l = SourceLocation()) :
+        Expression(l), condition(c), body(b), elsebranch(e) {}
 };
 
 struct ForExpression : public Expression
@@ -592,7 +609,9 @@ struct ForExpression : public Expression
     Statement *body;
     Statement *elsebranch;
     virtual ForExpression *forExpression() { return this; }
-    ForExpression(Statement *d, Expression *c, Statement *u, Statement *b, Statement *e) : decl(d), condition(c), update(u), body(b), elsebranch(e) {}
+    ForExpression(Statement *d, Expression *c, Statement *u, Statement *b, Statement *e, 
+            SourceLocation l = SourceLocation()) :
+        Expression(l), decl(d), condition(c), update(u), body(b), elsebranch(e) {}
 };
 
 struct SwitchExpression : public Expression
@@ -602,13 +621,15 @@ struct SwitchExpression : public Expression
     std::vector<Expression*> cases;
     std::vector<Statement*> statements;
     virtual SwitchExpression *switchExpression() { return this; }
+    SwitchExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
 };
 
 struct PackageExpression : public Expression
 {
     Expression *package;
     virtual PackageExpression *packageExpression() { return this; }
-    PackageExpression(Expression *p) : package(p) {}
+    PackageExpression(Expression *p, SourceLocation l = SourceLocation()) 
+        : Expression(l), package(p) {}
 };
 
 // import <STRING> |
@@ -618,7 +639,8 @@ struct ImportExpression : public Expression
     Expression *expression;
     TranslationUnit *unit;
     virtual ImportExpression *importExpression() { return this; }
-    ImportExpression(Expression *im, TranslationUnit *u) : expression(im), unit(u) { }
+    ImportExpression(Expression *im, TranslationUnit *u, SourceLocation l = SourceLocation()) :
+        Expression(l), expression(im), unit(u) { }
 };
 
 

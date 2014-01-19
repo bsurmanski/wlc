@@ -1,6 +1,9 @@
 # WLC
 ## WL [Wool] Compiler
 
+*IMPORTANT*: currently the WL compiler is in development. WLC is not yet ready for active usage.
+There is likely to be many bugs and missing features.
+
 WL is a new language meant to be used in a system level context. As such, there will
 be no garbage collector, no virtual machine, etc.
 

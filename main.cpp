@@ -5,6 +5,7 @@ using namespace std;
 #include "parser.hpp"
 #include "streamLexer.hpp"
 #include "irCodegenContext.hpp"
+#include "message.hpp"
 #include <vector>
 #include <llvm/Linker.h>
 
@@ -38,7 +39,7 @@ void compile(WLParams params)
         cg.codegenAST(ast);
     } else
     {
-        printf("fatal error: no input files\n");
+        emit_message(msg::FATAL, "no input files");
     }
 }
 

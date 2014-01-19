@@ -3,6 +3,8 @@
 #include "token.hpp"
 #include "irCodegenContext.hpp"
 
+#include "message.hpp"
+
 #include <fstream>
 #include <iostream>
 #include <stdio.h>
@@ -13,20 +15,23 @@ using namespace llvm;
 void IRCodegenContext::dwarfStopPoint(int ln)
 {
     llvm::DebugLoc loc = llvm::DebugLoc::get(ln, 1, diScope());
-    assert(!loc.isUnknown() && "unknown debug location");
+    assert_message(!loc.isUnknown(), msg::FAILURE, "unknown debug location");
     ir->SetCurrentDebugLocation(loc);
 }
 
 void IRCodegenContext::dwarfStopPoint(SourceLocation l)
 {
     llvm::DebugLoc loc = llvm::DebugLoc::get(l.line, l.ch, diScope());
-    assert(!loc.isUnknown() && "unknown debug location");
+    assert_message(!loc.isUnknown(), msg::FAILURE, "unknown debug location");
     ir->SetCurrentDebugLocation(loc);
 }
 
 llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
 {
-    assert(ty->isStruct() && "must be struct");
+    if(!ty->isStruct()) {
+        emit_message(msg::FAILURE, "unknown struct type");
+    }
+
     StructTypeInfo *sti = (StructTypeInfo*) ty->info;
 
     std::vector<Type*> structVec;
@@ -35,7 +40,8 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(sti->members[i]))
         {
             structVec.push_back(codegenType(vd->type));
-        } else { assert(false && "this cant be declared in a struct (yet?)"); }
+        } else 
+            emit_message(msg::UNIMPLEMENTED, "this cant be declared in a struct (yet?)");
     }
     if(sti->members.size())
     {
@@ -90,7 +96,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 //TODO
                 break;
             default:
-                assert(false && "type not handled");
+                emit_message(msg::FAILURE, "type not handled");
         }
         ty->cgType = llvmty;
     }
@@ -105,10 +111,9 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 
 llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 {
-    if(!value->cgValue)
-    {
+    if(!value->cgValue){
         //TODO
-        assert(false && "gen value...");
+        emit_message(msg::FAILURE, "AST Value failed to generate");
     }
 
     if(value->isLValue())
@@ -121,11 +126,10 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 
 llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
 {
-    assert(value->isLValue() && "rvalue used in lvalue context!");
-    if(!value->cgValue)
-    {
+    assert_message(value->isLValue(), msg::FATAL, "rvalue used in lvalue context!");
+    if(!value->cgValue) {
         //TODO
-        assert(false && "gen value...");
+        emit_message(msg::FAILURE, "AST Value failed to generate");
     }
 
     return (llvm::Value*) value->cgValue;
@@ -140,7 +144,7 @@ ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 
 ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
 {
-    assert(lval->isLValue() && "must be lvalue to load");
+    assert_message(lval->isLValue(), msg::FAILURE, "attempted to load RValue (must be LValue");
     ASTValue *loaded = new ASTValue(lval->type, codegenValue(lval));
     return loaded;
 }
@@ -216,7 +220,11 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         {
             iexp->id = lookup(iexp->id->getName());
             //TODO
-            assert(!iexp->id->isUndeclared() && "undeclared variable in this scope!");
+            if(iexp->id->isUndeclared()) {
+                emit_message(msg::ERROR, string("undeclared variable '") + 
+                        iexp->id->getName() + string("' in scope"), iexp->loc);
+                return NULL;
+            }
         }
         if(iexp->identifier()->isVariable())
         {
@@ -251,7 +259,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     {
         return promoteType(codegenExpression(cexp->expression), cexp->type);
     }
-    assert(false && "bad expression?");
+    emit_message(msg::FAILURE, "bad expression?", exp->loc);
     return NULL; //TODO
 }
 
@@ -371,7 +379,11 @@ ASTValue *IRCodegenContext::codegenForExpression(ForExpression *exp)
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *func = codegenExpression(exp->function);
-    assert(func && "unknown expression");
+    if(!func) {
+        emit_message(msg::ERROR, "unknown expression", exp->loc); 
+        return NULL;
+    }
+
     //assert(!func.llvmTy()->isFunctionTy() && "not callable!");
     //FunctionType *fty = (FunctionType*) func.llvmTy();
     //TODO: once proper type passing is done, check if callable above
@@ -388,7 +400,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
             rtype = fdecl->prototype->returnType;
             ftype = fdecl->prototype;
         }
-    } else { assert(false && "unknown function type?"); }
+    } else emit_message(msg::FAILURE, "unknown function type?", exp->loc);
 
     vector<ASTValue*> cargs;
     vector<Value*> llargs;
@@ -412,34 +424,52 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
     switch(exp->op)
     {
         case tok::plusplus:
-            assert(lhs->isLValue() && "can only increment LValue");
+            if(!lhs->isLValue()) {
+                emit_message(msg::ERROR, "can only incrememt LValue", exp->loc);
+                return NULL; 
+            }
+
             val = new ASTValue(lhs->getType(),
                     ir->CreateAdd(codegenValue(lhs),
                         ConstantInt::get(codegenType(lhs->getType()), 1)));
             storeValue(lhs, val);
             return val;
         case tok::minusminus:
-            assert(lhs->isLValue() && "can only decrement LValue");
+            if(!lhs->isLValue()) {
+                emit_message(msg::ERROR, "can only decrement LValue", exp->loc);
+                return NULL; 
+            }
             val = new ASTValue(lhs->getType(),
                     ir->CreateSub(codegenValue(lhs),
                         ConstantInt::get(codegenType(lhs->getType()), 1)));
             storeValue(lhs, val);
             return val;
         case tok::plus:
+            emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen (+)", exp->loc);
+            return NULL;
         case tok::minus:
+            emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen (-)", exp->loc);
+            return NULL;
         case tok::tilde:
-            assert(false && "unimpl unary codegen");
+            emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen (~)", exp->loc);
+            return NULL;
         case tok::bang:
             val = promoteType(lhs, ASTType::getBoolTy());
             return new ASTValue(ASTType::getBoolTy(), ir->CreateNot(codegenValue(val))); 
         case tok::caret:
-            assert(lhs->getType()->isPointer() && "can only dereference pointer type");
+            if(!lhs->getType()->isPointer()) {
+                emit_message(msg::ERROR, "attempt to dereference non-pointer type", exp->loc);
+                return NULL;
+            }
             return new ASTValue(lhs->getType()->getReferencedTy(), codegenValue(lhs), true);
         case tok::amp:
-            assert(lhs->isLValue() && "can only take reference of lvalue");
+            if(!lhs->isLValue()){
+                emit_message(msg::ERROR, "attempt to take reference of non-LValue", exp->loc);
+                return NULL;
+            }
             return new ASTValue(lhs->getType()->getPointerTy(), codegenLValue(lhs), false);
         default:
-            assert(false && "unary codegen unimpl");
+            emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen", exp->loc);
     }
     return NULL;
 }
@@ -456,14 +486,18 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         if(arr->getType()->isArray())
         {
             //TODO
-            assert(false && "indexing array not impl. try pointers...");
+            emit_message(msg::UNIMPLEMENTED, 
+                    "indexing arrays not implemented. try pointers", exp->loc);
         } else if(arr->getType()->isPointer())
         {
             //TODO: index array
             ASTType *indexedType = arr->getType()->getReferencedTy(); 
             Value *val = ir->CreateInBoundsGEP(codegenValue(arr), codegenValue(ind));
             return new ASTValue(indexedType, val, true);
-        } else assert(false && "attempt to index non-pointer/array type");
+        } else {
+            emit_message(msg::ERROR, "attempt to index non-pointer/array type", exp->loc);
+            return NULL;
+        }
     } else if(PostfixOpExpression *e = dynamic_cast<PostfixOpExpression*>(exp))
     {
         ASTValue *old;
@@ -492,7 +526,10 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 
             if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(), 
                     codegenValue(lhs), true);
-            assert(lhs->getType()->isStruct() && "can only index struct!");
+            if(!lhs->getType()->isStruct()) {
+                emit_message(msg::ERROR, "can only index struct type", dexp->loc);
+                return NULL;
+            }
             StructTypeInfo *sti = (StructTypeInfo*) lhs->getType()->getTypeInfo();
             int offset = 0;
             for(int i = 0; i < sti->members.size(); i++)
@@ -511,15 +548,16 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), offset));
                         Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
                         return new ASTValue(ty, llval, true);
-                    } else assert(false && "this should not be in a struct (right now)");
+                    } else emit_message(msg::UNIMPLEMENTED,
+                            "this should not be in a struct (right now)", sti->members[i]->loc);
                 }
                 offset++;
             }
-            assert(false && "member not in struct");
+            emit_message(msg::ERROR, "member not in struct", dexp->loc);
         return NULL;
     }
 
-    assert(false && "postfix codegen unimpl");
+    emit_message(msg::UNIMPLEMENTED, "postfix codegen unimpl", exp->loc);
     return NULL;
 }
 
@@ -586,7 +624,8 @@ void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, u
     {
         if((*v1)->type->isStruct() || (*v2)->type->isStruct())
         {
-            assert(false && "cannot convert structs (yet)");
+            // TODO: loc
+            emit_message(msg::UNIMPLEMENTED, "cannot convert structs (yet)");
         }
         if((*v1)->type->size() > (*v2)->type->size()) *v2 = promoteType(*v2, (*v1)->type);
         else if((*v2)->type->size() > (*v1)->type->size()) *v1 = promoteType(*v1, (*v2)->type);
@@ -598,7 +637,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     //TODO: bit messy
     if(exp->op == tok::dot)
     {
-        assert(false && "this should not be a binop");
+        emit_message(msg::FAILURE, "this should not be a binop", exp->loc);
     } else if(exp->op == tok::colon) //cast op
     {
         ASTValue *rhs = codegenExpression(exp->rhs);
@@ -606,7 +645,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         {
             ASTType *ty = iexp->identifier()->declaredType();
             return promoteType(rhs, ty);
-        } else assert(false && "need to cast to type");
+        } else emit_message(msg::ERROR, "need to cast to type", exp->loc);
     }
 
     ASTValue *lhs = codegenExpression(exp->lhs);
@@ -623,14 +662,18 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     {
         //ASSIGN
         case tok::equal:
-            if(!lhs->isLValue()) assert(false && "LHS must be LValue");
+            if(!lhs->isLValue()){
+                emit_message(msg::ERROR, "LHS must be LValue", exp->loc);
+                return NULL; 
+            }
             rhs = promoteType(rhs, TYPE); //TODO: merge with decl assign
             storeValue(lhs, rhs);
             return rhs;
 
         // I dont know, do something with a comma eventually
         case tok::comma:
-                assert(false && "unimpl binop");
+                emit_message(msg::UNIMPLEMENTED, "unimpl binop", exp->loc);
+                return NULL;
 
         // LOGIC OPS
         case tok::barbar:
@@ -741,7 +784,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
         case tok::starstar:
         default:
-            assert(false && "unimpl");
+            emit_message(msg::UNIMPLEMENTED, "unimplemented operator", exp->loc);
             return NULL; //XXX: null val
     }
 
@@ -795,15 +838,22 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         ir->SetInsertPoint(PG);
     } else if(BreakStatement *bstmt = dynamic_cast<BreakStatement*>(stmt))
     {
-        assert(breakLabel && "break doesnt make sense here!");
+        if(!breakLabel){
+            emit_message(msg::ERROR, "break doesnt make sense here!", stmt->loc);
+            return;
+        }
         ir->CreateBr(breakLabel);
         ir->SetInsertPoint(BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()));
     } else if(ContinueStatement *cstmt = dynamic_cast<ContinueStatement*>(stmt))
     {
-        assert(continueLabel && "continue doesnt make sense here!");
+        if(!continueLabel){
+            emit_message(msg::ERROR, "continue doesnt make sense here!", stmt->loc);
+            return;
+        }
+        
         ir->CreateBr(continueLabel);
         ir->SetInsertPoint(BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()));
-    } else assert(false && "i dont know what kind of statmeent this isssss");
+    } else emit_message(msg::FAILURE, "i dont know what kind of statmeent this isssss", stmt->loc);
 
 }
 
@@ -841,8 +891,11 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             int idx = 0;
             for(Function::arg_iterator AI = func->arg_begin(); AI != func->arg_end(); AI++, idx++)
             {
-                assert(fdecl->prototype->parameters.size() >= idx && 
-                        "argument counts dont seem to match up...");
+                if(fdecl->prototype->parameters.size() < idx){
+                        emit_message(msg::FAILURE, 
+                                "argument counts dont seem to match up...", decl->loc);
+                        return;
+                }
                 pair<ASTType*, std::string> param_i = fdecl->prototype->parameters[idx];
                 AI->setName(param_i.second);
                 AllocaInst *alloc = new AllocaInst(codegenType(param_i.first), 0, param_i.second, BB);
@@ -1046,6 +1099,12 @@ void IRCodegenContext::codegenPackage(Package *p)
 void IRCodegenContext::codegenAST(AST *ast)
 {
     codegenPackage(ast->getRootPackage());
+    if(currentErrorLevel() > msg::WARNING)
+    {
+        emit_message(msg::OUTPUT, "compilation ended with errors");
+        return;
+    }
+
     createIdentMetadata(linker.getModule());
     linker.getModule()->MaterializeAll();
     linker.getModule()->dump();

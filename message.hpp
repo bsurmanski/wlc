@@ -19,6 +19,7 @@ namespace msg
 
 #define assert_action(cond, do) if(cond) do;
 
+int currentErrorLevel();
 void cond_message(int cond, int level, std::string msg, SourceLocation loc = SourceLocation());
 void assert_message(int assert, int lvl, std::string msg, SourceLocation loc = SourceLocation());
 void emit_message(int level, std::string msg, SourceLocation loc = SourceLocation());

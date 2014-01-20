@@ -57,6 +57,14 @@ class ParseContext
     }
     void ignore() { if(!tqueue.empty()) { tqueue.pop_front(); return; } ignoreComments(); lexer->ignore(); }
 
+    void dropLine() { // dumps entire line of input given an error (if line ends in binop, dump that too)
+        bool binOp = false;
+        while(!peek().followsNewline() && !binOp) {
+            binOp = peek().isBinaryOp();
+            ignore(); 
+        }
+    }
+
     Token lookAhead(int i = 0) { // lookAhead(0) is equivilent to peek()
         while(tqueue.size() < i+1) {
             ignoreComments(); 

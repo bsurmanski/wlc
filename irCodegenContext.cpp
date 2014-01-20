@@ -445,10 +445,16 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
             storeValue(lhs, val);
             return val;
         case tok::plus:
-            emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen (+)", exp->loc);
-            return NULL;
+            return lhs;
         case tok::minus:
-            emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen (-)", exp->loc);
+            if(!lhs->getType()->isSigned()){
+                emit_message(msg::UNIMPLEMENTED, 
+                        "conversion to signed value using '-' unary op",
+                        exp->loc);
+                return NULL;
+            }
+            val = new ASTValue(lhs->getType(), ir->CreateNeg(codegenValue(lhs)));
+            return val;
             return NULL;
         case tok::tilde:
             emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen (~)", exp->loc);
@@ -672,7 +678,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
         // I dont know, do something with a comma eventually
         case tok::comma:
-                emit_message(msg::UNIMPLEMENTED, "unimpl binop", exp->loc);
+                emit_message(msg::UNIMPLEMENTED, "comma operator not yet implemented", exp->loc);
                 return NULL;
 
         // LOGIC OPS

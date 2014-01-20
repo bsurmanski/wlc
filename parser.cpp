@@ -98,7 +98,12 @@ ASTType *ParseContext::parseType()
             {
                 parseExpression(); //TODO: array size
             }
-            cond_message(peek().isNot(tok::rbracket), msg::ERROR, "expected ]");
+            if(peek().isNot(tok::rbracket))
+            {
+                emit_message(msg::ERROR, "expected ']'", peek().loc); 
+                dropLine();
+                return NULL;
+            }
             ignore(); // eat ]
             continue;
         }
@@ -173,7 +178,10 @@ void ParseContext::parseInclude()
         emit_message(msg::UNIMPLEMENTED, "include not yet impl");
         lexer = currentLexer;
         delete incLexer;
-    } else emit_message(msg::ERROR, "unknown include directive");
+    } else 
+    {
+        emit_message(msg::ERROR, "unknown include directive");
+    }
 }
 
 ImportExpression *ParseContext::parseImport()
@@ -266,14 +274,24 @@ PARSEEXP:
 
         case tok::kw_label:
             ignore();
-            cond_message(peek().isNot(tok::identifier), msg::ERROR, 
+            if(peek().isNot(tok::identifier))
+            {
+                emit_message(msg::ERROR, 
                     "expected identifier following label", loc);
+                dropLine();
+                return NULL;
+            }
             return new LabelStatement(getScope()->get(get().toString()), loc);
 
         case tok::kw_goto:
             ignore();
-            cond_message(peek().isNot(tok::identifier), msg::ERROR,
+            if(peek().isNot(tok::identifier))
+            {
+                emit_message(msg::ERROR,
                     "expected identifier following goto", loc);
+                dropLine();
+                return NULL;
+            }
             return new GotoStatement(getScope()->get(get().toString()), loc);
 
         case tok::kw_continue:
@@ -302,14 +320,28 @@ Declaration *ParseContext::parseDeclaration()
         ignore(); // eat "struct"
 
         Token t_id = get(); // eat ID
-        assert_message(t_id.is(tok::identifier), msg::ERROR, 
+        if(t_id.isNot(tok::identifier)){
+            emit_message(msg::ERROR, 
                 "expected struct name following 'struct' keyword", t_id.loc);
-        cond_message(getScope()->contains(t_id.toString()), msg::ERROR, 
+            dropLine();
+            return NULL;
+        }
+
+        if(getScope()->contains(t_id.toString())){
+            emit_message(msg::ERROR, 
                 std::string("redeclaration of struct ") + 
                 string("'") + t_id.toString() + string("'"), t_id.loc);
+            dropLine();
+            return NULL;
+        }
+
         Identifier *id = getScope()->get(t_id.toString());
-        assert_message(peek().is(tok::lbrace) || peek().is(tok::semicolon), msg::ERROR,
-                "expected lbrace", peek().loc);
+        if(peek().isNot(tok::lbrace) && peek().isNot(tok::semicolon)){
+            emit_message(msg::ERROR,
+                "expected '{' following struct declarator", peek().loc);
+            dropLine();
+            return NULL;
+        }
 
         SymbolTable *tbl = NULL;
         vector<Declaration*> members;
@@ -338,11 +370,20 @@ Declaration *ParseContext::parseDeclaration()
     ASTType *type = parseType();
 
     Token t_id = get();
-    assert_message(t_id.is(tok::identifier), msg::ERROR, 
+    if(t_id.isNot(tok::identifier)){
+        emit_message(msg::ERROR, 
             "expected identifier following type (declaration)", t_id.loc);
-    cond_message(getScope()->contains(t_id.toString()), msg::ERROR, 
+        dropLine();
+        return NULL;
+    }
+    if(getScope()->contains(t_id.toString())){
+        emit_message(msg::ERROR, 
             string("redeclaration of variable ") + string("'") + t_id.toString() + string("'"), 
             t_id.loc);
+        dropLine();
+        return NULL;
+    }
+
     Identifier *id = getScope()->get(t_id.toString());
 
     //TODO parse decl specs
@@ -359,8 +400,13 @@ Declaration *ParseContext::parseDeclaration()
             {
                 vararg = true;
                 ignore();
-                assert_message(peek().is(tok::rparen), msg::ERROR, 
+                if(peek().isNot(tok::rparen)){
+                    emit_message(msg::ERROR, 
                         "expected ) following vararg declaration ('...') ", peek().loc);
+                    dropLine();
+                    return NULL;
+                }
+
                 break;
             }
 
@@ -373,8 +419,12 @@ Declaration *ParseContext::parseDeclaration()
                 continue;
             } else
             {
-                assert_message(peek().is(tok::rparen), msg::ERROR, 
+                if(peek().isNot(tok::rparen)){
+                    emit_message(msg::ERROR, 
                         "expected ',' or ')' in function declaration", peek().loc);
+                    dropLine();
+                    return NULL;
+                }
             }
         }
         ignore(); //rparen
@@ -413,12 +463,20 @@ Expression *ParseContext::parseIfExpression()
     assert_message(peek().is(tok::kw_if), msg::ERROR, "expected 'if' keyword", peek().loc);
     ignore(); // ignore if
 
-    assert_message(peek().is(tok::lparen), msg::ERROR, 
+    if(peek().isNot(tok::lparen)){
+        emit_message(msg::ERROR, 
             "expected '(' following 'if' keyword", peek().loc);
+        dropLine();
+        return NULL;
+    }
     ignore();
     cond = parseExpression();
-    assert_message(peek().is(tok::rparen), msg::ERROR, "expected ')' following 'if' condition", 
+    if(peek().isNot(tok::rparen)){
+        emit_message(msg::ERROR, "expected ')' following 'if' condition", 
             peek().loc);
+        dropLine();
+        return NULL;
+    }
     ignore();
 
     body = parseStatement();
@@ -519,6 +577,7 @@ Expression *ParseContext::parseCastExpression(int prec)
     ASTType *type = parseType();
     if(!peek().is(tok::colon)) {
         emit_message(msg::ERROR, "expected colon for cast operator!", peek().loc);
+        dropLine();
         return NULL;
     }
     ignore(); // eat ':'

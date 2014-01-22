@@ -98,6 +98,7 @@ class ParseContext
     Statement *parseStatement();
     Declaration *parseDeclaration();
     Expression *parseIfExpression();
+    Expression *parseSwitchExpression();
     Expression *parseWhileExpression();
     Expression *parseForExpression();
     Expression *parseCastExpression(int prec = 0);

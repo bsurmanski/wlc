@@ -2,6 +2,9 @@ if exists("b:current_syntax")
     finish
 endif
 
+set smartindent
+set indentexpr="0{,0}"
+
 let b:current_syntax = "wl"
 
 syn keyword wExternal import module
@@ -61,3 +64,7 @@ hi def link wFloat Float
 
 " Strings
 syn region String start=+"+ end=+"[cwd]\=+ contains=@Spell
+
+" braces
+syn region wBlock start="{" end="}" transparent fold
+syn region wParen start="(" end=")" transparent

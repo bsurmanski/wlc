@@ -2,6 +2,7 @@
 #define _IRCODEGENCONTEXT_HPP
 
 #include "codegenContext.hpp"
+#include "config.hpp"
 #include <llvm/IR/Module.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/IRBuilder.h>
@@ -14,7 +15,7 @@
 
 #define CGSTR "wlc 0.1 - Jan 2014"
 
-void IRCodegen(AST *ast);
+void IRCodegen(AST *ast, WLConfig cfg);
 
 class IRDebug;
 class IRCodegenContext : public CodegenContext
@@ -35,7 +36,7 @@ class IRCodegenContext : public CodegenContext
 
     llvm::LLVMContext& getLLVMContext() { return context; }
 
-    void codegenAST(AST *ast);
+    void codegenAST(AST *ast, WLConfig param);
     protected:
     std::stack<SymbolTable*> scope;
 

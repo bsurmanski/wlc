@@ -1102,7 +1102,7 @@ void IRCodegenContext::codegenPackage(Package *p)
     }
 }
 
-void IRCodegenContext::codegenAST(AST *ast)
+void IRCodegenContext::codegenAST(AST *ast, WLConfig config)
 {
     codegenPackage(ast->getRootPackage());
     if(currentErrorLevel() > msg::WARNING)
@@ -1116,8 +1116,8 @@ void IRCodegenContext::codegenAST(AST *ast)
     linker.getModule()->dump();
 }
 
-void IRCodegen(AST *ast)
+void IRCodegen(AST *ast, WLConfig config)
 {
     IRCodegenContext context;
-    context.codegenAST(ast);
+    context.codegenAST(ast, config);
 }

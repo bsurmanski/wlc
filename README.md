@@ -116,3 +116,14 @@ what I would ever be able to do within reasonable contraints.
 ### Why not modify clang?
 WL's syntax is different enough that modifying clang would be a significant effort.
 Also, I am not familier enough with clang's architecture to do so.
+
+## Ideas
+structs are anologous to C structs. packing and allignment included
+
+for packed and alligned structs use syntax like struct(packed, allign(4)) { ... }
+    this way keywords are conditional
+
+classes are allowed to reorganize members for proper packing
+
+long cast with :: for statements like a = int:: b + c
+    or maybe just have a cast assign a := b + c

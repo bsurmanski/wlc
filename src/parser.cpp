@@ -92,14 +92,14 @@ ASTType *ParseContext::parseType()
 
         if(peek().is(tok::lbracket)) // XXX should this be parsed as part of the type, or as a postfix expression?
         {
-            ignore();
+            ignore(); // eat [
             type = type->getArrayTy();
             if(peek().isNot(tok::rbracket))
             {
                 parseExpression(); //TODO: array size
             }
-            if(peek().isNot(tok::rbracket))
-            {
+
+            if(peek().isNot(tok::rbracket)) {
                 emit_message(msg::ERROR, "expected ']'", peek().loc); 
                 dropLine();
                 return NULL;
@@ -226,6 +226,7 @@ Statement *ParseContext::parseDeclarationStatement()
 Statement *ParseContext::parseStatement()
 {
     int n = 1; //lookahead
+    int ad = 0; //array depth
     SourceLocation loc = peek().getLocation();
     switch(peek().kind)
     {
@@ -235,13 +236,31 @@ Statement *ParseContext::parseStatement()
 
         case tok::kw_extern:
         case tok::identifier:
-            while(lookAhead(n).is(tok::caret)) //XXX duplicated logic in parseExpression
-                n++;
-            if(lookAhead(n).is(tok::colon))
+            while(true){
+                while(lookAhead(n).is(tok::caret)){ //XXX duplicated logic in parseExpression
+                    n++;
+                    continue;
+                }
+                if(lookAhead(n).is(tok::lbracket)){
+                    ad++;
+                    while(ad){
+                        n++;
+                        if(lookAhead(n).is(tok::eof) || lookAhead(n).is(tok::unknown)){
+                            emit_message(msg::FATAL, "invalid array, expected ]", peek().loc);
+                        }
+                        if(lookAhead(n).is(tok::lbracket)) ad++; 
+                        if(lookAhead(n).is(tok::rbracket)) ad--; 
+                    }
+                    n++;
+                    continue;
+                }
+                break;
+            }
+            if(lookAhead(n).is(tok::colon)) // cast
             {
                 goto PARSEEXP;
             }
-            if(lookAhead(n).is(tok::identifier))
+            if(lookAhead(n).is(tok::identifier)) // declaration
             {
                 return parseDeclarationStatement();
             }
@@ -571,6 +590,34 @@ Expression *ParseContext::parseForExpression()
     return new ForExpression(decl, cond, upd, body, els, loc);
 }
 
+Expression *ParseContext::parseSwitchExpression()
+{
+    if(peek().isNot(tok::kw_switch)) {
+        emit_message(msg::FAILURE, "expected 'switch' keyword", peek().loc);
+        return NULL;
+    }
+    ignore(); // eat 'switch'
+
+    if(peek().isNot(tok::lparen)){
+        emit_message(msg::FAILURE, 
+            "expected '(' following 'switch' keyword", peek().loc);
+        return NULL;
+    }
+    ignore(); // eat '('
+
+    Expression *exp = parseExpression();
+
+    if(peek().isNot(tok::rparen)){
+        emit_message(msg::FAILURE, 
+            "expected ')' following 'switch' condition", peek().loc);
+        return NULL;
+    }
+    ignore(); // eat ')'
+
+    emit_message(msg::UNIMPLEMENTED, "switch keyword unimplemented", peek().loc);
+    return NULL; //TODO: parse body
+}
+
 Expression *ParseContext::parseCastExpression(int prec)
 {
     SourceLocation loc = peek().loc;
@@ -602,6 +649,8 @@ Expression *ParseContext::parseExpression(int prec)
             return parseWhileExpression();
         case tok::kw_for:
             return parseForExpression();
+        case tok::kw_switch:
+            return parseSwitchExpression();
         case tok::kw_import:
             return parseImport();
         default:

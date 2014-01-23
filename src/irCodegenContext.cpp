@@ -936,6 +936,22 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     {
         dwarfStopPoint(vdecl->loc);
         ASTType *vty = vdecl->type;
+
+        //XXX work around for undeclared struct
+        Identifier *id = NULL;
+        if(NamedUnknownInfo *usi = dynamic_cast<NamedUnknownInfo*>(vty->info))
+        {
+            if(usi->identifier->isUndeclared())
+            {
+                id = lookup(usi->identifier->getName());
+                if(id->isUndeclared()){
+                    emit_message(msg::ERROR, "undeclared struct: " + id->getName(), vdecl->loc);
+                    return;
+                }
+                vty = id->declaredType();
+            }
+        }
+
         AllocaInst *llvmDecl = ir->CreateAlloca(codegenType(vty), 0, vdecl->getName());
         llvmDecl->setAlignment(4);
 

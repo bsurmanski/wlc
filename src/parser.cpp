@@ -17,12 +17,44 @@
 using namespace llvm;
 using namespace std;
 
+// prepare for recovery if failed parsing
+void ParseContext::pushRecover()
+{
+    recoveryState.push_back(rqueue.size());
+}
+
+// drop recovery info once not needed
+void ParseContext::popRecover()
+{
+    recoveryState.pop_back();
+    if(!recoveryState.size())
+    {
+        while(rqueue.size())
+        {
+            rqueue.pop_front();
+        }
+    }
+}
+
+// recover from failed parsing
+void ParseContext::recover()
+{
+    int endpop = recoveryState.back();
+    recoveryState.pop_back();
+    while(rqueue.size() > endpop) 
+    {
+        tqueue.push_front(rqueue.back());
+        rqueue.pop_back();
+    }
+}
+
 ASTType *ParseContext::parseType()
 {
     ASTType *type = NULL;
     bool ptr = false;
     Token t = get();
-    cond_message(t.isNot(tok::identifier) && !t.isKeywordType(), msg::FAILURE, "unrecognized type");
+    //cond_message(t.isNot(tok::identifier) && !t.isKeywordType(), msg::FAILURE, "unrecognized type");
+    if(t.isNot(tok::identifier) && !t.isKeywordType()) return NULL;
     if(t.isKeywordType())
     {
        switch(t.kind)
@@ -71,7 +103,7 @@ ASTType *ParseContext::parseType()
        }
     } else {
         //TODO: should be get so structs dont need fwd decl?
-        Identifier *id = getScope()->lookup(t.toString()); 
+        Identifier *id = getScope()->get(t.toString()); 
         if(!id) {
             emit_message(msg::ERROR, "unknown type or variable", t.loc);
             return NULL;
@@ -228,34 +260,38 @@ Statement *ParseContext::parseStatement()
     int n = 1; //lookahead
     int ad = 0; //array depth
     SourceLocation loc = peek().getLocation();
+    ASTType *declType = NULL;
+    Identifier *id = NULL;
     switch(peek().kind)
     {
+        case tok::identifier:
+            id = getScope()->lookup(peek().toString()); 
+            if(!id || id->isUndeclared())
+            {
+                pushRecover();
+                declType = parseType();
+                if(declType && peek().is(tok::identifier)) //look ahead to see if decl
+                {
+                    recover();
+                    // FALLTHROUGH TO DECL (yes, we reparse the type. oh well...)
+                } else
+                {
+                    recover();
+                    goto PARSEEXP; // this seems to be an expression?
+                }
+            } else if(id->isStruct()) //XXX Class
+            {
+                //FALLTHROUGH TO DECL
+            } else goto PARSEEXP; //IF NOT UNDECLARED OR STRUCT, THIS IS PROBABLY AN EXPRESSION
+
+        case tok::kw_extern:
+        case tok::kw_struct:
 #define BTYPE(X,SZ,SN) case tok::kw_##X:
 #define FTYPE(X,SZ) case tok::kw_##X:
 #include "tokenkinds.def"
+                return parseDeclarationStatement();
 
-        case tok::kw_extern:
-        case tok::identifier:
-            while(true){
-                while(lookAhead(n).is(tok::caret)){ //XXX duplicated logic in parseExpression
-                    n++;
-                    continue;
-                }
-                if(lookAhead(n).is(tok::lbracket)){
-                    ad++;
-                    while(ad){
-                        n++;
-                        if(lookAhead(n).is(tok::eof) || lookAhead(n).is(tok::unknown)){
-                            emit_message(msg::FATAL, "invalid array, expected ]", peek().loc);
-                        }
-                        if(lookAhead(n).is(tok::lbracket)) ad++; 
-                        if(lookAhead(n).is(tok::rbracket)) ad--; 
-                    }
-                    n++;
-                    continue;
-                }
-                break;
-            }
+            /*
             if(lookAhead(n).is(tok::colon)) // cast
             {
                 goto PARSEEXP;
@@ -263,7 +299,7 @@ Statement *ParseContext::parseStatement()
             if(lookAhead(n).is(tok::identifier)) // declaration
             {
                 return parseDeclarationStatement();
-            }
+            }*/
             goto PARSEEXP;
         case tok::lbrace: // TODO: lbrace as statement instead of expression?
         case tok::kw_import:

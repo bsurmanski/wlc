@@ -30,6 +30,16 @@ class Parser
     protected:
 };
 
+/**
+ * parsing is pretty strange in WLC. The strangest parts revolve around identifiers.
+ * identifiers are user defined names, used as variable names, function names, and 
+ * struct names. In WL, global variables need not be defined before use. So, for example
+ * a function can be declared below it's usage. This has some strange side effects for parsing.
+ * When encountering an identifier, we often don't know whether it is a variable, function,
+ * struct, or simply undefined. This complicates determining expressions from declarations.
+ * The way I have solved it, is to treat unknown identifiers as declarations, and traceback
+ * if it turns out I am wrong
+ */
 class ParseContext
 {
     Lexer *lexer;
@@ -40,29 +50,44 @@ class ParseContext
     //std::stack<Lexer*> lexers;
 
     public:
-    ParseContext(Lexer *lex, Parser *parse, Package *p) : lexer(lex), parser(parse), package(p){}
+    ParseContext(Lexer *lex, Parser *parse, Package *p) : lexer(lex), parser(parse), 
+        package(p) {}
     ~ParseContext() { }
 
     protected:
-    std::deque<Token> tqueue;
+    std::deque<int> recoveryState; // tokens left over in rqueue after current recover
+    std::deque<Token> rqueue; // recovery queue
+    std::deque<Token> tqueue; // token lookahead queue
 
     void ignoreComments() { while(lexer->peek().kind == tok::comment) lexer->ignore(); }
     //void push() { tqueue.push(getBuffer()); }
-    Token get() { Token t; if(!tqueue.empty()){ t = tqueue.front(); tqueue.pop_front();} else { ignoreComments(); t = lexer->get();} return t; }
+    Token get() { 
+        Token t; 
+        if(!tqueue.empty()){ 
+            t = tqueue.front(); 
+            tqueue.pop_front();
+        } else { 
+            ignoreComments();
+            t = lexer->get();
+        } 
+        if(recoveryState.size()) rqueue.push_back(t);
+        return t; 
+    }
+
     Token linePeek() { Token t = peek(); if(!t.followsNewline()) return t; return Token(tok::semicolon); }
     Token peek() {
         if(!tqueue.empty()) return tqueue.front();
         ignoreComments();
         return lexer->peek();
     }
-    void ignore() { if(!tqueue.empty()) { tqueue.pop_front(); return; } ignoreComments(); lexer->ignore(); }
+    void ignore() { get(); }
 
     void dropLine() { // dumps entire line of input given an error (if line ends in binop, dump that too)
         bool binOp = false;
-        while(!peek().followsNewline() && !binOp) {
-            binOp = peek().isBinaryOp();
-            ignore(); 
-        }
+        //while(!peek().followsNewline() && !binOp) {
+        //    binOp = peek().isBinaryOp();
+        //    ignore(); 
+        //}
     }
 
     Token lookAhead(int i = 0) { // lookAhead(0) is equivilent to peek()
@@ -91,6 +116,9 @@ class ParseContext
     public:
     void parseTranslationUnit(TranslationUnit *u, const char *unitnm);
     void parseTopLevel(TranslationUnit *unit);
+    void pushRecover();
+    void popRecover();
+    void recover();
     ASTType *parseType();
     void parseInclude();
     ImportExpression *parseImport();

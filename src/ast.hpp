@@ -122,6 +122,8 @@ struct ASTTypeQual
 
 enum ASTTypeEnum
 {
+    TYPE_UNKNOWN,
+    TYPE_UNKNOWN_USER, //unknown user declared type
     TYPE_VOID,
     TYPE_BOOL,
     TYPE_CHAR,
@@ -141,7 +143,6 @@ enum ASTTypeEnum
     TYPE_POINTER,
     TYPE_ARRAY,
     TYPE_VEC,
-    TYPE_UNKNOWN
 };
 
 struct TypeInfo
@@ -181,6 +182,13 @@ struct StructTypeInfo : public TypeInfo
     StructDeclaration *getDeclaration() { return (StructDeclaration*) identifier->getDeclaration(); }
 };
 
+struct NamedUnknownInfo : public TypeInfo
+{
+    SymbolTable *scope;
+    Identifier *identifier;
+    NamedUnknownInfo(Identifier *id, SymbolTable *sc) : identifier(id), scope(sc) {}
+};
+
 struct AliasTypeInfo : public TypeInfo
 {
     Identifier *identifier;
@@ -208,7 +216,7 @@ struct ASTType
     ASTType(enum ASTTypeEnum ty) : type(ty), pointerTy(0), cgType(0)
     {}
 
-    ASTType() : pointerTy(NULL), cgType(NULL) {}
+    ASTType() : type(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL) {}
     //ASTType(ASTTypeQual q) : qual(q), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
     //virtual ~ASTType() { delete pointerTy; }
     //ASTType *getUnqual();

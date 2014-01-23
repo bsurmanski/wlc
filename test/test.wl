@@ -76,6 +76,7 @@ int main(int argc, char^^ argv)
 
     int iii = 5
     float j = float: iii
+    MyNewStruct newstruct
 
     int8 spc = 0
     while(!spc) 
@@ -89,4 +90,9 @@ int main(int argc, char^^ argv)
     }
 
     return 0
+}
+
+struct MyNewStruct
+{
+    int iiiiids    
 }

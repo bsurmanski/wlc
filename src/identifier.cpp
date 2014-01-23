@@ -26,10 +26,14 @@ ASTType *Identifier::getType()
 ASTType *Identifier::declaredType()
 {
     if(type != ID_STRUCT && type != ID_UNKNOWN) {
-        emit_message(msg::FAILURE, "this doesnt look like a type");
+        //emit_message(msg::FAILURE, "this doesnt look like a type");
         return NULL;
     }
-    if(!astType) astType = new ASTType();
+    if(!astType)
+    { 
+        astType = new ASTType();
+        astType->info = new NamedUnknownInfo(this, NULL);
+    }
     return astType;
 }
 

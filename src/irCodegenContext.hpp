@@ -40,6 +40,7 @@ class IRCodegenContext : public CodegenContext
     protected:
     std::stack<SymbolTable*> scope;
 
+    llvm::Type *codegenArrayType(ASTType *ty);
     llvm::Type *codegenStructType(ASTType *ty);
     llvm::Type *codegenType(ASTType *ty);
     llvm::Value *codegenValue(ASTValue *v);

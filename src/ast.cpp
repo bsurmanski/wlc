@@ -13,6 +13,14 @@ size_t StructTypeInfo::getSize()
     return sz;
 }
 
+std::string PointerTypeInfo::getName(){
+    return ptrTo->getName() + "^";
+}
+
+std::string ArrayTypeInfo::getName(){
+    return "array[" + arrayOf->getName() + "]";
+}
+
 ASTType *ASTType::getPointerTy()
 {
     if(!pointerTy)

@@ -14,6 +14,7 @@ be no garbage collector, no virtual machine, etc.
 * structs
 * function
 * varargs
+* arrays (with associated sizing)
 * importing
 * casting
 * loops
@@ -26,7 +27,6 @@ roughly in order of planned implementation
 
 * importing C headers (interfacing with clang's AST)
 * switch statements
-* array types
 * unions
 * enums
 * vector types
@@ -106,6 +106,27 @@ that would be somewhere in the future.
 
 Although WL currently does not have generics, it is a planned feature (sometime in the
 future).
+
+### How are arrays represented, and why not just use C-style arrays?
+In WL, Arrays are represented as a structure containing a pointer and size. The following
+C structure is equivilent to an int array in WL:
+
+    struct Array
+    {
+        int *ptr;
+        long size;
+    };
+
+When an array is initialized with a size in WL, (like: int[5] myarray), the 'ptr' member 
+is set to a stack allocated buffer of the appropriate size, and the 'size' member is set
+to the appropriate size. This can be done statically. Once an array is created, the 'ptr'
+and 'size' member can be accessed identically as if the arrays was a struct (with the dot
+operator).
+
+In C, arrays are represented as pointers. Often when using an array, a size is required.
+As such, in C, a size variable must be passed around seperately. If a simple C style array
+is required, you can just use a pointer. (this leads to a problem in structs, I would like
+to change this eventually)
 
 ### Why LLVM?
 Using LLVM allows me to focus on the syntax and functionality of the language, and eschew

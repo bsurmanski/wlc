@@ -119,7 +119,7 @@ class ParseContext
     void pushRecover();
     void popRecover();
     void recover();
-    ASTType *parseType();
+    ASTType *parseType(Expression **arrayInit); //XXX array init? omg hax
     void parseInclude();
     ImportExpression *parseImport();
     Statement *parseDeclarationStatement();

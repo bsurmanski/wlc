@@ -158,6 +158,7 @@ struct PointerTypeInfo : public TypeInfo
     ASTType *ptrTo;
     virtual ASTType *getReferenceTy() { return ptrTo; }
     PointerTypeInfo(ASTType *pto) : ptrTo(pto) {}
+    std::string getName();
 };
 
 struct ArrayTypeInfo : public TypeInfo
@@ -165,6 +166,7 @@ struct ArrayTypeInfo : public TypeInfo
     ASTType *arrayOf;
     virtual ASTType *getReferenceTy() { return arrayOf; }
     ArrayTypeInfo(ASTType *pto) : arrayOf(pto) {}
+    std::string getName();
 };
 
 struct VariableDeclaration;
@@ -243,7 +245,19 @@ struct ASTType
 
     std::string getName()
     {
-        return info->getName();
+        switch(type)
+        {
+            case TYPE_CHAR: return "char";
+            case TYPE_UCHAR: return "uchar";
+            case TYPE_BOOL: return "bool";
+            case TYPE_SHORT: return "short";
+            case TYPE_USHORT: return "ushort";
+            case TYPE_INT: return "int";
+            case TYPE_UINT: return "uint";
+            case TYPE_LONG: return "long";
+            case TYPE_ULONG: return "ulong";
+            default: return info->getName();
+        }
     }
 
     ASTType *getReferencedTy() { return info->getReferenceTy(); }
@@ -349,6 +363,14 @@ struct VariableDeclaration : public Declaration
     VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) : Declaration(nm, loc, ext), type(ty), value(val) {}
     virtual VariableDeclaration *variableDeclaration() { return this; }
     ASTType *getType() { return type; }
+};
+
+struct ArrayDeclaration : public VariableDeclaration
+{
+    Expression *sz;
+    ArrayDeclaration(ASTType *ty, Identifier *nm, Expression *val, Expression *s, SourceLocation loc, bool ext = false) :
+        VariableDeclaration(ty, nm, val, loc, ext), sz(s) {}
+    virtual ArrayDeclaration *arrayDeclaration() { return this; }
 };
 
 struct TypeDeclaration : public Declaration

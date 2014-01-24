@@ -53,6 +53,28 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
     return(llvm::Type*) ty->cgType;
 }
 
+/*
+ * array is equivilent to:
+ * struct Array {
+ *  void *arr;
+ *  long size;
+ * }
+ */
+llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
+{
+    ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(ty->info);
+    if(!ati) {
+        emit_message(msg::FAILURE, "attempt to codegen invalid array type");
+    }
+    vector<Type*> members;
+    members.push_back(codegenType(ati->arrayOf->getPointerTy()));
+    members.push_back(codegenType(ASTType::getLongTy()));
+    StructType *aty = StructType::create(context, ty->getName());
+    aty->setBody(members);
+    ty->cgType = aty;
+    return (llvm::Type*) ty->cgType;
+}
+
 llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 {
     if(!ty->cgType)
@@ -94,6 +116,9 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
             case TYPE_STRUCT:
                 llvmty = codegenStructType(ty);
                 //TODO
+                break;
+            case TYPE_ARRAY:
+                llvmty = codegenArrayType(ty);
                 break;
             default:
                 emit_message(msg::FAILURE, "type not handled");
@@ -491,9 +516,11 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         ASTValue *ind = codegenExpression(iexp->index);
         if(arr->getType()->isArray())
         {
-            //TODO
-            emit_message(msg::UNIMPLEMENTED, 
-                    "indexing arrays not implemented. try pointers", exp->loc);
+            ASTType *indexedType = arr->getType()->getReferencedTy();
+            Value *val = ir->CreateStructGEP(codegenLValue(arr), 0);
+            val = ir->CreateLoad(val);
+            val = ir->CreateInBoundsGEP(val, codegenValue(ind));
+            return new ASTValue(indexedType, val, true);
         } else if(arr->getType()->isPointer())
         {
             //TODO: index array
@@ -532,34 +559,65 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 
             if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(), 
                     codegenValue(lhs), true);
-            if(!lhs->getType()->isStruct()) {
-                emit_message(msg::ERROR, "can only index struct type", dexp->loc);
+            if(!lhs->getType()->isStruct() && !lhs->getType()->isArray()) {
+                emit_message(msg::ERROR, "can only index struct or array type", dexp->loc);
                 return NULL;
             }
-            StructTypeInfo *sti = (StructTypeInfo*) lhs->getType()->getTypeInfo();
-            int offset = 0;
-            for(int i = 0; i < sti->members.size(); i++)
-            {
-                // XXX better way to compare equality?
-                if(sti->members[i]->identifier->getName() == dexp->rhs)
-                {
-                    if(VariableDeclaration *vdecl = 
-                            dynamic_cast<VariableDeclaration*>(sti->members[i]))
-                    {
-                        //TODO proper struct GEP
 
-                        ASTType *ty = vdecl->type;
-                        std::vector<Value*> gep;
-                        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), offset));
-                        Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                        return new ASTValue(ty, llval, true);
-                    } else emit_message(msg::UNIMPLEMENTED,
-                            "this should not be in a struct (right now)", sti->members[i]->loc);
+            if(lhs->getType()->isStruct())
+            {
+                StructTypeInfo *sti = (StructTypeInfo*) lhs->getType()->getTypeInfo();
+                int offset = 0;
+                for(int i = 0; i < sti->members.size(); i++)
+                {
+                    // XXX better way to compare equality?
+                    if(sti->members[i]->identifier->getName() == dexp->rhs)
+                    {
+                        if(VariableDeclaration *vdecl = 
+                                dynamic_cast<VariableDeclaration*>(sti->members[i]))
+                        {
+                            //TODO proper struct GEP
+
+                            ASTType *ty = vdecl->type;
+                            std::vector<Value*> gep;
+                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), offset));
+                            Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
+                            return new ASTValue(ty, llval, true);
+                        } else emit_message(msg::UNIMPLEMENTED,
+                                "this should not be in a struct (right now)", sti->members[i]->loc);
+                    }
+                    offset++;
                 }
-                offset++;
+                emit_message(msg::ERROR, "member not in struct", dexp->loc);
+            } else if(lhs->getType()->isArray())
+            {
+                ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(lhs->getType()->info);
+                if(!ati){
+                    emit_message(msg::FATAL, "dot exp on array, not actually an array?", dexp->loc);
+                    return NULL;
+                }
+
+                if(dexp->rhs == "ptr")
+                {
+                    ASTType *ty = ati->getReferenceTy();
+                    std::vector<Value*> gep;
+                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                    Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
+                    return new ASTValue(ty, llval, true);
+                }
+
+                if(dexp->rhs == "size")
+                {
+                    ASTType *ty = ati->getReferenceTy();
+                    std::vector<Value*> gep;
+                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 1));
+                    Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
+                    return new ASTValue(ty, llval, true);
+                }
             }
-            emit_message(msg::ERROR, "member not in struct", dexp->loc);
         return NULL;
     }
 
@@ -953,10 +1011,38 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         }
 
         AllocaInst *llvmDecl = ir->CreateAlloca(codegenType(vty), 0, vdecl->getName());
-        llvmDecl->setAlignment(4);
+        llvmDecl->setAlignment(8);
+        ASTValue *idValue = new ASTValue(vty, llvmDecl, true); 
+
+        if(ArrayDeclaration *adecl = dynamic_cast<ArrayDeclaration*>(decl))
+        {
+            if(adecl->sz)
+            {
+                NumericExpression *nsz = dynamic_cast<NumericExpression *>(adecl->sz);
+
+                // create static array and store in array 'struct'
+                if( nsz && nsz->type == NumericExpression::INT)
+                {
+                    // array has a size
+                    Value *llvmSz = ConstantInt::get(codegenType(ASTType::getULongTy()), 
+                            nsz->intValue);
+                    AllocaInst *staticArray = ir->CreateAlloca(
+                            codegenType(adecl->getType()->info->getReferenceTy()), llvmSz);
+
+
+                    ir->CreateStore(staticArray, ir->CreateStructGEP(llvmDecl, 0));
+                    ir->CreateStore(llvmSz, ir->CreateStructGEP(llvmDecl, 1));
+
+                } else {
+                    emit_message(msg::FATAL, 
+                            "array declaration size must be constant integer expression (for now?)",
+                            adecl->loc);
+                    return;
+                }
+            }
+        }
 
         //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
-        ASTValue *idValue = new ASTValue(vty, llvmDecl, true); 
         if(vdecl->value)
         {
             ASTValue *defaultValue = codegenExpression(vdecl->value);

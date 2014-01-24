@@ -7,3 +7,5 @@ classes are allowed to reorganize members for proper packing
 
 long cast with :: for statements like a = int:: b + c
     or maybe just have a cast assign a := b + c
+
+tuples, being basically dynamically allocated structs

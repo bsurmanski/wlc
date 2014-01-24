@@ -48,7 +48,7 @@ void ParseContext::recover()
     }
 }
 
-ASTType *ParseContext::parseType()
+ASTType *ParseContext::parseType(Expression **arrayInit)
 {
     ASTType *type = NULL;
     bool ptr = false;
@@ -128,7 +128,8 @@ ASTType *ParseContext::parseType()
             type = type->getArrayTy();
             if(peek().isNot(tok::rbracket))
             {
-                parseExpression(); //TODO: array size
+                Expression *rsz = parseExpression(); //TODO: array size
+                if(arrayInit) *arrayInit = rsz;
             }
 
             if(peek().isNot(tok::rbracket)) {
@@ -269,7 +270,7 @@ Statement *ParseContext::parseStatement()
             if(!id || id->isUndeclared())
             {
                 pushRecover();
-                declType = parseType();
+                declType = parseType(NULL);
                 if(declType && peek().is(tok::identifier)) //look ahead to see if decl
                 {
                     recover();
@@ -422,7 +423,8 @@ Declaration *ParseContext::parseDeclaration()
         //return new TypeDeclaration();
     }
 
-    ASTType *type = parseType();
+    Expression *arrayInit = 0;
+    ASTType *type = parseType(&arrayInit);
 
     Token t_id = get();
     if(t_id.isNot(tok::identifier)){
@@ -465,7 +467,7 @@ Declaration *ParseContext::parseDeclaration()
                 break;
             }
 
-            ASTType *aty = parseType();
+            ASTType *aty = parseType(NULL);
             Token t_name = get();
             args.push_back(pair<ASTType*, std::string>(aty, t_name.toString()));
             if(peek().is(tok::comma))
@@ -500,6 +502,13 @@ Declaration *ParseContext::parseDeclaration()
     {
         ignore(); // ignore =
         defaultValue = parseExpression();
+    }
+
+    if(ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(type->info))
+    {
+        Declaration *adecl = new ArrayDeclaration(type, id, defaultValue, arrayInit, t_id.loc, external);
+        id->setDeclaration(adecl, Identifier::ID_VARIABLE);
+        return adecl;
     }
 
     Declaration *decl = new VariableDeclaration(type, id, defaultValue, t_id.loc, external);
@@ -657,7 +666,7 @@ Expression *ParseContext::parseSwitchExpression()
 Expression *ParseContext::parseCastExpression(int prec)
 {
     SourceLocation loc = peek().loc;
-    ASTType *type = parseType();
+    ASTType *type = parseType(NULL);
     if(!peek().is(tok::colon)) {
         emit_message(msg::ERROR, "expected colon for cast operator!", peek().loc);
         dropLine();

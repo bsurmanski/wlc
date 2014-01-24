@@ -383,7 +383,8 @@ Declaration *ParseContext::parseDeclaration()
             return NULL;
         }
 
-        if(getScope()->contains(t_id.toString())){
+        if(getScope()->contains(t_id.toString()) && 
+                !(getScope()->lookup(t_id.toString()))->isUndeclared()){
             emit_message(msg::ERROR, 
                 std::string("redeclaration of struct ") + 
                 string("'") + t_id.toString() + string("'"), t_id.loc);

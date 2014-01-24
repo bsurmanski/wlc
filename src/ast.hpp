@@ -141,6 +141,7 @@ enum ASTTypeEnum
     TYPE_CLASS,
     TYPE_FUNCTION,
     TYPE_POINTER,
+    TYPE_STATIC_ARRAY,
     TYPE_ARRAY,
     TYPE_VEC,
 };
@@ -215,10 +216,10 @@ struct ASTType
     }
     TypeInfo *getTypeInfo() { return info; }
 
-    ASTType(enum ASTTypeEnum ty) : type(ty), pointerTy(0), cgType(0)
+    ASTType(enum ASTTypeEnum ty) : type(ty), pointerTy(0), cgType(0), info(0)
     {}
 
-    ASTType() : type(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL) {}
+    ASTType() : type(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL), info(0) {}
     //ASTType(ASTTypeQual q) : qual(q), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
     //virtual ~ASTType() { delete pointerTy; }
     //ASTType *getUnqual();
@@ -239,6 +240,8 @@ struct ASTType
             case TYPE_LONG: return 8;
             case TYPE_STRUCT: return info->getSize();
             case TYPE_POINTER: return 8;
+            case TYPE_FLOAT: return 4;
+            case TYPE_DOUBLE: return 8;
             default: assert(false && "havent sized this type yet"); return 0; //TODO
         }
     };

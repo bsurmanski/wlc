@@ -52,7 +52,7 @@ Identifier *SymbolTable::lookup(std::string str, bool imports)
     if(symbols.count(str))
     {
         // XXX work around for multiple declarations, and forward declarations
-        if(symbols[str]->isUndeclared())
+        if(symbols[str]->isUndeclared() && parent)
         {
             id = parent->lookup(str);
             if(id && !id->isUndeclared()) ret = id;

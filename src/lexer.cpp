@@ -70,12 +70,16 @@ Token Lexer::lexPunct()
             if(peekChar() == '*')
             {
                 ignoreChar();
-                while(peekChar() != '*' && !eofChar())
-                {
-                    ignore();
+                while(true) {
+                    while(peekChar() != '*' && !eofChar())
+                        ignoreChar();
+
+                    assert(peekChar() == '*');
+                    ignoreChar();
+
                     if(peekChar() == '/') 
                     {
-                        ignore();
+                        ignoreChar();
                         break;
                     }
                 }

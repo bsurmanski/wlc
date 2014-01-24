@@ -1,14 +1,11 @@
 package test
 
-int printf(char^ str, ...);
-long ^malloc(int sz);
 void ^memcpy(void^ dest, void^ src, long n);
-int rand();
-void srand(uint seed);
 
 int RAND_MAX = 2147483647
 
 import "sdl.wl"
+import "cstdlib.wl"
 
 SDL_Surface^ surf = null
 SDL_Surface^ back = null
@@ -76,7 +73,7 @@ int main(int argc, char^^ argv)
 
     int iii = 5
     float j = float: iii
-    MyNewStruct newstruct
+    //MyNewStruct newstruct
 
     int8 spc = 0
     while(!spc) 

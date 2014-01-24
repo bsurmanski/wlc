@@ -1088,7 +1088,8 @@ void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationU
         {
             ASTType *idTy = id->getType();
             //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
-            GlobalValue::LinkageTypes linkage = GlobalValue::WeakAnyLinkage;
+            GlobalValue::LinkageTypes linkage = inc->globals[i]->external ? 
+                GlobalValue::ExternalLinkage : GlobalValue::WeakAnyLinkage;
             GlobalVariable *llvmval = new GlobalVariable(*(Module*)current->cgValue,
                     codegenType(idTy),
                     false,
@@ -1144,12 +1145,15 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
         {
             ASTType *idTy = id->getType();
             //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
-            GlobalValue::LinkageTypes linkage = unit->globals[i]->external ? GlobalValue::ExternalWeakLinkage : GlobalValue::WeakAnyLinkage;
+            GlobalValue::LinkageTypes linkage = unit->globals[i]->external ? 
+                GlobalValue::ExternalLinkage : GlobalValue::WeakAnyLinkage;
+            //linkage = GlobalValue::AvailableExternallyLinkage;
             GlobalVariable *llvmval = new GlobalVariable(*module,
                     codegenType(idTy),
                     false,
                     linkage,
-                    (llvm::Constant*) (unit->globals[i]->value ? codegenValue(codegenExpression(unit->globals[i]->value)) : 0),
+                    (llvm::Constant*) (unit->globals[i]->value ? 
+                        codegenValue(codegenExpression(unit->globals[i]->value)) : 0),
                     id->getName()); //TODO: proper global insertion
 
             ASTValue *gv = new ASTValue(idTy, llvmval, true);

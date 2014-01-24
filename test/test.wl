@@ -80,7 +80,7 @@ int main(int argc, char^^ argv)
     {
         SDL_PumpEvents();
         int8^ keystate = SDL_GetKeyState(0)
-        spc = keystate[SDL_SPACE]
+        spc = keystate[SDLK_SPACE]
         SDL_Delay(32)
         SDL_Flip(surf)
         update()

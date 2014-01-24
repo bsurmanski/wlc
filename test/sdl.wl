@@ -21,7 +21,6 @@ int SDL_APPACTIVE = 4
 uint8 SDL_GetAppState();
 
 // SDL_audio
-/*
 struct SDL_AudioSpec
 {
     int freq
@@ -76,7 +75,6 @@ void SDL_CloseAudio();
 void SDL_SetError(char ^fmt, ...);
 char^ SDL_GetError();
 void SDL_ClearError();
-*/
 
 // SDL_events.h
 
@@ -121,6 +119,8 @@ int SDL_EnableKeyRepeat(int delay, int interval);
 void SDL_GetKeyRepeat(int^ delay, int^ interval);
 uint8^ SDL_GetKeyState(int^ numkeys);
 char^ SDL_GetKeyName(int key);
+int SDL_GetModState();
+void SDL_SetModState(int modstate);
 
 // SDL_keysym
 int SDLK_BACKSPACE		= 8
@@ -195,13 +195,68 @@ int SDLK_x			= 120
 int SDLK_y			= 121
 int SDLK_z			= 122
 int SDLK_DELETE		= 127
+int SDLK_UP = 273
+int SDLK_DOWN = 274
+int SDLK_RIGHT = 275
+int SDLK_LEFT = 276
+int SDLK_INSERT = 277
+int SDLK_HOME = 278
+int SDLK_END = 279
+int SDLK_PAGEUP = 280
+int SDLK_PAGEDOWN = 281
 
-int SDL_SPACE = 32
+int KMOD_NONE = 0
+int KMOD_LSHIFT = 1
+int KMOD_RSHIFT = 2
+int KMOD_LCTRL = 64
+int KMOD_RCTRL = 128
+int KMOD_LALT = 256
+int KMOD_RALT = 512
 
+// SDL_mixer
+int MIX_INIT_FLAC = 1
+int MIX_INIT_MOD = 2
+int MIX_INIT_MP3 = 4
+int MIX_INIT_OGG = 8
 
-// SDL_Video
+int Mix_Init(int flag);
+void Mix_Quit();
+int MIX_CHANNELS = 8
 
-void SDL_WM_SetCaption(char^ title, char^ icon);
+struct Mix_Chunk
+{
+    int allocated
+    uint8 ^abuf
+    uint32 alen
+    uint8 volume
+}
+
+int MIX_NO_FADING = 0
+int MIX_FADING_OUT = 1
+int MIX_FADING_IN = 2
+
+//struct Mix_Music;
+int Mix_OpenAudio(int freq, uint16 format, int channels, int chunksz);
+int Mix_AllocateChannels(int numchans);
+int Mix_QuerySpec(int^ freq, uint16^ fmt, int^ channels);
+void Mix_FreeChunk(Mix_Chunk^ chunk);
+int Mix_PlayChannelTimed(int channel, Mix_Chunk^ chunk, int loops, int ticks);
+
+int Mix_PlayChannel(int chan, Mix_Chunk^ chunk, int loops) {
+    return Mix_PlayChannelTimed(chan, chunk, loops, -1);
+}
+
+int Mix_Volume(int chan, int vol);
+int Mix_VolumeChunk(Mix_Chunk^ chnk, int vol);
+int Mix_VolumeMusic(int volume);
+void Mix_Pause(int chan);
+void Mix_Resume(int chan);
+int Mix_Paused(int chan);
+int Mix_Playing(int chan);
+Mix_Chunk^ Mix_GetChunk(int chan);
+void Mix_CloseAudio();
+
+// SDL_Rect:::
 
 struct SDL_Rect
 {
@@ -210,6 +265,41 @@ struct SDL_Rect
     uint16 w
     uint16 h
 }
+
+// SDL_mouse
+struct WMcursor;
+struct SDL_Cursor {
+    SDL_Rect area
+    int16 hot_x
+    int16 hoy_y
+    uint8^ data
+    uint8^ mask
+    uint8^^ save
+    void^ wm_cursor
+}
+
+uint8 SDL_GetMouseState(int^ x, int^ y);
+uint8 SDL_GetRelativeMouseState(int^ x, int^ y);
+void SDL_WarpMouse(uint16 x, uint16 y);
+SDL_Cursor^ SDL_CreateCursor(uint8^ data, uint8^ mask, int w, int h, int hot_x, int hot_y);
+void SDL_SetCursor(SDL_Cursor^ cursor);
+SDL_Cursor^ SDL_GetCursor();
+void SDL_FreeCursor(SDL_Cursor^ cursor);
+int SDL_ShowCursor(int toggle);
+
+int SDL_BUTTON_LEFT = 1
+int SDL_BUTTON_MIDDLE = 2
+int SDL_BUTTON_RIGHT = 3
+
+// SDL_timer.h
+
+uint32 SDL_GetTicks();
+void SDL_Delay(int32 ms);
+
+// SDL_Video
+
+void SDL_WM_SetCaption(char^ title, char^ icon);
+
 
 struct SDL_Color
 {
@@ -273,6 +363,3 @@ SDL_Surface^ SDL_CreateRGBSurface(uint flags, int width, int height, int depth,
                                   int32 rmask, int32 gmask, int32 bmask, int32 amask);
 int SDL_Flip(SDL_Surface^ surf);
 
-// SDL_timer.h
-
-void SDL_Delay(int32 ms);

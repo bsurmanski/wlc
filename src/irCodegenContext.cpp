@@ -12,6 +12,8 @@
 using namespace std;
 using namespace llvm;
 
+SourceLocation currentLoc;
+
 void IRCodegenContext::dwarfStopPoint(int ln)
 {
     llvm::DebugLoc loc = llvm::DebugLoc::get(ln, 1, diScope());
@@ -21,6 +23,7 @@ void IRCodegenContext::dwarfStopPoint(int ln)
 
 void IRCodegenContext::dwarfStopPoint(SourceLocation l)
 {
+    currentLoc = l;
     llvm::DebugLoc loc = llvm::DebugLoc::get(l.line, l.ch, diScope());
     assert_message(!loc.isUnknown(), msg::FAILURE, "unknown debug location");
     ir->SetCurrentDebugLocation(loc);
@@ -80,6 +83,24 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
     if(!ty->cgType)
     {
         llvm::Type *llvmty = NULL;
+        if(ty->type == TYPE_UNKNOWN || ty->type == TYPE_UNKNOWN_USER)
+        {
+            Identifier* id = lookup(ty->getName());
+            Declaration* decl = id->getDeclaration();
+            if(TypeDeclaration* tdecl = dynamic_cast<TypeDeclaration*>(decl))
+            {
+                ty = tdecl->type; 
+            } else {
+                emit_message(msg::FATAL, "error, invalid type");
+                return NULL;
+            }
+            //TODO
+            if(id->isUndeclared()) {
+                emit_message(msg::ERROR, string("undeclared type'") + 
+                        id->getName() + string("' in scope"));
+                return NULL;
+            }
+        }
         switch(ty->type)
         {
             case TYPE_BOOL:
@@ -121,7 +142,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 llvmty = codegenArrayType(ty);
                 break;
             default:
-                emit_message(msg::FAILURE, "type not handled");
+                emit_message(msg::FAILURE, "type not handled", currentLoc);
         }
         ty->cgType = llvmty;
     }

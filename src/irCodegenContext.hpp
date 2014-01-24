@@ -13,8 +13,6 @@
 
 #include "irDebug.hpp"
 
-#define CGSTR "wlc 0.1 - Jan 2014"
-
 void IRCodegen(AST *ast, WLConfig cfg);
 
 class IRDebug;

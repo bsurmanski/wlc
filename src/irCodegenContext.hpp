@@ -15,6 +15,17 @@
 
 void IRCodegen(AST *ast, WLConfig cfg);
 
+struct IRFunction
+{
+    FunctionDeclaration *declaration;
+    ASTValue *retVal;
+    llvm::BasicBlock *exit;
+    bool returning;
+
+    IRFunction(): declaration(NULL), retVal(NULL), returning(false) {}
+    IRFunction(FunctionDeclaration *decl) : declaration(decl), returning(false) {}
+};
+
 class IRDebug;
 class IRCodegenContext : public CodegenContext
 {
@@ -25,6 +36,7 @@ class IRCodegenContext : public CodegenContext
     llvm::BasicBlock *breakLabel;
     llvm::BasicBlock *continueLabel;
     llvm::Linker linker;
+    IRFunction currentFunction;
     TranslationUnit *unit;
     IRDebug *debug;
 

@@ -18,17 +18,19 @@ syn keyword wConstant null
 syn keyword wTypedef alias
 syn keyword wLabel case default label
 syn keyword wStatement return
+syn keyword wStorageClass extern
 hi def link wExternal Include 
 hi def link wScopeDecl StorageClass
 hi def link wAssert Assert
 hi def link wConditional Conditional
 hi def link wBranch Statement
 hi def link wRepeat Repeat
-hi def link wBool Bool
+hi def link wBool Boolean
 hi def link wConstant Constant
 hi def link wTypedef Typedef
 hi def link wLabel Label
 hi def link wStatement Statement
+hi def link wStorageClass StorageClass
 
 " Types
 syn keyword Structure class struct union
@@ -41,8 +43,8 @@ syn keyword Type float32 float64
 
 " Comments
 syn match wTodo contained "\<\(TODO\|FIXME\|XXX\|NOTE\|TEMP\|HACK\|BUG\|REVIEW\|REFACTOR\)\(:\)\="
-syn region wBlockComment start="/\*" end="\*/" contains=wlTodo,@Spell fold
-syn match wLineComment "//.*" contains=wlTodo,@Spell
+syn region wBlockComment start="/\*" end="\*/" contains=wTodo,@Spell fold
+syn match wLineComment "//.*" contains=wTodo,@Spell
 hi def link wTodo Todo
 hi def link wLineComment Comment
 hi def link wBlockComment Comment

@@ -24,16 +24,23 @@ llvm::DIDescriptor IRDebug::currentScope()
 llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
 {
     assert(ty->isStruct() && "expected struct");
+    llvm::DIDescriptor DIContext(currentFile());
     StructTypeInfo *sti = (StructTypeInfo*) ty->info;
     vector<Value *> vec;
+    int offset = 0;
     for(int i = 0; i < sti->members.size(); i++)
     {
+        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(sti->members[i]);
+        assert(vdecl);
+        vec.push_back(di.createMemberType(DIContext, vdecl->getName(), currentFile(),
+                    sti->members[0]->loc.line, vdecl->getType()->size(), 8, 1, offset, 
+                    createType(vdecl->getType())));
+        offset += vdecl->getType()->size();
         //TODO: members 
     }
 
     DIArray arr = di.getOrCreateArray(vec);
 
-    llvm::DIDescriptor DIContext(currentFile());
     return di.createStructType(DIContext, //TODO: defined scope
             ty->getName(), 
             currentFile(), //TODO: defined file 
@@ -95,6 +102,8 @@ llvm::DIType IRDebug::createType(ASTType *ty)
             case TYPE_STRUCT:
                 dity = createStructType(ty);
                 break;
+            case TYPE_ARRAY:
+                return DIType();
             default:
                 assert(false && "debug info not yet added for type");
         }

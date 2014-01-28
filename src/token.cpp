@@ -25,6 +25,7 @@ int getBinaryPrecidence(tok::TokenKind tkind)
                 return 6;
         case tok::amp:
                 return 7;
+        case tok::bangequal:
         case tok::equalequal:
                 return 8;
         case tok::less:

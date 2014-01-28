@@ -53,6 +53,8 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
         ty->cgType = sty;
     }
     else ty->cgType = Type::getInt8Ty(context); //allow fwd declared types, TODO: cleaner
+
+    debug->createStructType(ty);
     return(llvm::Type*) ty->cgType;
 }
 
@@ -326,7 +328,8 @@ ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
 
     ir->SetInsertPoint(ontrue);
     codegenStatement(exp->body);
-    ir->CreateBr(onfalse);
+    if(!dynamic_cast<ReturnStatement*>(exp->body))
+        ir->CreateBr(endif);
 
     ir->SetInsertPoint(onfalse);
     if(exp->elsebranch) codegenStatement(exp->elsebranch);
@@ -508,6 +511,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
         case tok::bang:
             val = promoteType(lhs, ASTType::getBoolTy());
             return new ASTValue(ASTType::getBoolTy(), ir->CreateNot(codegenValue(val))); 
+            return val;
         case tok::caret:
             if(!lhs->getType()->isPointer()) {
                 emit_message(msg::ERROR, "attempt to dereference non-pointer type", exp->loc);
@@ -673,9 +677,9 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
             if(toType->isFloating())
             {
                 if(val->type->isSigned())
-                return new ASTValue(toType, ir->CreateUIToFP(codegenValue(val),
+                return new ASTValue(toType, ir->CreateSIToFP(codegenValue(val),
                             codegenType(toType)), false);
-                return new ASTValue(toType, ir->CreateSIToFP(codegenValue(val), 
+                return new ASTValue(toType, ir->CreateUIToFP(codegenValue(val), 
                             codegenType(toType)), false);
             }
         } else if(val->type->isFloating())
@@ -696,6 +700,23 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                 return new ASTValue(toType, 
                         ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
             }
+
+            if(toType->isInteger())
+            {
+                return new ASTValue(toType, ir->CreateIntCast(codegenValue(val), 
+                            codegenType(toType), false));
+            }
+
+            if(toType->isBool())
+            {
+                Value *i = ir->CreatePtrToInt(codegenValue(val), 
+                        codegenType(ASTType::getULongTy()));
+
+                return new ASTValue(ASTType::getBoolTy(), 
+                        ir->CreateICmpNE(i,
+                            ConstantInt::get(codegenType(ASTType::getULongTy()), 0)
+                            ));
+            }
         }
     }
     return val; // no conversion? failed converson?
@@ -712,8 +733,8 @@ void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, u
             // TODO: loc
             emit_message(msg::UNIMPLEMENTED, "cannot convert structs (yet)");
         }
-        if((*v1)->type->size() > (*v2)->type->size()) *v2 = promoteType(*v2, (*v1)->type);
-        else if((*v2)->type->size() > (*v1)->type->size()) *v1 = promoteType(*v1, (*v2)->type);
+        if((*v2)->type->size() > (*v1)->type->size()) *v1 = promoteType(*v1, (*v2)->type);
+        else *v2 = promoteType(*v2, (*v1)->type);
     }
 }
 
@@ -794,6 +815,13 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                 else // sign not required, irrelivant for equality
                     val = ir->CreateICmp(CmpInst::ICMP_EQ, lhs_val, rhs_val);
                 return new ASTValue(ASTType::getBoolTy(), val);
+        case tok::bangequal:
+                if(TYPE->isFloating())
+                    val = ir->CreateFCmp(CmpInst::FCMP_ONE, lhs_val, rhs_val);
+                else // sign not required, irrelivant for equality
+                    val = ir->CreateICmp(CmpInst::ICMP_NE, lhs_val, rhs_val);
+                return new ASTValue(ASTType::getBoolTy(), val);
+
         case tok::less:
                 if(TYPE->isFloating())
                     val = ir->CreateFCmpOLT(lhs_val, rhs_val);
@@ -867,6 +895,11 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                 val = ir->CreateURem(lhs_val, rhs_val);
             return new ASTValue(TYPE, val);
 
+        case tok::lessless:
+            val = ir->CreateShl(lhs_val, rhs_val);
+            return new ASTValue(TYPE, val);
+            //TODO: right shift
+
         case tok::starstar:
         default:
             emit_message(msg::UNIMPLEMENTED, "unimplemented operator", exp->loc);
@@ -882,17 +915,16 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
     if(exp->expression)
     {
         ASTValue *value = codegenExpression(exp->expression);
-        ir->CreateRet(codegenValue(value));
-        //TODO: cast to proper type
-        return;
+        storeValue(currentFunction.retVal, value);
     }
-    ir->CreateRetVoid();
-    //return value;
+
+    ir->CreateBr(currentFunction.exit);
 }
 
 void IRCodegenContext::codegenStatement(Statement *stmt)
 {
     if(!stmt) return;
+    dwarfStopPoint(stmt->loc);
     if(ExpressionStatement *estmt = dynamic_cast<ExpressionStatement*>(stmt))
     {
         codegenExpression(estmt->expression);
@@ -959,6 +991,8 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 {
     if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(decl))
     {
+        IRFunction backup = currentFunction;
+        currentFunction = IRFunction(fdecl);
         //FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
         //Function *func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
         Function *func = module->getFunction(fdecl->getName());
@@ -966,6 +1000,17 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         if(fdecl->body)
         {
             BasicBlock *BB = BasicBlock::Create(context, "entry", func);
+            BasicBlock *exitBB = BasicBlock::Create(context, "exit", func);
+            currentFunction.exit = exitBB;
+
+            currentFunction.retVal = NULL;
+            if(func->getReturnType() != Type::getVoidTy(context))
+            {
+                currentFunction.retVal = new ASTValue(fdecl->getReturnType(), 
+                        new AllocaInst(codegenType(fdecl->getReturnType()),
+                            0, "ret", BB), true);
+            }
+
             ir->SetInsertPoint(BB);
 
             dwarfStopPoint(decl->loc);
@@ -985,7 +1030,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                 AI->setName(param_i.second);
                 AllocaInst *alloc = new AllocaInst(codegenType(param_i.first), 0, param_i.second, BB);
                     //ir->CreateAlloca(codegenType(param_i.first), 0, param_i.second);
-                alloc->setAlignment(4);
+                alloc->setAlignment(8);
                 ASTValue *alloca = new ASTValue(param_i.first, alloc, true);
                 new StoreInst(AI, codegenLValue(alloca), BB);
                 //ir->CreateStore(AI, codegenLValue(alloca));
@@ -1004,13 +1049,21 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
             codegenStatement(fdecl->body);
 
-            if(func->getReturnType() == Type::getVoidTy(context))
+            if(!currentFunction.retVal) // returns void
             {
+                ir->CreateBr(currentFunction.exit);
+                ir->SetInsertPoint(currentFunction.exit);
                 ir->CreateRetVoid();
+            } else
+            {
+                ir->SetInsertPoint(currentFunction.exit);
+                ASTValue *astRet = loadValue(currentFunction.retVal);
+                ir->CreateRet(codegenValue(astRet));
             }
 
             popScope();
         }
+        currentFunction = backup;
     } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl))
     {
         dwarfStopPoint(vdecl->loc);

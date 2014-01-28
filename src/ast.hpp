@@ -351,6 +351,7 @@ struct FunctionDeclaration : public Declaration
     FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st, SourceLocation loc) : Declaration(id, loc), prototype(p), scope(sc), body(st), cgValue(NULL) {}
     virtual FunctionDeclaration *functionDeclaration() { return this; }
     SymbolTable *getScope() { return scope; }
+    ASTType *getReturnType() { return prototype->returnType; }
 };
 
 struct LabelDeclaration : public Declaration

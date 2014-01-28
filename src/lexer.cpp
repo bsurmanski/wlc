@@ -157,6 +157,7 @@ Token Lexer::lexPunct()
             break;
         case '!':
             ignoreChar();
+            IFCONSUMEBREAK('=', kind = tok::bangequal);
             kind = tok::bang;
             break;
         case ':':

@@ -7,7 +7,7 @@ void Identifier::setDeclaration(Declaration *decl, IDType ty)
 {
     FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(declaration);
     if(!fdecl || (fdecl && fdecl->body))
-        if(declaration) 
+        if(declaration)
         {
             emit_message(msg::FATAL, "redefinition");
         }

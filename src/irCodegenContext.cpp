@@ -1058,10 +1058,11 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
             codegenStatement(fdecl->body);
 
+            if(!currentFunction.terminated)
+                ir->CreateBr(currentFunction.exit);
+
             if(!currentFunction.retVal) // returns void
             {
-                if(!currentFunction.terminated)
-                    ir->CreateBr(currentFunction.exit);
                 ir->SetInsertPoint(currentFunction.exit);
                 ir->CreateRetVoid();
             } else

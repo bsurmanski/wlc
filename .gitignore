@@ -10,3 +10,4 @@ wlc
 program
 llvmir
 obj
+*.s

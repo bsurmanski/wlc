@@ -233,7 +233,7 @@ ImportExpression *ParseContext::parseImport()
         {
             importedUnit = new TranslationUnit(NULL, sexp->string);  //TODO: identifier
             parser->getAST()->addUnit(sexp->string, importedUnit);
-            parser->parseFile(importedUnit, sexp->string);
+            parser->parseFile(importedUnit, sexp->string, loc);
         }
     }
 
@@ -411,6 +411,7 @@ Declaration *ParseContext::parseDeclaration()
             {
                 Declaration *d = parseDeclaration();
                 members.push_back(d);
+                while(peek().is(tok::semicolon)) ignore();
             }
             ignore(); //eat rbrace
             popScope();
@@ -890,9 +891,16 @@ void ParseContext::parseTranslationUnit(TranslationUnit *unit, const char *unitn
     assert_message(!getScope(), msg::FAILURE, "invalid scope stack!", peek().loc);
 }
 
-void Parser::parseFile(TranslationUnit *unit, std::string filenm)
+void Parser::parseFile(TranslationUnit *unit, std::string filenm, SourceLocation l)
 {
     ifstream stream(filenm.c_str());
+    
+    if(stream.fail())
+    {
+        emit_message(msg::ERROR, "unknown file '" + filenm + "'", l);
+        return;
+    }
+
     Lexer *lexer = new StreamLexer(stream);
     lexer->setFilename(filenm.c_str());
     ParseContext context(lexer, this, ast->getRootPackage());

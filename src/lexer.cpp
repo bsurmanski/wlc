@@ -234,14 +234,37 @@ Token Lexer::lexNumber()
     //TODO hexstrings fp, etc
     bool fp = false;
     string numstr;
-    while(isdigit(peekChar()) || peekChar() == '.')
+    numstr += getChar();
+    if(numstr[0] == '0' && tolower(peekChar()) == 'x') //hex
     {
-        if(peekChar() == '.')
+        while(isxdigit(peekChar()) || peekChar() == '.')
         {
-            assert(!fp && "invalid numeric constant");
-            fp = true;
+            if(peekChar() == '.') {
+                assert(!fp && "invalid numeric constant");
+                fp = true; 
+            }
+            numstr += getChar();
         }
-        numstr += getChar();
+        assert(false && "hexadecimal not impl"); 
+    } else if(numstr[0] == '0' && tolower(peekChar()) == 'o') //octal
+    {
+        assert(false && "octal lexing not impl"); 
+
+    } else if(numstr[0] == '0' && tolower(peekChar()) == 'b') // binary
+    {
+        assert(false && "binary lexing not impl"); 
+    } else //normal decinal number
+    {
+        while(isdigit(peekChar()) || peekChar() == '.')
+        {
+            if(peekChar() == '.')
+            {
+                assert(!fp && "invalid numeric constant");
+                fp = true;
+            }
+            numstr += getChar();
+            while(peekChar() == '_') ignore();
+        }
     }
     if(fp) return Token(tok::floatNum, numstr);
     return Token(tok::intNum, numstr);

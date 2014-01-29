@@ -1,14 +1,16 @@
 error if return is not there
-error if import file does not exist
+## allow for duplicate return
+## error if import file does not exist
 error if param is type not yet defined
 check param order, type, and number
-dont error if semicolon is in struct def
+## dont error if semicolon is in struct def
+hexadecimal, octal, binary number parsing
 dont crash on 'f' postfix of numbers
-convert null to appropriate type in return
-allow implicit conversion from pointer to bool
+## convert null to appropriate type in return
+## allow implicit conversion from pointer to bool
 sizeof operator
 offsetof operator
-globals without init should default to 0
+## globals without init should default to 0
 correct struct debug info
 proper arrays
 negate operator
@@ -17,3 +19,4 @@ compound equal operators (and dont segfault on compound equal)
 ++ operator for float
 float coersion is off. an expression like (rand() / float: RAND_MAX) 
     does not parse right (should be random 0.0-1.0, instead is 0.0)
+right shift operator

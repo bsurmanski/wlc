@@ -9,12 +9,18 @@ import "cstdlib.wl"
 
 SDL_Surface^ surf = null
 SDL_Surface^ back = null
-void^ testval = null
+void^ testval
+
+struct SomeStruct
+{
+    int i
+    int j
+}
 
 bool pixelIsWhite(SDL_Surface^ s, int i, int j)
 {
     bool ret = s.pixels[i * s.format.BytesPerPixel + j * s.pitch]
-    return bool: ret
+    return ret
 }
 
 void setPixel(SDL_Surface^ s, int i, int j, int val) 
@@ -58,6 +64,12 @@ void randomize(SDL_Surface ^s)
         }
     }
     return
+}
+
+void^ somefunc()
+{
+    return null 
+    return testval
 }
 
 int main(int argc, char^^ argv)

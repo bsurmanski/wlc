@@ -201,10 +201,19 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
 {
     if(BlockExpression *bexp = exp->blockExpression())
     {
+        bool terminated = false;
         for(int i = 0; i < bexp->statements.size(); i++)
         {
-            codegenStatement(bexp->statements[i]);
+            if(terminated && dynamic_cast<LabelStatement*>(bexp->statements[i])) terminated = false;
+
+            if(!terminated)
+                codegenStatement(bexp->statements[i]);
+
+            if(dynamic_cast<GotoStatement*>(bexp->statements[i]) ||
+                    dynamic_cast<ReturnStatement*>(bexp->statements[i]))
+                terminated = true;
         }
+        currentFunction.terminated = terminated;
         return NULL; //TODO: value?
     }
     else if(NumericExpression *nexp = exp->numericExpression())
@@ -504,7 +513,6 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
             }
             val = new ASTValue(lhs->getType(), ir->CreateNeg(codegenValue(lhs)));
             return val;
-            return NULL;
         case tok::tilde:
             emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen (~)", exp->loc);
             return NULL;
@@ -915,7 +923,8 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
     if(exp->expression)
     {
         ASTValue *value = codegenExpression(exp->expression);
-        storeValue(currentFunction.retVal, value);
+        ASTValue *v = promoteType(value, currentFunction.retVal->getType());
+        storeValue(currentFunction.retVal, v);
     }
 
     ir->CreateBr(currentFunction.exit);
@@ -1051,11 +1060,13 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
             if(!currentFunction.retVal) // returns void
             {
-                ir->CreateBr(currentFunction.exit);
+                if(!currentFunction.terminated)
+                    ir->CreateBr(currentFunction.exit);
                 ir->SetInsertPoint(currentFunction.exit);
                 ir->CreateRetVoid();
             } else
             {
+                //ir->CreateBr(currentFunction.exit);
                 ir->SetInsertPoint(currentFunction.exit);
                 ASTValue *astRet = loadValue(currentFunction.retVal);
                 ir->CreateRet(codegenValue(astRet));
@@ -1168,7 +1179,7 @@ void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationU
                     codegenType(idTy),
                     false,
                     linkage,
-                    (llvm::Constant*) NULL,
+                    NULL,
                     id->getName()); //TODO: proper global insertion
             
             ASTValue *gv = new ASTValue(idTy, llvmval, true);
@@ -1227,7 +1238,8 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
                     false,
                     linkage,
                     (llvm::Constant*) (unit->globals[i]->value ? 
-                        codegenValue(codegenExpression(unit->globals[i]->value)) : 0),
+                        codegenValue(codegenExpression(unit->globals[i]->value)) : 
+                        (llvm::Constant*) llvm::Constant::getNullValue(codegenType(idTy))),
                     id->getName()); //TODO: proper global insertion
 
             ASTValue *gv = new ASTValue(idTy, llvmval, true);

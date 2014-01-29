@@ -20,10 +20,10 @@ struct IRFunction
     FunctionDeclaration *declaration;
     ASTValue *retVal;
     llvm::BasicBlock *exit;
-    bool returning;
+    bool terminated;
 
-    IRFunction(): declaration(NULL), retVal(NULL), returning(false) {}
-    IRFunction(FunctionDeclaration *decl) : declaration(decl), returning(false) {}
+    IRFunction(): declaration(NULL), retVal(NULL), terminated(false) {}
+    IRFunction(FunctionDeclaration *decl) : declaration(decl), terminated(false) {}
 };
 
 class IRDebug;

@@ -32,8 +32,19 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
     {
         VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(sti->members[i]);
         assert(vdecl);
-        vec.push_back(di.createMemberType(DIContext, vdecl->getName(), currentFile(),
-                    sti->members[0]->loc.line, vdecl->getType()->size(), 8, 1, offset, 
+        unsigned size = vdecl->getType()->size();
+        unsigned align = vdecl->getType()->align();
+        if(offset % align)
+            offset += (align - (offset % align));
+        vec.push_back(di.createMemberType(
+                    DIContext,
+                    vdecl->getName(),
+                    currentFile(),
+                    sti->members[0]->loc.line,
+                    size * 8,
+                    align * 8,
+                    offset * 8,
+                    0, 
                     createType(vdecl->getType())));
         offset += vdecl->getType()->size();
         //TODO: members 
@@ -45,8 +56,8 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
             ty->getName(), 
             currentFile(), //TODO: defined file 
             sti->getDeclaration()->loc.line, //line num
-            ty->size(),
-            ty->size(),
+            ty->size() * 8,
+            ty->align() * 8,
             0, // flags
             llvm::DIType(),
             arr

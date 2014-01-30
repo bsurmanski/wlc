@@ -152,6 +152,7 @@ struct TypeInfo
     virtual ASTType *getReferenceTy() { return NULL; }
     virtual std::string getName() { return ""; }
     virtual size_t getSize() { return 0; }
+    virtual size_t getAlign() { return 0; }
 };
 
 struct PointerTypeInfo : public TypeInfo
@@ -182,6 +183,7 @@ struct StructTypeInfo : public TypeInfo
         identifier(id), scope(sc), members(m), packed(false){}
     std::string getName() { return identifier->getName(); }
     virtual size_t getSize();
+    virtual size_t getAlign();
     StructDeclaration *getDeclaration() { return (StructDeclaration*) identifier->getDeclaration(); }
 };
 
@@ -239,6 +241,28 @@ struct ASTType
             case TYPE_ULONG:
             case TYPE_LONG: return 8;
             case TYPE_STRUCT: return info->getSize();
+            case TYPE_POINTER: return 8;
+            case TYPE_FLOAT: return 4;
+            case TYPE_DOUBLE: return 8;
+            default: assert(false && "havent sized this type yet"); return 0; //TODO
+        }
+    };
+
+    size_t align() const
+    {
+
+        switch(type)
+        {
+            case TYPE_CHAR:
+            case TYPE_UCHAR:
+            case TYPE_BOOL: return 1;
+            case TYPE_USHORT:
+            case TYPE_SHORT: return 2;
+            case TYPE_UINT:
+            case TYPE_INT: return 4;
+            case TYPE_ULONG:
+            case TYPE_LONG: return 8;
+            case TYPE_STRUCT: return info->getAlign();
             case TYPE_POINTER: return 8;
             case TYPE_FLOAT: return 4;
             case TYPE_DOUBLE: return 8;

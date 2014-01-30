@@ -4,13 +4,32 @@ size_t StructTypeInfo::getSize()
 {
     size_t sz = 0;
     VariableDeclaration *vd;
+    unsigned align;
     for(int i = 0; i < members.size(); i++)
     {
         vd = members[i]->variableDeclaration();
         assert(vd && "expected variable decl, found something else");
+
+        align = vd->getType()->align();
+        if(sz % align)
+            sz += (align - (sz % align));
         sz += vd->type->size();
     }
     return sz;
+}
+
+size_t StructTypeInfo::getAlign()
+{
+    size_t align = 0;
+    VariableDeclaration *vd;
+    for(int i = 0; i < members.size(); i++)
+    {
+        vd = members[i]->variableDeclaration();
+        assert(vd && "expected variable decl, found something else");
+        if(vd->getType()->align() > align)
+            align = vd->getType()->align();
+    }
+    return align;
 }
 
 std::string PointerTypeInfo::getName(){

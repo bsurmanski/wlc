@@ -11,7 +11,7 @@ dont crash on 'f' postfix of numbers
 sizeof operator
 offsetof operator
 ## globals without init should default to 0
-correct struct debug info
+## correct struct debug info
 proper arrays
 negate operator
 proper extern keyword for variables

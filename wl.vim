@@ -19,6 +19,7 @@ syn keyword wTypedef alias
 syn keyword wLabel case default label
 syn keyword wStatement return
 syn keyword wStorageClass extern
+syn keyword wOperator and or not
 hi def link wExternal Include 
 hi def link wScopeDecl StorageClass
 hi def link wAssert Assert
@@ -31,6 +32,7 @@ hi def link wTypedef Typedef
 hi def link wLabel Label
 hi def link wStatement Statement
 hi def link wStorageClass StorageClass
+hi def link wOperator Operator
 
 " Types
 syn keyword Structure class struct union

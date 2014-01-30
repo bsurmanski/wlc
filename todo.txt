@@ -1,4 +1,5 @@
 error if return is not there
+error if using compound assign op, and resolving binary types changes LHS
 ## allow for duplicate return
 ## error if import file does not exist
 error if param is type not yet defined

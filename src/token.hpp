@@ -23,6 +23,7 @@ using namespace tok;
 int getBinaryPrecidence(tok::TokenKind tkind);
 int getPostfixPrecidence(tok::TokenKind tkind);
 int getUnaryPrecidence(tok::TokenKind tkind);
+bool isAssignOp(tok::TokenKind tkind);
 
 struct Token
 {

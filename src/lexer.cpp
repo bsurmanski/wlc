@@ -35,6 +35,10 @@ Token Lexer::lexWord()
         tokstr += curChar;
     } while(isalnum(peekChar()) || peekChar() == '_');
 
+    if(tokstr == "and") return Token(tok::ampamp);
+    if(tokstr == "or") return Token(tok::barbar);
+    if(tokstr == "not") return Token(tok::bang);
+
 #define KEYWORD(X) if(#X == tokstr) return Token(tok::kw_##X);
 #include "tokenkinds.def"
 
@@ -52,20 +56,24 @@ Token Lexer::lexPunct()
         case '+':
             ignoreChar();
             IFCONSUMEBREAK('+', kind = tok::plusplus);
+            IFCONSUMEBREAK('=', kind = tok::plusequal);
             kind = tok::plus;
             break;
         case '-':
             ignoreChar();
             IFCONSUMEBREAK('-', kind = tok::minusminus);
+            IFCONSUMEBREAK('=', kind = tok::minusequal);
             kind = tok::minus;
             break;
         case '*':
             ignoreChar();
             IFCONSUMEBREAK('*', kind = tok::starstar);
+            IFCONSUMEBREAK('=', kind = tok::starequal);
             kind = tok::star;
             break;
         case '/':
             ignoreChar();
+            IFCONSUMEBREAK('=', kind = tok::slashequal);
             IFCONSUMEBREAK('/', kind = tok::comment; while(peekChar() != '\n' && !eofChar()) ignoreChar(); );
             if(peekChar() == '*')
             {
@@ -140,19 +148,23 @@ Token Lexer::lexPunct()
         case '&':
             ignoreChar();
             IFCONSUMEBREAK('&', kind = tok::ampamp);
+            IFCONSUMEBREAK('=', kind = tok::ampequal);
             kind = tok::amp;
             break;
         case '|':
             ignoreChar();
             IFCONSUMEBREAK('|', kind = tok::barbar);
+            IFCONSUMEBREAK('=', kind = tok::barequal);
             kind = tok::bar;
             break;
         case '^':
             ignoreChar();
+            IFCONSUMEBREAK('=', kind = tok::caretequal);
             kind = tok::caret;
             break;
         case '%':
             ignoreChar();
+            IFCONSUMEBREAK('=', kind = tok::percentequal);
             kind = tok::percent;
             break;
         case '!':

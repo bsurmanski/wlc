@@ -3,6 +3,27 @@
 #include <assert.h>
 #include "token.hpp"
 
+
+bool isAssignOp(tok::TokenKind tkind)
+{
+    switch(tkind)
+    {
+        case tok::equal:
+        case tok::plusequal:
+        case tok::minusequal:
+        case tok::starequal:
+        case tok::slashequal:
+        case tok::ampequal:
+        case tok::barequal:
+        case tok::caretequal:
+        case tok::percentequal:
+            return true;
+        default:
+            return false;
+    }
+
+}
+
 // higher precidence means stronger binding, 0 means no binding
 int getBinaryPrecidence(tok::TokenKind tkind)
 {
@@ -11,6 +32,14 @@ int getBinaryPrecidence(tok::TokenKind tkind)
         case tok::comma:
             return 1;
         case tok::equal:
+        case tok::plusequal:
+        case tok::minusequal:
+        case tok::starequal:
+        case tok::slashequal:
+        case tok::ampequal:
+        case tok::barequal:
+        case tok::caretequal:
+        case tok::percentequal:
                 return 2;
         case tok::barbar:
         case tok::kw_or:
@@ -47,6 +76,7 @@ int getBinaryPrecidence(tok::TokenKind tkind)
                 return 0;
     }
 }
+
 
 int getPostfixPrecidence(tok::TokenKind tkind)
 {

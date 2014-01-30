@@ -3,6 +3,8 @@
 #include "token.hpp"
 #include "irCodegenContext.hpp"
 
+#include <llvm/Analysis/Verifier.h>
+
 #include "message.hpp"
 
 #include <fstream>
@@ -781,10 +783,11 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
     ASTValue *lhs = codegenExpression(exp->lhs);
     ASTValue *rhs = codegenExpression(exp->rhs);
-    if(exp->op != tok::equal) //XXX messy
+    if(!isAssignOp((tok::TokenKind) exp->op)) //XXX messy
         codegenResolveBinaryTypes(&lhs, &rhs, exp->op);
 
     llvm::Value *val;
+    ASTValue *retValue = NULL;
 #define lhs_val codegenValue(lhs)
 #define rhs_val codegenValue(rhs)
 
@@ -797,9 +800,8 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                 emit_message(msg::ERROR, "LHS must be LValue", exp->loc);
                 return NULL; 
             }
-            rhs = promoteType(rhs, TYPE); //TODO: merge with decl assign
-            storeValue(lhs, rhs);
-            return rhs;
+            retValue = rhs; //TODO: merge with decl assign
+            break;
 
         // I dont know, do something with a comma eventually
         case tok::comma:
@@ -824,14 +826,22 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
         // BITWISE OPS
         case tok::bar:
+        case tok::barequal:
             val = ir->CreateOr(codegenValue(lhs), codegenValue(rhs));
-            return new ASTValue(TYPE, val);
+            retValue = new ASTValue(TYPE, val);
+            break;
+
         case tok::caret:
+        case tok::caretequal:
             val = ir->CreateXor(codegenValue(lhs), codegenValue(rhs));
-            return new ASTValue(TYPE, val);
+            retValue = new ASTValue(TYPE, val);
+            break; 
+
         case tok::amp:
+        case tok::ampequal:
             val = ir->CreateAnd(codegenValue(lhs), codegenValue(rhs));
-            return new ASTValue(TYPE, val);
+            retValue = new ASTValue(TYPE, val);
+            break;
 
         // COMPARE OPS
         case tok::equalequal:
@@ -882,43 +892,53 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
         // ARITHMETIC OPS
         case tok::plus:
+        case tok::plusequal:
             if(TYPE->isFloating())
                 val = ir->CreateFAdd(lhs_val, rhs_val);
             else
                 val = ir->CreateAdd(lhs_val, rhs_val);
-            return new ASTValue(TYPE, val); //TODO: proper typing (for all below too)
+            retValue = new ASTValue(TYPE, val); //TODO: proper typing (for all below too)
+            break;
 
         case tok::minus:
+        case tok::minusequal:
             if(TYPE->isFloating())
                 val = ir->CreateFSub(lhs_val, rhs_val);
             else
                 val = ir->CreateSub(lhs_val, rhs_val);
-            return new ASTValue(TYPE, val);
+            retValue = new ASTValue(TYPE, val);
+            break;
 
         case tok::star:
+        case tok::starequal:
             if(TYPE->isFloating())
                 val = ir->CreateFMul(lhs_val, rhs_val);
             else //TODO: signed?
                 val = ir->CreateMul(lhs_val, rhs_val);
-            return new ASTValue(TYPE, val);
+            retValue = new ASTValue(TYPE, val);
+            break;
 
         case tok::slash:
+        case tok::slashequal:
             if(TYPE->isFloating())
                 val = ir->CreateFDiv(lhs_val, rhs_val);
             else if(TYPE->isSigned())
                 val = ir->CreateSDiv(lhs_val, rhs_val);
             else
                 val = ir->CreateUDiv(lhs_val, rhs_val);
-            return new ASTValue(TYPE, val);
+            retValue = new ASTValue(TYPE, val);
+            break;
 
         case tok::percent:
+        case tok::percentequal:
             if(TYPE->isFloating())
                 val = ir->CreateFRem(lhs_val, rhs_val);
             else if(TYPE->isSigned())
                 val = ir->CreateSRem(lhs_val, rhs_val);
             else
                 val = ir->CreateURem(lhs_val, rhs_val);
-            return new ASTValue(TYPE, val);
+            retValue = new ASTValue(TYPE, val);
+            break;
 
         case tok::lessless:
             val = ir->CreateShl(lhs_val, rhs_val);
@@ -930,6 +950,14 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
             emit_message(msg::UNIMPLEMENTED, "unimplemented operator", exp->loc);
             return NULL; //XXX: null val
     }
+
+    if(isAssignOp((tok::TokenKind) exp->op)) //XXX messy
+    {
+        retValue = promoteType(retValue, TYPE); //TODO: merge with decl assign
+        storeValue(lhs, retValue);
+    }
+
+    return retValue;
 
 #undef lhs_val
 #undef rhs_val
@@ -1250,13 +1278,17 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
             //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
             GlobalValue::LinkageTypes linkage = unit->globals[i]->external ? 
                 GlobalValue::ExternalLinkage : GlobalValue::WeakAnyLinkage;
-            //linkage = GlobalValue::AvailableExternallyLinkage;
+            
+            //TODO: correct type for global storage (esspecially pointers?)
+
             GlobalVariable *llvmval = new GlobalVariable(*module,
                     codegenType(idTy),
                     false,
                     linkage,
                     (llvm::Constant*) (unit->globals[i]->value ? 
-                        codegenValue(codegenExpression(unit->globals[i]->value)) : 
+                        codegenValue(
+                            promoteType(codegenExpression(unit->globals[i]->value), idTy)
+                            ) : 
                         (llvm::Constant*) llvm::Constant::getNullValue(codegenType(idTy))),
                     id->getName()); //TODO: proper global insertion
 
@@ -1323,6 +1355,13 @@ void IRCodegenContext::codegenAST(AST *ast, WLConfig config)
 
     createIdentMetadata(linker.getModule());
     linker.getModule()->MaterializeAll();
+
+    //if(verifyModule(*linker.getModule(), PrintMessageAction))
+    {
+        //emit_message(msg::FAILURE, "failed to compile source code");
+    //   return;
+    }
+
     linker.getModule()->dump();
 }
 

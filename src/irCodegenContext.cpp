@@ -297,7 +297,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
             return new ASTValue(NULL, llvmfunc); 
         } else if(iexp->identifier()->isStruct())
         {
-
+            return new ASTValue(iexp->identifier()->declaredType(), NULL);
         }
     } else if(IfExpression *iexp = exp->ifExpression())
     {
@@ -589,6 +589,23 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
     } else if(DotExpression *dexp = dynamic_cast<DotExpression*>(exp))
     {
             ASTValue *lhs = codegenExpression(dexp->lhs);
+
+            if(!lhs->cgValue) // LHS is type
+            {
+                if(dexp->rhs == "sizeof")
+                {
+                    return new ASTValue(ASTType::getULongTy(), 
+                            ConstantInt::get(Type::getInt64Ty(context), 
+                                lhs->getType()->size()));
+                } else if(dexp->rhs == "offsetof")
+                {
+                    emit_message(msg::UNIMPLEMENTED, 
+                            "offsetof attribute not yet implemented", dexp->loc);
+                }
+                emit_message(msg::ERROR, "unknown attribute '" + dexp->rhs + "' of struct '" +
+                        lhs->getType()->getName() + "'", dexp->loc);
+                return NULL;
+            }
 
             if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(), 
                     codegenValue(lhs), true);

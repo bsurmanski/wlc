@@ -84,6 +84,8 @@ int main(int argc, char^^ argv)
     char^ title = "Life"
     SDL_WM_SetCaption(title, null)
 
+    uint mySize = SDL_Surface.sizeof
+
     int iii = 5
     float j = float: iii
     //MyNewStruct newstruct

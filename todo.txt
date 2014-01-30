@@ -8,7 +8,7 @@ hexadecimal, octal, binary number parsing
 dont crash on 'f' postfix of numbers
 ## convert null to appropriate type in return
 ## allow implicit conversion from pointer to bool
-sizeof operator
+## sizeof operator
 offsetof operator
 ## globals without init should default to 0
 ## correct struct debug info

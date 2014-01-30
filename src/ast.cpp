@@ -16,6 +16,7 @@ size_t StructTypeInfo::getSize()
         sz += vd->type->size();
     }
     return sz;
+    //TODO: handle packed
 }
 
 size_t StructTypeInfo::getAlign()
@@ -30,6 +31,7 @@ size_t StructTypeInfo::getAlign()
             align = vd->getType()->align();
     }
     return align;
+    //TODO: handle packed
 }
 
 std::string PointerTypeInfo::getName(){

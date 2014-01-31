@@ -74,6 +74,8 @@ struct Token
 #define FTYPE(X,SZ) case tok::kw_##X: return true;
 #include"tokenkinds.def"
 
+            case tok::kw_var: return true;
+
             default:
                 return false;
         }

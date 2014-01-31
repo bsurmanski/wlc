@@ -1126,6 +1126,27 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         dwarfStopPoint(vdecl->loc);
         ASTType *vty = vdecl->type;
 
+        ASTValue *defaultValue = 0;
+        //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
+        if(vdecl->value)
+        {
+            defaultValue = codegenExpression(vdecl->value);
+            //promoteType(defaultValue, vty);
+            //ir->CreateStore(codegenValue(defaultValue), llvmDecl);
+        }
+
+        if(vty->type == TYPE_DYNAMIC)
+        {
+            if(!defaultValue)
+            {
+                emit_message(msg::FAILURE, 
+                        "failure to codegen dynamic 'var' type default expression", vdecl->loc);
+            }
+
+            vty = defaultValue->getType();
+            vdecl->type = vty;
+        }
+
         //XXX work around for undeclared struct
         Identifier *id = NULL;
         if(NamedUnknownInfo *usi = dynamic_cast<NamedUnknownInfo*>(vty->info))
@@ -1144,6 +1165,18 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         AllocaInst *llvmDecl = ir->CreateAlloca(codegenType(vty), 0, vdecl->getName());
         llvmDecl->setAlignment(8);
         ASTValue *idValue = new ASTValue(vty, llvmDecl, true); 
+
+        if(defaultValue)
+        {
+            defaultValue = promoteType(defaultValue, vty);
+            storeValue(idValue, defaultValue);
+
+            Instruction *vinst = debug->createVariable(vdecl->getName(), 
+                    idValue, ir->GetInsertBlock(), vdecl->loc);
+            vinst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
+            //TODO: maybe create a LValue field in CGValue?
+        }
+        vdecl->identifier->setValue(idValue);
 
         if(ArrayDeclaration *adecl = dynamic_cast<ArrayDeclaration*>(decl))
         {
@@ -1173,21 +1206,6 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             }
         }
 
-        //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
-        if(vdecl->value)
-        {
-            ASTValue *defaultValue = codegenExpression(vdecl->value);
-            //promoteType(defaultValue, vty);
-            //ir->CreateStore(codegenValue(defaultValue), llvmDecl);
-            defaultValue = promoteType(defaultValue, vty);
-            storeValue(idValue, defaultValue);
-
-            Instruction *vinst = debug->createVariable(vdecl->getName(), 
-                    idValue, ir->GetInsertBlock(), vdecl->loc);
-            vinst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
-            //TODO: maybe create a LValue field in CGValue?
-        }
-        vdecl->identifier->setValue(idValue);
     } else if(StructDeclaration *sdecl = dynamic_cast<StructDeclaration*>(decl))
     {
         //XXX should be generated in the Declaration stuff of the package?
@@ -1280,6 +1298,19 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
                 GlobalValue::ExternalLinkage : GlobalValue::WeakAnyLinkage;
             
             //TODO: correct type for global storage (esspecially pointers?)
+            ASTValue *idValue = 0;
+            if(unit->globals[i]->value)
+                idValue = codegenExpression(unit->globals[i]->value);
+
+            if(idTy->type == TYPE_DYNAMIC)
+            {
+                if(!idValue)
+                    emit_message(msg::FAILURE, 
+                            "attempt to codegen dynamically typed \
+                            variable without properly assigned value", unit->globals[i]->loc);
+                idTy = idValue->getType();
+                unit->globals[i]->type = idTy;
+            }
 
             GlobalVariable *llvmval = new GlobalVariable(*module,
                     codegenType(idTy),

@@ -141,6 +141,7 @@ enum ASTTypeEnum
     TYPE_CLASS,
     TYPE_FUNCTION,
     TYPE_POINTER,
+    TYPE_DYNAMIC,
     TYPE_STATIC_ARRAY,
     TYPE_ARRAY,
     TYPE_VEC,
@@ -169,6 +170,11 @@ struct ArrayTypeInfo : public TypeInfo
     virtual ASTType *getReferenceTy() { return arrayOf; }
     ArrayTypeInfo(ASTType *pto) : arrayOf(pto) {}
     std::string getName();
+};
+
+struct DynamicTypeInfo : public TypeInfo
+{
+
 };
 
 struct VariableDeclaration;
@@ -319,6 +325,8 @@ struct ASTType
     DECLTY(FloatTy)
     DECLTY(DoubleTy)
 #undef DECLTY
+
+    static ASTType *DynamicTy; static ASTType *getDynamicTy();
 };
 
 struct ASTValueInfo

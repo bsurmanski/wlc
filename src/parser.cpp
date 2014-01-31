@@ -59,6 +59,8 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
     {
        switch(t.kind)
        {
+       case tok::kw_var:
+           type = ASTType::getDynamicTy(); break;
        case tok::kw_bool:
            type = ASTType::getBoolTy(); break;
 
@@ -251,7 +253,6 @@ Statement *ParseContext::parseDeclarationStatement()
     SourceLocation loc = peek().getLocation();
     decl = parseDeclaration();
 
-    printf("New declaration: %s\n", decl->getName().c_str());
     //TODO: register decl
     return new DeclarationStatement(decl, loc);
 }
@@ -287,6 +288,7 @@ Statement *ParseContext::parseStatement()
 
         case tok::kw_extern:
         case tok::kw_struct:
+        case tok::kw_var:
 #define BTYPE(X,SZ,SN) case tok::kw_##X:
 #define FTYPE(X,SZ) case tok::kw_##X:
 #include "tokenkinds.def"
@@ -504,6 +506,9 @@ Declaration *ParseContext::parseDeclaration()
     {
         ignore(); // ignore =
         defaultValue = parseExpression();
+    } else if(type->type == TYPE_DYNAMIC)
+    {
+        emit_message(msg::ERROR, "dynamic type 'var' without initializer", t_id.loc);
     }
 
     if(ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(type->info))

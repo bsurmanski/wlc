@@ -82,3 +82,11 @@ ASTType *ASTType::getArrayTy()
     DECLTY(TYPE_FLOAT, FloatTy)
     DECLTY(TYPE_DOUBLE, DoubleTy)
 #undef DECLTY
+
+ASTType *ASTType::DynamicTy = 0;
+
+ASTType *ASTType::getDynamicTy()
+{
+    if(!DynamicTy) DynamicTy = new ASTType(TYPE_DYNAMIC);
+    return DynamicTy;
+}

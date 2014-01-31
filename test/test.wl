@@ -11,6 +11,7 @@ SDL_Surface^ surf = null
 SDL_Surface^ back = null
 void^ testval
 
+
 struct SomeStruct
 {
     int i
@@ -81,7 +82,7 @@ int main(int argc, char^^ argv)
     srand(100)
     randomize(back)
     randomize(surf)
-    char^ title = "Life"
+    var title = "Life"
     SDL_WM_SetCaption(title, null)
 
     uint mySize = SDL_Surface.sizeof

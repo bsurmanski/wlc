@@ -1312,15 +1312,26 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
                 unit->globals[i]->type = idTy;
             }
 
+            llvm::Constant* gValue;
+            if(unit->globals[i]->external)
+            {
+                gValue = NULL;
+            } else if(unit->globals[i]->value)
+            {
+                gValue = (llvm::Constant*) codegenValue(
+                            promoteType(codegenExpression(unit->globals[i]->value), idTy)
+                            );
+            } else
+            {
+            
+                gValue = (llvm::Constant*) llvm::Constant::getNullValue(codegenType(idTy));
+            }
+
             GlobalVariable *llvmval = new GlobalVariable(*module,
                     codegenType(idTy),
                     false,
                     linkage,
-                    (llvm::Constant*) (unit->globals[i]->value ? 
-                        codegenValue(
-                            promoteType(codegenExpression(unit->globals[i]->value), idTy)
-                            ) : 
-                        (llvm::Constant*) llvm::Constant::getNullValue(codegenType(idTy))),
+                    gValue,
                     id->getName()); //TODO: proper global insertion
 
             ASTValue *gv = new ASTValue(idTy, llvmval, true);

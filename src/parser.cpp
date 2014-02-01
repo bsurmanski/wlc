@@ -5,6 +5,8 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/IRBuilder.h>
 
+#include <clang-c/Index.h>
+
 #include <fstream>
 #include <vector>
 #include <iostream>
@@ -224,6 +226,25 @@ ImportExpression *ParseContext::parseImport()
     SourceLocation loc = peek().loc;
 
     ignore(); // ignore import
+    
+    bool special = false;
+    std::string parserType;
+    if(peek().is(tok::lparen)) // special import
+    {
+        ignore(); // ignore (
+        special = true;
+        Expression *specialImportType = parseExpression();
+        if(!dynamic_cast<IdentifierExpression*>(specialImportType))
+        {
+            emit_message(msg::ERROR, "invalid special import expression", loc);
+            dropLine();
+            return NULL;
+        }
+        parserType = ((IdentifierExpression*)specialImportType)->getName();
+
+        ignore(); // ignore )
+    }
+
     Expression *importExpression = parseExpression();
 
     TranslationUnit *importedUnit = NULL;
@@ -235,7 +256,22 @@ ImportExpression *ParseContext::parseImport()
         {
             importedUnit = new TranslationUnit(NULL, sexp->string);  //TODO: identifier
             parser->getAST()->addUnit(sexp->string, importedUnit);
-            parser->parseFile(importedUnit, sexp->string, loc);
+
+            if(special)
+            {
+                if(parserType == "C")
+                {
+                    emit_message(msg::OUTPUT, "parsing C import", loc); 
+                    parseCImport(importedUnit, sexp->string, loc);
+                    emit_message(msg::OUTPUT, "finished C import", loc); 
+                } else
+                {
+                    emit_message(msg::ERROR, "unknown parser type '" + parserType + "'", loc);
+                }
+            } else
+            {
+                parser->parseFile(importedUnit, sexp->string, loc);
+            }
         }
     }
 
@@ -910,10 +946,122 @@ void Parser::parseFile(TranslationUnit *unit, std::string filenm, SourceLocation
     lexer->setFilename(filenm.c_str());
     ParseContext context(lexer, this, ast->getRootPackage());
     context.parseTranslationUnit(unit, filenm.c_str()); //TODO: identifier
-    //resolveImports(unit);
     delete lexer;
 
     //ast->getRootPackage()->addPackage("", unit);
     //ast->units[filenm] = unit; //TODO: symbol table
 
+}
+
+
+/// C Parsing fun stuff
+
+
+ASTType *ASTTypeFromCType(CXType ctype)
+{
+    ASTType *ty = 0;
+    switch(ctype.kind)
+    {
+        case CXType_Void: 
+        case CXType_Unexposed: //TODO: create a specific type for unexposed?
+            return ASTType::getVoidTy();
+        case CXType_Bool: return ASTType::getBoolTy();
+        case CXType_Char_U:
+        case CXType_UChar: return ASTType::getUCharTy();
+        case CXType_Char_S:
+        case CXType_SChar: return ASTType::getCharTy();
+        case CXType_UShort: return ASTType::getUShortTy();
+        case CXType_Short: return ASTType::getShortTy();
+        case CXType_UInt: return ASTType::getUIntTy();
+        case CXType_Int: return ASTType::getIntTy();
+        case CXType_Long: 
+        case CXType_LongLong: 
+            return ASTType::getLongTy();
+        case CXType_ULong: 
+        case CXType_ULongLong: 
+            return ASTType::getULongTy();
+        case CXType_Float:
+            return ASTType::getFloatTy();
+        case CXType_Double:
+            return ASTType::getDoubleTy();
+        case CXType_Pointer:
+            ty = ASTTypeFromCType(clang_getPointeeType(ctype));
+            if(ty) return ty->getPointerTy();
+            return NULL;
+        case CXType_Typedef:
+            return ASTTypeFromCType(clang_getCanonicalType(ctype));
+        default:
+            emit_message(msg::WARNING, "failed conversion of CType to WLType: " + 
+                    string(clang_getCString(clang_getTypeSpelling(ctype))));
+            return NULL;
+    }
+}
+
+CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
+{
+    TranslationUnit* unit = (TranslationUnit *) tUnit;
+
+    if(cursor.kind == CXCursor_FunctionDecl)
+    {
+        CXType fType = clang_getCursorType(cursor);
+        int nargs = clang_getNumArgTypes(fType);
+        vector<pair<ASTType*, std::string> > argType;
+        for(int i = 0; i < nargs; i++)
+        {
+            ASTType *astArgTy = 
+                    ASTTypeFromCType(clang_getArgType(fType, i));
+            if(!astArgTy) goto ERR;
+
+            argType.push_back( pair<ASTType*, std::string>(
+                        astArgTy, "")
+                    );
+        }
+
+        CXString cxname = clang_getCursorSpelling(cursor);
+        std::string name = clang_getCString(cxname);
+        ASTType *rType = ASTTypeFromCType(clang_getResultType(fType));
+
+        if(!rType) goto ERR;
+
+        Identifier *id = unit->getScope()->get(name);
+        FunctionPrototype *proto = new FunctionPrototype(rType, argType,
+                clang_isFunctionTypeVariadic(fType));
+        FunctionDeclaration *fdecl = new FunctionDeclaration(id, proto, 0, 0, SourceLocation());
+        id->setDeclaration(fdecl, Identifier::ID_FUNCTION);
+
+        unit->functions.push_back(fdecl);
+
+        printf("c function decl! '%s'\n", clang_getCString(cxname));
+    }
+
+    return CXChildVisit_Continue;
+ERR:
+    emit_message(msg::WARNING, "failed to convert function to WL typing: " + 
+            string(clang_getCString(clang_getCursorSpelling(cursor))));
+    return CXChildVisit_Continue;
+}
+
+void ParseContext::parseCImport(TranslationUnit *unit, 
+        std::string filenm, 
+        SourceLocation loc)
+{
+    const char *commandArgs[] = {
+        "-internal-isystem /usr/include",
+        "-c-isystem /usr/include",
+        "-v",
+        0,
+    };
+
+    CXIndex Idx = clang_createIndex(1,1);
+    CXTranslationUnit Unit = clang_createTranslationUnitFromSourceFile(
+            Idx,
+            filenm.c_str(),
+            3,
+            commandArgs,
+            0, 
+            0);
+
+    emit_message(msg::OUTPUT, "finished clang unit-create. begin visit");
+
+    clang_visitChildren(clang_getTranslationUnitCursor(Unit), CVisitor, unit);
 }

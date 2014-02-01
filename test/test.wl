@@ -6,6 +6,8 @@ int RAND_MAX = 2147483647
 
 import "sdl.wl"
 import "cstdlib.wl"
+//import "cstdio.wl"
+import(C) "/usr/include/stdio.h"
 
 SDL_Surface^ surf = null
 SDL_Surface^ back = null
@@ -84,6 +86,9 @@ int main(int argc, char^^ argv)
     randomize(surf)
     var title = "Life"
     SDL_WM_SetCaption(title, null)
+
+    int myi = 555;// myCFunc()
+    printf("myInt: %d", myi)
 
     uint mySize = SDL_Surface.sizeof
 

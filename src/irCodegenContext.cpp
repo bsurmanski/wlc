@@ -467,8 +467,9 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     for(int i = 0; i < exp->args.size(); i++)
     {
         ASTValue *val = codegenExpression(exp->args[i]);
-        if(!ftype->vararg || ftype->parameters[i].first)
+        if(!ftype->vararg || (ftype->parameters.size() > i && ftype->parameters[i].first))
             val = promoteType(val, ftype->parameters[i].first);
+        //TODO: vararg, promote type of float, int
         cargs.push_back(val);
         llargs.push_back(codegenValue(cargs[i]));
     }
@@ -1102,6 +1103,10 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
 
             codegenStatement(fdecl->body);
+
+            if(dynamic_cast<GotoStatement*>(fdecl->body) ||
+                    dynamic_cast<ReturnStatement*>(fdecl->body))
+                currentFunction.terminated = true;
 
             if(!currentFunction.terminated)
                 ir->CreateBr(currentFunction.exit);

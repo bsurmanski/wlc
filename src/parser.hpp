@@ -23,7 +23,6 @@ class Parser
     public:
         Parser() { ast = new AST(); }
         void parseFile(TranslationUnit *u, std::string filenm, SourceLocation l = SourceLocation());
-        void resolveImports(TranslationUnit *u);
         void parseString(const char *str);
         AST *getAST() { return ast; }
 
@@ -135,6 +134,8 @@ class ParseContext
     Expression *parsePostfixExpression(int prec = 0);
     Expression *parseUnaryExpression(int prec = 0);
     Expression *parseBinaryExpression(int prec = 0);
+
+    void parseCImport(TranslationUnit *unit, std::string filenm, SourceLocation loc = SourceLocation());
 };
 
 #endif

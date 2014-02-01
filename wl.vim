@@ -7,7 +7,12 @@ set indentexpr="0{,0}"
 
 let b:current_syntax = "wl"
 
-syn keyword wExternal import module
+syn match wlImportId "C" contained
+syn match wlImport "\<import\(\s*([_a-zA-Z][_a-zA-Z0-9]*)\)\?" contains=wlImportId
+hi def link wlImport Include
+hi def link wlImportId Identifier
+
+syn keyword wExternal module
 syn keyword wScopeDecl package
 syn keyword wAssert assert
 syn keyword wConditional if else switch

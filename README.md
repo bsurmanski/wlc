@@ -162,6 +162,9 @@ does not have the extensions.
 use clang to allow parsing the the interface of C headers, allowing the use calling C code within WL without the tedious task
 of creating wrapper modules. This may also extend to a *import(CPP)* statement in OWL.
 
+### Tail call optimization
+self explanitory, avoids stack overflows, makes deep recursive function faster
+
 ## Ideas (Not necessarily future additions)
 structs are anologous to C structs. packing and allignment included
 
@@ -207,3 +210,15 @@ reference counting on classes created within this module
 
 ### "use gc"
 garbage collection on classes created within this module
+
+### embedded code
+allow for embedding different languages with an 'embed' keyword. for example:
+
+    int wlInt = 5;
+    embed(C) {
+        int cInt = wlInt + 5;
+    }
+    wlInt += cInt
+
+This example would allow an embedded C statement within a WL scope. This would
+also extend to inlined ASM, using embed(ASM)

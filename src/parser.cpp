@@ -956,8 +956,34 @@ void Parser::parseFile(TranslationUnit *unit, std::string filenm, SourceLocation
 
 /// C Parsing fun stuff
 
+ASTType *ASTStructTypeFromCType(TranslationUnit *unit, CXType ctype)
+{
+    vector<Declaration*> members;
+    SymbolTable *tbl = new SymbolTable(unit->getScope());
+    CXString cxname = clang_getTypeSpelling(ctype);
+    string name = clang_getCString(cxname);
+    string sstruct = "struct ";
+    if(name.compare(0, sstruct.length(), sstruct) == 0) //remove 'struct' keyword
+    {
+        name = name.substr(sstruct.length());
+    }
 
-ASTType *ASTTypeFromCType(CXType ctype)
+    Identifier *id = unit->getScope()->lookup(name);
+    
+    if(!id)
+    {
+        id = unit->getScope()->get(name);
+        StructTypeInfo *sti = new StructTypeInfo(id, tbl, members);
+        StructDeclaration *sdecl = new StructDeclaration(id, NULL, members, SourceLocation());
+        id->declaredType()->setTypeInfo(sti, TYPE_STRUCT);
+        id->setDeclaration(sdecl, Identifier::ID_STRUCT);
+    }
+
+    return id->declaredType();
+}
+
+
+ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
 {
     ASTType *ty = 0;
     switch(ctype.kind)
@@ -985,11 +1011,13 @@ ASTType *ASTTypeFromCType(CXType ctype)
         case CXType_Double:
             return ASTType::getDoubleTy();
         case CXType_Pointer:
-            ty = ASTTypeFromCType(clang_getPointeeType(ctype));
+            ty = ASTTypeFromCType(unit, clang_getPointeeType(ctype));
             if(ty) return ty->getPointerTy();
             return NULL;
+        case CXType_Record:
+            return ASTStructTypeFromCType(unit, ctype);
         case CXType_Typedef:
-            return ASTTypeFromCType(clang_getCanonicalType(ctype));
+            return ASTTypeFromCType(unit, clang_getCanonicalType(ctype));
         default:
             emit_message(msg::WARNING, "failed conversion of CType to WLType: " + 
                     string(clang_getCString(clang_getTypeSpelling(ctype))));
@@ -1001,7 +1029,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 {
     TranslationUnit* unit = (TranslationUnit *) tUnit;
 
-    if(cursor.kind == CXCursor_FunctionDecl)
+    if(cursor.kind == CXCursor_FunctionDecl) 
     {
         CXType fType = clang_getCursorType(cursor);
         int nargs = clang_getNumArgTypes(fType);
@@ -1009,7 +1037,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         for(int i = 0; i < nargs; i++)
         {
             ASTType *astArgTy = 
-                    ASTTypeFromCType(clang_getArgType(fType, i));
+                    ASTTypeFromCType(unit, clang_getArgType(fType, i));
             if(!astArgTy) goto ERR;
 
             argType.push_back( pair<ASTType*, std::string>(
@@ -1019,7 +1047,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 
         CXString cxname = clang_getCursorSpelling(cursor);
         std::string name = clang_getCString(cxname);
-        ASTType *rType = ASTTypeFromCType(clang_getResultType(fType));
+        ASTType *rType = ASTTypeFromCType(unit, clang_getResultType(fType));
 
         if(!rType) goto ERR;
 

@@ -90,8 +90,10 @@ int main(int argc, char^^ argv)
     var tuple = [1, 2, 3]
     MyNewStruct st = [1, 2, 3]
 
-    float myfloat = 5.2;
-    printf("myFloat: %f, my tuple: %d\n", myfloat, tuple[2])
+    [int, int] intTuple = [1, 2]
+
+    float myfloat = 5.2
+    printf("myFloat: %f, my tuple: %d\n", myfloat, intTuple[1])
 
     uint mySize = SDL_Surface.sizeof
 

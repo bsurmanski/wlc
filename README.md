@@ -225,6 +225,33 @@ also extend to inlined ASM, using embed(ASM). It would need to be considered
 if variables would leak across 'embed' scopes
 
 ### Tuples
+Due to limitations of static typing, tuples will be more like unnamed structs than
+true tuples. This means that indexing can only be done with static integers. This 
+is because in a statement like
+
+    [int, char^] myTuple 
+    ...
+    var myvar = myTuple[i]
+
+it is imposible to determine the type required of 'v', either int or char^.
+It may be possible if all types in the tuple are of a uniform type:
+
+    [int, int, int] myIntTuple
+    ...
+    int myvar = myIntTuple[i]
+
+or if all members of the tuple are convertible to the destination type:
+
+    [char, int, float] myNumberTuple
+    ...
+    float mydest myNumberTuple[i]
+
+This last case may be exceedingly difficult, to calculate the correct
+tuple memory location of the member, and convert to the correct destination
+type at runtime.
+
+#### Tuple Syntax
+
 A comma can denote a tuple type, and a tuple value
 
     int,int,float myTuple
@@ -251,6 +278,7 @@ Tuples can be implicitly converted to a struct with an identical signature.
 this would allow compound struct declarations to use the same syntax as tuples.
 
     MyStruct s = [1, 2, 3]
+    [int,int,int] i = [1, 2, 3]
 
 #### Tuple auto unwrap
 if a tuple is passed as a function argument, it will automatically be unwrapped to
@@ -258,11 +286,23 @@ its components.
 
     int myFunction(int i, int j, float f);
 
+    ...
+
     [int,int,float] treble = [1, 2, 1.1]
     myFunction(treble)
 
     [int,int] pair = [1, 2]
     myFunction(pair, 5.5)
+
+this may also mean that having a tuple as a function argument would simply be syntactic
+sugar for auto wrapping on function entry. This would allow a function expecting a tuple
+to be called with individual values of the underlying tuple member types.
+
+    void myTupleFunction([int, int] someTuple);
+
+    ...
+
+    myTupleFunction(1, 2)
 
 #### Tuple return
 multiple values can be returned in a tuple.

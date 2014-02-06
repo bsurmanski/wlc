@@ -660,6 +660,11 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             {
                 TupleTypeInfo *tti = (TupleTypeInfo*) arr->getType()->info;
                 unsigned long long index = llci->getZExtValue();
+                if(tti->types.size() <= index)
+                {
+                    emit_message(msg::ERROR, "invalid tuple index", exp->loc);
+                    return NULL;
+                }
                 ASTType *type = tti->types[index];
                 Value *val = ir->CreateStructGEP(codegenLValue(arr), index);
                 return new ASTValue(type, val, true);
@@ -857,7 +862,7 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
             if(toType->type == TYPE_STRUCT)
             {
                 if(((TupleTypeInfo*) val->type->info)->types.size() ==
-                        ((StructTypeInfo*) toType->info)->members.size())
+                        ((StructTypeInfo*) toType->info)->members.size()) //TODO proper test
                 {
                     Value *toPtr = ir->CreateBitCast(codegenLValue(val), 
                             codegenType(toType)->getPointerTo());
@@ -865,6 +870,21 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                 } else
                 {
                     emit_message(msg::ERROR, "cannot convert tuple to struct");
+                    return NULL;
+                }
+            }
+
+            if(toType->type == TYPE_TUPLE)
+            {
+                if(((TupleTypeInfo*) val->type->info)->types.size() ==
+                        ((TupleTypeInfo*) toType->info)->types.size())
+                {
+                    Value *toPtr = ir->CreateBitCast(codegenLValue(val), 
+                            codegenType(toType)->getPointerTo());
+                    return new ASTValue(toType, toPtr, true); 
+                } else
+                {
+                    emit_message(msg::ERROR, "cannot convert tuple to incompatible tuple");
                     return NULL;
                 }
             }
@@ -1528,8 +1548,8 @@ void IRCodegenContext::codegenAST(AST *ast, WLConfig config)
 
     if(verifyModule(*linker.getModule(), PrintMessageAction))
     {
-        emit_message(msg::FAILURE, "failed to compile source code");
-        return;
+        emit_message(msg::OUTPUT, "failed to compile source code");
+        //return;
     } else 
     {
         emit_message(msg::OUTPUT, "successfully compiled source");

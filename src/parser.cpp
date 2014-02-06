@@ -52,12 +52,14 @@ void ParseContext::recover()
 
 ASTType *ParseContext::parseType(Expression **arrayInit)
 {
+    std::vector<ASTType*> tupleTypes;
+    TupleTypeInfo *tupleInfo;
     ASTType *type = NULL;
     bool ptr = false;
     Token t = get();
     //cond_message(t.isNot(tok::identifier) && !t.isKeywordType(), msg::FAILURE, "unrecognized type");
-    if(t.isNot(tok::identifier) && !t.isKeywordType()) return NULL;
-    if(t.isKeywordType())
+    if(t.isNot(tok::identifier) && !t.isKeywordType() && t.isNot(tok::lbracket)) return NULL;
+    if(t.isKeywordType() || t.is(tok::lbracket))
     {
        switch(t.kind)
        {
@@ -102,6 +104,19 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
             type = ASTType::getDoubleTy(); break;
         case tok::kw_void:
             type = ASTType::getVoidTy(); break;
+        case tok::lbracket:
+            type = new ASTType(); 
+            // lbracket already got
+            while(peek().isNot(tok::rbracket))
+            {
+                tupleTypes.push_back(parseType(NULL));
+                if(peek().is(tok::comma)) ignore();
+            }
+            ignore(); // eat ]
+            
+            tupleInfo = new TupleTypeInfo(tupleTypes);
+            type->setTypeInfo(tupleInfo, TYPE_TUPLE);
+            break;
         default:
             emit_message(msg::UNIMPLEMENTED, "unparsed type");
        }
@@ -302,11 +317,15 @@ Statement *ParseContext::parseStatement()
     Identifier *id = NULL;
     switch(peek().kind)
     {
-        case tok::lbracket:
         case tok::identifier:
             id = getScope()->lookup(peek().toString()); 
             if(!id || id->isUndeclared())
             {
+        case tok::lbracket:
+            if(peek().is(tok::lbracket))
+            {
+                emit_message(msg::OUTPUT, "lbracket in statement", loc);
+            }
                 pushRecover();
                 declType = parseType(NULL);
                 if(declType && peek().is(tok::identifier)) //look ahead to see if decl

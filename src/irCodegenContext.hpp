@@ -52,6 +52,7 @@ class IRCodegenContext : public CodegenContext
 
     llvm::Type *codegenArrayType(ASTType *ty);
     llvm::Type *codegenStructType(ASTType *ty);
+    llvm::Type *codegenTupleType(ASTType *ty);
     llvm::Type *codegenType(ASTType *ty);
     llvm::Value *codegenValue(ASTValue *v);
     llvm::Value *codegenLValue(ASTValue *v);

@@ -87,8 +87,10 @@ int main(int argc, char^^ argv)
     var title = "Life"
     SDL_WM_SetCaption(title, null)
 
-    int myi = 555;// myCFunc()
-    printf("myInt: %d", myi)
+    MyNewStruct st = [1, 2, 3]
+
+    float myfloat = 5.2;
+    printf("myFloat: %f, my tuple: %d %d %d\n", myfloat, st.a, st.b, st.c)
 
     uint mySize = SDL_Surface.sizeof
 
@@ -112,5 +114,7 @@ int main(int argc, char^^ argv)
 
 struct MyNewStruct
 {
-    int iiiiids    
+    int a
+    int b
+    int c
 }

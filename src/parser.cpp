@@ -302,6 +302,7 @@ Statement *ParseContext::parseStatement()
     Identifier *id = NULL;
     switch(peek().kind)
     {
+        case tok::lbracket:
         case tok::identifier:
             id = getScope()->lookup(peek().toString()); 
             if(!id || id->isUndeclared())
@@ -741,9 +742,42 @@ Expression *ParseContext::parseExpression(int prec)
             return parseSwitchExpression();
         case tok::kw_import:
             return parseImport();
+        case tok::lbracket:
+            return parseTupleExpression();
         default:
         return parseBinaryExpression(prec);
     }
+}
+
+Expression *ParseContext::parseTupleExpression()
+{
+    if(peek().isNot(tok::lbracket))
+    {
+        emit_message(msg::ERROR, "expected tuple expression", peek().loc);
+        dropLine();
+        return NULL;
+    }
+    
+    ignore();
+
+    std::vector<Expression*> members;
+    while(peek().isNot(tok::rbracket))
+    {
+        members.push_back(parseExpression()); 
+
+        if(peek().isNot(tok::comma) && peek().isNot(tok::rbracket))
+        {
+            emit_message(msg::ERROR, "expected ',' or ']' delimitting tuple expression", peek().loc);
+            dropLine();
+            return NULL;
+        }
+
+        if(peek().is(tok::comma)) ignore(); //ignore comma
+    }
+
+    ignore(); // ignore ]
+
+    return new TupleExpression(members);
 }
 
 Expression *ParseContext::parsePostfixExpression(int prec)

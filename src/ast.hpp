@@ -144,6 +144,7 @@ enum ASTTypeEnum
     TYPE_DYNAMIC,
     TYPE_STATIC_ARRAY,
     TYPE_ARRAY,
+    TYPE_TUPLE,
     TYPE_VEC,
 };
 
@@ -207,6 +208,14 @@ struct AliasTypeInfo : public TypeInfo
     AliasTypeInfo(Identifier *id, ASTType *a) :identifier(id), alias(a) {}
 };
 
+struct TupleTypeInfo : public TypeInfo
+{
+    std::vector<ASTType*> types;
+    //virtual size_t getSize();
+    //virtual size_t getAlign();
+    TupleTypeInfo(std::vector<ASTType*> t) : types(t) {}
+};
+
 #include <llvm/DebugInfo.h> //XXX
 struct ASTType
 {
@@ -246,6 +255,7 @@ struct ASTType
             case TYPE_INT: return 4;
             case TYPE_ULONG:
             case TYPE_LONG: return 8;
+            case TYPE_TUPLE:
             case TYPE_STRUCT: return info->getSize();
             case TYPE_POINTER: return 8;
             case TYPE_FLOAT: return 4;
@@ -268,6 +278,7 @@ struct ASTType
             case TYPE_INT: return 4;
             case TYPE_ULONG:
             case TYPE_LONG: return 8;
+            case TYPE_TUPLE:
             case TYPE_STRUCT: return info->getAlign();
             case TYPE_POINTER: return 8;
             case TYPE_FLOAT: return 4;
@@ -327,6 +338,7 @@ struct ASTType
 #undef DECLTY
 
     static ASTType *DynamicTy; static ASTType *getDynamicTy();
+    //static ASTType *getTupleTy(std::vector<ASTType *ty> t);
 };
 
 struct ASTValueInfo
@@ -497,6 +509,12 @@ struct Expression
     virtual CastExpression *castExpression() { return NULL; }
 
     //TODO: overrides
+};
+
+struct TupleExpression : public Expression
+{
+    std::vector<Expression*> members;
+    TupleExpression(std::vector<Expression*> e) : members(e) {}
 };
 
 struct CastExpression : public Expression

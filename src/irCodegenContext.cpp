@@ -4,6 +4,7 @@
 #include "irCodegenContext.hpp"
 
 #include <llvm/Analysis/Verifier.h>
+#include <llvm/Support/raw_ostream.h>
 
 #include "message.hpp"
 
@@ -60,6 +61,34 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
     return(llvm::Type*) ty->cgType;
 }
 
+llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
+{
+    TupleTypeInfo *tti = dynamic_cast<TupleTypeInfo*>(ty->info);
+    if(ty->type != TYPE_TUPLE || !tti)
+    {
+        emit_message(msg::FAILURE, "invalid tuple type codegen");
+        return NULL;
+    }
+
+    if(!tti->types.size())
+    {
+        emit_message(msg::ERROR, "invalid 0-tuple");
+        return NULL;
+    }
+
+    std::vector<Type*> tupleVec;
+    for(int i = 0; i < tti->types.size(); i++)
+    {
+        tupleVec.push_back(codegenType(tti->types[i]));
+    }
+
+    StructType *tty = StructType::create(context);
+    tty->setBody(tupleVec);
+    ty->cgType = tty;
+    debug->createType(ty); // TODO
+    return tty;
+}
+
 /*
  * array is equivilent to:
  * struct Array {
@@ -105,6 +134,8 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 return NULL;
             }
         }
+
+        ASTType *tmp;
         switch(ty->type)
         {
             case TYPE_BOOL:
@@ -136,11 +167,16 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 llvmty = Type::getVoidTy(context);
                 break;
             case TYPE_POINTER:
-                llvmty = codegenType(ty->getReferencedTy())->getPointerTo();
+                tmp = ty->getReferencedTy();
+                if(tmp->type == TYPE_VOID) tmp = ASTType::getCharTy();
+                llvmty = codegenType(tmp)->getPointerTo();
                 break;
             case TYPE_STRUCT:
                 llvmty = codegenStructType(ty);
                 //TODO
+                break;
+            case TYPE_TUPLE:
+                llvmty = codegenTupleType(ty);
                 break;
             case TYPE_ARRAY:
                 llvmty = codegenArrayType(ty);
@@ -317,6 +353,52 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(CastExpression *cexp = exp->castExpression())
     {
         return promoteType(codegenExpression(cexp->expression), cexp->type);
+    } else if(TupleExpression *texp = dynamic_cast<TupleExpression*>(exp))
+    {
+        //XXX codegen tuple
+        std::vector<ASTValue*> vals;
+        std::vector<ASTType*> types;
+        bool lvalue = true;
+        for(int i = 0; i < texp->members.size(); i++)
+        {
+            ASTValue *val = codegenExpression(texp->members[i]);
+            vals.push_back(val);
+            types.push_back(val->getType());
+
+            if(!val->isLValue()) lvalue = false;
+        }
+
+        TupleTypeInfo *tti = new TupleTypeInfo(types);
+        ASTType *tty = new ASTType();
+        tty->setTypeInfo(tti, TYPE_TUPLE);
+
+        if(lvalue)
+        {
+            emit_message(msg::UNIMPLEMENTED, "lvalue tuple unimplemented", exp->loc); 
+            return NULL;
+        }
+        else
+        {
+            std::vector<Constant*> llvals;
+            for(int i = 0; i < vals.size(); i++)
+            {
+                llvals.push_back((Constant*) codegenValue(vals[i]));
+            }
+
+            StructType *llty = (StructType*) codegenType(tty);
+
+            GlobalVariable *GV = new GlobalVariable(*module, llty, true, 
+                    GlobalValue::PrivateLinkage, 
+                    ConstantStruct::get(llty, llvals));
+
+            //vector<Value *> gep;
+            //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            //Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
+            return new ASTValue(tty, GV, true);
+        }
+
+        emit_message(msg::UNIMPLEMENTED, "tuple codegen", exp->loc);
     }
     emit_message(msg::FAILURE, "bad expression?", exp->loc);
     return NULL; //TODO
@@ -469,6 +551,15 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         ASTValue *val = codegenExpression(exp->args[i]);
         if(!ftype->vararg || (ftype->parameters.size() > i && ftype->parameters[i].first))
             val = promoteType(val, ftype->parameters[i].first);
+        else if(ftype->vararg)
+        {
+            if(val->getType()->isFloating()) 
+                val = promoteType(val, ASTType::getDoubleTy());
+            else if(val->getType()->isInteger() && val->getType()->isSigned()) 
+                val = promoteType(val, ASTType::getIntTy());
+            else if(val->getType()->isInteger()) 
+                val = promoteType(val, ASTType::getUIntTy());
+        }
         //TODO: vararg, promote type of float, int
         cargs.push_back(val);
         llargs.push_back(codegenValue(cargs[i]));
@@ -721,7 +812,7 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                             codegenType(toType)));
             }
         }
-        if(val->type->isPointer())
+        else if(val->type->isPointer())
         {
             if(toType->isPointer())
             {
@@ -744,6 +835,23 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                         ir->CreateICmpNE(i,
                             ConstantInt::get(codegenType(ASTType::getULongTy()), 0)
                             ));
+            }
+        } 
+        else if(val->type->type == TYPE_TUPLE)
+        {
+            if(toType->type == TYPE_STRUCT)
+            {
+                if(((TupleTypeInfo*) val->type->info)->types.size() ==
+                        ((StructTypeInfo*) toType->info)->members.size())
+                {
+                    Value *toPtr = ir->CreateBitCast(codegenLValue(val), 
+                            codegenType(toType)->getPointerTo());
+                    return new ASTValue(toType, toPtr, true); 
+                } else
+                {
+                    emit_message(msg::ERROR, "cannot convert tuple to struct");
+                    return NULL;
+                }
             }
         }
     }
@@ -1403,13 +1511,19 @@ void IRCodegenContext::codegenAST(AST *ast, WLConfig config)
     createIdentMetadata(linker.getModule());
     linker.getModule()->MaterializeAll();
 
-    //if(verifyModule(*linker.getModule(), PrintMessageAction))
+    if(verifyModule(*linker.getModule(), PrintMessageAction))
     {
-        //emit_message(msg::FAILURE, "failed to compile source code");
-    //   return;
+        emit_message(msg::FAILURE, "failed to compile source code");
+        return;
+    } else 
+    {
+        emit_message(msg::OUTPUT, "successfully compiled source");
     }
 
-    linker.getModule()->dump();
+    std::string err;
+    raw_fd_ostream output("output.ll", err);
+
+    linker.getModule()->print(output, 0);
 }
 
 void IRCodegen(AST *ast, WLConfig config)

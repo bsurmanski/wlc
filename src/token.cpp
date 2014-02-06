@@ -29,8 +29,6 @@ int getBinaryPrecidence(tok::TokenKind tkind)
 {
     switch(tkind)
     {
-        case tok::comma:
-            return 1;
         case tok::equal:
         case tok::plusequal:
         case tok::minusequal:

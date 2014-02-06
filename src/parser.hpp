@@ -134,6 +134,7 @@ class ParseContext
     Expression *parsePostfixExpression(int prec = 0);
     Expression *parseUnaryExpression(int prec = 0);
     Expression *parseBinaryExpression(int prec = 0);
+    Expression *parseTupleExpression();
 
     void parseCImport(TranslationUnit *unit, std::string filenm, SourceLocation loc = SourceLocation());
 };

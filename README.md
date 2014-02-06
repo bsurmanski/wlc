@@ -221,4 +221,77 @@ allow for embedding different languages with an 'embed' keyword. for example:
     wlInt += cInt
 
 This example would allow an embedded C statement within a WL scope. This would
-also extend to inlined ASM, using embed(ASM)
+also extend to inlined ASM, using embed(ASM). It would need to be considered 
+if variables would leak across 'embed' scopes
+
+### Tuples
+A comma can denote a tuple type, and a tuple value
+
+    int,int,float myTuple
+    myTuple = 5, 1, 2.3
+
+alternativly, tuple declarations can be surrounded by [ ]
+
+    [int,int,float] myTuple
+    myTuple = [5, 1, 2.3]
+
+Tuples can be implicitly converted to a struct with an identical signature. 
+
+    struct MyStruct
+    { 
+        int i
+        float j
+    }
+
+    ...
+
+    [int, float] myTuple = [1, 2.2]
+    MyStrct st = myTuple
+
+this would allow compound struct declarations to use the same syntax as tuples.
+
+    MyStruct s = [1, 2, 3]
+
+#### Tuple auto unwrap
+if a tuple is passed as a function argument, it will automatically be unwrapped to
+its components.
+
+    int myFunction(int i, int j, float f);
+
+    [int,int,float] treble = [1, 2, 1.1]
+    myFunction(treble)
+
+    [int,int] pair = [1, 2]
+    myFunction(pair, 5.5)
+
+#### Tuple return
+multiple values can be returned in a tuple.
+
+    [int,int] tupleReturner()
+    {
+        return [1,2]; 
+    }
+
+    ...
+
+    [int,int] pair = tuplerReturner()
+
+#### Tuple unpack
+Tuples can be unpacked onto multiple variables
+
+    [int, int] pair = [1,2]
+    int a
+    int b
+    a,b = pair
+
+syntax needs to be considered for the assignment...
+
+### Generic operator
+Generics can be denoted using the '!' operator.
+Generics can use tuples as it's generic parameter, if more than one member is required
+
+    SomeClass!long myfirstvar
+    MyClass![int,float] mysecondvar
+
+### Vector Types
+Vector and matrix types will be builtin.

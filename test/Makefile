@@ -8,10 +8,10 @@ ctest.o:
 	gcc test.c -c -o ctest.o
 
 llvmir: test.wl ../wlc
-	../wlc test.wl 2> test.ll
+	../wlc test.wl
 
 obj: llvmir 
-	llc test.ll --filetype=obj -o test.o -mtriple="x86_64-unknown-linux" -O0
+	llc output.ll --filetype=obj -o test.o -mtriple="x86_64-unknown-linux" -O0
 
 clean:
 	rm -f test.ll 

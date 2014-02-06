@@ -1,6 +1,8 @@
 #include "irDebug.hpp"
 
 #include <vector>
+#include <string>
+#include <sstream>
 
 using namespace std;
 using namespace llvm;
@@ -19,6 +21,50 @@ void createIdentMetadata(llvm::Module *m)
 llvm::DIDescriptor IRDebug::currentScope()
 {
     return context->getScope()->getDebug();
+}
+
+llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
+{
+
+    assert(ty->type == TYPE_TUPLE && "expected struct");
+    llvm::DIDescriptor DIContext(currentFile());
+    TupleTypeInfo *tti = (TupleTypeInfo*) ty->info;
+    vector<Value *> vec;
+    int offset = 0;
+    for(int i = 0; i < tti->types.size(); i++)
+    {
+        unsigned size = tti->types[i]->size();
+        unsigned align = tti->types[i]->align();
+        if(offset % align)
+            offset += (align - (offset % align));
+        stringstream ss;
+        ss << i;
+        vec.push_back(di.createMemberType(
+                    DIContext,
+                    std::string("[") + ss.str() + "]",
+                    currentFile(),
+                    0, //TODO line num
+                    size * 8,
+                    align * 8,
+                    offset * 8,
+                    0, 
+                    createType(tti->types[i])));
+        offset += tti->types[i]->size();
+        //TODO: members 
+    }
+
+    DIArray arr = di.getOrCreateArray(vec);
+
+    return di.createStructType(DIContext, //TODO: defined scope
+            ty->getName(), 
+            currentFile(), //TODO: defined file 
+            0, //line num //TODO line num
+            ty->size() * 8,
+            ty->align() * 8,
+            0, // flags
+            llvm::DIType(),
+            arr
+            ); 
 }
 
 llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
@@ -114,7 +160,10 @@ llvm::DIType IRDebug::createType(ASTType *ty)
                 dity = createStructType(ty);
                 break;
             case TYPE_ARRAY:
-                return DIType();
+                return DIType(); //TODO
+            case TYPE_TUPLE:
+                dity = createTupleType(ty);
+                break;
             default:
                 assert(false && "debug info not yet added for type");
         }

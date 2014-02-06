@@ -654,6 +654,21 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             ASTType *indexedType = arr->getType()->getReferencedTy(); 
             Value *val = ir->CreateInBoundsGEP(codegenValue(arr), codegenValue(ind));
             return new ASTValue(indexedType, val, true);
+        } else if(arr->getType()->type == TYPE_TUPLE)
+        {
+            if(ConstantInt *llci = dynamic_cast<ConstantInt*>(codegenValue(ind)))
+            {
+                TupleTypeInfo *tti = (TupleTypeInfo*) arr->getType()->info;
+                unsigned long long index = llci->getZExtValue();
+                ASTType *type = tti->types[index];
+                Value *val = ir->CreateStructGEP(codegenLValue(arr), index);
+                return new ASTValue(type, val, true);
+            } else
+            {
+                emit_message(msg::ERROR, "tuples can only be indexed with\
+                        constant integers, due to static typing", exp->loc);
+                return NULL;
+            }
         } else {
             emit_message(msg::ERROR, "attempt to index non-pointer/array type", exp->loc);
             return NULL;

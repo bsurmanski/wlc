@@ -87,10 +87,11 @@ int main(int argc, char^^ argv)
     var title = "Life"
     SDL_WM_SetCaption(title, null)
 
+    var tuple = [1, 2, 3]
     MyNewStruct st = [1, 2, 3]
 
     float myfloat = 5.2;
-    printf("myFloat: %f, my tuple: %d %d %d\n", myfloat, st.a, st.b, st.c)
+    printf("myFloat: %f, my tuple: %d\n", myfloat, tuple[2])
 
     uint mySize = SDL_Surface.sizeof
 

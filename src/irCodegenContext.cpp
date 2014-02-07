@@ -212,7 +212,11 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 
 llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
 {
-    assert_message(value->isLValue(), msg::FATAL, "rvalue used in lvalue context!");
+    if(!value->isLValue())
+    {
+        emit_message(msg::FATAL, "rvalue used in lvalue context!");
+        return NULL;
+    }
     if(!value->cgValue) {
         //TODO
         emit_message(msg::FAILURE, "AST Value failed to generate");
@@ -879,8 +883,19 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                 if(((TupleTypeInfo*) val->type->info)->types.size() ==
                         ((TupleTypeInfo*) toType->info)->types.size())
                 {
-                    Value *toPtr = ir->CreateBitCast(codegenLValue(val), 
-                            codegenType(toType)->getPointerTo());
+                    Value *toPtr;
+                    if(val->isLValue())
+                    {
+                        toPtr = ir->CreateBitCast(codegenLValue(val), 
+                              codegenType(toType)->getPointerTo());
+                    } else
+                    {
+                        toPtr = ir->CreateAlloca(codegenType(val->type));
+                        ir->CreateStore(codegenValue(val), toPtr);
+                        toPtr = ir->CreateBitCast(toPtr, 
+                              codegenType(toType)->getPointerTo());
+                    }
+
                     return new ASTValue(toType, toPtr, true); 
                 } else
                 {

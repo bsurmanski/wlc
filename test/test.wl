@@ -75,6 +75,11 @@ void^ somefunc()
     return testval
 }
 
+[int, int] myTupleFunc()
+{
+    return [124, 55]    
+}
+
 int main(int argc, char^^ argv)
 {
     surf = SDL_SetVideoMode(320, 240, 0, SDL_SWSURFACE)
@@ -90,10 +95,10 @@ int main(int argc, char^^ argv)
     var tuple = [1, 2, 3]
     MyNewStruct st = [1, 2, 3]
 
-    [int, int] intTuple = [1, 2]
+    [int, int] intTuple = myTupleFunc()
 
     float myfloat = 5.2
-    printf("myFloat: %f, my tuple: %d\n", myfloat, intTuple[1])
+    printf("myFloat: %f, my tuple: %d\n", myfloat, intTuple[0])
 
     uint mySize = SDL_Surface.sizeof
 

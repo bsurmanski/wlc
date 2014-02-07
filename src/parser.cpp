@@ -803,9 +803,9 @@ Expression *ParseContext::parsePostfixExpression(int prec)
 {
     SourceLocation loc = peek().loc;
     Expression *exp = parsePrimaryExpression();
-    while((peek().getPostfixPrecidence()) > prec)
+    while((linePeek().getPostfixPrecidence()) > prec)
     {
-        if(peek().is(tok::lparen)) // call
+        if(linePeek().is(tok::lparen)) // call
         {
             ignore(); // ignore lparen
             vector<Expression*> args;
@@ -821,7 +821,7 @@ Expression *ParseContext::parsePostfixExpression(int prec)
             }
             ignore(); // ignore rparen
             exp = new CallExpression(exp, args, loc);
-        } else if(peek().is(tok::lbracket)) //index/slice
+        } else if(linePeek().is(tok::lbracket)) //index/slice
         {
             ignore();
             Expression *index = parseExpression();
@@ -831,16 +831,16 @@ Expression *ParseContext::parsePostfixExpression(int prec)
             }
             ignore();
             exp = new IndexExpression(exp, index, loc);
-        } else if(peek().is(tok::dot))
+        } else if(linePeek().is(tok::dot))
         {
             ignore(); //ignore .
             exp = new DotExpression(exp, get().toString(), loc);
         }
-        else if(peek().is(tok::plusplus))
+        else if(linePeek().is(tok::plusplus))
         {
             ignore(); // ignore ++
             exp = new PostfixOpExpression(exp, tok::plusplus, loc);
-        } else if(peek().is(tok::minusminus))
+        } else if(linePeek().is(tok::minusminus))
         {
             ignore(); // ignore --
             exp = new PostfixOpExpression(exp, tok::minusminus, loc);

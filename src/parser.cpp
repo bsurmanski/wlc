@@ -1,5 +1,6 @@
 
 #include <cstdio>
+#include <unistd.h>
 
 #include <llvm/IR/Module.h>
 #include <llvm/IR/LLVMContext.h>
@@ -276,9 +277,7 @@ ImportExpression *ParseContext::parseImport()
             {
                 if(parserType == "C")
                 {
-                    emit_message(msg::OUTPUT, "parsing C import", loc); 
                     parseCImport(importedUnit, sexp->string, loc);
-                    emit_message(msg::OUTPUT, "finished C import", loc); 
                 } else
                 {
                     emit_message(msg::ERROR, "unknown parser type '" + parserType + "'", loc);
@@ -322,10 +321,6 @@ Statement *ParseContext::parseStatement()
             if(!id || id->isUndeclared())
             {
         case tok::lbracket:
-            if(peek().is(tok::lbracket))
-            {
-                emit_message(msg::OUTPUT, "lbracket in statement", loc);
-            }
                 pushRecover();
                 declType = parseType(NULL);
                 if(declType && peek().is(tok::identifier)) //look ahead to see if decl
@@ -1082,6 +1077,13 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 {
     TranslationUnit* unit = (TranslationUnit *) tUnit;
 
+    CXSourceLocation cxloc = clang_getCursorLocation(cursor);
+    CXFile file;
+    unsigned line, column;
+    clang_getSpellingLocation(cxloc, &file, &line, &column, 0);
+    const char *filenm = clang_getCString(clang_getFileName(file));
+    SourceLocation loc = SourceLocation(filenm, line, column);
+
     if(cursor.kind == CXCursor_FunctionDecl) 
     {
         CXType fType = clang_getCursorType(cursor);
@@ -1107,17 +1109,30 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         Identifier *id = unit->getScope()->get(name);
         FunctionPrototype *proto = new FunctionPrototype(rType, argType,
                 clang_isFunctionTypeVariadic(fType));
-        FunctionDeclaration *fdecl = new FunctionDeclaration(id, proto, 0, 0, SourceLocation());
+        FunctionDeclaration *fdecl = new FunctionDeclaration(id, proto, 0, 0, loc);
         id->setDeclaration(fdecl, Identifier::ID_FUNCTION);
 
         unit->functions.push_back(fdecl);
 
-        printf("c function decl! '%s'\n", clang_getCString(cxname));
+    } else if(cursor.kind == CXCursor_VarDecl)
+    {
+        CXType type = clang_getCursorType(cursor);
+        CXString cxname = clang_getCursorSpelling(cursor);
+        std::string name = clang_getCString(cxname);
+
+        ASTType *wlType = ASTTypeFromCType(unit, type);
+        if(!wlType) goto ERR;
+
+        Identifier *id = unit->getScope()->get(name);
+        CXLinkageKind linkage = clang_getCursorLinkage(cursor);
+        VariableDeclaration *vdecl = new VariableDeclaration(wlType, id, 0, loc, 
+                linkage == CXLinkage_External || linkage == CXLinkage_UniqueExternal);
+
     }
 
     return CXChildVisit_Continue;
 ERR:
-    emit_message(msg::WARNING, "failed to convert function to WL typing: " + 
+    emit_message(msg::WARNING, "failed to convert symbol to WL typing: " + 
             string(clang_getCString(clang_getCursorSpelling(cursor))));
     return CXChildVisit_Continue;
 }
@@ -1126,6 +1141,10 @@ void ParseContext::parseCImport(TranslationUnit *unit,
         std::string filenm, 
         SourceLocation loc)
 {
+    // redirect stderr
+    int ostderr = dup(fileno(stderr));
+    freopen("stderr.log", "w", stderr);
+
     const char *commandArgs[] = {
         "-internal-isystem /usr/include",
         "-c-isystem /usr/include",
@@ -1145,4 +1164,7 @@ void ParseContext::parseCImport(TranslationUnit *unit,
     emit_message(msg::OUTPUT, "finished clang unit-create. begin visit");
 
     clang_visitChildren(clang_getTranslationUnitCursor(Unit), CVisitor, unit);
+
+    // restore stderr
+    dup2(fileno(stderr), ostderr);
 }

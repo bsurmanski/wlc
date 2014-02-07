@@ -11,3 +11,4 @@ program
 llvmir
 obj
 *.s
+*.log

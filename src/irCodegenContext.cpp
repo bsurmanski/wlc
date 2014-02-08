@@ -776,32 +776,47 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     offset++;
                 }
                 emit_message(msg::ERROR, "member not in struct", dexp->loc);
-            } else if(lhs->getType()->isArray())
+            } else if(lhs->getType()->type == TYPE_DYNAMIC_ARRAY)
             {
                 ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(lhs->getType()->info);
                 if(!ati){
                     emit_message(msg::FATAL, "dot exp on array, not actually an array?", dexp->loc);
                     return NULL;
                 }
+                ASTType *ty = ati->getReferenceTy();
 
                 if(dexp->rhs == "ptr")
                 {
-                    ASTType *ty = ati->getReferenceTy();
                     std::vector<Value*> gep;
                     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
                     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
                     Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                    return new ASTValue(ty, llval, true);
+                    return new ASTValue(ty->getPointerTy(), llval, true);
                 }
 
                 if(dexp->rhs == "size")
                 {
-                    ASTType *ty = ati->getReferenceTy();
                     std::vector<Value*> gep;
                     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
                     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 1));
                     Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                    return new ASTValue(ty, llval, true);
+                    return new ASTValue(ASTType::getULongTy(), llval, true);
+                }
+            } else if(lhs->getType()->type == TYPE_ARRAY)
+            {
+                ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(lhs->getType()->info);
+                ASTType *ty = ati->getReferenceTy();
+
+                if(dexp->rhs == "ptr")
+                {
+                    return new ASTValue(ty->getPointerTy(), 
+                            ir->CreateInBoundsGEP(codegenLValue(lhs), 0), true);
+                }
+
+                if(dexp->rhs == "size")
+                {
+                    return new ASTValue(ASTType::getULongTy(), 
+                            ConstantInt::get(Type::getInt64Ty(context), ati->size));
                 }
             }
         return NULL;
@@ -932,6 +947,23 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
 
                 return new ASTValue(toType, toPtr, true);
             }
+        } if(val->type->type == TYPE_ARRAY)
+        {
+            if(toType->type == TYPE_POINTER)
+            {
+                ArrayTypeInfo *ati = (ArrayTypeInfo*) val->type->info;
+                if(ati->arrayOf != toType->getReferencedTy())
+                {
+                    emit_message(msg::ERROR, "invalid convesion from array to invalid pointer type"); 
+                    return NULL;
+                }
+                Value *ptr = codegenLValue(val);
+                ptr = ir->CreateBitCast(ptr, codegenType(toType));
+                return new ASTValue(toType, ptr, true);
+            }
+        } else if(val->type->type == TYPE_DYNAMIC_ARRAY)
+        {
+        
         }
     }
     return val; // no conversion? failed converson?

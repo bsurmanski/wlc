@@ -107,7 +107,8 @@ int main(int argc, char^^ argv)
     //MyNewStruct newstruct
     int[5] my5Array = [1,2,3,4,5]
 
-    printf("myArray: elem: %d %d %d %d %d... %d\n",
+    printf("myArray: elem: sz: %d, %d %d %d %d %d... %d\n",
+    my5Array.size,
     my5Array[0],
     my5Array[1],
     my5Array[2],

@@ -55,13 +55,25 @@ ASTType *ASTType::getPointerTy()
 
 ASTType *ASTType::getArrayTy()
 {
-    if(!arrayTy)
+    if(!dynamicArrayTy)
     {
-        ASTType *pty = new ASTType(TYPE_ARRAY);
-        pty->setTypeInfo(new ArrayTypeInfo(this));
-        arrayTy = pty;
+        ASTType *aty = new ASTType(TYPE_DYNAMIC_ARRAY);
+        aty->setTypeInfo(new ArrayTypeInfo(this));
+        dynamicArrayTy = aty;
     }
-    return arrayTy;
+    return dynamicArrayTy;
+}
+
+ASTType *ASTType::getArrayTy(int sz)
+{
+    ASTType *aty = 0;
+    if(!arrayTy.count(sz))
+    {
+        aty = new ASTType(TYPE_ARRAY);
+        aty->setTypeInfo(new ArrayTypeInfo(this, sz));
+        arrayTy[sz] = aty;
+    } else aty = arrayTy[sz];
+    return aty;
 }
 
 // declare all of the static ASTType instances, and their getter methods

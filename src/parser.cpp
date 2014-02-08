@@ -145,11 +145,23 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
         if(peek().is(tok::lbracket)) // XXX should this be parsed as part of the type, or as a postfix expression?
         {
             ignore(); // eat [
-            type = type->getArrayTy();
+            //type = type->getArrayTy();
             if(peek().isNot(tok::rbracket))
             {
-                Expression *rsz = parseExpression(); //TODO: array size
-                if(arrayInit) *arrayInit = rsz;
+                if(peek().isNot(tok::intNum))
+                {
+                    emit_message(msg::ERROR, "array index must be integer", peek().loc);
+                    return NULL;
+                }
+
+                int sz = get().intData();
+                type = type->getArrayTy(sz);
+
+                //Expression *rsz = parseExpression(); //TODO: array size
+                //if(arrayInit) *arrayInit = rsz;
+            } else
+            {
+                type = type->getArrayTy();
             }
 
             if(peek().isNot(tok::rbracket)) {

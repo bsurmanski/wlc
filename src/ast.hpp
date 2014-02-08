@@ -142,7 +142,7 @@ enum ASTTypeEnum
     TYPE_FUNCTION,
     TYPE_POINTER,
     TYPE_DYNAMIC,
-    TYPE_STATIC_ARRAY,
+    TYPE_DYNAMIC_ARRAY,
     TYPE_ARRAY,
     TYPE_TUPLE,
     TYPE_VEC,
@@ -168,8 +168,10 @@ struct PointerTypeInfo : public TypeInfo
 struct ArrayTypeInfo : public TypeInfo
 {
     ASTType *arrayOf;
+    int size;
     virtual ASTType *getReferenceTy() { return arrayOf; }
-    ArrayTypeInfo(ASTType *pto) : arrayOf(pto) {}
+    ArrayTypeInfo(ASTType *pto, int sz = 0) : arrayOf(pto), size(sz) {}
+    bool isDynamic() { return size == 0; }
     std::string getName();
 };
 
@@ -221,9 +223,11 @@ struct ASTType
 {
     ASTTypeEnum type;
     ASTType *pointerTy;
-    ASTType *arrayTy;
+    ASTType *dynamicArrayTy;
     llvm::Type *cgType; //TODO: should not have llvm in here!
     llvm::DIType diType; //TODO: whatever, prototype
+
+    std::map<int, ASTType*> arrayTy;
 
     TypeInfo *info;
     void setTypeInfo(TypeInfo *i, ASTTypeEnum en = TYPE_UNKNOWN)
@@ -241,6 +245,7 @@ struct ASTType
     //virtual ~ASTType() { delete pointerTy; }
     //ASTType *getUnqual();
     ASTType *getPointerTy();
+    ASTType *getArrayTy(int sz);
     ASTType *getArrayTy();
     size_t size() const
     {

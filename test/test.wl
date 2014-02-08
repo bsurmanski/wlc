@@ -105,6 +105,16 @@ int main(int argc, char^^ argv)
     int iii = 5
     float j = float: iii
     //MyNewStruct newstruct
+    int[5] my5Array = [1,2,3,4,5]
+
+    printf("myArray: elem: %d %d %d %d %d... %d\n",
+    my5Array[0],
+    my5Array[1],
+    my5Array[2],
+    my5Array[3],
+    my5Array[4],
+    my5Array[5],
+    );
 
     int8 spc = 0
     while(!spc) 

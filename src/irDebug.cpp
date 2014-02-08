@@ -23,6 +23,54 @@ llvm::DIDescriptor IRDebug::currentScope()
     return context->getScope()->getDebug();
 }
 
+llvm::DICompositeType IRDebug::createDynamicArrayType(ASTType *ty)
+{
+    llvm::DIDescriptor DIContext(currentFile());
+    ArrayTypeInfo *ati = (ArrayTypeInfo*) ty->info;
+    vector<Value *> vec;
+    vec.push_back(di.createMemberType(DIContext,
+                "ptr",
+                currentFile(),
+                0, //TODO line num
+                64,
+                64,
+                0,
+                0,
+                createType(ati->arrayOf)));
+
+    vec.push_back(di.createMemberType(DIContext,
+                "size",
+                currentFile(),
+                0, //TODO line num
+                64,
+                64,
+                64,
+                0,
+                createType(ASTType::getULongTy())));
+    DIArray arr = di.getOrCreateArray(vec);
+
+    return di.createStructType(DIContext, //TODO: defined scope
+            ty->getName(), 
+            currentFile(), //TODO: defined file 
+            0, //line num //TODO line num
+            128,
+            64,
+            0, // flags
+            llvm::DIType(),
+            arr
+            ); 
+}
+
+llvm::DICompositeType IRDebug::createArrayType(ASTType *ty)
+{
+    llvm::DIDescriptor DIContext(currentFile());
+    ArrayTypeInfo *ati = (ArrayTypeInfo*) ty->info;
+    assert(!ati->isDynamic());
+    return di.createArrayType(ati->size, ati->arrayOf->align(), 
+            createType(ati->arrayOf),
+            DIArray());
+}
+
 llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
 {
 
@@ -160,7 +208,9 @@ llvm::DIType IRDebug::createType(ASTType *ty)
                 dity = createStructType(ty);
                 break;
             case TYPE_ARRAY:
-                return DIType(); //TODO
+                return createArrayType(ty);
+            case TYPE_DYNAMIC_ARRAY:
+                return createDynamicArrayType(ty);
             case TYPE_TUPLE:
                 dity = createTupleType(ty);
                 break;

@@ -90,7 +90,7 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
 }
 
 /*
- * array is equivilent to:
+ * dynamic array is equivilent to:
  * struct Array {
  *  void *arr;
  *  long size;
@@ -102,12 +102,25 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
     if(!ati) {
         emit_message(msg::FAILURE, "attempt to codegen invalid array type");
     }
-    vector<Type*> members;
-    members.push_back(codegenType(ati->arrayOf->getPointerTy()));
-    members.push_back(codegenType(ASTType::getLongTy()));
-    StructType *aty = StructType::create(context, ty->getName());
-    aty->setBody(members);
-    ty->cgType = aty;
+
+    if(ati->isDynamic())
+    {
+        vector<Type*> members;
+        members.push_back(codegenType(ati->arrayOf->getPointerTy()));
+        members.push_back(codegenType(ASTType::getLongTy()));
+        StructType *aty = StructType::create(context, ty->getName());
+        aty->setBody(members);
+        ty->cgType = aty;
+
+        debug->createDynamicArrayType(ty);
+    } else
+    {
+        llvm::ArrayType *aty = ArrayType::get(codegenType(ati->arrayOf), ati->size);
+        ty->cgType = aty;
+
+        debug->createArrayType(ty);
+    }
+    
     return (llvm::Type*) ty->cgType;
 }
 
@@ -645,12 +658,17 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
     {
         ASTValue *arr = codegenExpression(iexp->lhs);
         ASTValue *ind = codegenExpression(iexp->index);
-        if(arr->getType()->isArray())
+        if(arr->getType()->type == TYPE_DYNAMIC_ARRAY)
         {
             ASTType *indexedType = arr->getType()->getReferencedTy();
             Value *val = ir->CreateStructGEP(codegenLValue(arr), 0);
             val = ir->CreateLoad(val);
             val = ir->CreateInBoundsGEP(val, codegenValue(ind));
+            return new ASTValue(indexedType, val, true);
+        }  else if(arr->getType()->type == TYPE_ARRAY)
+        {
+            ASTType *indexedType = arr->getType()->getReferencedTy();
+            Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), codegenValue(ind));
             return new ASTValue(indexedType, val, true);
         } else if(arr->getType()->isPointer())
         {
@@ -876,9 +894,7 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                     emit_message(msg::ERROR, "cannot convert tuple to struct");
                     return NULL;
                 }
-            }
-
-            if(toType->type == TYPE_TUPLE)
+            } else if(toType->type == TYPE_TUPLE)
             {
                 if(((TupleTypeInfo*) val->type->info)->types.size() ==
                         ((TupleTypeInfo*) toType->info)->types.size())
@@ -902,6 +918,19 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                     emit_message(msg::ERROR, "cannot convert tuple to incompatible tuple");
                     return NULL;
                 }
+            } else if(toType->type == TYPE_ARRAY)
+            {
+                Value *toPtr;
+                if(val->isLValue())
+                {
+                    toPtr = ir->CreateBitCast(codegenLValue(val),
+                            codegenType(toType)->getPointerTo());
+                } else
+                {
+                    emit_message(msg::FAILURE, "unimplemented RValue bitcast");
+                }
+
+                return new ASTValue(toType, toPtr, true);
             }
         }
     }

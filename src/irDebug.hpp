@@ -39,6 +39,8 @@ class IRDebug
         llvm::DIFile currentFile() { return diFile; }
         llvm::DIDescriptor currentScope();
         llvm::DICompositeType createStructType(ASTType *ty);
+        llvm::DICompositeType createDynamicArrayType(ASTType *ty);
+        llvm::DICompositeType createArrayType(ASTType *ty);
         llvm::DICompositeType createTupleType(ASTType *ty);
         llvm::DIType createType(ASTType *t);
         llvm::DICompositeType createPrototype(FunctionPrototype *p);

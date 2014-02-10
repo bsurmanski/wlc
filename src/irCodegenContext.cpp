@@ -89,6 +89,12 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
     return tty;
 }
 
+
+ASTValue *IRCodegenContext::createDynamicArray(ASTValue *ptr, ASTValue *sz)
+{
+    return NULL; //TODO 
+}
+
 /*
  * dynamic array is equivilent to:
  * struct Array {
@@ -192,6 +198,9 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 llvmty = codegenTupleType(ty);
                 break;
             case TYPE_ARRAY:
+                llvmty = codegenArrayType(ty);
+                break;
+            case TYPE_DYNAMIC_ARRAY:
                 llvmty = codegenArrayType(ty);
                 break;
             default:
@@ -934,6 +943,19 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                     return NULL;
                 }
             } else if(toType->type == TYPE_ARRAY)
+            {
+                Value *toPtr;
+                if(val->isLValue())
+                {
+                    toPtr = ir->CreateBitCast(codegenLValue(val),
+                            codegenType(toType)->getPointerTo());
+                } else
+                {
+                    emit_message(msg::FAILURE, "unimplemented RValue bitcast");
+                }
+
+                return new ASTValue(toType, toPtr, true);
+            } else if(toType->type == TYPE_DYNAMIC_ARRAY)
             {
                 Value *toPtr;
                 if(val->isLValue())

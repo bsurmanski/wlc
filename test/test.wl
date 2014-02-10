@@ -106,15 +106,17 @@ int main(int argc, char^^ argv)
     float j = float: iii
     //MyNewStruct newstruct
     int[5] my5Array = [1,2,3,4,5]
+    int[] darr = [1,2,3,4]
 
-    printf("myArray: elem: sz: %d, %d %d %d %d %d... %d\n",
-    my5Array.size,
-    my5Array[0],
-    my5Array[1],
-    my5Array[2],
-    my5Array[3],
-    my5Array[4],
-    my5Array[5],
+    printf("myArray: elem: sz: %d\n", //, %d %d %d %d %d... %d\n",
+    darr.size,
+    /*
+    darr[0],
+    darr[1],
+    darr[2],
+    darr[3],
+    darr[4],
+    */
     );
 
     int8 spc = 0

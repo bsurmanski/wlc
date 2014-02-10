@@ -3,6 +3,7 @@ SRCFILES=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier
 SRC=$(foreach file, $(SRCFILES), src/$(file))
 
 all:
+	ctags -R .
 	g++ $(SRC) `llvm-config --ldflags --cxxflags --libs` -lclang -ggdb -O0 -frtti -UNDEBUG -DDEBUG -o wlc
 
 install: wlc

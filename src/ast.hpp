@@ -321,7 +321,7 @@ struct ASTType
         type == TYPE_INT || type == TYPE_LONG; }
     bool isFloating() { return type == TYPE_FLOAT || type == TYPE_DOUBLE; }
     bool isVector() { return type == TYPE_VEC; }
-    bool isArray() { return type == TYPE_ARRAY; }
+    bool isArray() { return type == TYPE_ARRAY || type == TYPE_DYNAMIC_ARRAY; }
     bool isPointer() { return this && type == TYPE_POINTER; } //TODO: shouldnt need to test for this
 
 #define DECLTY(NM) static ASTType *NM; static ASTType *get##NM();

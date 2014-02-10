@@ -12,3 +12,5 @@ llvmir
 obj
 *.s
 *.log
+tags
+cscope.out

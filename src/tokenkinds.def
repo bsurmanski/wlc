@@ -101,6 +101,9 @@ KEYWORD(continue)
 // OWL
 KEYWORD(class)
 KEYWORD(var) /* statically checked automatic type variable var myvar = new MyStruct() */
+KEYWORD(new)
+KEYWORD(renew)
+KEYWORD(delete)
 
 // reserved words. hopefully will get around to implementing these
 RESERVE(defer) /* for deferring code until function exit. defer <STATEMENT>*/
@@ -112,6 +115,7 @@ RESERVE(let) /* like D alias, and for constants (let a = 7) */
 RESERVE(implicit) /* for implicit conversions, apply to function */
 RESERVE(this)
 RESERVE(super)
+RESERVE(go)
 
 PUNCTUATOR(plus, "+")
 PUNCTUATOR(plusplus, "++")

@@ -130,6 +130,9 @@ class ParseContext
     Expression *parseForExpression();
     Expression *parseCastExpression(int prec = 0);
     Expression *parseExpression(int prec = 0);
+    Expression *parseNewExpression();
+    Expression *parseDeleteExpression();
+    Expression *parseIdentifierExpression();
     Expression *parsePrimaryExpression();
     Expression *parsePostfixExpression(int prec = 0);
     Expression *parseUnaryExpression(int prec = 0);

@@ -425,9 +425,37 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         }
 
         emit_message(msg::UNIMPLEMENTED, "tuple codegen", exp->loc);
+    } else if(NewExpression *nexp = dynamic_cast<NewExpression*>(exp))
+    {
+        return codegenNewExpression(nexp); 
+    } else if(DeleteExpression *dexp = dynamic_cast<DeleteExpression*>(exp))
+    {
+        return codegenDeleteExpression(dexp);
     }
     emit_message(msg::FAILURE, "bad expression?", exp->loc);
     return NULL; //TODO
+}
+
+ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
+{
+    vector<Value*> llargs;
+    llargs.push_back(ConstantInt::get(codegenType(ASTType::getULongTy()), exp->type->size()));
+    Function *mallocFunc = module->getFunction("malloc");
+    Value *value = ir->CreateCall(mallocFunc, llargs);
+    return new ASTValue(exp->type, value);
+}
+
+ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
+{
+    vector<Value*> llargs;
+    ASTValue *val = codegenExpression(exp->expression);
+    val = promoteType(val, ASTType::getCharTy()->getPointerTy());
+    llargs.push_back(codegenValue(val));
+    Function *freeFunc = module->getFunction("free");
+    Value *value = ir->CreateCall(freeFunc, llargs);
+    //TODO: call deallocator function
+    //return new ASTValue(exp->type, value);
+    return NULL;
 }
 
 ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
@@ -835,6 +863,163 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
     return NULL;
 }
 
+ASTValue *IRCodegenContext::promoteInt(ASTValue *val, ASTType *toType)
+{
+    if(toType->isBool())
+    {
+        ASTValue zero(val->getType(), ConstantInt::get(codegenType(val->getType()), 0));
+        return new ASTValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(val),
+                    codegenValue(&zero)));
+    }
+
+    if(toType->isInteger())
+    {
+        return new ASTValue(toType, ir->CreateIntCast(codegenValue(val), 
+                    codegenType(toType), false)); //TODO: signedness
+    }
+    if(toType->isPointer())
+    {
+        return new ASTValue(toType, ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
+    }
+
+    if(toType->isFloating())
+    {
+        if(val->type->isSigned())
+        return new ASTValue(toType, ir->CreateSIToFP(codegenValue(val),
+                    codegenType(toType)), false);
+        return new ASTValue(toType, ir->CreateUIToFP(codegenValue(val), 
+                    codegenType(toType)), false);
+    }
+}
+
+ASTValue *IRCodegenContext::promoteFloat(ASTValue *val, ASTType *toType)
+{
+    if(toType->isFloating())
+    {
+        return new ASTValue(toType, ir->CreateFPCast(codegenValue(val), codegenType(toType)));
+    } else if(toType->isInteger())
+    {
+        return new ASTValue(toType, ir->CreateFPToUI(codegenValue(val), 
+                    codegenType(toType)));
+    }
+}
+
+ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
+{
+    if(toType->isPointer())
+    {
+        return new ASTValue(toType, 
+                ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
+    }
+
+    if(toType->isInteger())
+    {
+        return new ASTValue(toType, ir->CreateIntCast(codegenValue(val), 
+                    codegenType(toType), false));
+    }
+
+    if(toType->isBool())
+    {
+        Value *i = ir->CreatePtrToInt(codegenValue(val), 
+                codegenType(ASTType::getULongTy()));
+
+        return new ASTValue(ASTType::getBoolTy(), 
+                ir->CreateICmpNE(i,
+                    ConstantInt::get(codegenType(ASTType::getULongTy()), 0)
+                    ));
+    }
+}
+
+ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
+{
+    if(toType->type == TYPE_STRUCT)
+    {
+        if(((TupleTypeInfo*) val->type->info)->types.size() ==
+                ((StructTypeInfo*) toType->info)->members.size()) //TODO proper test
+        {
+            Value *toPtr = ir->CreateBitCast(codegenLValue(val), 
+                    codegenType(toType)->getPointerTo());
+            return new ASTValue(toType, toPtr, true); 
+        } else
+        {
+            emit_message(msg::ERROR, "cannot convert tuple to struct");
+            return NULL;
+        }
+    } else if(toType->type == TYPE_TUPLE)
+    {
+        if(((TupleTypeInfo*) val->type->info)->types.size() ==
+                ((TupleTypeInfo*) toType->info)->types.size())
+        {
+            Value *toPtr;
+            if(val->isLValue())
+            {
+                toPtr = ir->CreateBitCast(codegenLValue(val), 
+                      codegenType(toType)->getPointerTo());
+            } else
+            {
+                toPtr = ir->CreateAlloca(codegenType(val->type));
+                ir->CreateStore(codegenValue(val), toPtr);
+                toPtr = ir->CreateBitCast(toPtr, 
+                      codegenType(toType)->getPointerTo());
+            }
+
+            return new ASTValue(toType, toPtr, true); 
+        } else
+        {
+            emit_message(msg::ERROR, "cannot convert tuple to incompatible tuple");
+            return NULL;
+        }
+    } else if(toType->type == TYPE_ARRAY)
+    {
+        Value *toPtr;
+        if(val->isLValue())
+        {
+            toPtr = ir->CreateBitCast(codegenLValue(val),
+                    codegenType(toType)->getPointerTo());
+        } else
+        {
+            emit_message(msg::FAILURE, "unimplemented RValue bitcast");
+        }
+
+        return new ASTValue(toType, toPtr, true);
+    } else if(toType->type == TYPE_DYNAMIC_ARRAY)
+    {
+        Value *toPtr;
+        if(val->isLValue())
+        {
+            toPtr = ir->CreateBitCast(codegenLValue(val),
+                    codegenType(toType)->getPointerTo());
+        } else
+        {
+            emit_message(msg::FAILURE, "unimplemented RValue bitcast");
+        }
+
+        return new ASTValue(toType, toPtr, true);
+    }
+}
+
+ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
+{
+    if(val->type->type == TYPE_ARRAY)
+    {
+        if(toType->type == TYPE_POINTER)
+        {
+            ArrayTypeInfo *ati = (ArrayTypeInfo*) val->type->info;
+            if(ati->arrayOf != toType->getReferencedTy())
+            {
+                emit_message(msg::ERROR, "invalid convesion from array to invalid pointer type"); 
+                return NULL;
+            }
+            Value *ptr = codegenLValue(val);
+            ptr = ir->CreateBitCast(ptr, codegenType(toType));
+            return new ASTValue(toType, ptr, true);
+        }
+    } else if(val->type->type == TYPE_DYNAMIC_ARRAY)
+    {
+    
+    }
+}
+
 
 ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
 {
@@ -842,150 +1027,21 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
     {
         if(val->type->isInteger())
         {
-            if(toType->isBool())
-            {
-                ASTValue zero(val->getType(), ConstantInt::get(codegenType(val->getType()), 0));
-                return new ASTValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(val),
-                            codegenValue(&zero)));
-            }
-
-            if(toType->isInteger())
-            {
-                return new ASTValue(toType, ir->CreateIntCast(codegenValue(val), 
-                            codegenType(toType), false)); //TODO: signedness
-            }
-            if(toType->isPointer())
-            {
-                return new ASTValue(toType, ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
-            }
-
-            if(toType->isFloating())
-            {
-                if(val->type->isSigned())
-                return new ASTValue(toType, ir->CreateSIToFP(codegenValue(val),
-                            codegenType(toType)), false);
-                return new ASTValue(toType, ir->CreateUIToFP(codegenValue(val), 
-                            codegenType(toType)), false);
-            }
+            return promoteInt(val, toType);
         } else if(val->type->isFloating())
         {
-            if(toType->isFloating())
-            {
-                return new ASTValue(toType, ir->CreateFPCast(codegenValue(val), codegenType(toType)));
-            } else if(toType->isInteger())
-            {
-                return new ASTValue(toType, ir->CreateFPToUI(codegenValue(val), 
-                            codegenType(toType)));
-            }
+            return promoteFloat(val, toType);
         }
         else if(val->type->isPointer())
         {
-            if(toType->isPointer())
-            {
-                return new ASTValue(toType, 
-                        ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
-            }
-
-            if(toType->isInteger())
-            {
-                return new ASTValue(toType, ir->CreateIntCast(codegenValue(val), 
-                            codegenType(toType), false));
-            }
-
-            if(toType->isBool())
-            {
-                Value *i = ir->CreatePtrToInt(codegenValue(val), 
-                        codegenType(ASTType::getULongTy()));
-
-                return new ASTValue(ASTType::getBoolTy(), 
-                        ir->CreateICmpNE(i,
-                            ConstantInt::get(codegenType(ASTType::getULongTy()), 0)
-                            ));
-            }
+            return promotePointer(val, toType);
         } 
         else if(val->type->type == TYPE_TUPLE)
         {
-            if(toType->type == TYPE_STRUCT)
-            {
-                if(((TupleTypeInfo*) val->type->info)->types.size() ==
-                        ((StructTypeInfo*) toType->info)->members.size()) //TODO proper test
-                {
-                    Value *toPtr = ir->CreateBitCast(codegenLValue(val), 
-                            codegenType(toType)->getPointerTo());
-                    return new ASTValue(toType, toPtr, true); 
-                } else
-                {
-                    emit_message(msg::ERROR, "cannot convert tuple to struct");
-                    return NULL;
-                }
-            } else if(toType->type == TYPE_TUPLE)
-            {
-                if(((TupleTypeInfo*) val->type->info)->types.size() ==
-                        ((TupleTypeInfo*) toType->info)->types.size())
-                {
-                    Value *toPtr;
-                    if(val->isLValue())
-                    {
-                        toPtr = ir->CreateBitCast(codegenLValue(val), 
-                              codegenType(toType)->getPointerTo());
-                    } else
-                    {
-                        toPtr = ir->CreateAlloca(codegenType(val->type));
-                        ir->CreateStore(codegenValue(val), toPtr);
-                        toPtr = ir->CreateBitCast(toPtr, 
-                              codegenType(toType)->getPointerTo());
-                    }
-
-                    return new ASTValue(toType, toPtr, true); 
-                } else
-                {
-                    emit_message(msg::ERROR, "cannot convert tuple to incompatible tuple");
-                    return NULL;
-                }
-            } else if(toType->type == TYPE_ARRAY)
-            {
-                Value *toPtr;
-                if(val->isLValue())
-                {
-                    toPtr = ir->CreateBitCast(codegenLValue(val),
-                            codegenType(toType)->getPointerTo());
-                } else
-                {
-                    emit_message(msg::FAILURE, "unimplemented RValue bitcast");
-                }
-
-                return new ASTValue(toType, toPtr, true);
-            } else if(toType->type == TYPE_DYNAMIC_ARRAY)
-            {
-                Value *toPtr;
-                if(val->isLValue())
-                {
-                    toPtr = ir->CreateBitCast(codegenLValue(val),
-                            codegenType(toType)->getPointerTo());
-                } else
-                {
-                    emit_message(msg::FAILURE, "unimplemented RValue bitcast");
-                }
-
-                return new ASTValue(toType, toPtr, true);
-            }
-        } if(val->type->type == TYPE_ARRAY)
+            return promoteTuple(val, toType);
+        } if(val->type->isArray())
         {
-            if(toType->type == TYPE_POINTER)
-            {
-                ArrayTypeInfo *ati = (ArrayTypeInfo*) val->type->info;
-                if(ati->arrayOf != toType->getReferencedTy())
-                {
-                    emit_message(msg::ERROR, "invalid convesion from array to invalid pointer type"); 
-                    return NULL;
-                }
-                Value *ptr = codegenLValue(val);
-                ptr = ir->CreateBitCast(ptr, codegenType(toType));
-                return new ASTValue(toType, ptr, true);
-            }
-        } else if(val->type->type == TYPE_DYNAMIC_ARRAY)
-        {
-        
+            return promoteArray(val, toType);
         }
     }
     return val; // no conversion? failed converson?

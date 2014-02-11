@@ -516,10 +516,24 @@ struct Expression
     //TODO: overrides
 };
 
+struct NewExpression : public Expression
+{
+    ASTType *type;
+    NewExpression(ASTType *t, SourceLocation l = SourceLocation()) : Expression(l), type(t) {}
+};
+
+struct DeleteExpression : public Expression
+{
+    IdentifierExpression *expression;
+    DeleteExpression(IdentifierExpression *e, SourceLocation l = SourceLocation()) :
+        Expression(l), expression(e){}
+};
+
 struct TupleExpression : public Expression
 {
     std::vector<Expression*> members;
-    TupleExpression(std::vector<Expression*> e) : members(e) {}
+    TupleExpression(std::vector<Expression*> e, SourceLocation l = SourceLocation()) : 
+        Expression(l), members(e) {}
 };
 
 struct CastExpression : public Expression

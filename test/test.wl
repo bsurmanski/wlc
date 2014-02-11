@@ -119,6 +119,9 @@ int main(int argc, char^^ argv)
     */
     );
 
+    int^ mymalloc = new int
+    delete mymalloc
+
     int8 spc = 0
     while(!spc) 
     {

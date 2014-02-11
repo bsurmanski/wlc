@@ -425,8 +425,9 @@ PARSEEXP:
 
         case tok::semicolon:
             ignore();
-        default:
             return NULL;
+        default:
+            return new ExpressionStatement(parseExpression(), loc);
     }
 }
 
@@ -746,6 +747,24 @@ Expression *ParseContext::parseCastExpression(int prec)
     return new CastExpression(type, parseExpression(12), loc); // 12 == cast priority
 }
 
+Expression *ParseContext::parseDeleteExpression()
+{
+    SourceLocation loc = peek().loc;
+    assert(peek().is(tok::kw_delete));
+    ignore(); // ignore 'delete'
+    IdentifierExpression *ident = (IdentifierExpression*) parseIdentifierExpression();
+    return new DeleteExpression(ident, loc);
+}
+
+Expression *ParseContext::parseNewExpression()
+{
+    SourceLocation loc = peek().loc;
+    assert(peek().is(tok::kw_new));
+    ignore(); //ignore 'new'
+    ASTType *t = parseType(0);
+    return new NewExpression(t, loc);
+}
+
 Expression *ParseContext::parseExpression(int prec)
 {
     int n = 1; //look ahead
@@ -770,6 +789,10 @@ Expression *ParseContext::parseExpression(int prec)
             return parseImport();
         case tok::lbracket:
             return parseTupleExpression();
+        case tok::kw_new:
+            return parseNewExpression();
+        case tok::kw_delete:
+            return parseDeleteExpression();
         default:
         return parseBinaryExpression(prec);
     }
@@ -777,6 +800,7 @@ Expression *ParseContext::parseExpression(int prec)
 
 Expression *ParseContext::parseTupleExpression()
 {
+    SourceLocation loc = peek().loc;
     if(peek().isNot(tok::lbracket))
     {
         emit_message(msg::ERROR, "expected tuple expression", peek().loc);
@@ -803,7 +827,7 @@ Expression *ParseContext::parseTupleExpression()
 
     ignore(); // ignore ]
 
-    return new TupleExpression(members);
+    return new TupleExpression(members, loc);
 }
 
 Expression *ParseContext::parsePostfixExpression(int prec)
@@ -875,6 +899,19 @@ Expression *ParseContext::parseUnaryExpression(int prec)
     return parsePostfixExpression(prec);
 }
 
+Expression *ParseContext::parseIdentifierExpression()
+{
+    SourceLocation loc = peek().loc;
+    if(peek().isNot(tok::identifier))
+    {
+        emit_message(msg::ERROR, "expected identifier expression", loc); 
+        return NULL;
+    }
+
+    Identifier *id = getScope()->get(get().toString());
+    return new IdentifierExpression(id, loc);
+}
+
 Expression *ParseContext::parsePrimaryExpression()
 {
     SourceLocation loc = peek().loc;
@@ -943,8 +980,7 @@ Expression *ParseContext::parsePrimaryExpression()
 
     if(peek().is(tok::identifier))
     {
-        Identifier *id = getScope()->get(get().toString());
-        return new IdentifierExpression(id, loc);
+        return parseIdentifierExpression();
     }
 }
 

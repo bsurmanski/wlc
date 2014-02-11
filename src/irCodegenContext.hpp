@@ -51,10 +51,14 @@ class IRCodegenContext : public CodegenContext
     std::stack<SymbolTable*> scope;
 
     ASTValue *createDynamicArray(ASTValue *ptr, ASTValue *sz);
+
+    // codegen type
     llvm::Type *codegenArrayType(ASTType *ty);
     llvm::Type *codegenStructType(ASTType *ty);
     llvm::Type *codegenTupleType(ASTType *ty);
     llvm::Type *codegenType(ASTType *ty);
+
+    // codegen value
     llvm::Value *codegenValue(ASTValue *v);
     llvm::Value *codegenLValue(ASTValue *v);
 
@@ -77,7 +81,12 @@ class IRCodegenContext : public CodegenContext
     ASTValue *loadValue(ASTValue *val);
     ASTValue *storeValue(ASTValue *dest, ASTValue *val);
 
+    // expression
     ASTValue *codegenExpression(Expression *exp);
+
+    ASTValue *codegenNewExpression(NewExpression *exp);
+    ASTValue *codegenDeleteExpression(DeleteExpression *exp);
+
     ASTValue *codegenIfExpression(IfExpression *exp);
     ASTValue *codegenWhileExpression(WhileExpression *exp);
     ASTValue *codegenForExpression(ForExpression *exp);
@@ -85,13 +94,27 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);
     ASTValue *codegenUnaryExpression(UnaryExpression *exp);
     ASTValue *codegenBinaryExpression(BinaryExpression *exp);
+
+    // promote
     ASTValue *promoteType(ASTValue *val, ASTType *type);
-    void codegenImport(ImportExpression *e);
+    ASTValue *promoteInt(ASTValue *val, ASTType *type);
+    ASTValue *promoteFloat(ASTValue *val, ASTType *type);
+    ASTValue *promotePointer(ASTValue *val, ASTType *type);
+    ASTValue *promoteTuple(ASTValue *val, ASTType *type);
+    ASTValue *promoteArray(ASTValue *val, ASTType *type);
     void codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, unsigned op);
+
+    void codegenImport(ImportExpression *e);
+
+    // codegen statement
     void codegenReturnStatement(ReturnStatement *exp);
     void codegenStatement(Statement *stmt);
+
+    // codegen declaration
     llvm::FunctionType *codegenFunctionPrototype(FunctionPrototype *proto);
     void codegenDeclaration(Declaration *decl);
+
+    // codegen etc
     void codegenTranslationUnit(TranslationUnit *unit);
     void codegenIncludeUnit(TranslationUnit *current, TranslationUnit *inc);
     void codegenPackage(Package *p);

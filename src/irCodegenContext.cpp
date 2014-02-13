@@ -442,6 +442,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
     llargs.push_back(ConstantInt::get(codegenType(ASTType::getULongTy()), exp->type->size()));
     Function *mallocFunc = module->getFunction("malloc");
     Value *value = ir->CreateCall(mallocFunc, llargs);
+    value = ir->CreateBitCast(value, codegenType(exp->type)->getPointerTo());
     return new ASTValue(exp->type, value);
 }
 

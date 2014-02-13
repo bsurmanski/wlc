@@ -15,8 +15,8 @@ offsetof operator
 ## correct struct debug info
 proper arrays
 negate operator
-proper extern keyword for variables
-compound equal operators (and dont segfault on compound equal)
+## proper extern keyword for variables
+## compound equal operators (and dont segfault on compound equal)
 ++ operator for float
 float coersion is off. an expression like (rand() / float: RAND_MAX) 
     does not parse right (should be random 0.0-1.0, instead is 0.0)

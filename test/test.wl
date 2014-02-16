@@ -104,19 +104,17 @@ int main(int argc, char^^ argv)
 
     int iii = 5
     float j = float: iii
-    //MyNewStruct newstruct
+    MyNewStruct newstruct
     int[5] my5Array = [1,2,3,4,5]
     int[] darr = [1,2,3,4]
 
-    printf("myArray: elem: sz: %d\n", //, %d %d %d %d %d... %d\n",
+    printf("myArray: elem: sz: %d, %d %d %d %d %d\n",
     darr.size,
-    /*
     darr[0],
     darr[1],
     darr[2],
     darr[3],
     darr[4],
-    */
     );
 
     int^ mymalloc = new int

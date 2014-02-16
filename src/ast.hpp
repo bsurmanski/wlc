@@ -89,14 +89,14 @@ struct AST
     AST() { root = new Package; }
     ~AST() { delete root; }
     Package *getRootPackage() { return root; }
-    TranslationUnit *getUnit(std::string str) 
-    { 
+    TranslationUnit *getUnit(std::string str)
+    {
         char APATH[PATH_MAX + 1];
         realpath(str.c_str(), APATH);
         std::string astr = std::string(str);
-        if(units.count(astr)) return units[astr]; 
+        if(units.count(astr)) return units[astr];
         //TranslationUnit *nunit = new TranslationUnit(NULL); //TODO: identifier ?
-        //return nunit; 
+        //return nunit;
         return NULL;
     }
     void addUnit(std::string str, TranslationUnit *u)
@@ -105,7 +105,7 @@ struct AST
         realpath(str.c_str(), APATH);
         std::string astr = std::string(str);
         assert(!units.count(astr) && "reimport of translation unit!");
-        units[str] = u; 
+        units[str] = u;
     }
 };
 
@@ -157,6 +157,20 @@ struct TypeInfo
     virtual size_t getAlign() { return 0; }
 };
 
+
+struct DynamicTypeInfo : public TypeInfo
+{
+};
+
+struct VariableDeclaration;
+struct StructDeclaration;
+
+struct CompositeTypeInfo : TypeInfo
+{
+    virtual ASTType *getContainedType(unsigned index) = 0;
+    virtual unsigned length() = 0;
+};
+
 struct PointerTypeInfo : public TypeInfo
 {
     ASTType *ptrTo;
@@ -165,24 +179,19 @@ struct PointerTypeInfo : public TypeInfo
     std::string getName();
 };
 
-struct ArrayTypeInfo : public TypeInfo
+struct ArrayTypeInfo : public CompositeTypeInfo
 {
     ASTType *arrayOf;
-    int size;
+    unsigned size;
     virtual ASTType *getReferenceTy() { return arrayOf; }
+    virtual ASTType *getContainedType(unsigned i) { return arrayOf; }
+    virtual unsigned length() { return size; }
     ArrayTypeInfo(ASTType *pto, int sz = 0) : arrayOf(pto), size(sz) {}
     bool isDynamic() { return size == 0; }
     std::string getName();
 };
 
-struct DynamicTypeInfo : public TypeInfo
-{
-
-};
-
-struct VariableDeclaration;
-struct StructDeclaration;
-struct StructTypeInfo : public TypeInfo
+struct StructTypeInfo : public CompositeTypeInfo
 {
     bool packed;
     SymbolTable *scope;
@@ -191,6 +200,8 @@ struct StructTypeInfo : public TypeInfo
     StructTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
         identifier(id), scope(sc), members(m), packed(false){}
     std::string getName() { return identifier->getName(); }
+    virtual ASTType *getContainedType(unsigned i);
+    virtual unsigned length() { return members.size(); }
     virtual size_t getSize();
     virtual size_t getAlign();
     StructDeclaration *getDeclaration() { return (StructDeclaration*) identifier->getDeclaration(); }
@@ -210,13 +221,16 @@ struct AliasTypeInfo : public TypeInfo
     AliasTypeInfo(Identifier *id, ASTType *a) :identifier(id), alias(a) {}
 };
 
-struct TupleTypeInfo : public TypeInfo
+struct TupleTypeInfo : public CompositeTypeInfo
 {
     std::vector<ASTType*> types;
+    virtual ASTType *getContainedType(unsigned i) { return types[i]; }
+    virtual unsigned length() { return types.size(); }
     //virtual size_t getSize();
     //virtual size_t getAlign();
     TupleTypeInfo(std::vector<ASTType*> t) : types(t) {}
 };
+
 
 #include <llvm/DebugInfo.h> //XXX
 struct ASTType
@@ -314,15 +328,16 @@ struct ASTType
     bool isClass() { return type == TYPE_CLASS; }
     bool isStruct() { return type == TYPE_STRUCT; }
     bool isBool() { return type == TYPE_BOOL; }
-    bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT || 
+    bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT ||
         type == TYPE_INT || type == TYPE_LONG ||
         type == TYPE_UCHAR || type == TYPE_USHORT || type == TYPE_UINT || type == TYPE_ULONG; }
-    bool isSigned() { return type == TYPE_CHAR || type == TYPE_SHORT || 
+    bool isSigned() { return type == TYPE_CHAR || type == TYPE_SHORT ||
         type == TYPE_INT || type == TYPE_LONG; }
     bool isFloating() { return type == TYPE_FLOAT || type == TYPE_DOUBLE; }
     bool isVector() { return type == TYPE_VEC; }
     bool isArray() { return type == TYPE_ARRAY || type == TYPE_DYNAMIC_ARRAY; }
     bool isPointer() { return this && type == TYPE_POINTER; } //TODO: shouldnt need to test for this
+    bool isComposite() { return dynamic_cast<CompositeTypeInfo*>(info); }
 
 #define DECLTY(NM) static ASTType *NM; static ASTType *get##NM();
     DECLTY(VoidTy)
@@ -358,7 +373,7 @@ struct ASTValue
     llvm::Value *cgValue; //XXX
     llvm::DIVariable debug; //XXX
     ASTType *getType() { return type; }
-    ASTValue(ASTType *ty, void *cgv = NULL, bool lv = false) : type(ty), 
+    ASTValue(ASTType *ty, void *cgv = NULL, bool lv = false) : type(ty),
         cgValue((llvm::Value*) cgv), lValue(lv) {}
     bool isLValue() { return lValue; }
 };
@@ -377,6 +392,7 @@ struct Declaration
     Declaration(Identifier *id, SourceLocation l, bool ext = false) : identifier(id), loc(l), external(ext) {}
     virtual ~Declaration(){}
     virtual std::string getName() { if(identifier) return identifier->getName(); return ""; }
+    virtual ASTType *getType() = 0;
 
     virtual FunctionDeclaration *functionDeclaration() { return NULL; }
     virtual VariableDeclaration *variableDeclaration() { return NULL; }
@@ -401,11 +417,14 @@ struct FunctionDeclaration : public Declaration
     virtual FunctionDeclaration *functionDeclaration() { return this; }
     SymbolTable *getScope() { return scope; }
     ASTType *getReturnType() { return prototype->returnType; }
+
+    virtual ASTType *getType() { return prototype->returnType; } //TODO: prototype should be type?
 };
 
 struct LabelDeclaration : public Declaration
 {
     LabelDeclaration(Identifier *id, SourceLocation loc) : Declaration(id, loc) {}
+    virtual ASTType *getType() { return 0; }
 };
 
 struct VariableDeclaration : public Declaration
@@ -415,7 +434,7 @@ struct VariableDeclaration : public Declaration
     Expression *value; // initial value
     VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) : Declaration(nm, loc, ext), type(ty), value(val) {}
     virtual VariableDeclaration *variableDeclaration() { return this; }
-    ASTType *getType() { return type; }
+    virtual ASTType *getType() { return type; }
 };
 
 struct ArrayDeclaration : public VariableDeclaration
@@ -430,6 +449,8 @@ struct TypeDeclaration : public Declaration
 {
     ASTType *type;
     TypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) : Declaration(id, loc), type(ty) {}
+
+    virtual ASTType *getType() { return type; }
 };
 
 struct StructDeclaration : public TypeDeclaration
@@ -532,7 +553,7 @@ struct DeleteExpression : public Expression
 struct TupleExpression : public Expression
 {
     std::vector<Expression*> members;
-    TupleExpression(std::vector<Expression*> e, SourceLocation l = SourceLocation()) : 
+    TupleExpression(std::vector<Expression*> e, SourceLocation l = SourceLocation()) :
         Expression(l), members(e) {}
 };
 
@@ -541,7 +562,7 @@ struct CastExpression : public Expression
     ASTType *type;
     Expression *expression;
     virtual CastExpression *castExpression() { return this; }
-    CastExpression(ASTType *ty, Expression *exp, SourceLocation l = SourceLocation()) : 
+    CastExpression(ASTType *ty, Expression *exp, SourceLocation l = SourceLocation()) :
         Expression(l), type(ty), expression(exp){}
 };
 
@@ -574,7 +595,7 @@ struct PostfixOpExpression : public PostfixExpression
 {
     int op;
     Expression *lhs;
-    PostfixOpExpression(Expression *l, int o, SourceLocation lo = SourceLocation()) : 
+    PostfixOpExpression(Expression *l, int o, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), op(o) {}
 };
 
@@ -626,7 +647,7 @@ struct IdentifierExpression : public PrimaryExpression
 struct StringExpression : public PrimaryExpression
 {
     std::string string;
-    StringExpression(std::string str, SourceLocation l = SourceLocation()) : 
+    StringExpression(std::string str, SourceLocation l = SourceLocation()) :
         PrimaryExpression(l), string(str) {}
     virtual StringExpression *stringExpression() { return this; }
 };
@@ -689,7 +710,7 @@ struct IfExpression : public Expression
     Statement *body;
     Statement *elsebranch;
     virtual IfExpression *ifExpression() { return this; }
-    IfExpression(Expression *c, Statement *b, Statement *e, SourceLocation l = SourceLocation()) : 
+    IfExpression(Expression *c, Statement *b, Statement *e, SourceLocation l = SourceLocation()) :
         Expression(l), condition(c), body(b), elsebranch(e) {}
 };
 
@@ -712,7 +733,7 @@ struct ForExpression : public Expression
     Statement *body;
     Statement *elsebranch;
     virtual ForExpression *forExpression() { return this; }
-    ForExpression(Statement *d, Expression *c, Statement *u, Statement *b, Statement *e, 
+    ForExpression(Statement *d, Expression *c, Statement *u, Statement *b, Statement *e,
             SourceLocation l = SourceLocation()) :
         Expression(l), decl(d), condition(c), update(u), body(b), elsebranch(e) {}
 };
@@ -731,7 +752,7 @@ struct PackageExpression : public Expression
 {
     Expression *package;
     virtual PackageExpression *packageExpression() { return this; }
-    PackageExpression(Expression *p, SourceLocation l = SourceLocation()) 
+    PackageExpression(Expression *p, SourceLocation l = SourceLocation())
         : Expression(l), package(p) {}
 };
 

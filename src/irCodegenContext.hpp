@@ -40,8 +40,8 @@ class IRCodegenContext : public CodegenContext
     TranslationUnit *unit;
     IRDebug *debug;
 
-    IRCodegenContext() : context(llvm::getGlobalContext()), 
-    ir(new llvm::IRBuilder<>(context)), 
+    IRCodegenContext() : context(llvm::getGlobalContext()),
+    ir(new llvm::IRBuilder<>(context)),
      module(NULL), linker(new llvm::Module("", context)) {}
 
     llvm::LLVMContext& getLLVMContext() { return context; }
@@ -49,8 +49,6 @@ class IRCodegenContext : public CodegenContext
     void codegenAST(AST *ast, WLConfig param);
     protected:
     std::stack<SymbolTable*> scope;
-
-    ASTValue *createDynamicArray(ASTValue *ptr, ASTValue *sz);
 
     // codegen type
     llvm::Type *codegenArrayType(ASTType *ty);
@@ -83,6 +81,7 @@ class IRCodegenContext : public CodegenContext
 
     // expression
     ASTValue *codegenExpression(Expression *exp);
+    ASTValue *codegenTupleExpression(TupleExpression *exp, ASTType *ty = 0);
 
     ASTValue *codegenNewExpression(NewExpression *exp);
     ASTValue *codegenDeleteExpression(DeleteExpression *exp);

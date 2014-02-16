@@ -19,6 +19,11 @@ size_t StructTypeInfo::getSize()
     //TODO: handle packed
 }
 
+ASTType *StructTypeInfo::getContainedType(unsigned i)
+{
+    return members[i]->getType();
+}
+
 size_t StructTypeInfo::getAlign()
 {
     size_t align = 0;

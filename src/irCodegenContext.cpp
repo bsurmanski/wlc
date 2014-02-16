@@ -46,7 +46,7 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(sti->members[i]))
         {
             structVec.push_back(codegenType(vd->type));
-        } else 
+        } else
             emit_message(msg::UNIMPLEMENTED, "this cant be declared in a struct (yet?)");
     }
     if(sti->members.size())
@@ -90,11 +90,6 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
 }
 
 
-ASTValue *IRCodegenContext::createDynamicArray(ASTValue *ptr, ASTValue *sz)
-{
-    return NULL; //TODO 
-}
-
 /*
  * dynamic array is equivilent to:
  * struct Array {
@@ -126,7 +121,7 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
 
         debug->createArrayType(ty);
     }
-    
+
     return (llvm::Type*) ty->cgType;
 }
 
@@ -141,14 +136,14 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
             Declaration* decl = id->getDeclaration();
             if(TypeDeclaration* tdecl = dynamic_cast<TypeDeclaration*>(decl))
             {
-                ty = tdecl->type; 
+                ty = tdecl->type;
             } else {
                 emit_message(msg::FATAL, "error, invalid type");
                 return NULL;
             }
             //TODO
             if(id->isUndeclared()) {
-                emit_message(msg::ERROR, string("undeclared type'") + 
+                emit_message(msg::ERROR, string("undeclared type'") +
                         id->getName() + string("' in scope"));
                 return NULL;
             }
@@ -249,7 +244,7 @@ llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
 
 ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 {
-    ASTValue *stored = new ASTValue(dest->type, 
+    ASTValue *stored = new ASTValue(dest->type,
             ir->CreateStore(codegenValue(val), codegenLValue(dest)));
     return stored;
 }
@@ -309,7 +304,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     else if(StringExpression *sexp = exp->stringExpression())
     {
         Constant *strConstant = ConstantDataArray::getString(context, sexp->string);
-        GlobalVariable *GV = new GlobalVariable(*module, strConstant->getType(), true, 
+        GlobalVariable *GV = new GlobalVariable(*module, strConstant->getType(), true,
                 GlobalValue::PrivateLinkage, strConstant);
         vector<Value *> gep;
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
@@ -342,7 +337,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
             iexp->id = lookup(iexp->id->getName());
             //TODO
             if(iexp->id->isUndeclared()) {
-                emit_message(msg::ERROR, string("undeclared variable '") + 
+                emit_message(msg::ERROR, string("undeclared variable '") +
                         iexp->id->getName() + string("' in scope"), iexp->loc);
                 return NULL;
             }
@@ -358,7 +353,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
             //Value *llvmfunc = module->getFunction(iexp->identifier()->getName());
             Value *llvmfunc = (Value*) ((FunctionDeclaration*) iexp->identifier()->declaration)->cgValue;
             //TODO: proper function CGType (llvmfunc->getFunctionType())
-            return new ASTValue(NULL, llvmfunc); 
+            return new ASTValue(NULL, llvmfunc);
         } else if(iexp->identifier()->isStruct())
         {
             return new ASTValue(iexp->identifier()->declaredType(), NULL);
@@ -375,59 +370,16 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     }else if(ImportExpression *iexp = exp->importExpression())
     {
         //TODO: should it return something? probably. Some sort of const package ptr or something...
-        return NULL; 
+        return NULL;
     } else if(CastExpression *cexp = exp->castExpression())
     {
         return promoteType(codegenExpression(cexp->expression), cexp->type);
     } else if(TupleExpression *texp = dynamic_cast<TupleExpression*>(exp))
     {
-        //XXX codegen tuple
-        std::vector<ASTValue*> vals;
-        std::vector<ASTType*> types;
-        bool lvalue = true;
-        for(int i = 0; i < texp->members.size(); i++)
-        {
-            ASTValue *val = codegenExpression(texp->members[i]);
-            vals.push_back(val);
-            types.push_back(val->getType());
-
-            if(!val->isLValue()) lvalue = false;
-        }
-
-        TupleTypeInfo *tti = new TupleTypeInfo(types);
-        ASTType *tty = new ASTType();
-        tty->setTypeInfo(tti, TYPE_TUPLE);
-
-        if(lvalue)
-        {
-            emit_message(msg::UNIMPLEMENTED, "lvalue tuple unimplemented", exp->loc); 
-            return NULL;
-        }
-        else
-        {
-            std::vector<Constant*> llvals;
-            for(int i = 0; i < vals.size(); i++)
-            {
-                llvals.push_back((Constant*) codegenValue(vals[i]));
-            }
-
-            StructType *llty = (StructType*) codegenType(tty);
-
-            GlobalVariable *GV = new GlobalVariable(*module, llty, true, 
-                    GlobalValue::PrivateLinkage, 
-                    ConstantStruct::get(llty, llvals));
-
-            //vector<Value *> gep;
-            //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-            //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-            //Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
-            return new ASTValue(tty, GV, true);
-        }
-
-        emit_message(msg::UNIMPLEMENTED, "tuple codegen", exp->loc);
+        return codegenTupleExpression(texp);
     } else if(NewExpression *nexp = dynamic_cast<NewExpression*>(exp))
     {
-        return codegenNewExpression(nexp); 
+        return codegenNewExpression(nexp);
     } else if(DeleteExpression *dexp = dynamic_cast<DeleteExpression*>(exp))
     {
         return codegenDeleteExpression(dexp);
@@ -436,8 +388,67 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     return NULL; //TODO
 }
 
+ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType *ty)
+{
+    //XXX codegen tuple
+    std::vector<ASTValue*> vals;
+    std::vector<ASTType*> types;
+    bool lvalue = true;
+    CompositeTypeInfo *cti = 0;
+    if(ty) cti = dynamic_cast<CompositeTypeInfo*>(ty->info);
+
+    for(int i = 0; i < exp->members.size(); i++)
+    {
+        ASTValue *val = codegenExpression(exp->members[i]);
+
+        if(cti)
+            val = promoteType(val, cti->getContainedType(i));
+
+        vals.push_back(val);
+        types.push_back(val->getType());
+
+        if(!val->isLValue()) lvalue = false;
+    }
+
+    TupleTypeInfo *tti = new TupleTypeInfo(types);
+    ASTType *tty = new ASTType();
+    tty->setTypeInfo(tti, TYPE_TUPLE);
+
+    if(lvalue)
+    {
+        emit_message(msg::UNIMPLEMENTED, "lvalue tuple unimplemented", exp->loc);
+        return NULL;
+    }
+    else
+    {
+        std::vector<Constant*> llvals;
+        for(int i = 0; i < vals.size(); i++)
+        {
+            llvals.push_back((Constant*) codegenValue(vals[i]));
+        }
+
+        StructType *llty = (StructType*) codegenType(tty);
+
+        GlobalVariable *GV = new GlobalVariable(*module, llty, true,
+                GlobalValue::PrivateLinkage,
+                ConstantStruct::get(llty, llvals));
+
+        //vector<Value *> gep;
+        //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        //Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
+        return new ASTValue(tty, GV, true);
+    }
+}
+
 ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 {
+    if(exp->type->type == TYPE_DYNAMIC_ARRAY)
+    {
+        emit_message(msg::ERROR, "cannot created unsized array. meaningless alloaction", exp->loc);
+        return NULL;
+    }
+
     vector<Value*> llargs;
     llargs.push_back(ConstantInt::get(codegenType(ASTType::getULongTy()), exp->type->size()));
     Function *mallocFunc = module->getFunction("malloc");
@@ -466,11 +477,11 @@ ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
     //codegenResolveBinaryTypes(&cond, &zero, 0);
     //ASTValue *icond = new ASTValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(cond), codegenValue(zero)));
     ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
-    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "true", 
+    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "true",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "false", 
+    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "false",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *endif = BasicBlock::Create(context, "endif", 
+    llvm::BasicBlock *endif = BasicBlock::Create(context, "endif",
             ir->GetInsertBlock()->getParent());
     ir->CreateCondBr(codegenValue(icond), ontrue, onfalse);
 
@@ -489,13 +500,13 @@ ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
 
 ASTValue *IRCodegenContext::codegenWhileExpression(WhileExpression *exp)
 {
-    llvm::BasicBlock *whileBB = BasicBlock::Create(context, "while_condition", 
+    llvm::BasicBlock *whileBB = BasicBlock::Create(context, "while_condition",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "while_true", 
+    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "while_true",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "while_false", 
+    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "while_false",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *endwhile = BasicBlock::Create(context, "endwhile", 
+    llvm::BasicBlock *endwhile = BasicBlock::Create(context, "endwhile",
             ir->GetInsertBlock()->getParent());
 
     ir->CreateBr(whileBB);
@@ -521,7 +532,7 @@ ASTValue *IRCodegenContext::codegenWhileExpression(WhileExpression *exp)
     ir->CreateBr(endwhile);
 
     //TODO: break label should be set to whatever it was previously, to allow for nested while
-    this->breakLabel = NULL; 
+    this->breakLabel = NULL;
 
     ir->SetInsertPoint(endwhile);
     return NULL;
@@ -529,15 +540,15 @@ ASTValue *IRCodegenContext::codegenWhileExpression(WhileExpression *exp)
 
 ASTValue *IRCodegenContext::codegenForExpression(ForExpression *exp)
 {
-    llvm::BasicBlock *forBB = BasicBlock::Create(context, "for_condition", 
+    llvm::BasicBlock *forBB = BasicBlock::Create(context, "for_condition",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "for_true", 
+    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "for_true",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "for_false", 
+    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "for_false",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *forupdate = BasicBlock::Create(context, "forupdate", 
+    llvm::BasicBlock *forupdate = BasicBlock::Create(context, "forupdate",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *endfor = BasicBlock::Create(context, "endfor", 
+    llvm::BasicBlock *endfor = BasicBlock::Create(context, "endfor",
             ir->GetInsertBlock()->getParent());
 
     if(exp->decl) codegenStatement(exp->decl);
@@ -577,7 +588,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *func = codegenExpression(exp->function);
     if(!func) {
-        emit_message(msg::ERROR, "unknown expression", exp->loc); 
+        emit_message(msg::ERROR, "unknown expression", exp->loc);
         return NULL;
     }
 
@@ -591,7 +602,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->function))
     {
         // XXX messy, not always true
-        FunctionDeclaration *fdecl = (FunctionDeclaration*) iexp->id->declaration; 
+        FunctionDeclaration *fdecl = (FunctionDeclaration*) iexp->id->declaration;
         if(fdecl)
         {
             rtype = fdecl->prototype->returnType;
@@ -608,11 +619,11 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
             val = promoteType(val, ftype->parameters[i].first);
         else if(ftype->vararg)
         {
-            if(val->getType()->isFloating()) 
+            if(val->getType()->isFloating())
                 val = promoteType(val, ASTType::getDoubleTy());
-            else if(val->getType()->isInteger() && val->getType()->isSigned()) 
+            else if(val->getType()->isInteger() && val->getType()->isSigned())
                 val = promoteType(val, ASTType::getIntTy());
-            else if(val->getType()->isInteger()) 
+            else if(val->getType()->isInteger())
                 val = promoteType(val, ASTType::getUIntTy());
         }
         //TODO: vararg, promote type of float, int
@@ -633,7 +644,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
         case tok::plusplus:
             if(!lhs->isLValue()) {
                 emit_message(msg::ERROR, "can only incrememt LValue", exp->loc);
-                return NULL; 
+                return NULL;
             }
 
             val = new ASTValue(lhs->getType(),
@@ -644,7 +655,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
         case tok::minusminus:
             if(!lhs->isLValue()) {
                 emit_message(msg::ERROR, "can only decrement LValue", exp->loc);
-                return NULL; 
+                return NULL;
             }
             val = new ASTValue(lhs->getType(),
                     ir->CreateSub(codegenValue(lhs),
@@ -655,7 +666,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
             return lhs;
         case tok::minus:
             if(!lhs->getType()->isSigned()){
-                emit_message(msg::UNIMPLEMENTED, 
+                emit_message(msg::UNIMPLEMENTED,
                         "conversion to signed value using '-' unary op",
                         exp->loc);
                 return NULL;
@@ -667,7 +678,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
             return NULL;
         case tok::bang:
             val = promoteType(lhs, ASTType::getBoolTy());
-            return new ASTValue(ASTType::getBoolTy(), ir->CreateNot(codegenValue(val))); 
+            return new ASTValue(ASTType::getBoolTy(), ir->CreateNot(codegenValue(val)));
             return val;
         case tok::caret:
             if(!lhs->getType()->isPointer()) {
@@ -711,7 +722,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         } else if(arr->getType()->isPointer())
         {
             //TODO: index array
-            ASTType *indexedType = arr->getType()->getReferencedTy(); 
+            ASTType *indexedType = arr->getType()->getReferencedTy();
             Value *val = ir->CreateInBoundsGEP(codegenValue(arr), codegenValue(ind));
             return new ASTValue(indexedType, val, true);
         } else if(arr->getType()->type == TYPE_TUPLE)
@@ -768,12 +779,12 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             {
                 if(dexp->rhs == "sizeof")
                 {
-                    return new ASTValue(ASTType::getULongTy(), 
-                            ConstantInt::get(Type::getInt64Ty(context), 
+                    return new ASTValue(ASTType::getULongTy(),
+                            ConstantInt::get(Type::getInt64Ty(context),
                                 lhs->getType()->size()));
                 } else if(dexp->rhs == "offsetof")
                 {
-                    emit_message(msg::UNIMPLEMENTED, 
+                    emit_message(msg::UNIMPLEMENTED,
                             "offsetof attribute not yet implemented", dexp->loc);
                 }
                 emit_message(msg::ERROR, "unknown attribute '" + dexp->rhs + "' of struct '" +
@@ -781,7 +792,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 return NULL;
             }
 
-            if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(), 
+            if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(),
                     codegenValue(lhs), true);
             if(!lhs->getType()->isStruct() && !lhs->getType()->isArray()) {
                 emit_message(msg::ERROR, "can only index struct or array type", dexp->loc);
@@ -797,7 +808,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     // XXX better way to compare equality?
                     if(sti->members[i]->identifier->getName() == dexp->rhs)
                     {
-                        if(VariableDeclaration *vdecl = 
+                        if(VariableDeclaration *vdecl =
                                 dynamic_cast<VariableDeclaration*>(sti->members[i]))
                         {
                             //TODO proper struct GEP
@@ -847,13 +858,13 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 
                 if(dexp->rhs == "ptr")
                 {
-                    return new ASTValue(ty->getPointerTy(), 
+                    return new ASTValue(ty->getPointerTy(),
                             ir->CreateInBoundsGEP(codegenLValue(lhs), 0), true);
                 }
 
                 if(dexp->rhs == "size")
                 {
-                    return new ASTValue(ASTType::getULongTy(), 
+                    return new ASTValue(ASTType::getULongTy(),
                             ConstantInt::get(Type::getInt64Ty(context), ati->size));
                 }
             }
@@ -875,7 +886,7 @@ ASTValue *IRCodegenContext::promoteInt(ASTValue *val, ASTType *toType)
 
     if(toType->isInteger())
     {
-        return new ASTValue(toType, ir->CreateIntCast(codegenValue(val), 
+        return new ASTValue(toType, ir->CreateIntCast(codegenValue(val),
                     codegenType(toType), false)); //TODO: signedness
     }
     if(toType->isPointer())
@@ -888,7 +899,7 @@ ASTValue *IRCodegenContext::promoteInt(ASTValue *val, ASTType *toType)
         if(val->type->isSigned())
         return new ASTValue(toType, ir->CreateSIToFP(codegenValue(val),
                     codegenType(toType)), false);
-        return new ASTValue(toType, ir->CreateUIToFP(codegenValue(val), 
+        return new ASTValue(toType, ir->CreateUIToFP(codegenValue(val),
                     codegenType(toType)), false);
     }
 }
@@ -900,7 +911,7 @@ ASTValue *IRCodegenContext::promoteFloat(ASTValue *val, ASTType *toType)
         return new ASTValue(toType, ir->CreateFPCast(codegenValue(val), codegenType(toType)));
     } else if(toType->isInteger())
     {
-        return new ASTValue(toType, ir->CreateFPToUI(codegenValue(val), 
+        return new ASTValue(toType, ir->CreateFPToUI(codegenValue(val),
                     codegenType(toType)));
     }
 }
@@ -909,22 +920,22 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
 {
     if(toType->isPointer())
     {
-        return new ASTValue(toType, 
+        return new ASTValue(toType,
                 ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
     }
 
     if(toType->isInteger())
     {
-        return new ASTValue(toType, ir->CreateIntCast(codegenValue(val), 
+        return new ASTValue(toType, ir->CreateIntCast(codegenValue(val),
                     codegenType(toType), false));
     }
 
     if(toType->isBool())
     {
-        Value *i = ir->CreatePtrToInt(codegenValue(val), 
+        Value *i = ir->CreatePtrToInt(codegenValue(val),
                 codegenType(ASTType::getULongTy()));
 
-        return new ASTValue(ASTType::getBoolTy(), 
+        return new ASTValue(ASTType::getBoolTy(),
                 ir->CreateICmpNE(i,
                     ConstantInt::get(codegenType(ASTType::getULongTy()), 0)
                     ));
@@ -938,9 +949,9 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
         if(((TupleTypeInfo*) val->type->info)->types.size() ==
                 ((StructTypeInfo*) toType->info)->members.size()) //TODO proper test
         {
-            Value *toPtr = ir->CreateBitCast(codegenLValue(val), 
+            Value *toPtr = ir->CreateBitCast(codegenLValue(val),
                     codegenType(toType)->getPointerTo());
-            return new ASTValue(toType, toPtr, true); 
+            return new ASTValue(toType, toPtr, true);
         } else
         {
             emit_message(msg::ERROR, "cannot convert tuple to struct");
@@ -954,17 +965,17 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
             Value *toPtr;
             if(val->isLValue())
             {
-                toPtr = ir->CreateBitCast(codegenLValue(val), 
+                toPtr = ir->CreateBitCast(codegenLValue(val),
                       codegenType(toType)->getPointerTo());
             } else
             {
                 toPtr = ir->CreateAlloca(codegenType(val->type));
                 ir->CreateStore(codegenValue(val), toPtr);
-                toPtr = ir->CreateBitCast(toPtr, 
+                toPtr = ir->CreateBitCast(toPtr,
                       codegenType(toType)->getPointerTo());
             }
 
-            return new ASTValue(toType, toPtr, true); 
+            return new ASTValue(toType, toPtr, true);
         } else
         {
             emit_message(msg::ERROR, "cannot convert tuple to incompatible tuple");
@@ -986,16 +997,24 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
     } else if(toType->type == TYPE_DYNAMIC_ARRAY)
     {
         Value *toPtr;
+        Value *toSize;
+        AllocaInst *arr;
         if(val->isLValue())
         {
             toPtr = ir->CreateBitCast(codegenLValue(val),
-                    codegenType(toType)->getPointerTo());
+                    codegenType(toType->getReferencedTy())->getPointerTo());
+            TupleTypeInfo *tti = (TupleTypeInfo*) val->type->info;
+            toSize = ConstantInt::get(codegenType(ASTType::getULongTy()), tti->length());
+
+            arr = ir->CreateAlloca(codegenType(toType));
+            ir->CreateStore(toPtr, ir->CreateStructGEP(arr, 0));
+            ir->CreateStore(toSize, ir->CreateStructGEP(arr, 1));
         } else
         {
             emit_message(msg::FAILURE, "unimplemented RValue bitcast");
         }
 
-        return new ASTValue(toType, toPtr, true);
+        return new ASTValue(toType, arr, true);
     }
 }
 
@@ -1008,7 +1027,7 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
             ArrayTypeInfo *ati = (ArrayTypeInfo*) val->type->info;
             if(ati->arrayOf != toType->getReferencedTy())
             {
-                emit_message(msg::ERROR, "invalid convesion from array to invalid pointer type"); 
+                emit_message(msg::ERROR, "invalid convesion from array to invalid pointer type");
                 return NULL;
             }
             Value *ptr = codegenLValue(val);
@@ -1017,7 +1036,7 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
         }
     } else if(val->type->type == TYPE_DYNAMIC_ARRAY)
     {
-    
+
     }
 }
 
@@ -1036,7 +1055,7 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
         else if(val->type->isPointer())
         {
             return promotePointer(val, toType);
-        } 
+        }
         else if(val->type->type == TYPE_TUPLE)
         {
             return promoteTuple(val, toType);
@@ -1084,6 +1103,10 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     ASTValue *rhs = codegenExpression(exp->rhs);
     if(!isAssignOp((tok::TokenKind) exp->op)) //XXX messy
         codegenResolveBinaryTypes(&lhs, &rhs, exp->op);
+    else if(lhs->type->type == TYPE_ARRAY)
+    {
+        emit_message(msg::ERROR, "cannot assign to statically defined array", exp->loc);
+    }
 
     llvm::Value *val;
     ASTValue *retValue = NULL;
@@ -1097,7 +1120,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         case tok::equal:
             if(!lhs->isLValue()){
                 emit_message(msg::ERROR, "LHS must be LValue", exp->loc);
-                return NULL; 
+                return NULL;
             }
             retValue = rhs; //TODO: merge with decl assign
             break;
@@ -1134,7 +1157,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         case tok::caretequal:
             val = ir->CreateXor(codegenValue(lhs), codegenValue(rhs));
             retValue = new ASTValue(TYPE, val);
-            break; 
+            break;
 
         case tok::amp:
         case tok::ampequal:
@@ -1290,7 +1313,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     } else if(LabelStatement *lstmt = dynamic_cast<LabelStatement*>(stmt))
     {
         if(!lstmt->identifier->getValue())
-            lstmt->identifier->setValue(new ASTValue(NULL, BasicBlock::Create(context, 
+            lstmt->identifier->setValue(new ASTValue(NULL, BasicBlock::Create(context,
                             lstmt->identifier->getName(), ir->GetInsertBlock()->getParent())));
         llvm::BasicBlock *BB = (llvm::BasicBlock*) lstmt->identifier->getValue()->cgValue;
         ir->CreateBr(BB);
@@ -1299,12 +1322,12 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     } else if(GotoStatement *gstmt = dynamic_cast<GotoStatement*>(stmt))
     {
         if(!gstmt->identifier->getValue())
-            gstmt->identifier->setValue(new ASTValue(NULL, BasicBlock::Create(context, 
+            gstmt->identifier->setValue(new ASTValue(NULL, BasicBlock::Create(context,
                             gstmt->identifier->getName(), ir->GetInsertBlock()->getParent())));
         llvm::BasicBlock *BB = (llvm::BasicBlock*) gstmt->identifier->getValue()->cgValue;
         ir->CreateBr(BB);
-       // post GOTO block 
-        BasicBlock *PG = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()); 
+       // post GOTO block
+        BasicBlock *PG = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent());
         ir->SetInsertPoint(PG);
     } else if(BreakStatement *bstmt = dynamic_cast<BreakStatement*>(stmt))
     {
@@ -1320,7 +1343,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
             emit_message(msg::ERROR, "continue doesnt make sense here!", stmt->loc);
             return;
         }
-        
+
         ir->CreateBr(continueLabel);
         ir->SetInsertPoint(BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()));
     } else emit_message(msg::FAILURE, "i dont know what kind of statmeent this isssss", stmt->loc);
@@ -1336,7 +1359,7 @@ FunctionType *IRCodegenContext::codegenFunctionPrototype(FunctionPrototype *prot
         params.push_back(codegenType(proto->parameters[i].first));
     }
     // XXX return, args, varargs
-    FunctionType *fty = FunctionType::get(codegenType(rty), params, proto->vararg); 
+    FunctionType *fty = FunctionType::get(codegenType(rty), params, proto->vararg);
     return fty;
 }
 
@@ -1359,7 +1382,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             currentFunction.retVal = NULL;
             if(func->getReturnType() != Type::getVoidTy(context))
             {
-                currentFunction.retVal = new ASTValue(fdecl->getReturnType(), 
+                currentFunction.retVal = new ASTValue(fdecl->getReturnType(),
                         new AllocaInst(codegenType(fdecl->getReturnType()),
                             0, "ret", BB), true);
             }
@@ -1375,7 +1398,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             for(Function::arg_iterator AI = func->arg_begin(); AI != func->arg_end(); AI++, idx++)
             {
                 if(fdecl->prototype->parameters.size() < idx){
-                        emit_message(msg::FAILURE, 
+                        emit_message(msg::FAILURE,
                                 "argument counts dont seem to match up...", decl->loc);
                         return;
                 }
@@ -1433,16 +1456,20 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
         if(vdecl->value)
         {
-            defaultValue = codegenExpression(vdecl->value);
-            //promoteType(defaultValue, vty);
-            //ir->CreateStore(codegenValue(defaultValue), llvmDecl);
+            TupleExpression *texp = dynamic_cast<TupleExpression*>(vdecl->value);
+            if(vty && vty->isComposite() && texp)
+            {
+                defaultValue = codegenTupleExpression(texp, vty);
+            } else { // not composite vty
+                defaultValue = codegenExpression(vdecl->value);
+            }
         }
 
         if(vty->type == TYPE_DYNAMIC)
         {
             if(!defaultValue)
             {
-                emit_message(msg::FAILURE, 
+                emit_message(msg::FAILURE,
                         "failure to codegen dynamic 'var' type default expression", vdecl->loc);
             }
 
@@ -1467,14 +1494,14 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
         AllocaInst *llvmDecl = ir->CreateAlloca(codegenType(vty), 0, vdecl->getName());
         llvmDecl->setAlignment(8);
-        ASTValue *idValue = new ASTValue(vty, llvmDecl, true); 
+        ASTValue *idValue = new ASTValue(vty, llvmDecl, true);
 
         if(defaultValue)
         {
             defaultValue = promoteType(defaultValue, vty);
             storeValue(idValue, defaultValue);
 
-            Instruction *vinst = debug->createVariable(vdecl->getName(), 
+            Instruction *vinst = debug->createVariable(vdecl->getName(),
                     idValue, ir->GetInsertBlock(), vdecl->loc);
             vinst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
             //TODO: maybe create a LValue field in CGValue?
@@ -1491,7 +1518,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                 if( nsz && nsz->type == NumericExpression::INT)
                 {
                     // array has a size
-                    Value *llvmSz = ConstantInt::get(codegenType(ASTType::getULongTy()), 
+                    Value *llvmSz = ConstantInt::get(codegenType(ASTType::getULongTy()),
                             nsz->intValue);
                     AllocaInst *staticArray = ir->CreateAlloca(
                             codegenType(adecl->getType()->info->getReferenceTy()), llvmSz);
@@ -1501,7 +1528,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                     ir->CreateStore(llvmSz, ir->CreateStructGEP(llvmDecl, 1));
 
                 } else {
-                    emit_message(msg::FATAL, 
+                    emit_message(msg::FATAL,
                             "array declaration size must be constant integer expression (for now?)",
                             adecl->loc);
                     return;
@@ -1540,7 +1567,7 @@ void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationU
         {
             ASTType *idTy = id->getType();
             //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
-            GlobalValue::LinkageTypes linkage = inc->globals[i]->external ? 
+            GlobalValue::LinkageTypes linkage = inc->globals[i]->external ?
                 GlobalValue::ExternalLinkage : GlobalValue::WeakAnyLinkage;
             GlobalVariable *llvmval = new GlobalVariable(*(Module*)current->cgValue,
                     codegenType(idTy),
@@ -1548,7 +1575,7 @@ void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationU
                     linkage,
                     NULL,
                     id->getName()); //TODO: proper global insertion
-            
+
             ASTValue *gv = new ASTValue(idTy, llvmval, true);
             id->setValue(gv); //TODO: is id declared across modules? should value only be set in local module?
         } else if(id->isFunction())
@@ -1562,8 +1589,8 @@ void IRCodegenContext::codegenIncludeUnit(TranslationUnit *current, TranslationU
     {
         FunctionDeclaration *fdecl = inc->functions[i];
         FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
-        fdecl->cgValue = Function::Create(fty, 
-                Function::ExternalWeakLinkage, 
+        fdecl->cgValue = Function::Create(fty,
+                Function::ExternalWeakLinkage,
                 fdecl->getName(), (Module*)current->cgValue);
     }
 }
@@ -1597,9 +1624,9 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
         {
             ASTType *idTy = id->getType();
             //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
-            GlobalValue::LinkageTypes linkage = unit->globals[i]->external ? 
+            GlobalValue::LinkageTypes linkage = unit->globals[i]->external ?
                 GlobalValue::ExternalLinkage : GlobalValue::WeakAnyLinkage;
-            
+
             //TODO: correct type for global storage (esspecially pointers?)
             ASTValue *idValue = 0;
             if(unit->globals[i]->value)
@@ -1608,7 +1635,7 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
             if(idTy->type == TYPE_DYNAMIC)
             {
                 if(!idValue)
-                    emit_message(msg::FAILURE, 
+                    emit_message(msg::FAILURE,
                             "attempt to codegen dynamically typed \
                             variable without properly assigned value", unit->globals[i]->loc);
                 idTy = idValue->getType();
@@ -1626,7 +1653,7 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
                             );
             } else
             {
-            
+
                 gValue = (llvm::Constant*) llvm::Constant::getNullValue(codegenType(idTy));
             }
 
@@ -1664,7 +1691,7 @@ void IRCodegenContext::codegenTranslationUnit(TranslationUnit *u)
         codegenDeclaration(unit->functions[i]);
 
     popScope();
-    
+
     //fprintf(stderr, "~~~~~~");
     //((llvm::Module*) u->cgValue)->dump();
     //fprintf(stderr, "~~~~~~");
@@ -1705,7 +1732,7 @@ void IRCodegenContext::codegenAST(AST *ast, WLConfig config)
     {
         emit_message(msg::OUTPUT, "failed to compile source code");
         //return;
-    } else 
+    } else
     {
         emit_message(msg::OUTPUT, "successfully compiled source");
     }

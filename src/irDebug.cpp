@@ -50,15 +50,15 @@ llvm::DICompositeType IRDebug::createDynamicArrayType(ASTType *ty)
     DIArray arr = di.getOrCreateArray(vec);
 
     return di.createStructType(DIContext, //TODO: defined scope
-            ty->getName(), 
-            currentFile(), //TODO: defined file 
+            ty->getName(),
+            currentFile(), //TODO: defined file
             0, //line num //TODO line num
             128,
             64,
             0, // flags
             llvm::DIType(),
             arr
-            ); 
+            );
 }
 
 llvm::DICompositeType IRDebug::createArrayType(ASTType *ty)
@@ -66,7 +66,7 @@ llvm::DICompositeType IRDebug::createArrayType(ASTType *ty)
     llvm::DIDescriptor DIContext(currentFile());
     ArrayTypeInfo *ati = (ArrayTypeInfo*) ty->info;
     assert(!ati->isDynamic());
-    return di.createArrayType(ati->size, ati->arrayOf->align(), 
+    return di.createArrayType(ati->size, ati->arrayOf->align(),
             createType(ati->arrayOf),
             DIArray());
 }
@@ -95,24 +95,24 @@ llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
                     size * 8,
                     align * 8,
                     offset * 8,
-                    0, 
+                    0,
                     createType(tti->types[i])));
         offset += tti->types[i]->size();
-        //TODO: members 
+        //TODO: members
     }
 
     DIArray arr = di.getOrCreateArray(vec);
 
     return di.createStructType(DIContext, //TODO: defined scope
-            ty->getName(), 
-            currentFile(), //TODO: defined file 
+            ty->getName(),
+            currentFile(), //TODO: defined file
             0, //line num //TODO line num
             ty->size() * 8,
             ty->align() * 8,
             0, // flags
             llvm::DIType(),
             arr
-            ); 
+            );
 }
 
 llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
@@ -138,24 +138,24 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
                     size * 8,
                     align * 8,
                     offset * 8,
-                    0, 
+                    0,
                     createType(vdecl->getType())));
         offset += vdecl->getType()->size();
-        //TODO: members 
+        //TODO: members
     }
 
     DIArray arr = di.getOrCreateArray(vec);
 
     return di.createStructType(DIContext, //TODO: defined scope
-            ty->getName(), 
-            currentFile(), //TODO: defined file 
+            ty->getName(),
+            currentFile(), //TODO: defined file
             sti->getDeclaration()->loc.line, //line num
             ty->size() * 8,
             ty->align() * 8,
             0, // flags
             llvm::DIType(),
             arr
-            ); 
+            );
 }
 
 llvm::DIType IRDebug::createType(ASTType *ty)
@@ -243,12 +243,12 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
     {
     llvm::DIDescriptor DIContext(currentFile());
     f->diSubprogram = di.createFunction(
-            DIContext, //f->getScope()->getDebug(), 
+            DIContext, //f->getScope()->getDebug(),
             f->getName(),
             f->getName(),
-            currentFile(), 
+            currentFile(),
             f->loc.line, //TODO
-            createPrototype(f->prototype), 
+            createPrototype(f->prototype),
             false, //is local
             f->body, //is definition
             f->loc.line,
@@ -265,8 +265,8 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
 
 llvm::DIGlobalVariable IRDebug::createGlobal(VariableDeclaration *decl, ASTValue *val)
 {
-    return di.createGlobalVariable(decl->identifier->getName(), 
-            currentFile(), 
+    return di.createGlobalVariable(decl->identifier->getName(),
+            currentFile(),
             decl->loc.line,
             createType(decl->getType()),
             false, //TODO: local to unit?

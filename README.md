@@ -211,6 +211,14 @@ reference counting on classes created within this module
 ### "use gc"
 garbage collection on classes created within this module
 
+### "use threadlocal"
+variables in scope will be threadlocal by default. maybe have a keyword 'threadshared' 
+(maybe 'tshared' or 'shared') to allow a variable to then default to share between threads
+
+### "use zero"
+zero out all variables on allocation
+
+
 ### embedded code
 allow for embedding different languages with an 'embed' keyword. for example:
 

@@ -108,6 +108,8 @@ int main(int argc, char^^ argv)
     int[5] my5Array = [1,2,3,4,5]
     int[] darr = [1,2,3,4]
 
+    printf("sizeof array's: %d %d\n", int[5].sizeof, int[].sizeof);
+
     printf("myArray: elem: sz: %d, %d %d %d %d %d\n",
     darr.size,
     darr[0],
@@ -116,6 +118,7 @@ int main(int argc, char^^ argv)
     darr[3],
     darr[4],
     );
+
 
     int^ mymalloc = new int
     delete mymalloc

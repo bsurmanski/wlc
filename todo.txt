@@ -22,3 +22,7 @@ float coersion is off. an expression like (rand() / float: RAND_MAX)
     does not parse right (should be random 0.0-1.0, instead is 0.0)
 right shift operator
 ## float point, integer promotion in vararg functions
+
+make a 'type' expression?
+TypeInfo->getSize(), ASTType->size(). change one or other to make sense
+static arrays might now actually allocate on the stack properly

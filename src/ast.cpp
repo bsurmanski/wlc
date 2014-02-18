@@ -81,6 +81,13 @@ ASTType *ASTType::getArrayTy(int sz)
     return aty;
 }
 
+size_t ArrayTypeInfo::getSize() {
+    if(isDynamic())
+        return ASTType::getCharTy()->getPointerTy()->size() + ASTType::getULongTy()->size();
+    else
+        return size * arrayOf->size();
+}
+
 // declare all of the static ASTType instances, and their getter methods
 #define DECLTY(TY,NM) ASTType *ASTType::NM = 0; ASTType *ASTType::get##NM() { if(!NM) NM = new ASTType(TY); return NM; }
     DECLTY(TYPE_VOID, VoidTy)

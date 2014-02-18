@@ -981,6 +981,12 @@ Expression *ParseContext::parsePrimaryExpression()
     if(peek().is(tok::identifier))
     {
         return parseIdentifierExpression();
+        //TODO: in statement like "MyStruct[].sizeof", this will fail
+    }
+
+    if(peek().isKeywordType())
+    {
+        return new TypeExpression(parseType(0),loc);
     }
 }
 
@@ -1003,7 +1009,7 @@ Expression *ParseContext::parseBinaryExpression(int prec)
         }
         lhs = new BinaryExpression(op, lhs, rhs, lhsLoc);
     }
-    //assert(lhs && "somethings up");
+
     if(!lhs) {
         emit_message(msg::FAILURE, "LHS of binary expression may not be valid expression", lhsLoc);
         return NULL;

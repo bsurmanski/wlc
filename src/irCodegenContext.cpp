@@ -773,9 +773,29 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         }
     } else if(DotExpression *dexp = dynamic_cast<DotExpression*>(exp))
     {
-            ASTValue *lhs = codegenExpression(dexp->lhs);
 
-            if(!lhs->cgValue) // LHS is type
+            ASTValue *lhs; // = codegenExpression(dexp->lhs);
+            if(TypeExpression *tyexp = dexp->lhs->typeExpression())
+            {
+                if(dexp->rhs == "sizeof")
+                {
+                    return new ASTValue(ASTType::getULongTy(),
+                            ConstantInt::get(Type::getInt64Ty(context),
+                                tyexp->type->size()));
+                } else if(dexp->rhs == "offsetof")
+                {
+                    emit_message(msg::UNIMPLEMENTED,
+                            "offsetof attribute not yet implemented", dexp->loc);
+                }
+                emit_message(msg::ERROR, "unknown attribute '" + dexp->rhs + "' of struct '" +
+                        tyexp->type->getName() + "'", dexp->loc);
+                return NULL;
+            }
+
+            lhs = codegenExpression(dexp->lhs);
+
+            //TODO: duplicate of above. resolve 'MyStruct.sizeof' lhs to TypeExpression
+            if(!lhs->cgValue)
             {
                 if(dexp->rhs == "sizeof")
                 {
@@ -868,6 +888,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                             ConstantInt::get(Type::getInt64Ty(context), ati->size));
                 }
             }
+        emit_message(msg::ERROR, "unknown dot expression", exp->loc);
         return NULL;
     }
 

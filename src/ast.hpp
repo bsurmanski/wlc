@@ -185,6 +185,7 @@ struct ArrayTypeInfo : public CompositeTypeInfo
     unsigned size;
     virtual ASTType *getReferenceTy() { return arrayOf; }
     virtual ASTType *getContainedType(unsigned i) { return arrayOf; }
+    virtual size_t getSize();
     virtual unsigned length() { return size; }
     ArrayTypeInfo(ASTType *pto, int sz = 0) : arrayOf(pto), size(sz) {}
     bool isDynamic() { return size == 0; }
@@ -275,6 +276,8 @@ struct ASTType
             case TYPE_ULONG:
             case TYPE_LONG: return 8;
             case TYPE_TUPLE:
+            case TYPE_ARRAY:
+            case TYPE_DYNAMIC_ARRAY:
             case TYPE_STRUCT: return info->getSize();
             case TYPE_POINTER: return 8;
             case TYPE_FLOAT: return 4;
@@ -484,6 +487,7 @@ struct SwitchExpression;
 struct ImportExpression;
 struct PackageExpression;
 struct CastExpression;
+struct TypeExpression;
 
 struct Expression
 {
@@ -534,7 +538,16 @@ struct Expression
     virtual PackageExpression *packageExpression() { return NULL; }
     virtual CastExpression *castExpression() { return NULL; }
 
+    virtual TypeExpression *typeExpression() { return NULL; }
+
     //TODO: overrides
+};
+
+struct TypeExpression : public Expression
+{
+    ASTType *type;
+    TypeExpression(ASTType *t, SourceLocation l = SourceLocation()) : Expression(l), type(t) {}
+    virtual TypeExpression *typeExpression() { return this; }
 };
 
 struct NewExpression : public Expression

@@ -24,5 +24,8 @@ right shift operator
 ## float point, integer promotion in vararg functions
 
 make a 'type' expression?
+make an 'operator' expression so that operators can have properties?
 TypeInfo->getSize(), ASTType->size(). change one or other to make sense
+TypeInfo->getReferenceTy(), ASTType->getReferencedTy(). change on or other to make sense
 static arrays might now actually allocate on the stack properly
+make a 'create dynamic array' function, for use in casting and 'new' expressions

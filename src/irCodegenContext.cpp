@@ -449,21 +449,48 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         return NULL;
     }
 
+    ASTType *ty = exp->type;
     vector<Value*> llargs;
     llargs.push_back(ConstantInt::get(codegenType(ASTType::getULongTy()), exp->type->size()));
     Function *mallocFunc = module->getFunction("malloc");
-    Value *value = ir->CreateCall(mallocFunc, llargs);
-    value = ir->CreateBitCast(value, codegenType(exp->type)->getPointerTo());
-    return new ASTValue(exp->type, value);
+    Value *value;
+    value = ir->CreateCall(mallocFunc, llargs);
+    if(exp->type->isArray())
+    {
+        ASTType *arrty = exp->type->getReferencedTy();
+        ty = arrty->getArrayTy();
+        Value *ptr = ir->CreateBitCast(value,
+                codegenType(arrty)->getPointerTo());
+        Value *sz = ConstantInt::get(codegenType(ASTType::getULongTy()), exp->type->length());
+        value = ir->CreateAlloca(codegenType(ty));
+        ir->CreateStore(ptr, ir->CreateStructGEP(value, 0));
+        ir->CreateStore(sz, ir->CreateStructGEP(value, 1));
+        value = ir->CreateLoad(value);
+        //TODO: create a 'create array' function
+    } else
+        value = ir->CreateBitCast(value, codegenType(exp->type)->getPointerTo());
+    return new ASTValue(ty, value);
 }
 
 ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
 {
     vector<Value*> llargs;
     ASTValue *val = codegenExpression(exp->expression);
+
+    if(val->type->isArray() && val->type->type == TYPE_DYNAMIC_ARRAY)
+    {
+        //TODO: duplicate of ".ptr". make a function for this
+        std::vector<Value*> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+        val = new ASTValue(val->type->getReferencedTy(), llval, true);
+    }
+
     val = promoteType(val, ASTType::getCharTy()->getPointerTy());
     llargs.push_back(codegenValue(val));
     Function *freeFunc = module->getFunction("free");
+
     Value *value = ir->CreateCall(freeFunc, llargs);
     //TODO: call deallocator function
     //return new ASTValue(exp->type, value);
@@ -1059,6 +1086,8 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
     {
 
     }
+
+    return val; //TODO
 }
 
 

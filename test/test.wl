@@ -119,7 +119,8 @@ int main(int argc, char^^ argv)
     darr[4],
     );
 
-
+    int[] newarr = new int[5]
+    delete newarr
     int^ mymalloc = new int
     delete mymalloc
 

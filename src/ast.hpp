@@ -155,6 +155,7 @@ struct TypeInfo
     virtual std::string getName() { return ""; }
     virtual size_t getSize() { return 0; }
     virtual size_t getAlign() { return 0; }
+    virtual size_t length() { return 1; }
 };
 
 
@@ -168,7 +169,6 @@ struct StructDeclaration;
 struct CompositeTypeInfo : TypeInfo
 {
     virtual ASTType *getContainedType(unsigned index) = 0;
-    virtual unsigned length() = 0;
 };
 
 struct PointerTypeInfo : public TypeInfo
@@ -186,7 +186,7 @@ struct ArrayTypeInfo : public CompositeTypeInfo
     virtual ASTType *getReferenceTy() { return arrayOf; }
     virtual ASTType *getContainedType(unsigned i) { return arrayOf; }
     virtual size_t getSize();
-    virtual unsigned length() { return size; }
+    virtual size_t length() { return size; }
     ArrayTypeInfo(ASTType *pto, int sz = 0) : arrayOf(pto), size(sz) {}
     bool isDynamic() { return size == 0; }
     std::string getName();
@@ -202,7 +202,7 @@ struct StructTypeInfo : public CompositeTypeInfo
         identifier(id), scope(sc), members(m), packed(false){}
     std::string getName() { return identifier->getName(); }
     virtual ASTType *getContainedType(unsigned i);
-    virtual unsigned length() { return members.size(); }
+    virtual size_t length() { return members.size(); }
     virtual size_t getSize();
     virtual size_t getAlign();
     StructDeclaration *getDeclaration() { return (StructDeclaration*) identifier->getDeclaration(); }
@@ -226,7 +226,7 @@ struct TupleTypeInfo : public CompositeTypeInfo
 {
     std::vector<ASTType*> types;
     virtual ASTType *getContainedType(unsigned i) { return types[i]; }
-    virtual unsigned length() { return types.size(); }
+    virtual size_t length() { return types.size(); }
     //virtual size_t getSize();
     //virtual size_t getAlign();
     TupleTypeInfo(std::vector<ASTType*> t) : types(t) {}
@@ -285,6 +285,17 @@ struct ASTType
             default: assert(false && "havent sized this type yet"); return 0; //TODO
         }
     };
+
+    size_t length() const
+    {
+        switch(type)
+        {
+            case TYPE_ARRAY:
+            case TYPE_DYNAMIC_ARRAY:
+                return info->length();
+            default: return 1;
+        }
+    }
 
     size_t align() const
     {

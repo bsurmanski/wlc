@@ -22,10 +22,10 @@ class IRDebug
         llvm::DIFile diFile;
         llvm::DICompileUnit diUnit;
 
-        IRDebug(IRCodegenContext *c, TranslationUnit *u) : context(c), unit(u), 
-             di(*(llvm::Module*)unit->cgValue) 
+        IRDebug(IRCodegenContext *c, TranslationUnit *u) : context(c), unit(u),
+             di(*(llvm::Module*)unit->cgValue)
         {
-            diUnit = di.createCompileUnit(0, u->filenm, PROJDIR, CGSTR, false, "", 0); 
+            diUnit = di.createCompileUnit(0, u->filenm, PROJDIR, CGSTR, false, "", 0);
             diFile = di.createFile(u->filenm, PROJDIR);
         }
 
@@ -46,7 +46,7 @@ class IRDebug
         llvm::DICompositeType createPrototype(FunctionPrototype *p);
         llvm::DISubprogram createFunction(FunctionDeclaration *f);
         llvm::DIGlobalVariable createGlobal(VariableDeclaration *decl, ASTValue *val);
-        llvm::Instruction *createVariable(std::string nm, ASTValue *v, 
+        llvm::Instruction *createVariable(std::string nm, ASTValue *v,
                 llvm::BasicBlock *bb, SourceLocation loc, int argn = 0);
 };
 

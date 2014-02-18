@@ -71,12 +71,12 @@ WLConfig parseCmd(int argc, char **argv)
             case '?':
                 if(optopt == 'l' || optopt == 'L' || optopt == 'I')
                 {
-                    emit_message(msg::FATAL, string("missing argument to '-") + 
+                    emit_message(msg::FATAL, string("missing argument to '-") +
                             string((char*) &optopt, 1) + string("'"));
                     break;
                 }
             default:
-                emit_message(msg::FATAL, string("unrecognized command line option '-") + 
+                emit_message(msg::FATAL, string("unrecognized command line option '-") +
                         string(optarg) + string("'"));
                 break;
         }

@@ -44,7 +44,7 @@ void ParseContext::recover()
 {
     int endpop = recoveryState.back();
     recoveryState.pop_back();
-    while(rqueue.size() > endpop) 
+    while(rqueue.size() > endpop)
     {
         tqueue.push_front(rqueue.back());
         rqueue.pop_back();
@@ -106,7 +106,7 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
         case tok::kw_void:
             type = ASTType::getVoidTy(); break;
         case tok::lbracket:
-            type = new ASTType(); 
+            type = new ASTType();
             // lbracket already got
             while(peek().isNot(tok::rbracket))
             {
@@ -114,7 +114,7 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
                 if(peek().is(tok::comma)) ignore();
             }
             ignore(); // eat ]
-            
+
             tupleInfo = new TupleTypeInfo(tupleTypes);
             type->setTypeInfo(tupleInfo, TYPE_TUPLE);
             break;
@@ -123,7 +123,7 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
        }
     } else {
         //TODO: should be get so structs dont need fwd decl?
-        Identifier *id = getScope()->get(t.toString()); 
+        Identifier *id = getScope()->get(t.toString());
         if(!id) {
             emit_message(msg::ERROR, "unknown type or variable", t.loc);
             return NULL;
@@ -165,7 +165,7 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
             }
 
             if(peek().isNot(tok::rbracket)) {
-                emit_message(msg::ERROR, "expected ']'", peek().loc); 
+                emit_message(msg::ERROR, "expected ']'", peek().loc);
                 dropLine();
                 return NULL;
             }
@@ -243,7 +243,7 @@ void ParseContext::parseInclude()
         emit_message(msg::UNIMPLEMENTED, "include not yet impl");
         lexer = currentLexer;
         delete incLexer;
-    } else 
+    } else
     {
         emit_message(msg::ERROR, "unknown include directive");
     }
@@ -254,7 +254,7 @@ ImportExpression *ParseContext::parseImport()
     SourceLocation loc = peek().loc;
 
     ignore(); // ignore import
-    
+
     bool special = false;
     std::string parserType;
     if(peek().is(tok::lparen)) // special import
@@ -278,7 +278,7 @@ ImportExpression *ParseContext::parseImport()
     TranslationUnit *importedUnit = NULL;
     //XXX deffer importing to end of TU parse? Would allow 'package' expression and subsequent imports to work as expected, I imagine
     if(StringExpression *sexp = dynamic_cast<StringExpression*>(importExpression))
-    { 
+    {
         importedUnit = parser->getAST()->getUnit(sexp->string);
         if(!importedUnit) // This TU hasnt been loaded from file yet, DOIT
         {
@@ -329,7 +329,7 @@ Statement *ParseContext::parseStatement()
     switch(peek().kind)
     {
         case tok::identifier:
-            id = getScope()->lookup(peek().toString()); 
+            id = getScope()->lookup(peek().toString());
             if(!id || id->isUndeclared())
             {
         case tok::lbracket:
@@ -397,7 +397,7 @@ PARSEEXP:
             ignore();
             if(peek().isNot(tok::identifier))
             {
-                emit_message(msg::ERROR, 
+                emit_message(msg::ERROR,
                     "expected identifier following label", loc);
                 dropLine();
                 return NULL;
@@ -418,7 +418,7 @@ PARSEEXP:
         case tok::kw_continue:
             ignore();
             return new ContinueStatement(loc);
-            
+
         case tok::kw_break:
             ignore();
             return new BreakStatement(loc);
@@ -443,16 +443,16 @@ Declaration *ParseContext::parseDeclaration()
 
         Token t_id = get(); // eat ID
         if(t_id.isNot(tok::identifier)){
-            emit_message(msg::ERROR, 
+            emit_message(msg::ERROR,
                 "expected struct name following 'struct' keyword", t_id.loc);
             dropLine();
             return NULL;
         }
 
-        if(getScope()->contains(t_id.toString()) && 
+        if(getScope()->contains(t_id.toString()) &&
                 !(getScope()->lookup(t_id.toString()))->isUndeclared()){
-            emit_message(msg::ERROR, 
-                std::string("redeclaration of struct ") + 
+            emit_message(msg::ERROR,
+                std::string("redeclaration of struct ") +
                 string("'") + t_id.toString() + string("'"), t_id.loc);
             dropLine();
             return NULL;
@@ -471,7 +471,7 @@ Declaration *ParseContext::parseDeclaration()
         if(peek().is(tok::lbrace))
         {
             ignore(); // eat lbrace
-            tbl = new SymbolTable(getScope()); 
+            tbl = new SymbolTable(getScope());
             pushScope(tbl);
             while(peek().isNot(tok::rbrace))
             {
@@ -496,14 +496,14 @@ Declaration *ParseContext::parseDeclaration()
 
     Token t_id = get();
     if(t_id.isNot(tok::identifier)){
-        emit_message(msg::ERROR, 
+        emit_message(msg::ERROR,
             "expected identifier following type (declaration)", t_id.loc);
         dropLine();
         return NULL;
     }
     if(getScope()->contains(t_id.toString())){
-        emit_message(msg::ERROR, 
-            string("redeclaration of variable ") + string("'") + t_id.toString() + string("'"), 
+        emit_message(msg::ERROR,
+            string("redeclaration of variable ") + string("'") + t_id.toString() + string("'"),
             t_id.loc);
         dropLine();
         return NULL;
@@ -526,7 +526,7 @@ Declaration *ParseContext::parseDeclaration()
                 vararg = true;
                 ignore();
                 if(peek().isNot(tok::rparen)){
-                    emit_message(msg::ERROR, 
+                    emit_message(msg::ERROR,
                         "expected ) following vararg declaration ('...') ", peek().loc);
                     dropLine();
                     return NULL;
@@ -545,7 +545,7 @@ Declaration *ParseContext::parseDeclaration()
             } else
             {
                 if(peek().isNot(tok::rparen)){
-                    emit_message(msg::ERROR, 
+                    emit_message(msg::ERROR,
                         "expected ',' or ')' in function declaration", peek().loc);
                     dropLine();
                     return NULL;
@@ -599,7 +599,7 @@ Expression *ParseContext::parseIfExpression()
     ignore(); // ignore if
 
     if(peek().isNot(tok::lparen)){
-        emit_message(msg::ERROR, 
+        emit_message(msg::ERROR,
             "expected '(' following 'if' keyword", peek().loc);
         dropLine();
         return NULL;
@@ -607,7 +607,7 @@ Expression *ParseContext::parseIfExpression()
     ignore();
     cond = parseExpression();
     if(peek().isNot(tok::rparen)){
-        emit_message(msg::ERROR, "expected ')' following 'if' condition", 
+        emit_message(msg::ERROR, "expected ')' following 'if' condition",
             peek().loc);
         dropLine();
         return NULL;
@@ -637,7 +637,7 @@ Expression *ParseContext::parseWhileExpression()
             "expected '(' following 'while' keyword", peek().loc);
     ignore(); // eat '('
     cond = parseExpression();
-    assert_message(peek().is(tok::rparen), msg::ERROR, 
+    assert_message(peek().is(tok::rparen), msg::ERROR,
             "expected ')' following 'while' condition", peek().loc);
     ignore(); // eat ')'
 
@@ -668,7 +668,7 @@ Expression *ParseContext::parseForExpression()
     ignore(); // ignore for
 
     if(!peek().is(tok::lparen)) {
-    emit_message(msg::ERROR, 
+    emit_message(msg::ERROR,
             "expected '(' following 'for' keyword", peek().loc);
         return NULL;
     }
@@ -715,7 +715,7 @@ Expression *ParseContext::parseSwitchExpression()
     ignore(); // eat 'switch'
 
     if(peek().isNot(tok::lparen)){
-        emit_message(msg::FAILURE, 
+        emit_message(msg::FAILURE,
             "expected '(' following 'switch' keyword", peek().loc);
         return NULL;
     }
@@ -724,7 +724,7 @@ Expression *ParseContext::parseSwitchExpression()
     Expression *exp = parseExpression();
 
     if(peek().isNot(tok::rparen)){
-        emit_message(msg::FAILURE, 
+        emit_message(msg::FAILURE,
             "expected ')' following 'switch' condition", peek().loc);
         return NULL;
     }
@@ -807,13 +807,13 @@ Expression *ParseContext::parseTupleExpression()
         dropLine();
         return NULL;
     }
-    
+
     ignore();
 
     std::vector<Expression*> members;
     while(peek().isNot(tok::rbracket))
     {
-        members.push_back(parseExpression()); 
+        members.push_back(parseExpression());
 
         if(peek().isNot(tok::comma) && peek().isNot(tok::rbracket))
         {
@@ -844,7 +844,7 @@ Expression *ParseContext::parsePostfixExpression(int prec)
             {
                 args.push_back(parseExpression(getBinaryPrecidence(tok::comma)));
                 if(!peek().is(tok::comma) && !peek().is(tok::rparen)) {
-                    emit_message(msg::ERROR, 
+                    emit_message(msg::ERROR,
                             "expected ',' or ')' following call parameter", peek().loc);
                     return NULL;
                 }
@@ -856,7 +856,7 @@ Expression *ParseContext::parsePostfixExpression(int prec)
         {
             ignore();
             Expression *index = parseExpression();
-            if(!peek().is(tok::rbracket)) { 
+            if(!peek().is(tok::rbracket)) {
                 emit_message(msg::ERROR, "expected ']' following index expression", peek().loc);
                 return NULL;
             }
@@ -875,9 +875,9 @@ Expression *ParseContext::parsePostfixExpression(int prec)
         {
             ignore(); // ignore --
             exp = new PostfixOpExpression(exp, tok::minusminus, loc);
-        } else 
-            emit_message(msg::FAILURE, 
-                    "this doesn't look like a postfix expresion to me!", 
+        } else
+            emit_message(msg::FAILURE,
+                    "this doesn't look like a postfix expresion to me!",
                     peek().loc);
     }
 
@@ -904,7 +904,7 @@ Expression *ParseContext::parseIdentifierExpression()
     SourceLocation loc = peek().loc;
     if(peek().isNot(tok::identifier))
     {
-        emit_message(msg::ERROR, "expected identifier expression", loc); 
+        emit_message(msg::ERROR, "expected identifier expression", loc);
         return NULL;
     }
 
@@ -922,7 +922,7 @@ Expression *ParseContext::parsePrimaryExpression()
 
     if(peek().is(tok::intNum))
     {
-        return new NumericExpression(NumericExpression::INT, ASTType::getIntTy(), 
+        return new NumericExpression(NumericExpression::INT, ASTType::getIntTy(),
                 get().intData(), loc);
     }
 
@@ -935,19 +935,19 @@ Expression *ParseContext::parsePrimaryExpression()
     if(peek().is(tok::kw_true))
     {
         ignore();
-        return new NumericExpression(NumericExpression::INT, ASTType::getBoolTy(), 
+        return new NumericExpression(NumericExpression::INT, ASTType::getBoolTy(),
                 (uint64_t) 1L, loc); //TODO: bool type
     }
     if(peek().is(tok::kw_false))
     {
         ignore();
-        return new NumericExpression(NumericExpression::INT, ASTType::getBoolTy(), 
+        return new NumericExpression(NumericExpression::INT, ASTType::getBoolTy(),
                 (uint64_t) 0L, loc); //TODO: bool
     }
     if(peek().is(tok::kw_null))
     {
         ignore();
-        return new NumericExpression(NumericExpression::INT, ASTType::getVoidTy()->getPointerTy(), 
+        return new NumericExpression(NumericExpression::INT, ASTType::getVoidTy()->getPointerTy(),
                 (uint64_t) 0L, loc); //TODO: void^
     }
 
@@ -1031,7 +1031,7 @@ void ParseContext::parseTranslationUnit(TranslationUnit *unit, const char *unitn
 void Parser::parseFile(TranslationUnit *unit, std::string filenm, SourceLocation l)
 {
     ifstream stream(filenm.c_str());
-    
+
     if(stream.fail())
     {
         emit_message(msg::ERROR, "unknown file '" + filenm + "'", l);
@@ -1065,7 +1065,7 @@ ASTType *ASTStructTypeFromCType(TranslationUnit *unit, CXType ctype)
     }
 
     Identifier *id = unit->getScope()->lookup(name);
-    
+
     if(!id)
     {
         id = unit->getScope()->get(name);
@@ -1084,7 +1084,7 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
     ASTType *ty = 0;
     switch(ctype.kind)
     {
-        case CXType_Void: 
+        case CXType_Void:
         case CXType_Unexposed: //TODO: create a specific type for unexposed?
             return ASTType::getVoidTy();
         case CXType_Bool: return ASTType::getBoolTy();
@@ -1096,11 +1096,11 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
         case CXType_Short: return ASTType::getShortTy();
         case CXType_UInt: return ASTType::getUIntTy();
         case CXType_Int: return ASTType::getIntTy();
-        case CXType_Long: 
-        case CXType_LongLong: 
+        case CXType_Long:
+        case CXType_LongLong:
             return ASTType::getLongTy();
-        case CXType_ULong: 
-        case CXType_ULongLong: 
+        case CXType_ULong:
+        case CXType_ULongLong:
             return ASTType::getULongTy();
         case CXType_Float:
             return ASTType::getFloatTy();
@@ -1115,7 +1115,7 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
         case CXType_Typedef:
             return ASTTypeFromCType(unit, clang_getCanonicalType(ctype));
         default:
-            emit_message(msg::WARNING, "failed conversion of CType to WLType: " + 
+            emit_message(msg::WARNING, "failed conversion of CType to WLType: " +
                     string(clang_getCString(clang_getTypeSpelling(ctype))));
             return NULL;
     }
@@ -1132,14 +1132,14 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
     const char *filenm = clang_getCString(clang_getFileName(file));
     SourceLocation loc = SourceLocation(filenm, line, column);
 
-    if(cursor.kind == CXCursor_FunctionDecl) 
+    if(cursor.kind == CXCursor_FunctionDecl)
     {
         CXType fType = clang_getCursorType(cursor);
         int nargs = clang_getNumArgTypes(fType);
         vector<pair<ASTType*, std::string> > argType;
         for(int i = 0; i < nargs; i++)
         {
-            ASTType *astArgTy = 
+            ASTType *astArgTy =
                     ASTTypeFromCType(unit, clang_getArgType(fType, i));
             if(!astArgTy) goto ERR;
 
@@ -1173,20 +1173,20 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 
         Identifier *id = unit->getScope()->get(name);
         CXLinkageKind linkage = clang_getCursorLinkage(cursor);
-        VariableDeclaration *vdecl = new VariableDeclaration(wlType, id, 0, loc, 
+        VariableDeclaration *vdecl = new VariableDeclaration(wlType, id, 0, loc,
                 linkage == CXLinkage_External || linkage == CXLinkage_UniqueExternal);
 
     }
 
     return CXChildVisit_Continue;
 ERR:
-    emit_message(msg::WARNING, "failed to convert symbol to WL typing: " + 
+    emit_message(msg::WARNING, "failed to convert symbol to WL typing: " +
             string(clang_getCString(clang_getCursorSpelling(cursor))));
     return CXChildVisit_Continue;
 }
 
-void ParseContext::parseCImport(TranslationUnit *unit, 
-        std::string filenm, 
+void ParseContext::parseCImport(TranslationUnit *unit,
+        std::string filenm,
         SourceLocation loc)
 {
     // redirect stderr
@@ -1206,7 +1206,7 @@ void ParseContext::parseCImport(TranslationUnit *unit,
             filenm.c_str(),
             3,
             commandArgs,
-            0, 
+            0,
             0);
 
     emit_message(msg::OUTPUT, "finished clang unit-create. begin visit");

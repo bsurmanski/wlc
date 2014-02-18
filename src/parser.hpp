@@ -31,7 +31,7 @@ class Parser
 
 /**
  * parsing is pretty strange in WLC. The strangest parts revolve around identifiers.
- * identifiers are user defined names, used as variable names, function names, and 
+ * identifiers are user defined names, used as variable names, function names, and
  * struct names. In WL, global variables need not be defined before use. So, for example
  * a function can be declared below it's usage. This has some strange side effects for parsing.
  * When encountering an identifier, we often don't know whether it is a variable, function,
@@ -49,7 +49,7 @@ class ParseContext
     //std::stack<Lexer*> lexers;
 
     public:
-    ParseContext(Lexer *lex, Parser *parse, Package *p) : lexer(lex), parser(parse), 
+    ParseContext(Lexer *lex, Parser *parse, Package *p) : lexer(lex), parser(parse),
         package(p) {}
     ~ParseContext() { }
 
@@ -60,17 +60,17 @@ class ParseContext
 
     void ignoreComments() { while(lexer->peek().kind == tok::comment) lexer->ignore(); }
     //void push() { tqueue.push(getBuffer()); }
-    Token get() { 
-        Token t; 
-        if(!tqueue.empty()){ 
-            t = tqueue.front(); 
+    Token get() {
+        Token t;
+        if(!tqueue.empty()){
+            t = tqueue.front();
             tqueue.pop_front();
-        } else { 
+        } else {
             ignoreComments();
             t = lexer->get();
-        } 
+        }
         if(recoveryState.size()) rqueue.push_back(t);
-        return t; 
+        return t;
     }
 
     Token linePeek() { Token t = peek(); if(!t.followsNewline()) return t; return Token(tok::semicolon); }
@@ -85,13 +85,13 @@ class ParseContext
         bool binOp = false;
         //while(!peek().followsNewline() && !binOp) {
         //    binOp = peek().isBinaryOp();
-        //    ignore(); 
+        //    ignore();
         //}
     }
 
     Token lookAhead(int i = 0) { // lookAhead(0) is equivilent to peek()
         while(tqueue.size() < i+1) {
-            ignoreComments(); 
+            ignoreComments();
             tqueue.push_back(lexer->get());
         }
         return tqueue.at(i);

@@ -30,7 +30,7 @@ ASTType *Identifier::declaredType()
         return NULL;
     }
     if(!astType)
-    { 
+    {
         astType = new ASTType();
         astType->info = new NamedUnknownInfo(this, NULL);
     }

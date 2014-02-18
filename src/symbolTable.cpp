@@ -58,7 +58,7 @@ Identifier *SymbolTable::lookup(std::string str, bool imports)
             if(id && !id->isUndeclared()) ret = id;
         }
         ret = symbols[str];
-    } 
+    }
 
     if((!ret || ret->isUndeclared()) && parent)
     {

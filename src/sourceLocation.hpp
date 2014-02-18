@@ -20,10 +20,10 @@ struct SourceSlice
     SourceSlice(SourceLocation lo, int len) : loc(lo), length(len) {}
 
     SourceLocation getBegin() { return loc; }
-    SourceLocation getEnd() { 
+    SourceLocation getEnd() {
         SourceLocation end = loc;
         end.ch += length; //TODO: what if crosses lines?
-        return end; 
+        return end;
     }
 };
 

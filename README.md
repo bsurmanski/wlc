@@ -9,23 +9,36 @@ be no garbage collector, no virtual machine, etc.
 
 ## Features
 
+* statically typed
+* can interface with C (experimental import(C) expression)
+* tuples (unnamed structs)
+* multiple return values (using tuples)
+* inferred types in declarations using the 'var' keyword
+* sized array types
+* dynamic memory allocation using 'new'/'delete'/'renew' or 'malloc'/'free'
+
+## Implemented Functionality
+
 * basic types
 * pointers
 * structs
-* function
+* tuples
+* functions
 * varargs
 * arrays (with associated sizing)
 * importing
 * casting
-* loops
+* loops (while, for)
 * basic operators
 * declaration/use invarience
 * optional semicolons
+* importing C headers, using clang (experimental. currently able to interface with
+  functions, variables, basic types (including pointers), structs. unfortunately not
+  preprocessor tokens, const and other things)
 
-## Planned features
+## Planned Functionality
 roughly in order of planned implementation
 
-* importing C headers (interfacing with clang's AST)
 * switch statements
 * unions
 * enums
@@ -128,6 +141,15 @@ As such, in C, a size variable must be passed around seperately. If a simple C s
 is required, you can just use a pointer. (this leads to a problem in structs, I would like
 to change this eventually)
 
+### How do I import C files?
+use the 'import(C) expression'
+
+    import(C) "stdio.h"
+
+an exact path to the the file may be required. 
+this feature is experimental and could change in syntax and semantics.
+currently, const or volatile declarations fail to convert correctly and are ignored.
+
 ### Why LLVM?
 Using LLVM allows me to focus on the syntax and functionality of the language, and eschew
 all optimization and backend logic. This allows me to develop the language much faster and
@@ -141,31 +163,31 @@ Also, I am not familier enough with clang's architecture to do so.
 ## Future
 
 ### 'Use' statement
-use statements will enable specific compiler extensions, or modify language syntax. Use statements will have a syntax of
+use statements will enable specific compiler extensions, or modify language syntax. Use
+statements will have a syntax of
 
     use extensionName
 
-extensions can have various effects ranging from syntactical preference (substituting symbols), to declaring new keywords, types,
-and behaviour. 
+extensions can have various effects ranging from syntactical preference (substituting
+symbols), to declaring new keywords, types, and behaviour. 
 
-extensions will only affect the module they are declared in. 'use' extensions should not destructively modify the behaviour
-of the compiler, and Modules with 'use' extensions should be able to interface with those without.
+extensions will only affect the module they are declared in. 'use' extensions should not
+destructively modify the behaviour of the compiler, and Modules with 'use' extensions
+should be able to interface with those without.
 
 standard libraries will not include any 'use' statements.
 
 see 'Ideas' for some examples of possible 'use' extensions.
 
-There may be a set of extensions that are required for a 'conforming' compiler, and a 'embedded' standard can be created that
-does not have the extensions.
-
-### import(C)
-use clang to allow parsing the the interface of C headers, allowing the use calling C code within WL without the tedious task
-of creating wrapper modules. This may also extend to a *import(CPP)* statement in OWL.
+There may be a set of extensions that are required for a 'conforming' compiler, and a 'embedded' 
+standard can be created that does not have the extensions.
 
 ### Tail call optimization
 self explanitory, avoids stack overflows, makes deep recursive function faster
 
 ## Ideas (Not necessarily future additions)
+
+### General Things
 structs are anologous to C structs. packing and allignment included
 
 for packed and alligned structs use syntax like struct(packed, allign(4)) { ... }
@@ -173,37 +195,47 @@ for packed and alligned structs use syntax like struct(packed, allign(4)) { ... 
 
 go-like dynamic interfaces
 
-a 'go' keyword that creates a new thread from a function call. (note: it would be a full thread, not a coroutine)
+a 'go' keyword that creates a new thread from a function call. (note: it would be a full
+thread, not a coroutine)
 
 classes are allowed to reorganize members for proper packing
 
 long cast with :: for statements like a = int:: b + c
     or maybe just have a cast assign a := b + c
 
+### import(CPP)
+an equivilent to the import(C) statement, but for CPP files. may only be supported in
+'OWL'
+
 ### "use objects"
-OWL, the object oriented extension to WL, may be added as a simple 'use' extensions that enables various other features. one idea
-is to have a "use owl" meta extension that enables various other extensions like objects, interfaces, vector types.
-Maybe a program will be added (lets call it 'owlc') that runs wlc with the OWL extensions enabled in all modules by default. similar to
-the idea of g++ to gcc.
+OWL, the object oriented extension to WL, may be added as a simple 'use' extensions that
+enables various other features. one idea is to have a "use owl" meta extension that
+enables various other extensions like objects, interfaces, vector types.  Maybe a program
+will be added (lets call it 'owlc') that runs wlc with the OWL extensions enabled in all
+modules by default. similar to the idea of g++ to gcc.
 
 ### "use cptr"
-cptr extension that modifies the compiler to use '\*' as the pointer specifier symbol (for fans of traditional C syntax)
+cptr extension that modifies the compiler to use '\*' as the pointer specifier symbol (for
+fans of traditional C syntax)
 
 ### "use semicolon"
 semicolons are required to terminate statements. (for fans of traditional C)
 
 ### "use cderef"
-extensions that forces pointer dereferencing to use the '->' symbol. (for fans of traditional C syntax)
+extensions that forces pointer dereferencing to use the '->' symbol. (for fans of
+traditional C syntax)
 
 ### "use cbool"
-extension that forces boolean keywords 'and', 'or' and 'not' to instead use the C symbols '&&', '||', and '!'
+extension that forces boolean keywords 'and', 'or' and 'not' to instead use the C symbols
+'&&', '||', and '!'
 
 ### "use clike"
 meta extension that enables all c-like extensions (cptr, semicolon, cderef, cbool, etc)
 
 ### "use restrict"
-forbids pointer aliasing, all pointers will be 'restrict' by default. This will allow many optimization opportunities, 
-but is not enabled by default due to subtilties of behaviour involving restricting pointer aliasing.
+forbids pointer aliasing, all pointers will be 'restrict' by default. This will allow many
+optimization opportunities, but is not enabled by default due to subtilties of behaviour
+involving restricting pointer aliasing.
 
 ### "use count"
 reference counting on classes created within this module
@@ -212,7 +244,7 @@ reference counting on classes created within this module
 garbage collection on classes created within this module
 
 ### "use threadlocal"
-variables in scope will be threadlocal by default. maybe have a keyword 'threadshared' 
+variables in scope will be threadlocal by default. maybe have a keyword 'threadshared'
 (maybe 'tshared' or 'shared') to allow a variable to then default to share between threads
 
 ### "use zero"

@@ -56,7 +56,7 @@ void update()
     memcpy(surf.pixels, back.pixels, 240 * surf.pitch)
 }
 
-void randomize(SDL_Surface ^s)
+void randomize(SDL_Surface^ s)
 {
     for(int j = 0; j < 240; j++)
     {

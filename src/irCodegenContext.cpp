@@ -666,6 +666,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
     ASTValue *lhs = codegenExpression(exp->lhs); // expression after unary op: eg in !a, lhs=a
 
     ASTValue *val;
+    Value *llval = 0;
     switch(exp->op)
     {
         case tok::plusplus:
@@ -674,9 +675,17 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
                 return NULL;
             }
 
-            val = new ASTValue(lhs->getType(),
-                    ir->CreateAdd(codegenValue(lhs),
-                        ConstantInt::get(codegenType(lhs->getType()), 1)));
+            if(lhs->getType()->isFloating())
+            {
+                llval = ConstantFP::get(codegenType(lhs->getType()), 1.0f);
+                llval = ir->CreateFAdd(codegenValue(lhs), llval);
+            } else
+            {
+                llval = ConstantInt::get(codegenType(lhs->getType()), 1);
+                llval = ir->CreateAdd(codegenValue(lhs), llval);
+            }
+
+            val = new ASTValue(lhs->getType(), llval);
             storeValue(lhs, val);
             return val;
         case tok::minusminus:
@@ -684,9 +693,18 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
                 emit_message(msg::ERROR, "can only decrement LValue", exp->loc);
                 return NULL;
             }
-            val = new ASTValue(lhs->getType(),
-                    ir->CreateSub(codegenValue(lhs),
-                        ConstantInt::get(codegenType(lhs->getType()), 1)));
+
+            if(lhs->getType()->isFloating())
+            {
+                llval = ConstantFP::get(codegenType(lhs->getType()), 1.0f);
+                llval = ir->CreateFSub(codegenValue(lhs), llval);
+            } else
+            {
+                llval = ConstantInt::get(codegenType(lhs->getType()), 1);
+                llval = ir->CreateSub(codegenValue(lhs), llval);
+            }
+
+            val = new ASTValue(lhs->getType(), llval);
             storeValue(lhs, val);
             return val;
         case tok::plus:
@@ -781,20 +799,39 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         ASTValue *old;
         ASTValue *val;
         ASTValue *lhs = codegenExpression(e->lhs);
+        Value *llval = 0;
+
         switch(e->op)
         {
             case tok::plusplus:
             old = loadValue(lhs);
-            val = new ASTValue(lhs->getType(),
-                    ir->CreateAdd(codegenValue(lhs),
-                        ConstantInt::get(codegenType(lhs->getType()), 1)));
+            if(lhs->getType()->isFloating())
+            {
+                llval = ConstantFP::get(codegenType(lhs->getType()), 1.0f);
+                llval = ir->CreateFAdd(codegenValue(lhs), llval);
+            } else
+            {
+                llval = ConstantInt::get(codegenType(lhs->getType()), 1);
+                llval = ir->CreateAdd(codegenValue(lhs), llval);
+            }
+
+            val = new ASTValue(lhs->getType(), llval);
+
             storeValue(lhs, val);
             return old;
             case tok::minusminus:
+            if(lhs->getType()->isFloating())
+            {
+                llval = ConstantFP::get(codegenType(lhs->getType()), 1.0f);
+                llval = ir->CreateFSub(codegenValue(lhs), llval);
+            } else
+            {
+                llval = ConstantInt::get(codegenType(lhs->getType()), 1);
+                llval = ir->CreateSub(codegenValue(lhs), llval);
+            }
             old = loadValue(lhs);
-            val = new ASTValue(lhs->getType(),
-                    ir->CreateSub(codegenValue(lhs),
-                        ConstantInt::get(codegenType(lhs->getType()), 1)));
+            val = new ASTValue(lhs->getType(), llval);
+
             storeValue(lhs, val);
             return old;
         }

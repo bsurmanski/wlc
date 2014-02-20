@@ -99,6 +99,8 @@ int main(int argc, char^^ argv)
 
     float myfloat = 5.2
     printf("myFloat: %f, my tuple: %d\n", myfloat, intTuple[0])
+    ++myfloat
+    printf("myFloat2: %f\n", myfloat);
 
     uint mySize = SDL_Surface.sizeof
 

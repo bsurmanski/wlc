@@ -241,6 +241,22 @@ Token Lexer::lexString()
     return Token(tok::charstring, tokstr);
 }
 
+//digit is in ASCII
+static unsigned xdigittoi(unsigned dig)
+{
+    if(dig >= '0' && dig <= '9')
+    {
+        return dig - '0';
+    } else if(dig >= 'a' && dig <= 'f')
+    {
+        return dig - 'a' + 10;
+    } else if(dig >= 'A' && dig <= 'F')
+    {
+        return dig - 'a' + 10;
+    }
+    assert(false && "attempt to parse invalid HEX string");
+}
+
 Token Lexer::lexNumber()
 {
     //TODO hexstrings fp, etc
@@ -249,15 +265,26 @@ Token Lexer::lexNumber()
     numstr += getChar();
     if(numstr[0] == '0' && tolower(peekChar()) == 'x') //hex
     {
+        ignoreChar(); // ignore 'x'
+        numstr = ""; // empty the string
         while(isxdigit(peekChar()) || peekChar() == '.')
         {
             if(peekChar() == '.') {
-                assert(!fp && "invalid numeric constant");
+                assert(!fp && "invalid numeric constant, hexadecimal floating point not supported");
                 fp = true;
             }
             numstr += getChar();
         }
-        assert(false && "hexadecimal not impl");
+
+        double num = 0;
+        unsigned lsh = 0;
+        for(int i = numstr.size() - 1; i >= 0; i--)
+        {
+            num += xdigittoi(numstr[i]) << lsh;
+            lsh += 4;
+        }
+        return Token(tok::intNum, num);
+
     } else if(numstr[0] == '0' && tolower(peekChar()) == 'o') //octal
     {
         assert(false && "octal lexing not impl");

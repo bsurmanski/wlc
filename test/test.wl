@@ -97,7 +97,7 @@ int main(int argc, char^^ argv)
 
     [int, int] intTuple = myTupleFunc()
 
-    float myfloat = 5.2f
+    float myfloat = 0x1234
     printf("myFloat: %f, my tuple: %d\n", myfloat, intTuple[0])
     ++myfloat
     printf("myFloat2: %f\n", myfloat);

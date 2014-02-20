@@ -123,6 +123,17 @@ Token::Token(TokenKind k, std::string st) : kind(k)
     } else { assert(false && "havent bothered with conversion of this constant type yet..."); }
 }
 
+Token::Token(TokenKind k, double data) : kind(k)
+{
+    if(kind == tok::intNum)
+    {
+        iData = data;
+    } else if(kind == tok::floatNum)
+    {
+        fData = data;
+    } else assert(false && "invalid token kind initialization");
+}
+
 Token::Token(const Token &other)
 {
     kind = other.kind;

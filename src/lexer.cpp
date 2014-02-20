@@ -277,6 +277,12 @@ Token Lexer::lexNumber()
             numstr += getChar();
             while(peekChar() == '_') ignore();
         }
+
+        if(peekChar() == 'f')
+        {
+            fp = true;
+            ignoreChar();
+        }
     }
     if(fp) return Token(tok::floatNum, numstr);
     return Token(tok::intNum, numstr);

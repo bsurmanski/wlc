@@ -1422,7 +1422,10 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         case tok::lessless:
             val = ir->CreateShl(lhs_val, rhs_val);
             return new ASTValue(TYPE, val);
-            //TODO: right shift
+
+        case tok::greatergreater:
+            val = ir->CreateLShr(lhs_val, rhs_val);
+            return new ASTValue(TYPE, val);
 
         case tok::starstar:
         default:

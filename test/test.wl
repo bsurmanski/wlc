@@ -112,11 +112,9 @@ int main(int argc, char^^ argv)
 
     uint mySize = SDL_Surface.sizeof
 
-    int iii = 5
-    float j = float: iii
     MyNewStruct newstruct
     SomeUnion myUnion
-    myUnion.myLong = 4294967298
+    myUnion.myLong = 4294967298 >> 10
     printf("union: %d %d %lld\n", myUnion.myChar, myUnion.myInt, myUnion.myLong);
     int[5] my5Array = [1,2,3,4,5]
     int[] darr = [1,2,3,4]

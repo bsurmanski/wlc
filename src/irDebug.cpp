@@ -117,7 +117,7 @@ llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
 
 llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
 {
-    assert(ty->isStruct() && "expected struct");
+    assert(ty->isStruct() && "expected struct for debug info generation");
     llvm::DIDescriptor DIContext(currentFile());
     StructTypeInfo *sti = (StructTypeInfo*) ty->info;
     vector<Value *> vec;
@@ -154,6 +154,44 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
             ty->align() * 8,
             0, // flags
             llvm::DIType(),
+            arr
+            );
+}
+
+llvm::DICompositeType IRDebug::createUnionType(ASTType *ty)
+{
+    assert(ty->isUnion() && "expected union for debug info generation");
+    llvm::DIDescriptor DIContext(currentFile());
+    UnionTypeInfo *sti = (UnionTypeInfo*) ty->info;
+    vector<Value *> vec;
+    for(int i = 0; i < sti->members.size(); i++)
+    {
+        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(sti->members[i]);
+        assert(vdecl);
+        unsigned size = vdecl->getType()->size();
+        unsigned align = vdecl->getType()->align();
+        vec.push_back(di.createMemberType(
+                    DIContext,
+                    vdecl->getName(),
+                    currentFile(),
+                    sti->members[0]->loc.line,
+                    size * 8,
+                    align * 8,
+                    0, //offset
+                    0,
+                    createType(vdecl->getType())));
+        //TODO: members
+    }
+
+    DIArray arr = di.getOrCreateArray(vec);
+
+    return di.createUnionType(DIContext, //TODO: defined scope
+            ty->getName(),
+            currentFile(), //TODO: defined file
+            sti->getDeclaration()->loc.line, //line num
+            ty->size() * 8,
+            ty->align() * 8,
+            0, // flags
             arr
             );
 }

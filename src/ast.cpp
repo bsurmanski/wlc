@@ -19,12 +19,12 @@ size_t StructTypeInfo::getSize()
     //TODO: handle packed
 }
 
-ASTType *StructTypeInfo::getContainedType(unsigned i)
+ASTType *StructUnionInfo::getContainedType(unsigned i)
 {
     return members[i]->getType();
 }
 
-size_t StructTypeInfo::getAlign()
+size_t StructUnionInfo::getAlign()
 {
     size_t align = 0;
     VariableDeclaration *vd;
@@ -39,12 +39,28 @@ size_t StructTypeInfo::getAlign()
     //TODO: handle packed
 }
 
+size_t UnionTypeInfo::getSize()
+{
+    size_t sz = 0;
+    VariableDeclaration *vd;
+    for(int i = 0; i < members.size(); i++)
+    {
+        vd = members[i]->variableDeclaration();
+        if(vd->getType()->size() > sz)
+            sz = vd->getType()->size();
+    }
+}
+
 std::string PointerTypeInfo::getName(){
     return ptrTo->getName() + "^";
 }
 
 std::string ArrayTypeInfo::getName(){
     return "array[" + arrayOf->getName() + "]";
+}
+
+size_t ArrayTypeInfo::getAlign(){
+    return arrayOf->align();
 }
 
 ASTType *ASTType::getPointerTy()
@@ -86,6 +102,41 @@ size_t ArrayTypeInfo::getSize() {
         return ASTType::getCharTy()->getPointerTy()->size() + ASTType::getULongTy()->size();
     else
         return size * arrayOf->size();
+}
+
+size_t AliasTypeInfo::getSize()
+{
+    return alias->size();
+}
+
+size_t AliasTypeInfo::getAlign()
+{
+    return alias->align();
+}
+
+size_t TupleTypeInfo::getSize()
+{
+    size_t sz = 0;
+    unsigned align;
+    for(int i = 0; i < types.size(); i++)
+    {
+        align = types[i]->align();
+        if(sz % align)
+            sz += (align - (sz % align));
+        sz += types[i]->size();
+    }
+    return sz;
+}
+
+size_t TupleTypeInfo::getAlign()
+{
+    size_t max = 0;
+    for(int i = 0; i < types.size(); i++)
+    {
+        if(types[i]->align() > max)
+            max = types[i]->align();
+    }
+    return max;
 }
 
 // declare all of the static ASTType instances, and their getter methods

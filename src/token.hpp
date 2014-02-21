@@ -37,7 +37,8 @@ struct Token
     union
     {
         std::string *strData; // no union with classes? WHY!!! C++!!!!!!!
-        uint64_t iData;
+        int64_t iData;
+        uint64_t uiData;
         double fData;
     };
 
@@ -59,7 +60,7 @@ struct Token
     std::string stringData() { if(kind == tok::charstring || kind == tok::identifier) return *strData;
         return ""; }
     //TODO: parse other datatypes as int?
-    uint64_t intData() { if(kind == tok::intNum) { return iData; } return 0; }
+    int64_t intData() { if(kind == tok::intNum) { return iData; } return 0; }
     //TODO: parse other datatypes as float?
     double floatData() { if(kind == tok::floatNum) { return fData; } return 0.0; }
 

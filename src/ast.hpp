@@ -153,8 +153,8 @@ struct TypeInfo
     virtual ~TypeInfo() {}
     virtual ASTType *getReferenceTy() { return NULL; }
     virtual std::string getName() { return ""; }
-    virtual size_t getSize() { return 0; }
-    virtual size_t getAlign() { return 0; }
+    virtual size_t getSize() { assert(false && "size of type is unknown"); }
+    virtual size_t getAlign() { assert(false && "alignment of type is unknown"); }
     virtual size_t length() { return 1; }
 };
 
@@ -164,7 +164,7 @@ struct DynamicTypeInfo : public TypeInfo
 };
 
 struct VariableDeclaration;
-struct StructDeclaration;
+struct StructUnionDeclaration;
 
 struct CompositeTypeInfo : TypeInfo
 {
@@ -186,26 +186,42 @@ struct ArrayTypeInfo : public CompositeTypeInfo
     virtual ASTType *getReferenceTy() { return arrayOf; }
     virtual ASTType *getContainedType(unsigned i) { return arrayOf; }
     virtual size_t getSize();
+    virtual size_t getAlign();
     virtual size_t length() { return size; }
     ArrayTypeInfo(ASTType *pto, int sz = 0) : arrayOf(pto), size(sz) {}
     bool isDynamic() { return size == 0; }
     std::string getName();
 };
 
-struct StructTypeInfo : public CompositeTypeInfo
+struct StructUnionInfo : public CompositeTypeInfo
 {
-    bool packed;
     SymbolTable *scope;
     Identifier *identifier;
     std::vector<Declaration*> members; // <type, name>
-    StructTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
-        identifier(id), scope(sc), members(m), packed(false){}
+    StructUnionInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
+        identifier(id), scope(sc), members(m){}
     std::string getName() { return identifier->getName(); }
     virtual ASTType *getContainedType(unsigned i);
+    virtual size_t getAlign();
+    StructUnionDeclaration *getDeclaration() { return (StructUnionDeclaration*) identifier->getDeclaration(); }
+};
+
+struct StructTypeInfo : public StructUnionInfo
+{
+    bool packed;
+    StructTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
+        StructUnionInfo(id, sc, m) {}
     virtual size_t length() { return members.size(); }
     virtual size_t getSize();
-    virtual size_t getAlign();
-    StructDeclaration *getDeclaration() { return (StructDeclaration*) identifier->getDeclaration(); }
+};
+
+struct UnionTypeInfo : public StructUnionInfo
+{
+    UnionTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
+        StructUnionInfo(id, sc, m) {}
+    std::string getName() { return identifier->getName(); }
+    virtual size_t length() { return members.size(); }
+    virtual size_t getSize();
 };
 
 struct NamedUnknownInfo : public TypeInfo
@@ -220,6 +236,8 @@ struct AliasTypeInfo : public TypeInfo
     Identifier *identifier;
     ASTType *alias;
     AliasTypeInfo(Identifier *id, ASTType *a) :identifier(id), alias(a) {}
+    virtual size_t getSize();
+    virtual size_t getAlign();
 };
 
 struct TupleTypeInfo : public CompositeTypeInfo
@@ -227,8 +245,8 @@ struct TupleTypeInfo : public CompositeTypeInfo
     std::vector<ASTType*> types;
     virtual ASTType *getContainedType(unsigned i) { return types[i]; }
     virtual size_t length() { return types.size(); }
-    //virtual size_t getSize();
-    //virtual size_t getAlign();
+    virtual size_t getSize();
+    virtual size_t getAlign();
     TupleTypeInfo(std::vector<ASTType*> t) : types(t) {}
 };
 
@@ -275,14 +293,14 @@ struct ASTType
             case TYPE_INT: return 4;
             case TYPE_ULONG:
             case TYPE_LONG: return 8;
-            case TYPE_TUPLE:
-            case TYPE_ARRAY:
-            case TYPE_DYNAMIC_ARRAY:
-            case TYPE_STRUCT: return info->getSize();
             case TYPE_POINTER: return 8;
             case TYPE_FLOAT: return 4;
             case TYPE_DOUBLE: return 8;
-            default: assert(false && "havent sized this type yet"); return 0; //TODO
+            case TYPE_TUPLE:
+            case TYPE_ARRAY:
+            case TYPE_DYNAMIC_ARRAY:
+            case TYPE_STRUCT:
+            default: return info->getSize();
         }
     };
 
@@ -312,11 +330,10 @@ struct ASTType
             case TYPE_ULONG:
             case TYPE_LONG: return 8;
             case TYPE_TUPLE:
-            case TYPE_STRUCT: return info->getAlign();
             case TYPE_POINTER: return 8;
             case TYPE_FLOAT: return 4;
             case TYPE_DOUBLE: return 8;
-            default: assert(false && "havent sized this type yet"); return 0; //TODO
+            default: return info->getAlign();
         }
     };
 
@@ -341,6 +358,7 @@ struct ASTType
     bool isAggregate() { return type == TYPE_STRUCT || type == TYPE_UNION || type == TYPE_CLASS; }
     bool isClass() { return type == TYPE_CLASS; }
     bool isStruct() { return type == TYPE_STRUCT; }
+    bool isUnion() { return type == TYPE_UNION; }
     bool isBool() { return type == TYPE_BOOL; }
     bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT ||
         type == TYPE_INT || type == TYPE_LONG ||
@@ -467,10 +485,10 @@ struct TypeDeclaration : public Declaration
     virtual ASTType *getType() { return type; }
 };
 
-struct StructDeclaration : public TypeDeclaration
+struct StructUnionDeclaration : public TypeDeclaration
 {
     std::vector<Declaration*> members;
-    StructDeclaration(Identifier *id, ASTType *ty, std::vector<Declaration*> m, SourceLocation loc) : TypeDeclaration(id, ty, loc), members(m) {}
+    StructUnionDeclaration(Identifier *id, ASTType *ty, std::vector<Declaration*> m, SourceLocation loc) : TypeDeclaration(id, ty, loc), members(m) {}
 };
 
 /***

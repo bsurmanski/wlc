@@ -61,6 +61,52 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
     return(llvm::Type*) ty->cgType;
 }
 
+llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
+{
+    if(!ty->isUnion()) {
+        emit_message(msg::FAILURE, "unknown union type");
+    }
+
+    UnionTypeInfo *sti = (UnionTypeInfo*) ty->info;
+
+    unsigned align = 0;
+    unsigned size = 0;
+    ASTType *alignedType = 0;
+    std::vector<Type*> unionVec;
+    for(int i = 0; i < sti->members.size(); i++)
+    {
+        if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(sti->members[i]))
+        {
+            if(vd->getType()->align() > align)
+            {
+                alignedType = vd->type;
+                align = vd->getType()->align();
+            }
+
+            if(vd->getType()->size() > size)
+            {
+                size = vd->getType()->size();
+            }
+            //unionVec.push_back(codegenType(vd->type));
+        } else
+            emit_message(msg::UNIMPLEMENTED, "this cant be declared in a union (yet?)");
+    }
+
+    if(sti->members.size())
+    {
+        unionVec.push_back(codegenType(alignedType));
+        if(size - alignedType->size())
+            unionVec.push_back(ArrayType::get(Type::getInt8Ty(context), size - alignedType->size()));
+        StructType *sty = StructType::create(context, sti->identifier->getName());
+        sty->setBody(unionVec);
+        ty->cgType = sty;
+    }
+    else ty->cgType = Type::getInt8Ty(context); //allow fwd declared types, TODO: cleaner
+
+    debug->createUnionType(ty);
+    return(llvm::Type*) ty->cgType;
+}
+
 llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
 {
     TupleTypeInfo *tti = dynamic_cast<TupleTypeInfo*>(ty->info);
@@ -187,7 +233,9 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 break;
             case TYPE_STRUCT:
                 llvmty = codegenStructType(ty);
-                //TODO
+                break;
+            case TYPE_UNION:
+                llvmty = codegenUnionType(ty);
                 break;
             case TYPE_TUPLE:
                 llvmty = codegenTupleType(ty);
@@ -203,11 +251,6 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
         }
         ty->cgType = llvmty;
     }
-
-    //XXX workaround for weird struct stuff (struct being declared without name)... very silly
-    //if(ty->type == TYPE_STRUCT)
-        //module->addTypeName(((StructTypeInfo*)ty->info)->identifier->getName(),(StructType*)ty->cgType);
-        //((StructType*)ty->cgType)->setName(((StructTypeInfo*)ty->info)->identifier->getName());
 
     return (llvm::Type *) ty->cgType;
 }
@@ -878,7 +921,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 
             if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(),
                     codegenValue(lhs), true);
-            if(!lhs->getType()->isStruct() && !lhs->getType()->isArray()) {
+            if(!lhs->getType()->isStruct() && !lhs->getType()->isArray() && !lhs->getType()->isUnion()) {
                 emit_message(msg::ERROR, "can only index struct or array type", dexp->loc);
                 return NULL;
             }
@@ -907,6 +950,31 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                                 "this should not be in a struct (right now)", sti->members[i]->loc);
                     }
                     offset++;
+                }
+                emit_message(msg::ERROR, "member not in struct", dexp->loc);
+            } else if(lhs->getType()->isUnion())
+            {
+                UnionTypeInfo *sti = (UnionTypeInfo*) lhs->getType()->getTypeInfo();
+                for(int i = 0; i < sti->members.size(); i++)
+                {
+                    // XXX better way to compare equality?
+                    if(sti->members[i]->identifier->getName() == dexp->rhs)
+                    {
+                        if(VariableDeclaration *vdecl =
+                                dynamic_cast<VariableDeclaration*>(sti->members[i]))
+                        {
+                            //TODO proper struct GEP
+
+                            ASTType *ty = vdecl->type;
+                            std::vector<Value*> gep;
+                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                            Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
+                            llval = ir->CreateBitCast(llval, codegenType(ty)->getPointerTo());
+                            return new ASTValue(ty, llval, true);
+                        } else emit_message(msg::UNIMPLEMENTED,
+                                "this should not be in a union (right now)", sti->members[i]->loc);
+                    }
                 }
                 emit_message(msg::ERROR, "member not in struct", dexp->loc);
             } else if(lhs->getType()->type == TYPE_DYNAMIC_ARRAY)
@@ -1623,7 +1691,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             }
         }
 
-    } else if(StructDeclaration *sdecl = dynamic_cast<StructDeclaration*>(decl))
+    } else if(StructUnionDeclaration *sdecl = dynamic_cast<StructUnionDeclaration*>(decl))
     {
         //XXX should be generated in the Declaration stuff of the package?
         /*

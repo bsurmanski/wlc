@@ -19,6 +19,7 @@ struct Identifier
         ID_MODULE,
         ID_CLASS,
         ID_STRUCT,
+        ID_UNION,
         ID_ALIAS,
         ID_LABEL,
     };
@@ -49,6 +50,7 @@ struct Identifier
     bool isVariable() { return type == ID_VARIABLE; }
     bool isFunction() { return type == ID_FUNCTION; }
     bool isStruct() { return type == ID_STRUCT; }
+    bool isUnion() { return type == ID_UNION; }
     bool isPackage() { return type == ID_PACKAGE; }
     bool isModule() { return type = ID_MODULE; }
 

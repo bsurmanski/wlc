@@ -344,12 +344,13 @@ Statement *ParseContext::parseStatement()
                     recover();
                     goto PARSEEXP; // this seems to be an expression?
                 }
-            } else if(id->isStruct()) //XXX Class
+            } else if(id->isStruct() || id->isUnion()) //XXX Class
             {
                 //FALLTHROUGH TO DECL
             } else goto PARSEEXP; //IF NOT UNDECLARED OR STRUCT, THIS IS PROBABLY AN EXPRESSION
 
         case tok::kw_extern:
+        case tok::kw_union:
         case tok::kw_struct:
         case tok::kw_var:
 #define BTYPE(X,SZ,SN) case tok::kw_##X:
@@ -437,8 +438,9 @@ Declaration *ParseContext::parseDeclaration()
     if(peek().is(tok::kw_extern)) { external = true; ignore(); }
 
     //TODO: parse function decl specs
-    if(peek().is(tok::kw_struct)) //parse struct
+    if(peek().is(tok::kw_struct) || peek().is(tok::kw_union)) //parse struct
     {
+        bool isUnion = peek().is(tok::kw_union);
         ignore(); // eat "struct"
 
         Token t_id = get(); // eat ID
@@ -483,10 +485,22 @@ Declaration *ParseContext::parseDeclaration()
             popScope();
         } else ignore(); // eat semicolon
 
-        StructTypeInfo *sti = new StructTypeInfo(id, tbl, members); //TODO: use info
-        StructDeclaration *sdecl = new StructDeclaration(id, NULL, members, t_id.loc);
-        id->declaredType()->setTypeInfo(sti, TYPE_STRUCT);
-        id->setDeclaration(sdecl, Identifier::ID_STRUCT);
+        StructUnionInfo *sui = 0;
+        StructUnionDeclaration *sud = 0;
+        StructUnionDeclaration *sdecl = new StructUnionDeclaration(id, NULL, members, t_id.loc);
+
+        if(isUnion)
+        {
+            sui = new UnionTypeInfo(id, tbl, members); //TODO: use info
+            id->declaredType()->setTypeInfo(sui, TYPE_UNION);
+            id->setDeclaration(sdecl, Identifier::ID_UNION);
+        } else
+        {
+            sui = new StructTypeInfo(id, tbl, members); //TODO: use info
+            id->declaredType()->setTypeInfo(sui, TYPE_STRUCT);
+            id->setDeclaration(sdecl, Identifier::ID_STRUCT);
+        }
+
         return sdecl;
         //return new TypeDeclaration();
     }
@@ -923,7 +937,7 @@ Expression *ParseContext::parsePrimaryExpression()
     if(peek().is(tok::intNum))
     {
         return new NumericExpression(NumericExpression::INT, ASTType::getIntTy(),
-                get().intData(), loc);
+                (uint64_t) get().intData(), loc);
     }
 
     if(peek().is(tok::floatNum))
@@ -1076,7 +1090,8 @@ ASTType *ASTStructTypeFromCType(TranslationUnit *unit, CXType ctype)
     {
         id = unit->getScope()->get(name);
         StructTypeInfo *sti = new StructTypeInfo(id, tbl, members);
-        StructDeclaration *sdecl = new StructDeclaration(id, NULL, members, SourceLocation());
+        StructUnionDeclaration *sdecl =
+            new StructUnionDeclaration(id, NULL, members, SourceLocation());
         id->declaredType()->setTypeInfo(sti, TYPE_STRUCT);
         id->setDeclaration(sdecl, Identifier::ID_STRUCT);
     }

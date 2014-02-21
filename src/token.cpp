@@ -115,7 +115,7 @@ Token::Token(TokenKind k, std::string st) : kind(k)
         strData = new std::string(st);
     else if(kind == tok::intNum)
     {
-        iData = atol(st.c_str());
+        iData = atoll(st.c_str());
     }
     else if(kind == tok::floatNum)
     {

@@ -20,6 +20,13 @@ struct SomeStruct
     int j
 }
 
+union SomeUnion
+{
+    int myInt
+    char myChar
+    long myLong
+}
+
 bool pixelIsWhite(SDL_Surface^ s, int i, int j)
 {
     bool ret = s.pixels[i * s.format.BytesPerPixel + j * s.pitch]
@@ -107,6 +114,9 @@ int main(int argc, char^^ argv)
     int iii = 5
     float j = float: iii
     MyNewStruct newstruct
+    SomeUnion myUnion
+    myUnion.myLong = 511
+    printf("union: %d %d %d\n", myUnion.myChar, myUnion.myInt, myUnion.myLong);
     int[5] my5Array = [1,2,3,4,5]
     int[] darr = [1,2,3,4]
 

@@ -936,7 +936,7 @@ Expression *ParseContext::parsePrimaryExpression()
 
     if(peek().is(tok::intNum))
     {
-        return new NumericExpression(NumericExpression::INT, ASTType::getIntTy(),
+        return new NumericExpression(NumericExpression::INT, ASTType::getLongTy(),
                 (uint64_t) get().intData(), loc);
     }
 

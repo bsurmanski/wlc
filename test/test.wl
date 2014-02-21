@@ -87,6 +87,7 @@ void^ somefunc()
     return [124, 55]    
 }
 
+//int[5] statArr = [1,2,3,4,5]
 int main(int argc, char^^ argv)
 {
     surf = SDL_SetVideoMode(320, 240, 0, SDL_SWSURFACE)
@@ -115,8 +116,8 @@ int main(int argc, char^^ argv)
     float j = float: iii
     MyNewStruct newstruct
     SomeUnion myUnion
-    myUnion.myLong = 511
-    printf("union: %d %d %d\n", myUnion.myChar, myUnion.myInt, myUnion.myLong);
+    myUnion.myLong = 4294967298
+    printf("union: %d %d %lld\n", myUnion.myChar, myUnion.myInt, myUnion.myLong);
     int[5] my5Array = [1,2,3,4,5]
     int[] darr = [1,2,3,4]
 

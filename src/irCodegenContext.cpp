@@ -691,9 +691,11 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         {
             if(val->getType()->isFloating())
                 val = promoteType(val, ASTType::getDoubleTy());
-            else if(val->getType()->isInteger() && val->getType()->isSigned())
+            else if(val->getType()->isInteger() && val->getType()->isSigned() &&
+                    val->getType()->size() < ASTType::getIntTy()->size())
                 val = promoteType(val, ASTType::getIntTy());
-            else if(val->getType()->isInteger())
+            else if(val->getType()->isInteger() &&
+                    val->getType()->size() < ASTType::getIntTy()->size())
                 val = promoteType(val, ASTType::getUIntTy());
         }
         //TODO: vararg, promote type of float, int

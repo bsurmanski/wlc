@@ -680,6 +680,11 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         }
     } else emit_message(msg::FAILURE, "unknown function type?", exp->loc);
 
+    if((ftype->parameters.size() != exp->args.size()) && !ftype->vararg)
+    {
+        emit_message(msg::ERROR, "invalid number of arguments provided for function call", exp->loc);
+    }
+
     vector<ASTValue*> cargs;
     vector<Value*> llargs;
     for(int i = 0; i < exp->args.size(); i++)
@@ -687,6 +692,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         ASTValue *val = codegenExpression(exp->args[i]);
         if(!ftype->vararg || (ftype->parameters.size() > i && ftype->parameters[i].first))
             val = promoteType(val, ftype->parameters[i].first);
+
         else if(ftype->vararg)
         {
             if(val->getType()->isFloating())
@@ -698,7 +704,12 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
                     val->getType()->size() < ASTType::getIntTy()->size())
                 val = promoteType(val, ASTType::getUIntTy());
         }
-        //TODO: vararg, promote type of float, int
+
+        if(!val)
+        {
+            emit_message(msg::ERROR, "invalid arguement provided for function", exp->loc);
+        }
+
         cargs.push_back(val);
         llargs.push_back(codegenValue(cargs[i]));
     }

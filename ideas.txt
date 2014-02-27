@@ -14,3 +14,8 @@ foreach
 find something in arrays
 sorting
 libraries
+
+maybe have a dynamic cast operator? maybe ::
+eg MyClass:: value
+maybe if needed, can have a reinterpret cast as :::
+int::: myfloat

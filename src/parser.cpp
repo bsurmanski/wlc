@@ -1142,6 +1142,21 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
     }
 }
 
+#include<clang/Lex/MacroInfo.h>
+#include<clang/Lex/Preprocessor.h>
+#include<clang/Lex/PreprocessingRecord.h>
+#include<clang/Frontend/ASTUnit.h>
+#include "../include/CXTranslationUnit.h"
+#include "../include/CXCursor.h"
+#include "../include/CIndexer.h"
+const clang::MacroInfo *getCursorMacroInfo(CXCursor c)
+{
+    const clang::MacroDefinition *MD = clang::cxcursor::getCursorMacroDefinition(c);
+    const CXTranslationUnit TU = clang_Cursor_getTranslationUnit(c);
+    return clang::cxindex::getMacroInfo(MD, TU);
+}
+
+static CXTranslationUnit *cxUnit = 0;
 CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 {
     TranslationUnit* unit = (TranslationUnit *) tUnit;
@@ -1197,6 +1212,36 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         VariableDeclaration *vdecl = new VariableDeclaration(wlType, id, 0, loc,
                 linkage == CXLinkage_External || linkage == CXLinkage_UniqueExternal);
 
+    } else if(cursor.kind == CXCursor_MacroDefinition)
+    {
+        CXString cxname = clang_getCursorSpelling(cursor);
+        std::string name = clang_getCString(cxname);
+        CXType type = clang_getCursorType(cursor);
+
+        CXSourceRange range = clang_getCursorExtent(cursor);
+        CXSourceLocation sloc = clang_getRangeEnd(range);
+        unsigned LINE, COL, OFF;
+        clang_getFileLocation(sloc, 0, &LINE, &COL, &OFF);
+        CXToken *tokens = 0;
+        unsigned nTokens = 0;
+        clang_tokenize(*cxUnit, range, &tokens, &nTokens);
+        std::string valuestr;
+        for(int i = 0; i < nTokens - 1; i++)
+        {
+            CXString spelling = clang_getTokenSpelling(*cxUnit, tokens[i]);
+            valuestr += clang_getCString(spelling);
+        }
+
+        const clang::MacroInfo *MI = getCursorMacroInfo(cursor);
+
+
+        if(MI->isObjectLike())
+        {
+            printf("MACRO: (%d, %d) %s, %s\n", nTokens, COL, name.c_str(), valuestr.c_str());
+        } else goto ERR;
+
+
+        //TODO: finish macro parsing stuff
     }
 
     return CXChildVisit_Continue;
@@ -1229,6 +1274,8 @@ void ParseContext::parseCImport(TranslationUnit *unit,
             commandArgs,
             0,
             0);
+
+    cxUnit = &Unit;
 
     emit_message(msg::OUTPUT, "finished clang unit-create. begin visit");
 

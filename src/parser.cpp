@@ -1170,13 +1170,28 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 
     if(cursor.kind == CXCursor_FunctionDecl)
     {
+        CXString cxname = clang_getCursorSpelling(cursor);
+        std::string name = clang_getCString(cxname);
+
         CXType fType = clang_getCursorType(cursor);
         int nargs = clang_getNumArgTypes(fType);
         vector<pair<ASTType*, std::string> > argType;
+
+        if(name == "malloc")
+        {
+            CXString tcxname = clang_getTypeSpelling(fType);
+            std::string tname = clang_getCString(tcxname);
+            CXType arg1 = clang_getArgType(fType, 0);
+            std::string t1name = clang_getCString(clang_getTypeSpelling(arg1));
+            printf("C function: %s\n", name.c_str());
+        }
+
+
         for(int i = 0; i < nargs; i++)
         {
             ASTType *astArgTy =
-                    ASTTypeFromCType(unit, clang_getArgType(fType, i));
+                    ASTTypeFromCType(unit,
+                            clang_getCanonicalType(clang_getArgType(fType, i)));
             if(!astArgTy) goto ERR;
 
             argType.push_back( pair<ASTType*, std::string>(
@@ -1184,8 +1199,6 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
                     );
         }
 
-        CXString cxname = clang_getCursorSpelling(cursor);
-        std::string name = clang_getCString(cxname);
         ASTType *rType = ASTTypeFromCType(unit, clang_getResultType(fType));
 
         if(!rType) goto ERR;
@@ -1211,39 +1224,50 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         CXLinkageKind linkage = clang_getCursorLinkage(cursor);
         VariableDeclaration *vdecl = new VariableDeclaration(wlType, id, 0, loc,
                 linkage == CXLinkage_External || linkage == CXLinkage_UniqueExternal);
+        id->setDeclaration(vdecl, Identifier::ID_VARIABLE);
+        //unit->globals.push_back(vdecl);
 
     } else if(cursor.kind == CXCursor_MacroDefinition)
     {
-        CXString cxname = clang_getCursorSpelling(cursor);
-        std::string name = clang_getCString(cxname);
-        CXType type = clang_getCursorType(cursor);
-
-        CXSourceRange range = clang_getCursorExtent(cursor);
-        CXSourceLocation sloc = clang_getRangeEnd(range);
-        unsigned LINE, COL, OFF;
-        clang_getFileLocation(sloc, 0, &LINE, &COL, &OFF);
-        CXToken *tokens = 0;
-        unsigned nTokens = 0;
-        clang_tokenize(*cxUnit, range, &tokens, &nTokens);
-        std::string valuestr;
-        for(int i = 0; i < nTokens - 1; i++)
-        {
-            CXString spelling = clang_getTokenSpelling(*cxUnit, tokens[i]);
-            valuestr += clang_getCString(spelling);
-        }
-
         const clang::MacroInfo *MI = getCursorMacroInfo(cursor);
-
 
         if(MI->isObjectLike())
         {
-            printf("MACRO: (%d, %d) %s, %s\n", nTokens, COL, name.c_str(), valuestr.c_str());
-        } else goto ERR;
+            if(MI->getNumTokens() == 1 && MI->getReplacementToken(0).isLiteral())
+            {
+                clang::Token tok = MI->getReplacementToken(0);
+                if(tok.getKind() == clang::tok::numeric_constant)
+                {
+
+                string name = string(clang_getCString(clang_getCursorSpelling(cursor)));
+                Identifier *id = unit->getScope()->get(name);
+                if(id->getDeclaration())
+                {
+                    printf("Macro redefines value, ");
+                    goto MACRO_ERR;
+                }
+                NumericExpression *val = new NumericExpression(NumericExpression::DOUBLE,
+                        ASTType::getDoubleTy(), atof(tok.getLiteralData()));
+                //VariableDeclaration *vdecl = new VariableDeclaration(ASTType::getDoubleTy(),
+                //        id, val, loc, false);
+                id->setExpression(val);
+                //unit->globals.push_back(vdecl);
+                    printf("MACRO: %s: %f\n", name.c_str(), val->floatValue);
+                } else goto MACRO_ERR;
+            } else
+            {
+                goto MACRO_ERR;
+            }
+        } else goto MACRO_ERR;
 
 
         //TODO: finish macro parsing stuff
     }
 
+    return CXChildVisit_Continue;
+MACRO_ERR:
+    emit_message(msg::WARNING, "failed to convert macro into WL symbol: " +
+            string(clang_getCString(clang_getCursorSpelling(cursor))));
     return CXChildVisit_Continue;
 ERR:
     emit_message(msg::WARNING, "failed to convert symbol to WL typing: " +
@@ -1260,17 +1284,20 @@ void ParseContext::parseCImport(TranslationUnit *unit,
     freopen("stderr.log", "w", stderr);
 
     const char *commandArgs[] = {
+        "-triple", "x86_64-unknown-linux-gnu",
+        "-resource-dir", "/usr/lib/clang/3.4",
         "-internal-isystem /usr/include",
         "-c-isystem /usr/include",
         "-v",
         0,
     };
+    pushScope(unit->getScope());
 
     CXIndex Idx = clang_createIndex(1,1);
     CXTranslationUnit Unit = clang_createTranslationUnitFromSourceFile(
             Idx,
             filenm.c_str(),
-            3,
+            (sizeof(commandArgs) / sizeof(commandArgs[0]) - 1),
             commandArgs,
             0,
             0);
@@ -1280,6 +1307,10 @@ void ParseContext::parseCImport(TranslationUnit *unit,
     emit_message(msg::OUTPUT, "finished clang unit-create. begin visit");
 
     clang_visitChildren(clang_getTranslationUnitCursor(Unit), CVisitor, unit);
+
+    currentPackage()->addPackage(unit);
+
+    popScope();
 
     // restore stderr
     dup2(fileno(stderr), ostderr);

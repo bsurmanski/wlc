@@ -19,3 +19,7 @@ maybe have a dynamic cast operator? maybe ::
 eg MyClass:: value
 maybe if needed, can have a reinterpret cast as :::
 int::: myfloat
+
+have various different types of import statements. eg: import(string), import(file) or import(include)
+have the return value be determined by the import type.
+

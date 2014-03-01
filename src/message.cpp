@@ -54,6 +54,6 @@ void emit_message(int level, std::string msg, SourceLocation loc)
 
     cout << msg << endl;
 
-    if(level == FATAL) exit(-1);
+    if(level == FATAL) assert(false);
     if(level == FAILURE) assert(false); //throw a fit, this compiler isnt working
 }

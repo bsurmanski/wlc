@@ -299,6 +299,47 @@ ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
     return loaded;
 }
 
+ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
+{
+    if(id->getValue()) return id->getValue();
+
+    ///XXX work around for forward declarations of variables in parent scopes
+    if(id->isUndeclared())
+    {
+        //id = lookup(iexp->id->getName());
+        if(id->isUndeclared()) {
+            emit_message(msg::ERROR, string("undeclared variable '") +
+                    id->getName() + string("' in scope"));
+            return NULL;
+        }
+    }
+    if(id->isVariable())
+    {
+        emit_message(msg::FAILURE, "failed to codegen identifier");
+        return id->getValue(); //TODO
+
+    //} else if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration()))
+    } else if(id->isFunction())
+    {
+        //Value *llvmfunc = module->getFunction(id->getName());
+        Value *llvmfunc = (Value*) ((FunctionDeclaration*) id->declaration)->cgValue;
+        //TODO: proper function CGType (llvmfunc->getFunctionType())
+        id->setValue(new ASTValue(NULL, llvmfunc));
+    } else if(id->isStruct())
+    {
+        id->setValue(new ASTValue(id->declaredType(), NULL));
+    } else if(id->isExpression())
+    {
+        id->setValue(codegenExpression(id->getExpression()));
+    } else if(id->isLabel())
+    {
+        id->setValue(new ASTValue(NULL, BasicBlock::Create(context,
+                        id->getName(), ir->GetInsertBlock()->getParent())));
+    }
+
+    return id->getValue();
+}
+
 ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
 {
     if(BlockExpression *bexp = exp->blockExpression())
@@ -385,22 +426,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
                 return NULL;
             }
         }
-        if(iexp->identifier()->isVariable())
-        {
-            //ASTValue *ptrvalue = iexp->identifier()->value; //TODO: load value?
-            return iexp->identifier()->getValue();
-
-        //} else if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(iexp->identifier()->getDeclaration()))
-        } else if(iexp->identifier()->isFunction())
-        {
-            //Value *llvmfunc = module->getFunction(iexp->identifier()->getName());
-            Value *llvmfunc = (Value*) ((FunctionDeclaration*) iexp->identifier()->declaration)->cgValue;
-            //TODO: proper function CGType (llvmfunc->getFunctionType())
-            return new ASTValue(NULL, llvmfunc);
-        } else if(iexp->identifier()->isStruct())
-        {
-            return new ASTValue(iexp->identifier()->declaredType(), NULL);
-        }
+        return codegenIdentifier(iexp->id);
     } else if(IfExpression *iexp = exp->ifExpression())
     {
         return codegenIfExpression(iexp);
@@ -1483,19 +1509,15 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         codegenReturnStatement(rstmt);
     } else if(LabelStatement *lstmt = dynamic_cast<LabelStatement*>(stmt))
     {
-        if(!lstmt->identifier->getValue())
-            lstmt->identifier->setValue(new ASTValue(NULL, BasicBlock::Create(context,
-                            lstmt->identifier->getName(), ir->GetInsertBlock()->getParent())));
-        llvm::BasicBlock *BB = (llvm::BasicBlock*) lstmt->identifier->getValue()->cgValue;
+        ASTValue *lbl = codegenIdentifier(lstmt->identifier);
+        llvm::BasicBlock *BB = (llvm::BasicBlock*) lbl->cgValue;
         ir->CreateBr(BB);
         ir->SetInsertPoint(BB);
-        lstmt->identifier->setValue(new ASTValue(NULL, BB)); //TODO: cg value?
+        //lstmt->identifier->setValue(new ASTValue(NULL, BB)); //TODO: cg value?
     } else if(GotoStatement *gstmt = dynamic_cast<GotoStatement*>(stmt))
     {
-        if(!gstmt->identifier->getValue())
-            gstmt->identifier->setValue(new ASTValue(NULL, BasicBlock::Create(context,
-                            gstmt->identifier->getName(), ir->GetInsertBlock()->getParent())));
-        llvm::BasicBlock *BB = (llvm::BasicBlock*) gstmt->identifier->getValue()->cgValue;
+        ASTValue *lbl = codegenIdentifier(gstmt->identifier);
+        llvm::BasicBlock *BB = (llvm::BasicBlock*) lbl->cgValue;
         ir->CreateBr(BB);
        // post GOTO block
         BasicBlock *PG = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent());

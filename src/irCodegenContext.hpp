@@ -87,6 +87,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenNewExpression(NewExpression *exp);
     ASTValue *codegenDeleteExpression(DeleteExpression *exp);
 
+    ASTValue *codegenIdentifier(Identifier *id);
     ASTValue *codegenIfExpression(IfExpression *exp);
     ASTValue *codegenWhileExpression(WhileExpression *exp);
     ASTValue *codegenForExpression(ForExpression *exp);

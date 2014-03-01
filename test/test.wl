@@ -5,8 +5,9 @@ void ^memcpy(void^ dest, void^ src, long n);
 int RAND_MAX = 2147483647
 
 import "sdl.wl"
-import "cstdlib.wl"
+//import "cstdlib.wl"
 //import "cstdio.wl"
+import(C) "/usr/include/stdlib.h"
 import(C) "/usr/include/stdio.h"
 
 SDL_Surface^ surf = null
@@ -120,6 +121,7 @@ int main(int argc, char^^ argv)
     int[] darr = [1,2,3,4]
 
     printf("sizeof array's: %d %d\n", int[5].sizeof, int[].sizeof);
+    printf("seek cur is: %f\n", SEEK_CUR);
 
     printf("myArray: elem: sz: %d, %d %d %d %d %d\n",
     darr.size,

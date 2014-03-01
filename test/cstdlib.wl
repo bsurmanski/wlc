@@ -1,4 +1,4 @@
-import "cstdio.wl"
+//import "cstdio.wl"
 
 int RAND_MAX = 214783647
 int EXIT_FAILURE = 1

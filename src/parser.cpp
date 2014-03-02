@@ -1177,16 +1177,6 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         int nargs = clang_getNumArgTypes(fType);
         vector<pair<ASTType*, std::string> > argType;
 
-        if(name == "malloc")
-        {
-            CXString tcxname = clang_getTypeSpelling(fType);
-            std::string tname = clang_getCString(tcxname);
-            CXType arg1 = clang_getArgType(fType, 0);
-            std::string t1name = clang_getCString(clang_getTypeSpelling(arg1));
-            printf("C function: %s\n", name.c_str());
-        }
-
-
         for(int i = 0; i < nargs; i++)
         {
             ASTType *astArgTy =

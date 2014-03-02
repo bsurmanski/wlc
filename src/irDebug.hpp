@@ -13,28 +13,24 @@
 #define PROJDIR "/home/brandon/PROJECTS/C/term/wlc"
 
 class IRCodegenContext;
+class IRTranslationUnit;
 class IRDebug
 {
     public:
         IRCodegenContext *context;
-        TranslationUnit *unit;
+        IRTranslationUnit *unit;
         llvm::DIBuilder di;
         llvm::DIFile diFile;
         llvm::DICompileUnit diUnit;
 
-        IRDebug(IRCodegenContext *c, TranslationUnit *u) : context(c), unit(u),
-             di(*(llvm::Module*)unit->cgValue)
-        {
-            diUnit = di.createCompileUnit(0, u->filenm, PROJDIR, CGSTR, false, "", 0);
-            diFile = di.createFile(u->filenm, PROJDIR);
-        }
+        IRDebug(IRCodegenContext *c, IRTranslationUnit *u);
 
         ~IRDebug()
         {
             di.finalize();
         }
 
-        llvm::Module *getModule() { return (llvm::Module*) unit->cgValue; }
+        llvm::Module *getModule();
 
         llvm::DIFile currentFile() { return diFile; }
         llvm::DIDescriptor currentScope();

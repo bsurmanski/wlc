@@ -7,6 +7,15 @@
 using namespace std;
 using namespace llvm;
 
+IRDebug::IRDebug(IRCodegenContext *c, IRTranslationUnit *u) : context(c), unit(u),
+     di(*unit->module)
+{
+    diUnit = di.createCompileUnit(0, u->unit->filenm, PROJDIR, CGSTR, false, "", 0);
+    diFile = di.createFile(u->unit->filenm, PROJDIR);
+}
+
+llvm::Module *IRDebug::getModule() { return (llvm::Module*) unit->module; }
+
 // added due to requirement debug info in LLVM 3.4
 void createIdentMetadata(llvm::Module *m)
 {

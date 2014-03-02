@@ -26,6 +26,21 @@ struct IRFunction
     IRFunction(FunctionDeclaration *decl) : declaration(decl), terminated(false) {}
 };
 
+struct IRTranslationUnit
+{
+    TranslationUnit *unit;
+    llvm::Module *module;
+
+    std::map<std::string, llvm::Type*> types;
+
+    std::vector<VariableDeclaration*>& getGlobals() { return unit->globals; }
+    std::vector<FunctionDeclaration*>& getFunctions() { return unit->functions; }
+
+    SymbolTable *getScope() { return unit->getScope(); }
+    //operator TranslationUnit*() { return unit; }
+    IRTranslationUnit(TranslationUnit *u) : unit(u) {}
+};
+
 class IRDebug;
 class IRCodegenContext : public CodegenContext
 {
@@ -37,7 +52,7 @@ class IRCodegenContext : public CodegenContext
     llvm::BasicBlock *continueLabel;
     llvm::Linker linker;
     IRFunction currentFunction;
-    TranslationUnit *unit;
+    IRTranslationUnit *unit;
     IRDebug *debug;
 
     IRCodegenContext() : context(llvm::getGlobalContext()),
@@ -116,8 +131,8 @@ class IRCodegenContext : public CodegenContext
     void codegenDeclaration(Declaration *decl);
 
     // codegen etc
-    void codegenTranslationUnit(TranslationUnit *unit);
-    void codegenIncludeUnit(TranslationUnit *current, TranslationUnit *inc);
+    void codegenTranslationUnit(IRTranslationUnit *unit);
+    void codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc);
     void codegenPackage(Package *p);
 };
 

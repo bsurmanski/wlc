@@ -999,7 +999,8 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     }
                     offset++;
                 }
-                emit_message(msg::ERROR, "member not in struct", dexp->loc);
+                emit_message(msg::ERROR, "member not in struct: " + sti->getName() + "." + dexp->rhs,
+                        dexp->loc);
             } else if(lhs->getType()->isUnion())
             {
                 UnionTypeInfo *sti = (UnionTypeInfo*) lhs->getType()->getTypeInfo();

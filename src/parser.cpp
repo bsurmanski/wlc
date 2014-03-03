@@ -1135,6 +1135,8 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
             return ASTStructTypeFromCType(unit, ctype);
         case CXType_Typedef:
             return ASTTypeFromCType(unit, clang_getCanonicalType(ctype));
+        case CXType_Enum:
+            return ASTType::getULongTy();
         default:
             emit_message(msg::WARNING, "failed conversion of CType to WLType: " +
                     string(clang_getCString(clang_getTypeSpelling(ctype))));
@@ -1242,16 +1244,26 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
                 //        id, val, loc, false);
                 id->setExpression(val);
                 //unit->globals.push_back(vdecl);
-                    printf("MACRO: %s: %f\n", name.c_str(), val->floatValue);
+                    //printf("MACRO: %s: %f\n", name.c_str(), val->floatValue);
                 } else goto MACRO_ERR;
             } else
             {
                 goto MACRO_ERR;
             }
         } else goto MACRO_ERR;
+    } else if(cursor.kind == CXCursor_EnumDecl)
+    {
+        return CXChildVisit_Recurse;
+    } else if(cursor.kind == CXCursor_EnumConstantDecl)
+    {
+        CXString cxname = clang_getCursorSpelling(cursor);
+        std::string name = clang_getCString(cxname);
+        Identifier *id = unit->getScope()->get(name);
+        int64_t val = clang_getEnumConstantDeclValue(cursor);
+                NumericExpression *nval = new NumericExpression(NumericExpression::INT,
+                        ASTType::getLongTy(), (uint64_t) val);
 
-
-        //TODO: finish macro parsing stuff
+        id->setExpression(nval);
     }
 
     return CXChildVisit_Continue;
@@ -1273,6 +1285,11 @@ void ParseContext::parseCImport(TranslationUnit *unit,
     int ostderr = dup(fileno(stderr));
     freopen("stderr.log", "w", stderr);
 
+    if(access(filenm.c_str(), F_OK) == -1)
+    {
+        emit_message(msg::ERROR, "imported C file does not exist: " + filenm, loc);
+    }
+
     const char *commandArgs[] = {
         "-triple", "x86_64-unknown-linux-gnu",
         "-resource-dir", "/usr/lib/clang/3.4",
@@ -1293,8 +1310,6 @@ void ParseContext::parseCImport(TranslationUnit *unit,
             0);
 
     cxUnit = &Unit;
-
-    emit_message(msg::OUTPUT, "finished clang unit-create. begin visit");
 
     clang_visitChildren(clang_getTranslationUnitCursor(Unit), CVisitor, unit);
 

@@ -1369,6 +1369,7 @@ void ParseContext::parseCImport(TranslationUnit *unit,
         "-resource-dir", "/usr/lib/clang/3.4",
         "-internal-isystem /usr/include",
         "-c-isystem /usr/include",
+        "-DGL_GLEXT_PROTOTYPES", //TODO: tmp
         "-v",
         0,
     };

@@ -1126,12 +1126,6 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
                 ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
     }
 
-    if(toType->isInteger())
-    {
-        return new ASTValue(toType, ir->CreateIntCast(codegenValue(val),
-                    codegenType(toType), false));
-    }
-
     if(toType->isBool())
     {
         Value *i = ir->CreatePtrToInt(codegenValue(val),
@@ -1141,6 +1135,12 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
                 ir->CreateICmpNE(i,
                     ConstantInt::get(codegenType(ASTType::getULongTy()), 0)
                     ));
+    }
+
+    if(toType->isInteger())
+    {
+        return new ASTValue(toType, ir->CreateIntCast(codegenValue(val),
+                    codegenType(toType), false));
     }
 }
 

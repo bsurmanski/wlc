@@ -254,6 +254,9 @@ llvm::DIType IRDebug::createType(ASTType *ty)
             case TYPE_STRUCT:
                 dity = createStructType(ty);
                 break;
+            case TYPE_UNION:
+                dity = createUnionType(ty);
+                break;
             case TYPE_ARRAY:
                 return createArrayType(ty);
             case TYPE_DYNAMIC_ARRAY:

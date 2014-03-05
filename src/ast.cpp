@@ -35,6 +35,7 @@ size_t StructUnionInfo::getAlign()
         if(vd->getType()->align() > align)
             align = vd->getType()->align();
     }
+    if(align == 0) return 1; //TODO: empty struct, bad!
     return align;
     //TODO: handle packed
 }

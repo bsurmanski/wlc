@@ -1072,16 +1072,77 @@ void Parser::parseFile(TranslationUnit *unit, std::string filenm, SourceLocation
 
 /// C Parsing fun stuff
 
-ASTType *ASTStructTypeFromCType(TranslationUnit *unit, CXType ctype)
+SourceLocation SourceLocationFromCLocation(CXSourceLocation cxloc)
+{
+    CXFile file;
+    unsigned line, column;
+    clang_getSpellingLocation(cxloc, &file, &line, &column, 0);
+    const char *filenm = clang_getCString(clang_getFileName(file));
+    return SourceLocation(filenm, line, column);
+}
+
+struct StructVisitorArg
+{
+    TranslationUnit *unit;
+    std::vector<Declaration *> *members;
+    SymbolTable *scope;
+};
+
+ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype);
+
+CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
+{
+    StructVisitorArg *m = (StructVisitorArg*) svarg;
+
+    TranslationUnit *unit = m->unit;
+    std::vector<Declaration *> *members = m->members;
+    SymbolTable *scope = m->scope;
+
+    CXSourceLocation cxloc = clang_getCursorLocation(cursor);
+    SourceLocation loc = SourceLocationFromCLocation(cxloc);
+
+    if(cursor.kind == CXCursor_FieldDecl)
+    {
+        CXString cxname = clang_getCursorSpelling(cursor);
+        string name = clang_getCString(cxname);
+
+        Identifier *id = scope->get(name);
+        ASTType *ty = ASTTypeFromCType(unit, clang_getCursorType(cursor));
+        if(!ty) return CXChildVisit_Break;
+        VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc);
+        id->setDeclaration(vdecl, Identifier::ID_VARIABLE);
+        members->push_back(vdecl);
+    } else if(cursor.kind == CXCursor_UnionDecl || cursor.kind == CXCursor_StructDecl)
+    {
+        ASTType *ty = ASTTypeFromCType(unit, clang_getCursorType(cursor));
+        if(!ty) return CXChildVisit_Break;
+        Identifier *id = scope->get("___" + ty->getName()); // TODO: proper scope name
+        VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc);
+        id->setDeclaration(vdecl, Identifier::ID_VARIABLE);
+        members->push_back(vdecl);
+    } else
+    {
+        emit_message(msg::FAILURE, "unknown field in C record", loc);
+    }
+
+    return CXChildVisit_Continue;
+}
+
+ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
 {
     vector<Declaration*> members;
     SymbolTable *tbl = new SymbolTable(unit->getScope());
     CXString cxname = clang_getTypeSpelling(ctype);
+    CXCursor typeDecl = clang_getTypeDeclaration(ctype);
     string name = clang_getCString(cxname);
     string sstruct = "struct ";
+    string sunion = "union ";
     if(name.compare(0, sstruct.length(), sstruct) == 0) //remove 'struct' keyword
     {
         name = name.substr(sstruct.length());
+    } else if(name.compare(0, sunion.length(), sunion) == 0) //remove 'union' keyword
+    {
+        name = name.substr(sunion.length());
     }
 
     Identifier *id = unit->getScope()->lookup(name);
@@ -1089,11 +1150,17 @@ ASTType *ASTStructTypeFromCType(TranslationUnit *unit, CXType ctype)
     if(!id)
     {
         id = unit->getScope()->get(name);
+
+        StructVisitorArg svarg = { unit, &members, tbl };
+        clang_visitChildren(typeDecl, StructVisitor, &svarg);
+
         StructTypeInfo *sti = new StructTypeInfo(id, tbl, members);
         StructUnionDeclaration *sdecl =
             new StructUnionDeclaration(id, NULL, members, SourceLocation());
-        id->declaredType()->setTypeInfo(sti, TYPE_STRUCT);
-        id->setDeclaration(sdecl, Identifier::ID_STRUCT);
+        id->declaredType()->setTypeInfo(sti,
+                typeDecl.kind == CXCursor_StructDecl ? TYPE_STRUCT : TYPE_UNION);
+        id->setDeclaration(sdecl,
+                typeDecl.kind == CXCursor_StructDecl ? Identifier::ID_STRUCT : Identifier::ID_UNION);
     }
 
     return id->declaredType();
@@ -1103,11 +1170,13 @@ ASTType *ASTStructTypeFromCType(TranslationUnit *unit, CXType ctype)
 ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
 {
     ASTType *ty = 0;
+
     switch(ctype.kind)
     {
         case CXType_Void:
-        case CXType_Unexposed: //TODO: create a specific type for unexposed?
             return ASTType::getVoidTy();
+        case CXType_Unexposed: //TODO: create a specific type for unexposed?
+            return ASTType::getVoidTy()->getPointerTy();
         case CXType_Bool: return ASTType::getBoolTy();
         case CXType_Char_U:
         case CXType_UChar: return ASTType::getUCharTy();
@@ -1128,15 +1197,19 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
         case CXType_Double:
             return ASTType::getDoubleTy();
         case CXType_Pointer:
+        case CXType_VariableArray:
             ty = ASTTypeFromCType(unit, clang_getPointeeType(ctype));
             if(ty) return ty->getPointerTy();
             return NULL;
         case CXType_Record:
-            return ASTStructTypeFromCType(unit, ctype);
+            return ASTRecordTypeFromCType(unit, ctype);
         case CXType_Typedef:
             return ASTTypeFromCType(unit, clang_getCanonicalType(ctype));
         case CXType_Enum:
             return ASTType::getULongTy();
+        case CXType_ConstantArray:
+            return ASTTypeFromCType(unit,
+                    clang_getElementType(ctype))->getArrayTy(clang_getArraySize(ctype));
         default:
             emit_message(msg::WARNING, "failed conversion of CType to WLType: " +
                     string(clang_getCString(clang_getTypeSpelling(ctype))));
@@ -1158,17 +1231,14 @@ const clang::MacroInfo *getCursorMacroInfo(CXCursor c)
     return clang::cxindex::getMacroInfo(MD, TU);
 }
 
+
 static CXTranslationUnit *cxUnit = 0;
 CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 {
     TranslationUnit* unit = (TranslationUnit *) tUnit;
 
     CXSourceLocation cxloc = clang_getCursorLocation(cursor);
-    CXFile file;
-    unsigned line, column;
-    clang_getSpellingLocation(cxloc, &file, &line, &column, 0);
-    const char *filenm = clang_getCString(clang_getFileName(file));
-    SourceLocation loc = SourceLocation(filenm, line, column);
+    SourceLocation loc = SourceLocationFromCLocation(cxloc);
 
     if(cursor.kind == CXCursor_FunctionDecl)
     {
@@ -1264,6 +1334,10 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
                         ASTType::getLongTy(), (uint64_t) val);
 
         id->setExpression(nval);
+    } else if(cursor.kind == CXCursor_StructDecl)
+    {
+        // will generate struct ASTType
+        ASTTypeFromCType(unit, clang_getCursorType(cursor));
     }
 
     return CXChildVisit_Continue;

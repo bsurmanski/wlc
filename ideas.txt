@@ -23,3 +23,4 @@ int::: myfloat
 have various different types of import statements. eg: import(string), import(file) or import(include)
 have the return value be determined by the import type.
 
+have a 'wlx' utility that will transform the source. eg. transform to-from extensions.

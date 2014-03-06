@@ -1234,7 +1234,7 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
             }
             Value *ptr = codegenLValue(val);
             ptr = ir->CreateBitCast(ptr, codegenType(toType));
-            return new ASTValue(toType, ptr, true);
+            return new ASTValue(toType, ptr, false); //TODO: should be lvalue, but that causes it to load incorrectly
         }
     } else if(val->type->type == TYPE_DYNAMIC_ARRAY)
     {

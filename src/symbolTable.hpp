@@ -15,9 +15,20 @@ struct SymbolTable
     SymbolTable *parent;
     std::vector<SymbolTable*> siblings;
     std::map<std::string, Identifier *> symbols;
+    std::map<std::string, bool> extensions;
     llvm::DIDescriptor debug; //TODO
     void setDebug(llvm::DIDescriptor d) { debug = d; }
     llvm::DIDescriptor getDebug() { return debug; }
+
+    bool extensionEnabled(std::string s)
+    {
+        return extensions[s] || (parent && parent->extensionEnabled(s));
+    }
+
+    bool enableExtension(std::string s)
+    {
+        extensions[s] = true;
+    }
 
     SymbolTable(SymbolTable *par = NULL) : parent(par), debug(0) { if(!par) addBuiltin(); }
     SymbolIterator begin() { return symbols.begin(); }

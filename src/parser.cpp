@@ -194,8 +194,13 @@ void ParseContext::parseTopLevel(TranslationUnit *unit)
             unit->imports.push_back(parseImport());
             break;
 
+        case tok::kw_use:
+            parseUseExpression();
+            break;
+
         case tok::kw_include:
             parseInclude();
+            break;
 
         case tok::kw_package:
             ignore();
@@ -223,6 +228,34 @@ void ParseContext::parseTopLevel(TranslationUnit *unit)
                 emit_message(msg::FAILURE, "what sort of global statement did i just parse?");
             }
     }
+}
+
+TopLevelExpression *ParseContext::parseTopLevelExpression()
+{
+    switch(peek().kind)
+    {
+
+    }
+}
+
+UseExpression *ParseContext::parseUseExpression()
+{
+    if(peek().isNot(tok::kw_use))
+    {
+        emit_message(msg::FAILURE, "expected 'use' keyword", peek().loc);
+        return NULL;
+    }
+    ignore();
+
+    if(peek().isNot(tok::charstring))
+    {
+        emit_message(msg::ERROR, "expected string following 'use' keyword", peek().loc);
+        return NULL;
+    }
+
+    std::string extname = get().stringData();
+    getScope()->enableExtension(extname);
+    return new UseExpression();
 }
 
 void ParseContext::parseInclude()
@@ -287,12 +320,12 @@ ImportExpression *ParseContext::parseImport()
 
             if(special)
             {
-                if(parserType == "C")
+                if(getScope()->extensionEnabled("importc") && parserType == "C")
                 {
                     parseCImport(importedUnit, sexp->string, loc);
                 } else
                 {
-                    emit_message(msg::ERROR, "unknown parser type '" + parserType + "'", loc);
+                    emit_message(msg::ERROR, "unknown import type '" + parserType + "'", loc);
                 }
             } else
             {

@@ -97,6 +97,7 @@ KEYWORD(label)
 KEYWORD(package) /* declare package like Java, (package com.mysite.mypackage) */
 KEYWORD(break)
 KEYWORD(continue)
+KEYWORD(use) /* use extensions */
 
 // OWL
 KEYWORD(class)

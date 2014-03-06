@@ -124,6 +124,8 @@ class ParseContext
     Statement *parseDeclarationStatement();
     Statement *parseStatement();
     Declaration *parseDeclaration();
+    TopLevelExpression *parseTopLevelExpression();
+    UseExpression *parseUseExpression();
     Expression *parseIfExpression();
     Expression *parseSwitchExpression();
     Expression *parseWhileExpression();

@@ -1,3 +1,5 @@
+use "importc"
+
 import(C) "/usr/include/GL/gl.h"
 import(C) "/usr/include/GL/glext.h"
 import(C) "/usr/include/SDL/SDL.h"

@@ -73,6 +73,9 @@ struct TranslationUnit : public Package
     std::vector<TypeDeclaration*> types;
     std::vector<VariableDeclaration*> globals;
     std::vector<FunctionDeclaration*> functions;
+
+    std::map<std::string, bool> extensions;
+
     std::string filenm;
     bool expl; // explicitly requested for compile. eg, not included
     TranslationUnit(Identifier *id, std::string fn = "") : Package(id), filenm(fn), expl(false) {}
@@ -554,10 +557,12 @@ struct WhileExpression;
 struct ForExpression;
 struct PassExpression;
 struct SwitchExpression;
+struct TopLevelExpression;
 struct ImportExpression;
 struct PackageExpression;
 struct CastExpression;
 struct TypeExpression;
+struct UseExpression;
 
 struct Expression
 {
@@ -604,10 +609,11 @@ struct Expression
     virtual ForExpression *forExpression() { return NULL; }
     virtual PassExpression *passExpression() { return NULL; }
     virtual SwitchExpression *switchExpression() { return NULL; }
+    virtual TopLevelExpression *topLevelExpression() { return NULL; }
     virtual ImportExpression *importExpression() { return NULL; }
     virtual PackageExpression *packageExpression() { return NULL; }
     virtual CastExpression *castExpression() { return NULL; }
-
+    virtual UseExpression *useExpression() { return NULL; }
     virtual TypeExpression *typeExpression() { return NULL; }
 
     //TODO: overrides
@@ -839,15 +845,32 @@ struct PackageExpression : public Expression
         : Expression(l), package(p) {}
 };
 
+
+struct TopLevelExpression : public Expression
+{
+    TopLevelExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
+    virtual TopLevelExpression *topLevelExpression() { return this; }
+};
+
+struct UseExpression : public TopLevelExpression
+{
+    virtual UseExpression *useExpression() { return this; }
+};
+
 // import <STRING> |
 // import <IDENTIFIER>
-struct ImportExpression : public Expression
+struct ImportExpression : public TopLevelExpression
 {
     Expression *expression;
     TranslationUnit *unit;
     virtual ImportExpression *importExpression() { return this; }
     ImportExpression(Expression *im, TranslationUnit *u, SourceLocation l = SourceLocation()) :
-        Expression(l), expression(im), unit(u) { }
+        TopLevelExpression(l), expression(im), unit(u) { }
+};
+
+struct IncludeExpression : public TopLevelExpression
+{
+
 };
 
 

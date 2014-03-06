@@ -27,6 +27,7 @@ syn keyword wStorageClass extern
 syn keyword wOperator and or not
 syn keyword wMemOperator new delete renew
 syn keyword wDeclaration var
+syn keyword wUse use
 hi def link wExternal Include 
 hi def link wScopeDecl StorageClass
 hi def link wAssert Assert
@@ -42,6 +43,7 @@ hi def link wStorageClass StorageClass
 hi def link wOperator Operator
 hi def link wMemOperator Operator
 hi def link wDeclaration Keyword
+hi def link wUse Keyword
 
 " Types
 syn keyword Structure class struct union

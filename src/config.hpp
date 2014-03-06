@@ -12,6 +12,7 @@ struct WLConfig
     std::vector<std::string> inc; // -i
     std::vector<std::string> libdirs; // -L
     std::vector<std::string> incdirs; // -I
+
     bool debug;
 
     WLConfig()

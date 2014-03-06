@@ -461,6 +461,9 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(DeleteExpression *dexp = dynamic_cast<DeleteExpression*>(exp))
     {
         return codegenDeleteExpression(dexp);
+    } else if(UseExpression *uexp = exp->useExpression())
+    {
+        return NULL;
     }
     emit_message(msg::FAILURE, "bad expression?", exp->loc);
     return NULL; //TODO

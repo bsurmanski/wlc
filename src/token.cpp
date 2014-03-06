@@ -9,6 +9,7 @@ bool isAssignOp(tok::TokenKind tkind)
     switch(tkind)
     {
         case tok::equal:
+        case tok::colonequal:
         case tok::plusequal:
         case tok::minusequal:
         case tok::starequal:
@@ -30,6 +31,7 @@ int getBinaryPrecidence(tok::TokenKind tkind)
     switch(tkind)
     {
         case tok::equal:
+        case tok::colonequal:
         case tok::plusequal:
         case tok::minusequal:
         case tok::starequal:

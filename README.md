@@ -77,6 +77,15 @@ example:
     // some declaration of a,b,c here
     int i = int: a + int: b + int: c
 
+alternatively, if a variable is being assigned to an expression, and the whole expression needs
+to be casted, the ':=' operator can be used to cast to the type of the left hand side
+
+    int^ myIntPointer = getSomeIntPointer()
+    char^ myCharPointer := myIntPointer
+    char^ equivilentCharPointer = char^: myIntPointer
+
+the cast assign operator effectively casts a value without the required noise of casting
+
 ### Why are braces optional for a function body?
 this allows quick oneliner functions to be easy to write and read. This also 
 falls into the expectation presented by the conditional and loop statments (if,while,etc).

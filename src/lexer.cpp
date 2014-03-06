@@ -174,6 +174,7 @@ Token Lexer::lexPunct()
             break;
         case ':':
             ignoreChar();
+            IFCONSUMEBREAK('=', kind = tok::colonequal);
             kind = tok::colon;
             break;
         case '~':

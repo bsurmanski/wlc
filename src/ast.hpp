@@ -348,6 +348,34 @@ struct ASTType
         }
     }
 
+    bool coercesTo(ASTType *ty) const
+    {
+        switch(type)
+        {
+            case TYPE_POINTER:
+                return ty->isInteger() || ty == this; //TODO: check if compatible pointer
+            case TYPE_BOOL:
+            case TYPE_UCHAR:
+            case TYPE_CHAR:
+            case TYPE_USHORT:
+            case TYPE_SHORT:
+            case TYPE_UINT:
+            case TYPE_INT:
+            case TYPE_ULONG:
+            case TYPE_LONG:
+            case TYPE_FLOAT:
+            case TYPE_DOUBLE:
+                return ty->isNumeric();
+            default:
+                return false;
+        }
+    }
+
+    bool castsTo(ASTType *ty) const
+    {
+        return true;  //TODO
+    }
+
     size_t length() const
     {
         switch(type)
@@ -410,6 +438,7 @@ struct ASTType
     bool isSigned() { return type == TYPE_CHAR || type == TYPE_SHORT ||
         type == TYPE_INT || type == TYPE_LONG; }
     bool isFloating() { return type == TYPE_FLOAT || type == TYPE_DOUBLE; }
+    bool isNumeric() { return isFloating() || isInteger(); }
     bool isVector() { return type == TYPE_VEC; }
     bool isArray() { return type == TYPE_ARRAY || type == TYPE_DYNAMIC_ARRAY; }
     bool isPointer() { return this && type == TYPE_POINTER; } //TODO: shouldnt need to test for this

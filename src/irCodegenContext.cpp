@@ -1325,6 +1325,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     {
         //ASSIGN
         case tok::equal:
+        case tok::colonequal:
             if(!lhs->isLValue()){
                 emit_message(msg::ERROR, "LHS must be LValue", exp->loc);
                 return NULL;
@@ -1485,7 +1486,18 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
     if(isAssignOp((tok::TokenKind) exp->op)) //XXX messy
     {
-        retValue = promoteType(retValue, TYPE); //TODO: merge with decl assign
+        if(rhs->type->coercesTo(lhs->type))
+        {
+            retValue = promoteType(retValue, TYPE); //TODO: merge with decl assign
+        } else if(rhs->type->castsTo(lhs->type) && exp->op == tok::colonequal) // cast equal
+        {
+            retValue = promoteType(retValue, TYPE);
+        } else
+        {
+            emit_message(msg::ERROR, "cannot assign value of type '" + rhs->type->getName() +
+                    "' to type '" + lhs->type->getName() + "'", exp->loc);
+            return NULL;
+        }
         storeValue(lhs, retValue);
     }
 

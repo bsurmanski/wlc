@@ -613,7 +613,7 @@ Declaration *ParseContext::parseDeclaration()
     }
 
     Expression *defaultValue = NULL;
-    if(peek().is(tok::equal))
+    if(peek().is(tok::equal) || peek().is(tok::colonequal))
     {
         ignore(); // ignore =
         defaultValue = parseExpression();

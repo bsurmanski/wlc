@@ -302,7 +302,48 @@ struct ASTType
             case TYPE_STRUCT:
             default: return info->getSize();
         }
-    };
+    }
+
+    // conversion priority
+    unsigned priority() const
+    {
+        switch(type)
+        {
+            case TYPE_UNION:
+            case TYPE_STRUCT:
+                return 0;
+            case TYPE_TUPLE:
+                return 1;
+            case TYPE_ARRAY:
+                return 2;
+            case TYPE_DYNAMIC_ARRAY:
+                return 3;
+            case TYPE_POINTER:
+                return 4;
+            case TYPE_BOOL:
+                return 5;
+            case TYPE_UCHAR:
+                return 6;
+            case TYPE_CHAR:
+                return 7;
+            case TYPE_USHORT:
+                return 8;
+            case TYPE_SHORT:
+                return 9;
+            case TYPE_UINT:
+                return 10;
+            case TYPE_INT:
+                return 11;
+            case TYPE_ULONG:
+                return 12;
+            case TYPE_LONG:
+                return 13;
+            case TYPE_FLOAT:
+                return 14;
+            case TYPE_DOUBLE:
+                return 15;
+        }
+    }
 
     size_t length() const
     {

@@ -1282,7 +1282,7 @@ void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, u
             // TODO: loc
             emit_message(msg::UNIMPLEMENTED, "cannot convert structs (yet)");
         }
-        if((*v2)->type->size() > (*v1)->type->size()) *v1 = promoteType(*v1, (*v2)->type);
+        if((*v2)->type->priority() > (*v1)->type->priority()) *v1 = promoteType(*v1, (*v2)->type);
         else *v2 = promoteType(*v2, (*v1)->type);
     }
 }

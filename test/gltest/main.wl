@@ -94,7 +94,7 @@ void initShaders()
 
 void draw()
 {
-    glUniform1f(gltick, sin(tick) / 4.0f)
+    glUniform1f(gltick, sin(tick) / 4)
     glBindTexture(GL_TEXTURE_2D, tex)
     glBegin(GL_QUADS)
     glTexCoord2i(0,0)

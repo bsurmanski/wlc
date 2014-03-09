@@ -912,6 +912,30 @@ Expression *ParseContext::parsePostfixExpression(int prec)
         } else if(linePeek().is(tok::dot))
         {
             ignore(); //ignore .
+            int n = 1;
+
+            // look ahead and see if we can spot an 'infix cast'
+            while(lookAhead(n).isNot(tok::dot) && !lookAhead(n).followsNewline() &&
+                    !lookAhead(n).isBinaryOp())
+            {
+                if(lookAhead(n).is(tok::colon)) // infix cast detected
+                {
+                    ASTType *type = parseType(NULL);
+                    if(peek().isNot(tok::colon)){
+                        emit_message(msg::ERROR,
+                                "expected colon while parsing infix cast", peek().loc);
+                        dropLine();
+                        return NULL;
+                    }
+                    ignore(); //colon
+                    loc = peek().loc;
+                    exp = new DotExpression(exp, get().toString(), loc);
+                    exp = new CastExpression(type, exp, loc);
+                    return exp;
+                }
+                n++;
+            }
+
             exp = new DotExpression(exp, get().toString(), loc);
         }
         else if(linePeek().is(tok::plusplus))

@@ -84,7 +84,24 @@ to be casted, the ':=' operator can be used to cast to the type of the left hand
     char^ myCharPointer := myIntPointer
     char^ equivilentCharPointer = char^: myIntPointer
 
-the cast assign operator effectively casts a value without the required noise of casting
+the cast assign operator effectively casts a value without the required noise of casting.
+
+Another addition added to help reduce casting noise is the 'infix' cast. This style of casting
+is used for long 'dot expression' chains. In a long chain of member references, 
+it is often necessary to cast one of the members to another type. Due to the nature of 
+cast expressions, the cast type will end up at the beginning of the expression, far away
+from the relevent variable. And often this requires exuberant brackets to disambiguate the
+member which requires casting. This often creates confusing expressions which requires the
+excessive eye-pingponging to understand what is being applied where. WL attempts to reduce
+ambiguity in long dereferencing chains by adding an infix cast to keep the casted member 
+close to the casted type. Heres an example:
+
+    MyClass bar = getABar();
+    int foo1 = (Biz: bar.baz.buzz).value
+    int foo2 = bar.baz. Biz: buzz .value
+
+compare the two equivilent casts in the assignment of foo1, and foo2. the second of which
+can be read left to right without the need to look back to the beginning of the expression. 
 
 ### Why are braces optional for a function body?
 this allows quick oneliner functions to be easy to write and read. This also 

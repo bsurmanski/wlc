@@ -1937,13 +1937,16 @@ void IRCodegenContext::codegenPackage(Package *p)
     }
 }
 
-void IRCodegenContext::codegenAST(AST *ast, WLConfig config)
+#include <fcntl.h>
+#include <unistd.h>
+
+std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
 {
     codegenPackage(ast->getRootPackage());
     if(currentErrorLevel() > msg::WARNING)
     {
         emit_message(msg::OUTPUT, "compilation ended with errors");
-        return;
+        return "";
     }
 
     createIdentMetadata(linker.getModule());
@@ -1959,9 +1962,21 @@ void IRCodegenContext::codegenAST(AST *ast, WLConfig config)
     }
 
     std::string err;
-    raw_fd_ostream output("output.ll", err);
-
+    std::string outputll = config.tempName + "/output.ll";
+    std::string outputo = config.tempName + "/output.o";
+    raw_fd_ostream output(outputll.c_str(), err);
     linker.getModule()->print(output, 0);
+    output.close();
+
+    std::string llccmd = "llc " + outputll + " --filetype=obj -O0 -o " + outputo;
+
+    int syserr = system(llccmd.c_str());
+    if(syserr)
+    {
+        emit_message(msg::FATAL, std::string("system command failed...") + llccmd.c_str());
+    }
+
+    return outputo;
 }
 
 void IRCodegen(AST *ast, WLConfig config)

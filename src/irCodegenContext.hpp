@@ -61,7 +61,7 @@ class IRCodegenContext : public CodegenContext
 
     llvm::LLVMContext& getLLVMContext() { return context; }
 
-    void codegenAST(AST *ast, WLConfig param);
+    std::string codegenAST(AST *ast, WLConfig param);
     protected:
     std::stack<SymbolTable*> scope;
 

@@ -11,6 +11,46 @@ using namespace std;
 #include <vector>
 #include <llvm/Linker.h>
 
+void link(WLConfig params, std::string outputo)
+{
+        std::string dynamiclinker = "/lib64/ld-linux-x86-64.so.2";
+
+        std::string libdirstr = "";
+        std::string incdirstr = "";
+        std::string libstr = "";
+        std::string incstr = "";
+
+
+        for(int i = 0; i < params.libdirs.size(); i++)
+        {
+            libdirstr += " -L" + params.libdirs[i];
+        }
+
+        for(int i = 0; i < params.incdirs.size(); i++)
+        {
+            incdirstr += " -l" + params.incdirs[i];
+        }
+
+        for(int i = 0; i < params.lib.size(); i++)
+        {
+            libstr += " -l" + params.lib[i];
+        }
+
+        for(int i = 0; i < params.inc.size(); i++)
+        {
+            libstr += " -i" + params.inc[i];
+        }
+
+        std::string linkcmd = "ld " + outputo +
+            " /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o -lc -lm -dynamic-linker " +
+            dynamiclinker + libdirstr + incdirstr + libstr + incstr + " -o " + params.output;
+        int err = system(linkcmd.c_str());
+        if(err)
+        {
+            printf("err: %d\n", err);
+            emit_message(msg::FATAL, "error linking: " + linkcmd);
+        }
+}
 
 void compile(WLConfig params)
 {
@@ -33,7 +73,8 @@ void compile(WLConfig params)
             }
         }
         IRCodegenContext cg;
-        cg.codegenAST(ast, params);
+        std::string outputo = cg.codegenAST(ast, params);
+        link(params, outputo);
     } else
     {
         emit_message(msg::FATAL, "no input files");
@@ -45,6 +86,9 @@ WLConfig parseCmd(int argc, char **argv)
     WLConfig params;
     params.cmd = string(argv[0]);
     params.files = vector<string>();
+    char ftemplate[32] = "/tmp/wlcXXXXXX\0";
+    params.tempName = mkdtemp(ftemplate);
+    params.output = "a.out"; // default output string
 
     int c;
     while((c = getopt(argc, argv, "-gl:L:I:o:")) != -1)
@@ -68,6 +112,7 @@ WLConfig parseCmd(int argc, char **argv)
                 break;
             case 'o':
                 params.output = string(optarg);
+                break;
             case '?':
                 if(optopt == 'l' || optopt == 'L' || optopt == 'I')
                 {
@@ -84,10 +129,16 @@ WLConfig parseCmd(int argc, char **argv)
     return params;
 }
 
+void deinit(WLConfig &config)
+{
+    rmdir(config.tempName.c_str());
+}
+
 int main(int argc, char **argv)
 {
     WLConfig param = parseCmd(argc, argv);
     if(currentErrorLevel()) return -1; // failure to parse args
     compile(param);
+    deinit(param);
     return 0;
 }

@@ -1963,7 +1963,15 @@ std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
 
     std::string err;
     std::string outputll = config.tempName + "/output.ll";
-    std::string outputo = config.tempName + "/output.o";
+    std::string outputo;
+    if(config.link)
+    {
+        outputo = config.tempName + "/output.o";
+    } else
+    {
+        outputo = "output.o";
+    }
+
     raw_fd_ostream output(outputll.c_str(), err);
     linker.getModule()->print(output, 0);
     output.close();

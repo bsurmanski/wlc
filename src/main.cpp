@@ -74,7 +74,9 @@ void compile(WLConfig params)
         }
         IRCodegenContext cg;
         std::string outputo = cg.codegenAST(ast, params);
-        link(params, outputo);
+
+        if(params.link)
+            link(params, outputo);
     } else
     {
         emit_message(msg::FATAL, "no input files");
@@ -91,7 +93,7 @@ WLConfig parseCmd(int argc, char **argv)
     params.output = "a.out"; // default output string
 
     int c;
-    while((c = getopt(argc, argv, "-gl:L:I:o:")) != -1)
+    while((c = getopt(argc, argv, "-gcl:L:I:o:")) != -1)
     {
         switch(c)
         {
@@ -100,6 +102,9 @@ WLConfig parseCmd(int argc, char **argv)
                 break;
             case 'g':
                 params.debug = true;
+                break;
+            case 'c':
+                params.link = false;
                 break;
             case 'l':
                 params.lib.push_back(optarg);

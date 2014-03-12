@@ -15,11 +15,13 @@ struct WLConfig
 
     std::string tempName;
 
+    bool link;
     bool debug;
 
     WLConfig()
     {
-        debug = 0;
+        link = true;
+        debug = false;
     }
 };
 

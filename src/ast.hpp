@@ -617,9 +617,11 @@ struct Expression
         EXP_IMPORT,
     };
     */
-
     void setLocation(SourceLocation l) { loc = l; }
     SourceLocation loc;
+
+    virtual bool isConstant() { return false; }
+    virtual ASTType *getType() { return NULL; }
 
     Expression(SourceLocation l = SourceLocation()) : loc(l) {}
     virtual UnaryExpression *unaryExpression() { return NULL; }
@@ -658,6 +660,7 @@ struct TypeExpression : public Expression
 struct NewExpression : public Expression
 {
     ASTType *type;
+    virtual ASTType *getType() { return type; }
     NewExpression(ASTType *t, SourceLocation l = SourceLocation()) : Expression(l), type(t) {}
 };
 
@@ -679,6 +682,7 @@ struct CastExpression : public Expression
 {
     ASTType *type;
     Expression *expression;
+    virtual ASTType *getType() { return type; }
     virtual CastExpression *castExpression() { return this; }
     CastExpression(ASTType *ty, Expression *exp, SourceLocation l = SourceLocation()) :
         Expression(l), type(ty), expression(exp){}
@@ -695,6 +699,7 @@ struct CallExpression : public PostfixExpression
 {
     virtual CallExpression *callExpression() { return this; }
     Expression *function;
+    virtual ASTType *getType() { return function->getType(); }
     std::vector<Expression *> args;
     CallExpression(Expression *f, std::vector<Expression*> a, SourceLocation l = SourceLocation()) :
         PostfixExpression(l), function(f), args(a) {}
@@ -730,6 +735,8 @@ struct UnaryExpression : public Expression
     virtual UnaryExpression *unaryExpression() { return this; }
     Expression *lhs;
     unsigned op;
+
+    virtual bool isConstant() { return lhs->isConstant(); }
     UnaryExpression(unsigned o, Expression *l, SourceLocation lo = SourceLocation()) :
         Expression(lo), lhs(l), op(o) {}
 };
@@ -740,6 +747,7 @@ struct BinaryExpression : public Expression
     Expression *lhs;
     Expression *rhs;
     unsigned op;
+    virtual bool isConstant() { return lhs->isConstant() && rhs->isConstant(); }
     BinaryExpression(unsigned o, Expression *l, Expression *r, SourceLocation lo = SourceLocation()) :
         Expression(lo), lhs(l), rhs(r), op(o) {}
 };
@@ -765,6 +773,8 @@ struct IdentifierExpression : public PrimaryExpression
 struct StringExpression : public PrimaryExpression
 {
     std::string string;
+    virtual ASTType *getType() { return ASTType::getCharTy()->getArrayTy(string.length()); }
+    virtual bool isConstant() { return true; }
     StringExpression(std::string str, SourceLocation l = SourceLocation()) :
         PrimaryExpression(l), string(str) {}
     virtual StringExpression *stringExpression() { return this; }
@@ -791,6 +801,8 @@ struct NumericExpression : public PrimaryExpression
         char charValue;
     };
 
+    virtual ASTType *getType() { return astType; }
+    virtual bool isConstant() { return true; }
     NumericExpression(NumericType t, ASTType* ty, double val, SourceLocation l = SourceLocation()) :
         PrimaryExpression(l), type(t),  astType(ty), floatValue(val) {}
     NumericExpression(NumericType t, ASTType *ty, uint64_t val, SourceLocation l = SourceLocation()) :
@@ -801,6 +813,7 @@ struct NumericExpression : public PrimaryExpression
 struct DeclarationExpression : public Expression
 {
     Declaration *decl;
+    virtual ASTType *getType() { return decl->getType(); }
     DeclarationExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
     virtual DeclarationExpression *declarationExpression() { return this; }
 };
@@ -856,12 +869,17 @@ struct ForExpression : public Expression
         Expression(l), decl(d), condition(c), update(u), body(b), elsebranch(e) {}
 };
 
+struct CaseExpression : public Expression
+{
+    Expression *_case;
+    std::vector<Statement *> statements;
+};
+
 struct SwitchExpression : public Expression
 {
     //TODO
     Expression *_switch;
-    std::vector<Expression*> cases;
-    std::vector<Statement*> statements;
+    std::vector<CaseExpression *> cases;
     virtual SwitchExpression *switchExpression() { return this; }
     SwitchExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
 };

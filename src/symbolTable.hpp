@@ -6,8 +6,6 @@
 #include <string>
 #include "identifier.hpp"
 
-#include <llvm/DebugInfo.h> //XXX
-
 typedef std::map<std::string, Identifier*>::iterator SymbolIterator;
 
 struct SymbolTable
@@ -16,9 +14,6 @@ struct SymbolTable
     std::vector<SymbolTable*> siblings;
     std::map<std::string, Identifier *> symbols;
     std::map<std::string, bool> extensions;
-    llvm::DIDescriptor debug; //TODO
-    void setDebug(llvm::DIDescriptor d) { debug = d; }
-    llvm::DIDescriptor getDebug() { return debug; }
 
     bool extensionEnabled(std::string s)
     {
@@ -30,7 +25,7 @@ struct SymbolTable
         extensions[s] = true;
     }
 
-    SymbolTable(SymbolTable *par = NULL) : parent(par), debug(0) { if(!par) addBuiltin(); }
+    SymbolTable(SymbolTable *par = NULL) : parent(par) { if(!par) addBuiltin(); }
     SymbolIterator begin() { return symbols.begin(); }
     SymbolIterator end() { return symbols.end(); }
     void addSibling(SymbolTable *t);

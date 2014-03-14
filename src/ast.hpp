@@ -688,7 +688,6 @@ struct CastExpression : public Expression
         Expression(l), type(ty), expression(exp){}
 };
 
-
 struct PostfixExpression : public Expression
 {
     PostfixExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
@@ -869,19 +868,13 @@ struct ForExpression : public Expression
         Expression(l), decl(d), condition(c), update(u), body(b), elsebranch(e) {}
 };
 
-struct CaseExpression : public Expression
-{
-    Expression *_case;
-    std::vector<Statement *> statements;
-};
-
 struct SwitchExpression : public Expression
 {
-    //TODO
-    Expression *_switch;
-    std::vector<CaseExpression *> cases;
+    Expression *condition;
+    Statement *body;
     virtual SwitchExpression *switchExpression() { return this; }
-    SwitchExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
+    SwitchExpression(Expression *cond, Statement *b, SourceLocation l = SourceLocation())
+        : condition(cond), body(b), Expression(l) {}
 };
 
 struct PackageExpression : public Expression
@@ -950,6 +943,13 @@ struct LabelStatement : Statement
 {
     Identifier *identifier;
     LabelStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
+};
+
+struct CaseStatement : public Statement
+{
+    Expression *value;
+    CaseStatement(Expression *exp, SourceLocation l = SourceLocation()) :
+        Statement(l), value(exp) {}
 };
 
 struct GotoStatement : Statement

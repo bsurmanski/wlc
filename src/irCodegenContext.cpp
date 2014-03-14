@@ -464,9 +464,19 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(UseExpression *uexp = exp->useExpression())
     {
         return NULL;
+    } else if(SwitchExpression *sexp = dynamic_cast<SwitchExpression*>(exp))
+    {
+        return codegenSwitchExpression(sexp);
     }
+
     emit_message(msg::FAILURE, "bad expression?", exp->loc);
     return NULL; //TODO
+}
+
+ASTValue *IRCodegenContext::codegenSwitchExpression(SwitchExpression *exp)
+{
+    //TODO:
+    return NULL;
 }
 
 ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType *ty)
@@ -1609,7 +1619,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
             dwarfStopPoint(decl->loc);
             debug->createFunction(fdecl);
-            pushScope(fdecl->scope, fdecl->diSubprogram);
+            pushScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
             dwarfStopPoint(decl->loc);
 
             int idx = 0;
@@ -1819,8 +1829,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
     this->module = this->unit->module;
     this->debug = new IRDebug(this, u);
 
-    pushScope(unit->getScope(), debug->diUnit); //TODO: debug
-    //if(u->cgValue) return (llvm::Module*) u->cgValue; //XXX already codegend
+    pushScope(new IRScope(unit->unit->getScope(), debug->getCompileUnit()));
 
     for(int i = 0; i < unit->unit->imports.size(); i++) //TODO: import symbols.
     {
@@ -1962,8 +1971,17 @@ std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
     }
 
     std::string err;
-    std::string outputll = config.tempName + "/output.ll";
+    std::string outputll;
     std::string outputo;
+
+    if(config.emitllvm)
+    {
+        outputll = "output.ll";
+    } else
+    {
+        outputll = config.tempName + "/output.ll";
+    }
+
     if(config.link)
     {
         outputo = config.tempName + "/output.o";
@@ -1978,10 +1996,16 @@ std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
 
     std::string llccmd = "llc " + outputll + " --filetype=obj -O0 -o " + outputo;
 
-    int syserr = system(llccmd.c_str());
-    if(syserr)
+    if(!config.emitllvm)
     {
-        emit_message(msg::FATAL, std::string("system command failed...") + llccmd.c_str());
+        int syserr = system(llccmd.c_str());
+        if(syserr)
+        {
+            emit_message(msg::FATAL, std::string("system command failed...") + llccmd.c_str());
+        }
+    } else
+    {
+        return "";
     }
 
     return outputo;

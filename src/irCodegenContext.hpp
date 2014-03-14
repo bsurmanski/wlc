@@ -26,19 +26,44 @@ struct IRFunction
     IRFunction(FunctionDeclaration *decl) : declaration(decl), terminated(false) {}
 };
 
+struct IRScope
+{
+    llvm::BasicBlock *breakLabel;
+    llvm::BasicBlock *continueLabel;
+    llvm::DIDescriptor debug;
+    std::vector<std::pair<llvm::Value*, llvm::BasicBlock*> > cases;
+    SymbolTable *table;
+
+    llvm::DIDescriptor getDebug() { return debug; }
+
+    bool contains(std::string s) { return table->contains(s); }
+    Identifier *getInScope(std::string s) { return table->getInScope(s); }
+    Identifier *get(std::string s) { return table->get(s); }
+    Identifier *lookup(std::string s, bool imports = true) { return table->lookup(s, imports); }
+
+    IRScope(SymbolTable *tbl, llvm::DIDescriptor dbg) : table(tbl), debug(dbg) {}
+};
+
 struct IRTranslationUnit
 {
     TranslationUnit *unit;
+    IRScope *scope;
     llvm::Module *module;
+
 
     std::map<std::string, llvm::Type*> types;
 
     std::vector<VariableDeclaration*>& getGlobals() { return unit->globals; }
     std::vector<FunctionDeclaration*>& getFunctions() { return unit->functions; }
 
-    SymbolTable *getScope() { return unit->getScope(); }
+
+    //IRScope *getScope() {
+    //    if(!scope)
+    //        scope = new IRScope(unit->getScope(), );
+    //    return scope;
+    //}
     //operator TranslationUnit*() { return unit; }
-    IRTranslationUnit(TranslationUnit *u) : unit(u) {}
+    IRTranslationUnit(TranslationUnit *u) : unit(u), scope(NULL) {}
 };
 
 class IRDebug;
@@ -63,7 +88,8 @@ class IRCodegenContext : public CodegenContext
 
     std::string codegenAST(AST *ast, WLConfig param);
     protected:
-    std::stack<SymbolTable*> scope;
+    //std::stack<SymbolTable*> scope;
+    std::stack<IRScope*> scope;
 
     // codegen type
     llvm::Type *codegenArrayType(ASTType *ty);
@@ -81,9 +107,9 @@ class IRCodegenContext : public CodegenContext
 
     public:
     //scope
-    void pushScope(SymbolTable* tbl, llvm::DIDescriptor debug) { tbl->setDebug(debug); scope.push(tbl);}
-    SymbolTable *popScope() { SymbolTable *tbl = scope.top(); scope.pop(); return tbl;}
-    SymbolTable *getScope() { return scope.top(); }
+    void pushScope(IRScope *sc) { scope.push(sc);}
+    IRScope *popScope() { IRScope *tbl = scope.top(); scope.pop(); return tbl;}
+    IRScope *getScope() { return scope.top(); }
     Identifier *lookup(std::string str){ return scope.top()->lookup(str); }
     Identifier *getInScope(std::string str) { return scope.top()->getInScope(str); }
 
@@ -106,6 +132,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenIfExpression(IfExpression *exp);
     ASTValue *codegenWhileExpression(WhileExpression *exp);
     ASTValue *codegenForExpression(ForExpression *exp);
+    ASTValue *codegenSwitchExpression(SwitchExpression *exp);
     ASTValue *codegenCallExpression(CallExpression *exp);
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);
     ASTValue *codegenUnaryExpression(UnaryExpression *exp);

@@ -17,11 +17,13 @@ struct WLConfig
 
     bool link;
     bool debug;
+    bool emitllvm;
 
     WLConfig()
     {
         link = true;
         debug = false;
+        emitllvm = false;
     }
 };
 

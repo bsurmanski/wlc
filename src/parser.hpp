@@ -123,6 +123,7 @@ class ParseContext
     ImportExpression *parseImport();
     Statement *parseDeclarationStatement();
     Statement *parseStatement();
+    CaseStatement *parseCaseStatement();
     Declaration *parseDeclaration();
     TopLevelExpression *parseTopLevelExpression();
     UseExpression *parseUseExpression();

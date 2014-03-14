@@ -32,6 +32,7 @@ class IRDebug
 
         llvm::Module *getModule();
 
+        llvm::DICompileUnit getCompileUnit() { return diUnit; }
         llvm::DIFile currentFile() { return diFile; }
         llvm::DIDescriptor currentScope();
         llvm::DICompositeType createStructType(ASTType *ty);

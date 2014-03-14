@@ -125,6 +125,13 @@ int main(int argc, char^^ argv)
     SDL_Surface^ surf = SDL_SetVideoMode(512, 256, 32, SDL_OPENGL)
     bool spc = false
 
+    switch(5)
+    {
+        case 1
+        case 2
+            printf("hi")
+    }
+
     init()
     while(!spc)
     {

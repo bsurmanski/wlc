@@ -457,6 +457,9 @@ PARSEEXP:
             ignore();
             return new BreakStatement(loc);
 
+        case tok::kw_case:
+            return parseCaseStatement();
+
         case tok::semicolon:
             ignore();
             return NULL;
@@ -753,8 +756,31 @@ Expression *ParseContext::parseForExpression()
     return new ForExpression(decl, cond, upd, body, els, loc);
 }
 
+CaseStatement *ParseContext::parseCaseStatement()
+{
+    SourceLocation loc = peek().loc;
+    if(peek().isNot(tok::kw_case))
+    {
+        emit_message(msg::FAILURE, "expected 'case' keyword", peek().loc);
+        return NULL;
+    }
+    ignore(); // eat 'case'
+    Expression *exp = parseExpression();
+
+    /*
+    if(peek().isNot(tok::colon))
+    {
+        emit_message(msg::FAILURE, "expected ':' following case value", peek().loc);
+        return NULL;
+    }
+    ignore(); // eat ':' */
+
+    return new CaseStatement(exp, loc);
+}
+
 Expression *ParseContext::parseSwitchExpression()
 {
+    SourceLocation loc = peek().loc;
     if(peek().isNot(tok::kw_switch)) {
         emit_message(msg::FAILURE, "expected 'switch' keyword", peek().loc);
         return NULL;
@@ -777,8 +803,9 @@ Expression *ParseContext::parseSwitchExpression()
     }
     ignore(); // eat ')'
 
-    emit_message(msg::UNIMPLEMENTED, "switch keyword unimplemented", peek().loc);
-    return NULL; //TODO: parse body
+    Statement *body = parseStatement();
+
+    return new SwitchExpression(exp, body, loc);
 }
 
 Expression *ParseContext::parseCastExpression(int prec)

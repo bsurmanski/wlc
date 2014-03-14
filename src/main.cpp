@@ -93,7 +93,7 @@ WLConfig parseCmd(int argc, char **argv)
     params.output = "a.out"; // default output string
 
     int c;
-    while((c = getopt(argc, argv, "-gcl:L:I:o:")) != -1)
+    while((c = getopt(argc, argv, "-gcSl:L:I:o:")) != -1)
     {
         switch(c)
         {
@@ -104,6 +104,12 @@ WLConfig parseCmd(int argc, char **argv)
                 params.debug = true;
                 break;
             case 'c':
+                assert(!params.emitllvm && "-c and -S are currently exclusive");
+                params.link = false;
+                break;
+            case 'S':
+                //assert(params.link && "-c and -S are currently exclusive");
+                params.emitllvm = true;
                 params.link = false;
                 break;
             case 'l':

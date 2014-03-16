@@ -582,6 +582,7 @@ struct StringExpression;
 struct DeclarationExpression;
 struct BlockExpression;
 struct IfExpression;
+struct LoopExpression;
 struct WhileExpression;
 struct ForExpression;
 struct PassExpression;
@@ -636,6 +637,7 @@ struct Expression
     virtual DeclarationExpression *declarationExpression() { return NULL; }
     virtual BlockExpression *blockExpression() { return NULL; }
     virtual IfExpression *ifExpression() { return NULL; }
+    virtual LoopExpression *loopExpression() { return NULL; }
     virtual WhileExpression *whileExpression() { return NULL; }
     virtual ForExpression *forExpression() { return NULL; }
     virtual PassExpression *passExpression() { return NULL; }
@@ -838,34 +840,39 @@ struct IfExpression : public Expression
 {
     Expression *condition;
     Statement *body;
-    Statement *elsebranch;
+    Statement *elsebr;
     virtual IfExpression *ifExpression() { return this; }
     IfExpression(Expression *c, Statement *b, Statement *e, SourceLocation l = SourceLocation()) :
-        Expression(l), condition(c), body(b), elsebranch(e) {}
+        Expression(l), condition(c), body(b), elsebr(e) {}
 };
 
-// value same as if
-struct WhileExpression : public Expression
+struct LoopExpression : public Expression
 {
-    Expression *condition;
-    Statement *body;
-    Statement *elsebranch;
-    virtual WhileExpression *whileExpression() { return this; }
-    WhileExpression(Expression *c, Statement *b, Statement *e, SourceLocation l = SourceLocation()) :
-        Expression(l), condition(c), body(b), elsebranch(e) {}
-};
-
-struct ForExpression : public Expression
-{
-    Statement *decl;
     Expression *condition;
     Statement *update;
     Statement *body;
-    Statement *elsebranch;
+    Statement *elsebr;
+    LoopExpression *loopExpression() { return this; }
+    LoopExpression(Expression *c, Statement *u, Statement *b, Statement *el,
+            SourceLocation l = SourceLocation()) : Expression(l), condition(c),
+                                                update(u), body(b), elsebr(el) {}
+};
+
+// value same as if
+struct WhileExpression : public LoopExpression
+{
+    virtual WhileExpression *whileExpression() { return this; }
+    WhileExpression(Expression *c, Statement *b, Statement *e, SourceLocation l = SourceLocation()) :
+        LoopExpression(c, NULL, b, e, l) {}
+};
+
+struct ForExpression : public LoopExpression
+{
+    Statement *decl;
     virtual ForExpression *forExpression() { return this; }
     ForExpression(Statement *d, Expression *c, Statement *u, Statement *b, Statement *e,
             SourceLocation l = SourceLocation()) :
-        Expression(l), decl(d), condition(c), update(u), body(b), elsebranch(e) {}
+        decl(d), LoopExpression(c, u, b, e, l) {}
 };
 
 struct SwitchExpression : public Expression

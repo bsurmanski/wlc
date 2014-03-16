@@ -26,13 +26,32 @@ struct IRFunction
     IRFunction(FunctionDeclaration *decl) : declaration(decl), terminated(false) {}
 };
 
+struct IRSwitchCase
+{
+    Expression *astCase;
+    llvm::Value *irCase;
+    llvm::BasicBlock *irBlock;
+};
+
+struct IRCodegenContext;
+struct IRLoop
+{
+    llvm::BasicBlock *end; // where to go after break
+    llvm::BasicBlock *udp; // where to go after continue
+
+    IRLoop(IRCodegenContext *c, LoopExpression *exp);
+};
+
 struct IRScope
 {
     llvm::BasicBlock *breakLabel;
     llvm::BasicBlock *continueLabel;
     llvm::DIDescriptor debug;
-    std::vector<std::pair<llvm::Value*, llvm::BasicBlock*> > cases;
     SymbolTable *table;
+
+    //switch
+    SwitchExpression *switchExp;
+    std::vector<IRSwitchCase*> cases;
 
     llvm::DIDescriptor getDebug() { return debug; }
 
@@ -79,6 +98,7 @@ class IRCodegenContext : public CodegenContext
     IRFunction currentFunction;
     IRTranslationUnit *unit;
     IRDebug *debug;
+    std::stack<IRScope*> scope;
 
     IRCodegenContext() : context(llvm::getGlobalContext()),
     ir(new llvm::IRBuilder<>(context)),
@@ -88,8 +108,6 @@ class IRCodegenContext : public CodegenContext
 
     std::string codegenAST(AST *ast, WLConfig param);
     protected:
-    //std::stack<SymbolTable*> scope;
-    std::stack<IRScope*> scope;
 
     // codegen type
     llvm::Type *codegenArrayType(ASTType *ty);
@@ -130,8 +148,7 @@ class IRCodegenContext : public CodegenContext
 
     ASTValue *codegenIdentifier(Identifier *id);
     ASTValue *codegenIfExpression(IfExpression *exp);
-    ASTValue *codegenWhileExpression(WhileExpression *exp);
-    ASTValue *codegenForExpression(ForExpression *exp);
+    ASTValue *codegenLoopExpression(LoopExpression *exp);
     ASTValue *codegenSwitchExpression(SwitchExpression *exp);
     ASTValue *codegenCallExpression(CallExpression *exp);
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);

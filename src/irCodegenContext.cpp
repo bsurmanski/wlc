@@ -439,13 +439,10 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(IfExpression *iexp = exp->ifExpression())
     {
         return codegenIfExpression(iexp);
-    } else if(WhileExpression *wexp = exp->whileExpression())
+    } else if(LoopExpression *lexp = exp->loopExpression())
     {
-        return codegenWhileExpression(wexp);
-    } else if(ForExpression *fexp = exp->forExpression())
-    {
-        return codegenForExpression(fexp);
-    }else if(ImportExpression *iexp = exp->importExpression())
+        return codegenLoopExpression(lexp);
+    } else if(ImportExpression *iexp = exp->importExpression())
     {
         //TODO: should it return something? probably. Some sort of const package ptr or something...
         return NULL;
@@ -609,70 +606,33 @@ ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
         ir->CreateBr(endif);
 
     ir->SetInsertPoint(onfalse);
-    if(exp->elsebranch) codegenStatement(exp->elsebranch);
+    if(exp->elsebr) codegenStatement(exp->elsebr);
     ir->CreateBr(endif);
 
     ir->SetInsertPoint(endif);
     return NULL;
 }
 
-ASTValue *IRCodegenContext::codegenWhileExpression(WhileExpression *exp)
+ASTValue *IRCodegenContext::codegenLoopExpression(LoopExpression *exp)
 {
-    llvm::BasicBlock *whileBB = BasicBlock::Create(context, "while_condition",
+    llvm::BasicBlock *loopBB = BasicBlock::Create(context, "loop_condition",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "while_true",
+    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "loop_true",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "while_false",
+    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "loop_false",
             ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *endwhile = BasicBlock::Create(context, "endwhile",
+    llvm::BasicBlock *loopupdate = BasicBlock::Create(context, "loop_update",
+            ir->GetInsertBlock()->getParent());
+    llvm::BasicBlock *loopend = BasicBlock::Create(context, "loop_end",
             ir->GetInsertBlock()->getParent());
 
-    ir->CreateBr(whileBB);
-    ir->SetInsertPoint(whileBB);
-    ASTValue *cond = codegenExpression(exp->condition);
-    ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
-
-    /*if(icond->getType() != ASTType::getBoolTy())
+    if(ForExpression *fexp = exp->forExpression())
     {
-        ASTValue *zero = new ASTValue(ASTType::getIntTy(), ConstantInt::get(Type::getInt32Ty(context), 0));
-        codegenResolveBinaryTypes(&cond, &zero, 0);
-        icond = new ASTValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(cond), codegenValue(zero)));
-    }*/
-    ir->CreateCondBr(codegenValue(icond), ontrue, onfalse);
+        if(fexp->decl) codegenStatement(fexp->decl);
+    }
 
-    this->breakLabel = endwhile;
-    ir->SetInsertPoint(ontrue);
-    codegenStatement(exp->body);
-    ir->CreateBr(whileBB);
-
-    ir->SetInsertPoint(onfalse);
-    if(exp->elsebranch) codegenStatement(exp->elsebranch);
-    ir->CreateBr(endwhile);
-
-    //TODO: break label should be set to whatever it was previously, to allow for nested while
-    this->breakLabel = NULL;
-
-    ir->SetInsertPoint(endwhile);
-    return NULL;
-}
-
-ASTValue *IRCodegenContext::codegenForExpression(ForExpression *exp)
-{
-    llvm::BasicBlock *forBB = BasicBlock::Create(context, "for_condition",
-            ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *ontrue = BasicBlock::Create(context, "for_true",
-            ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *onfalse = BasicBlock::Create(context, "for_false",
-            ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *forupdate = BasicBlock::Create(context, "forupdate",
-            ir->GetInsertBlock()->getParent());
-    llvm::BasicBlock *endfor = BasicBlock::Create(context, "endfor",
-            ir->GetInsertBlock()->getParent());
-
-    if(exp->decl) codegenStatement(exp->decl);
-
-    ir->CreateBr(forBB);
-    ir->SetInsertPoint(forBB);
+    ir->CreateBr(loopBB);
+    ir->SetInsertPoint(loopBB);
 
     if(exp->condition)
     {
@@ -683,22 +643,24 @@ ASTValue *IRCodegenContext::codegenForExpression(ForExpression *exp)
 
     BasicBlock *OLDBREAK = this->breakLabel; // TODO: ugly
     BasicBlock *OLDCONTINUE = this->continueLabel; //TODO: still ugly
-    this->breakLabel = endfor;
-    this->continueLabel = forupdate;
+
+    this->breakLabel = loopend;
+    this->continueLabel = loopupdate;
     ir->SetInsertPoint(ontrue);
     if(exp->body) codegenStatement(exp->body);
-    ir->CreateBr(forupdate);
-    ir->SetInsertPoint(forupdate);
+    ir->CreateBr(loopupdate);
+    ir->SetInsertPoint(loopupdate);
     if(exp->update) codegenStatement(exp->update);
-    ir->CreateBr(forBB);
+    ir->CreateBr(loopBB);
 
     ir->SetInsertPoint(onfalse);
-    if(exp->elsebranch) codegenStatement(exp->elsebranch);
-    ir->CreateBr(endfor);
+    if(exp->elsebr) codegenStatement(exp->elsebr);
+    ir->CreateBr(loopend);
+
     this->breakLabel = OLDBREAK;
     this->continueLabel = OLDCONTINUE;
 
-    ir->SetInsertPoint(endfor);
+    ir->SetInsertPoint(loopend);
     return NULL;
 }
 

@@ -351,18 +351,18 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
 
 ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
 {
-    if(BlockExpression *bexp = exp->blockExpression())
+    if(CompoundExpression *cexp = exp->compoundExpression())
     {
         bool terminated = false;
-        for(int i = 0; i < bexp->statements.size(); i++)
+        for(int i = 0; i < cexp->statements.size(); i++)
         {
-            if(terminated && dynamic_cast<LabelStatement*>(bexp->statements[i])) terminated = false;
+            if(terminated && dynamic_cast<LabelStatement*>(cexp->statements[i])) terminated = false;
 
             if(!terminated)
-                codegenStatement(bexp->statements[i]);
+                codegenStatement(cexp->statements[i]);
 
-            if(dynamic_cast<GotoStatement*>(bexp->statements[i]) ||
-                    dynamic_cast<ReturnStatement*>(bexp->statements[i]))
+            if(dynamic_cast<GotoStatement*>(cexp->statements[i]) ||
+                    dynamic_cast<ReturnStatement*>(cexp->statements[i]))
                 terminated = true;
         }
         currentFunction.terminated = terminated;
@@ -436,12 +436,19 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
             }
         }
         return codegenIdentifier(iexp->id);
-    } else if(IfExpression *iexp = exp->ifExpression())
+    } else if(BlockExpression *bexp = exp->blockExpression())
     {
-        return codegenIfExpression(iexp);
-    } else if(LoopExpression *lexp = exp->loopExpression())
-    {
-        return codegenLoopExpression(lexp);
+        ASTValue *value = NULL;
+        pushScope(new IRScope(bexp->scope, debug->createScope(getScope()->debug, bexp->loc)));
+        if(IfExpression *iexp = exp->ifExpression())
+        {
+            value = codegenIfExpression(iexp);
+        } else if(LoopExpression *lexp = exp->loopExpression())
+        {
+            value = codegenLoopExpression(lexp);
+        }
+        popScope();
+        return value;
     } else if(ImportExpression *iexp = exp->importExpression())
     {
         //TODO: should it return something? probably. Some sort of const package ptr or something...

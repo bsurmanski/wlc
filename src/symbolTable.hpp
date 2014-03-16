@@ -25,6 +25,7 @@ struct SymbolTable
         extensions[s] = true;
     }
 
+    void dump();
     SymbolTable(SymbolTable *par = NULL) : parent(par) { if(!par) addBuiltin(); }
     SymbolIterator begin() { return symbols.begin(); }
     SymbolIterator end() { return symbols.end(); }

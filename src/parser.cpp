@@ -504,13 +504,12 @@ Declaration *ParseContext::parseDeclaration()
             return NULL;
         }
 
-        SymbolTable *tbl = NULL;
+        SymbolTable *tbl = new SymbolTable(getScope());
+        pushScope(tbl);
         vector<Declaration*> members;
         if(peek().is(tok::lbrace))
         {
             ignore(); // eat lbrace
-            tbl = new SymbolTable(getScope());
-            pushScope(tbl);
             while(peek().isNot(tok::rbrace))
             {
                 Declaration *d = parseDeclaration();
@@ -518,7 +517,6 @@ Declaration *ParseContext::parseDeclaration()
                 while(peek().is(tok::semicolon)) ignore();
             }
             ignore(); //eat rbrace
-            popScope();
         } else ignore(); // eat semicolon
 
         StructUnionInfo *sui = 0;
@@ -536,6 +534,8 @@ Declaration *ParseContext::parseDeclaration()
             id->declaredType()->setTypeInfo(sui, TYPE_STRUCT);
             id->setDeclaration(sdecl, Identifier::ID_STRUCT);
         }
+
+        popScope();
 
         return sdecl;
         //return new TypeDeclaration();
@@ -645,6 +645,8 @@ Expression *ParseContext::parseIfExpression()
     Expression *cond = NULL;
     Statement *body = NULL;
     Statement *els = NULL;
+    SymbolTable *scope = new SymbolTable(getScope());
+    pushScope(scope);
     assert_message(peek().is(tok::kw_if), msg::ERROR, "expected 'if' keyword", peek().loc);
     ignore(); // ignore if
 
@@ -669,9 +671,11 @@ Expression *ParseContext::parseIfExpression()
     {
         ignore(); // else kw
         els = parseStatement();
-    }
+    } //TODO: 'else' should have seperate scope
 
-    return new IfExpression(cond, body, els,loc);
+    popScope();
+
+    return new IfExpression(scope, cond, body, els, loc);
 }
 
 Expression *ParseContext::parseWhileExpression()
@@ -680,6 +684,8 @@ Expression *ParseContext::parseWhileExpression()
     Expression *cond = NULL;
     Statement *body = NULL;
     Statement *els = NULL;
+    SymbolTable *scope = new SymbolTable(getScope());
+    pushScope(scope);
     assert_message(peek().is(tok::kw_while), msg::ERROR, "expected 'while' keyword", peek().loc);
     ignore(); // eat 'while'
 
@@ -697,9 +703,11 @@ Expression *ParseContext::parseWhileExpression()
     {
         ignore(); // else kw
         els = parseStatement();
-    }
+    } //TODO: 'else' should have seperate scope
 
-    return new WhileExpression(cond, body, els, loc);
+    popScope();
+
+    return new WhileExpression(scope, cond, body, els, loc);
 }
 
 Expression *ParseContext::parseForExpression()
@@ -710,6 +718,8 @@ Expression *ParseContext::parseForExpression()
     Statement *upd = NULL;
     Statement *body = NULL;
     Statement *els = NULL;
+    SymbolTable *scope = new SymbolTable(getScope());
+    pushScope(scope);
 
     if(!peek().is(tok::kw_for)) {
         emit_message(msg::ERROR, "expected 'for' keyword", peek().loc);
@@ -753,7 +763,9 @@ Expression *ParseContext::parseForExpression()
         els = parseStatement();
     }
 
-    return new ForExpression(decl, cond, upd, body, els, loc);
+    popScope(); //TODO: else should have seperate scope
+
+    return new ForExpression(scope, decl, cond, upd, body, els, loc);
 }
 
 CaseStatement *ParseContext::parseCaseStatement()
@@ -1073,7 +1085,7 @@ Expression *ParseContext::parsePrimaryExpression()
             stmts.push_back(parseStatement());
         }
         ignore(); // eat rbrace
-        return new BlockExpression(stmts, loc);
+        return new CompoundExpression(stmts, loc);
     }
 
     if(peek().is(tok::identifier))

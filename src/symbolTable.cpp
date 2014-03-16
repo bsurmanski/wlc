@@ -1,6 +1,8 @@
 #include "symbolTable.hpp"
 #include "ast.hpp"
 
+#include <iostream>
+
 void SymbolTable::addBuiltin()
 {
     //XXX dont think this is needed
@@ -8,6 +10,14 @@ void SymbolTable::addBuiltin()
 //#include "tokenkinds.def"
 }
 
+void SymbolTable::dump()
+{
+    std::map<std::string, Identifier *>::iterator it = symbols.begin();
+    for(; it != symbols.end(); it++)
+    {
+        std::cout << it->first << ": " << it->second->getName() << std::endl;
+    }
+}
 
 bool SymbolTable::contains(std::string str)
 {

@@ -13,6 +13,8 @@
 
 #include "irDebug.hpp"
 
+struct IRCodegenContext;
+
 void IRCodegen(AST *ast, WLConfig cfg);
 
 struct IRFunction
@@ -33,14 +35,14 @@ struct IRSwitchCase
     llvm::BasicBlock *irBlock;
 };
 
-struct IRCodegenContext;
+/*
 struct IRLoop
 {
     llvm::BasicBlock *end; // where to go after break
     llvm::BasicBlock *udp; // where to go after continue
 
     IRLoop(IRCodegenContext *c, LoopExpression *exp);
-};
+};*/
 
 struct IRScope
 {

@@ -580,6 +580,7 @@ struct IdentifierExpression;
 struct NumericExpression;
 struct StringExpression;
 struct DeclarationExpression;
+struct CompoundExpression;
 struct BlockExpression;
 struct IfExpression;
 struct LoopExpression;
@@ -635,6 +636,7 @@ struct Expression
     virtual NumericExpression *numericExpression() { return NULL; }
     virtual StringExpression *stringExpression() { return NULL; }
     virtual DeclarationExpression *declarationExpression() { return NULL; }
+    virtual CompoundExpression *compoundExpression() { return NULL; }
     virtual BlockExpression *blockExpression() { return NULL; }
     virtual IfExpression *ifExpression() { return NULL; }
     virtual LoopExpression *loopExpression() { return NULL; }
@@ -824,55 +826,65 @@ struct Statement;
 
 // value of (bool) 0. if 'pass' is encountered, value of pass
 //TODO: probably shouldn't be an expression
-struct BlockExpression : public Expression
+struct CompoundExpression : public Expression
 {
     //TODO: sym table
     std::vector<Statement*> statements;
-    BlockExpression(std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
+    CompoundExpression(std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
         Expression(l), statements(s) {}
-    virtual BlockExpression *blockExpression() { return this; }
+    virtual CompoundExpression *compoundExpression() { return this; }
 };
 
 // value of following expression, or (bool) 1 if not found
 
-// value of following expression. usually block, with (bool) 0 / (bool) 1 pass
-struct IfExpression : public Expression
+struct BlockExpression : public Expression
 {
-    Expression *condition;
+    SymbolTable *scope;
     Statement *body;
-    Statement *elsebr;
-    virtual IfExpression *ifExpression() { return this; }
-    IfExpression(Expression *c, Statement *b, Statement *e, SourceLocation l = SourceLocation()) :
-        Expression(l), condition(c), body(b), elsebr(e) {}
+    virtual BlockExpression *blockExpression() { return this; }
+    BlockExpression(SymbolTable *sc, Statement *b, SourceLocation l = SourceLocation()) :
+        scope(sc), body(b), Expression(l) {}
 };
 
-struct LoopExpression : public Expression
+// value of following expression. usually block, with (bool) 0 / (bool) 1 pass
+struct IfExpression : public BlockExpression
+{
+    Expression *condition;
+    Statement *elsebr;
+    virtual IfExpression *ifExpression() { return this; }
+    IfExpression(SymbolTable *sc, Expression *c, Statement *b, Statement *e,
+            SourceLocation l = SourceLocation()) :
+        BlockExpression(sc, b, l), condition(c), elsebr(e) {}
+};
+
+struct LoopExpression : public BlockExpression
 {
     Expression *condition;
     Statement *update;
-    Statement *body;
     Statement *elsebr;
     LoopExpression *loopExpression() { return this; }
-    LoopExpression(Expression *c, Statement *u, Statement *b, Statement *el,
-            SourceLocation l = SourceLocation()) : Expression(l), condition(c),
-                                                update(u), body(b), elsebr(el) {}
+    LoopExpression(SymbolTable *sc, Expression *c, Statement *u, Statement *b, Statement *el,
+            SourceLocation l = SourceLocation()) : BlockExpression(sc, b, l), condition(c),
+                                                update(u), elsebr(el) {}
 };
 
 // value same as if
 struct WhileExpression : public LoopExpression
 {
     virtual WhileExpression *whileExpression() { return this; }
-    WhileExpression(Expression *c, Statement *b, Statement *e, SourceLocation l = SourceLocation()) :
-        LoopExpression(c, NULL, b, e, l) {}
+    WhileExpression(SymbolTable *sc, Expression *c, Statement *b, Statement *e,
+            SourceLocation l = SourceLocation()) :
+        LoopExpression(sc, c, NULL, b, e, l) {}
 };
 
 struct ForExpression : public LoopExpression
 {
     Statement *decl;
     virtual ForExpression *forExpression() { return this; }
-    ForExpression(Statement *d, Expression *c, Statement *u, Statement *b, Statement *e,
-            SourceLocation l = SourceLocation()) :
-        decl(d), LoopExpression(c, u, b, e, l) {}
+    ForExpression(SymbolTable *sc, Statement *d, Expression *c, Statement *u,
+            Statement *b, Statement *e,
+            SourceLocation l = SourceLocation()) : LoopExpression(sc, c, u, b, e, l),
+        decl(d) {}
 };
 
 struct SwitchExpression : public Expression

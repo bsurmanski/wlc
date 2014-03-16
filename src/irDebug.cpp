@@ -32,6 +32,11 @@ llvm::DIDescriptor IRDebug::currentScope()
     return context->getScope()->getDebug();
 }
 
+llvm::DIDescriptor IRDebug::createScope(llvm::DIDescriptor parent, SourceLocation loc)
+{
+    return di.createLexicalBlock(parent, currentFile(), loc.line, loc.ch);
+}
+
 llvm::DICompositeType IRDebug::createDynamicArrayType(ASTType *ty)
 {
     llvm::DIDescriptor DIContext(currentFile());

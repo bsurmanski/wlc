@@ -35,6 +35,7 @@ class IRDebug
         llvm::DICompileUnit getCompileUnit() { return diUnit; }
         llvm::DIFile currentFile() { return diFile; }
         llvm::DIDescriptor currentScope();
+        llvm::DIDescriptor createScope(llvm::DIDescriptor parent, SourceLocation loc);
         llvm::DICompositeType createStructType(ASTType *ty);
         llvm::DICompositeType createUnionType(ASTType *ty);
         llvm::DICompositeType createDynamicArrayType(ASTType *ty);

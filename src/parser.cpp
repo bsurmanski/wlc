@@ -779,22 +779,18 @@ CaseStatement *ParseContext::parseCaseStatement()
     ignore(); // eat 'case'
     Expression *exp = parseExpression();
 
-    /*
-    if(peek().isNot(tok::colon))
-    {
-        emit_message(msg::FAILURE, "expected ':' following case value", peek().loc);
-        return NULL;
-    }
-    ignore(); // eat ':' */
-
     return new CaseStatement(exp, loc);
 }
 
 Expression *ParseContext::parseSwitchExpression()
 {
     SourceLocation loc = peek().loc;
+    SymbolTable *scope = new SymbolTable(getScope());
+    pushScope(scope);
+
     if(peek().isNot(tok::kw_switch)) {
         emit_message(msg::FAILURE, "expected 'switch' keyword", peek().loc);
+        popScope();
         return NULL;
     }
     ignore(); // eat 'switch'
@@ -802,6 +798,7 @@ Expression *ParseContext::parseSwitchExpression()
     if(peek().isNot(tok::lparen)){
         emit_message(msg::FAILURE,
             "expected '(' following 'switch' keyword", peek().loc);
+        popScope();
         return NULL;
     }
     ignore(); // eat '('
@@ -811,13 +808,15 @@ Expression *ParseContext::parseSwitchExpression()
     if(peek().isNot(tok::rparen)){
         emit_message(msg::FAILURE,
             "expected ')' following 'switch' condition", peek().loc);
+        popScope();
         return NULL;
     }
     ignore(); // eat ')'
 
     Statement *body = parseStatement();
+    popScope();
 
-    return new SwitchExpression(exp, body, loc);
+    return new SwitchExpression(scope, exp, body, loc);
 }
 
 Expression *ParseContext::parseCastExpression(int prec)

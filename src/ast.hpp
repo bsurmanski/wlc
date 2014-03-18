@@ -887,13 +887,13 @@ struct ForExpression : public LoopExpression
         decl(d) {}
 };
 
-struct SwitchExpression : public Expression
+struct SwitchExpression : public BlockExpression
 {
     Expression *condition;
-    Statement *body;
     virtual SwitchExpression *switchExpression() { return this; }
-    SwitchExpression(Expression *cond, Statement *b, SourceLocation l = SourceLocation())
-        : condition(cond), body(b), Expression(l) {}
+    SwitchExpression(SymbolTable *sc, Expression *cond, Statement *b,
+            SourceLocation l = SourceLocation())
+        : BlockExpression(sc, b, l), condition(cond) {}
 };
 
 struct PackageExpression : public Expression

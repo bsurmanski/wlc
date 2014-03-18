@@ -353,19 +353,12 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
 {
     if(CompoundExpression *cexp = exp->compoundExpression())
     {
-        bool terminated = false;
         for(int i = 0; i < cexp->statements.size(); i++)
         {
-            if(terminated && dynamic_cast<LabelStatement*>(cexp->statements[i])) terminated = false;
-
-            if(!terminated)
+            if(!isTerminated() || (dynamic_cast<LabelStatement*>(cexp->statements[i]) ||
+                              dynamic_cast<CaseStatement*>(cexp->statements[i])))
                 codegenStatement(cexp->statements[i]);
-
-            if(dynamic_cast<GotoStatement*>(cexp->statements[i]) ||
-                    dynamic_cast<ReturnStatement*>(cexp->statements[i]))
-                terminated = true;
         }
-        currentFunction.terminated = terminated;
         return NULL; //TODO: value?
     }
     else if(NumericExpression *nexp = exp->numericExpression())
@@ -446,6 +439,9 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         } else if(LoopExpression *lexp = exp->loopExpression())
         {
             value = codegenLoopExpression(lexp);
+        } else if(SwitchExpression *sexp = exp->switchExpression())
+        {
+            value = codegenSwitchExpression(sexp);
         }
         popScope();
         return value;
@@ -468,19 +464,10 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(UseExpression *uexp = exp->useExpression())
     {
         return NULL;
-    } else if(SwitchExpression *sexp = dynamic_cast<SwitchExpression*>(exp))
-    {
-        return codegenSwitchExpression(sexp);
     }
 
     emit_message(msg::FAILURE, "bad expression?", exp->loc);
     return NULL; //TODO
-}
-
-ASTValue *IRCodegenContext::codegenSwitchExpression(SwitchExpression *exp)
-{
-    //TODO:
-    return NULL;
 }
 
 ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType *ty)
@@ -648,11 +635,11 @@ ASTValue *IRCodegenContext::codegenLoopExpression(LoopExpression *exp)
         ir->CreateCondBr(codegenValue(icond), ontrue, onfalse);
     } else ir->CreateBr(ontrue);
 
-    BasicBlock *OLDBREAK = this->breakLabel; // TODO: ugly
-    BasicBlock *OLDCONTINUE = this->continueLabel; //TODO: still ugly
+    getScope()->breakLabel = loopend;
+    getScope()->continueLabel = loopupdate;
 
-    this->breakLabel = loopend;
-    this->continueLabel = loopupdate;
+    if(!loopupdate) getScope()->continueLabel = loopBB;
+
     ir->SetInsertPoint(ontrue);
     if(exp->body) codegenStatement(exp->body);
     ir->CreateBr(loopupdate);
@@ -664,11 +651,47 @@ ASTValue *IRCodegenContext::codegenLoopExpression(LoopExpression *exp)
     if(exp->elsebr) codegenStatement(exp->elsebr);
     ir->CreateBr(loopend);
 
-    this->breakLabel = OLDBREAK;
-    this->continueLabel = OLDCONTINUE;
-
     ir->SetInsertPoint(loopend);
     return NULL;
+}
+
+ASTValue *IRCodegenContext::codegenSwitchExpression(SwitchExpression *exp)
+{
+    //BasicBlock *switchBB = BasicBlock::Create(context, "switch",
+    //                                     ir->GetInsertBlock()->getParent());
+
+    BasicBlock *switchend = BasicBlock::Create(context, "switch_end",
+                                         ir->GetInsertBlock()->getParent());
+
+    BasicBlock *preSwitch = ir->GetInsertBlock();
+
+    ASTValue *cond = codegenExpression(exp->condition);
+    SwitchInst *sinst = ir->CreateSwitch(codegenValue(cond), switchend);
+    //TODO: set cases
+
+    getScope()->switchExp = exp;
+
+    setTerminated(true);
+    if(exp->body) codegenStatement(exp->body);
+
+    for(int i = 0; i < getScope()->cases.size(); i++)
+    {
+        IRSwitchCase *cs = getScope()->cases[i];
+        if(!cs->irCase->getType()->isInteger())
+        {
+            emit_message(msg::ERROR, "case value can currently only be constant integer values",
+                    cs->astCase->loc);
+        }
+        ASTValue *caseValue = promoteType(cs->irCase, cond->type);
+        sinst->addCase((llvm::ConstantInt*) codegenValue(caseValue), cs->irBlock);
+    }
+
+    if(!isTerminated())
+        ir->CreateBr(switchend);
+    ir->SetInsertPoint(switchend);
+    setTerminated(false);
+
+    return NULL; //TODO:
 }
 
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
@@ -1496,6 +1519,7 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
     }
 
     ir->CreateBr(currentFunction.exit);
+    setTerminated(true);
 }
 
 void IRCodegenContext::codegenStatement(Statement *stmt)
@@ -1511,11 +1535,28 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     } else if (ReturnStatement *rstmt = dynamic_cast<ReturnStatement*>(stmt))
     {
         codegenReturnStatement(rstmt);
+    } else if(CaseStatement *cstmt = dynamic_cast<CaseStatement*>(stmt))
+    {
+        if(!cstmt->value->isConstant())
+        {
+            emit_message(msg::ERROR, "case value must be a constant", cstmt->loc);
+        }
+        BasicBlock *caseBB = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent());
+
+        if(!isTerminated())
+            ir->CreateBr(caseBB);
+
+        setTerminated(false);
+
+        ir->SetInsertPoint(caseBB);
+        getScope()->addCase(cstmt->value, codegenExpression(cstmt->value), caseBB);
+
     } else if(LabelStatement *lstmt = dynamic_cast<LabelStatement*>(stmt))
     {
         ASTValue *lbl = codegenIdentifier(lstmt->identifier);
         llvm::BasicBlock *BB = (llvm::BasicBlock*) lbl->cgValue;
-        ir->CreateBr(BB);
+        if(!isTerminated())
+            ir->CreateBr(BB);
         ir->SetInsertPoint(BB);
         //lstmt->identifier->setValue(new ASTValue(NULL, BB)); //TODO: cg value?
     } else if(GotoStatement *gstmt = dynamic_cast<GotoStatement*>(stmt))
@@ -1526,22 +1567,25 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
        // post GOTO block
         BasicBlock *PG = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent());
         ir->SetInsertPoint(PG);
+        setTerminated(true);
     } else if(BreakStatement *bstmt = dynamic_cast<BreakStatement*>(stmt))
     {
-        if(!breakLabel){
+        BasicBlock *br = getScope()->getBreak();
+        if(!br){
             emit_message(msg::ERROR, "break doesnt make sense here!", stmt->loc);
             return;
         }
-        ir->CreateBr(breakLabel);
+        ir->CreateBr(br);
         ir->SetInsertPoint(BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()));
     } else if(ContinueStatement *cstmt = dynamic_cast<ContinueStatement*>(stmt))
     {
-        if(!continueLabel){
+        BasicBlock *cont = getScope()->getContinue();
+        if(!cont){
             emit_message(msg::ERROR, "continue doesnt make sense here!", stmt->loc);
             return;
         }
 
-        ir->CreateBr(continueLabel);
+        ir->CreateBr(cont);
         ir->SetInsertPoint(BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()));
     } else emit_message(msg::FAILURE, "i dont know what kind of statmeent this isssss", stmt->loc);
 
@@ -1622,11 +1666,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
             codegenStatement(fdecl->body);
 
-            if(dynamic_cast<GotoStatement*>(fdecl->body) ||
-                    dynamic_cast<ReturnStatement*>(fdecl->body))
-                currentFunction.terminated = true;
-
-            if(!currentFunction.terminated)
+            if(!isTerminated())
                 ir->CreateBr(currentFunction.exit);
 
             if(!currentFunction.retVal) // returns void
@@ -1643,6 +1683,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
             popScope();
         }
+        setTerminated(false);
         currentFunction = backup;
     } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl))
     {
@@ -1930,6 +1971,7 @@ std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
     createIdentMetadata(linker.getModule());
     linker.getModule()->MaterializeAll();
 
+    /*
     if(verifyModule(*linker.getModule(), PrintMessageAction))
     {
         emit_message(msg::OUTPUT, "failed to compile source code");
@@ -1937,7 +1979,7 @@ std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
     } else
     {
         emit_message(msg::OUTPUT, "successfully compiled source");
-    }
+    }*/
 
     std::string err;
     std::string outputll;

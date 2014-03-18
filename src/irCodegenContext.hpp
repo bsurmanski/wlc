@@ -3,6 +3,7 @@
 
 #include "codegenContext.hpp"
 #include "config.hpp"
+#include "message.hpp"
 #include <llvm/IR/Module.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/IRBuilder.h>
@@ -31,8 +32,10 @@ struct IRFunction
 struct IRSwitchCase
 {
     Expression *astCase;
-    llvm::Value *irCase;
+    ASTValue *irCase;
     llvm::BasicBlock *irBlock;
+    IRSwitchCase(Expression *e, ASTValue *i, llvm::BasicBlock *ir) :
+        astCase(e), irCase(i), irBlock(ir) {}
 };
 
 /*
@@ -50,6 +53,7 @@ struct IRScope
     llvm::BasicBlock *continueLabel;
     llvm::DIDescriptor debug;
     SymbolTable *table;
+    IRScope *parent;
 
     //switch
     SwitchExpression *switchExp;
@@ -57,12 +61,41 @@ struct IRScope
 
     llvm::DIDescriptor getDebug() { return debug; }
 
+    llvm::BasicBlock *getBreak() {
+        if(!breakLabel && parent)
+            return parent->getBreak();
+        return breakLabel;
+    }
+
+    llvm::BasicBlock *getContinue() {
+        if(!continueLabel && parent)
+            return parent->getContinue();
+        return continueLabel;
+    }
+
+    void addCase(Expression *cs, ASTValue *ircs, llvm::BasicBlock *bl)
+    {
+        if(switchExp)
+        {
+            cases.push_back(new IRSwitchCase(cs, ircs, bl));
+        } else if(parent)
+        {
+            parent->addCase(cs, ircs, bl);
+        } else
+        {
+            emit_message(msg::ERROR, "'case' label must be in switch scope");
+        }
+    }
+
+    IRScope *getParent() { return parent; }
+
     bool contains(std::string s) { return table->contains(s); }
     Identifier *getInScope(std::string s) { return table->getInScope(s); }
     Identifier *get(std::string s) { return table->get(s); }
     Identifier *lookup(std::string s, bool imports = true) { return table->lookup(s, imports); }
 
-    IRScope(SymbolTable *tbl, llvm::DIDescriptor dbg) : table(tbl), debug(dbg) {}
+    IRScope(SymbolTable *tbl, llvm::DIDescriptor dbg) : table(tbl), debug(dbg),
+        breakLabel(0), continueLabel(0), parent(0) {}
 };
 
 struct IRTranslationUnit
@@ -77,13 +110,6 @@ struct IRTranslationUnit
     std::vector<VariableDeclaration*>& getGlobals() { return unit->globals; }
     std::vector<FunctionDeclaration*>& getFunctions() { return unit->functions; }
 
-
-    //IRScope *getScope() {
-    //    if(!scope)
-    //        scope = new IRScope(unit->getScope(), );
-    //    return scope;
-    //}
-    //operator TranslationUnit*() { return unit; }
     IRTranslationUnit(TranslationUnit *u) : unit(u), scope(NULL) {}
 };
 
@@ -94,22 +120,24 @@ class IRCodegenContext : public CodegenContext
     llvm::LLVMContext &context;
     llvm::IRBuilder<> *ir;
     llvm::Module *module;
-    llvm::BasicBlock *breakLabel;
-    llvm::BasicBlock *continueLabel;
     llvm::Linker linker;
     IRFunction currentFunction;
     IRTranslationUnit *unit;
     IRDebug *debug;
-    std::stack<IRScope*> scope;
+    IRScope *scope;
+    bool terminated;
 
     IRCodegenContext() : context(llvm::getGlobalContext()),
     ir(new llvm::IRBuilder<>(context)),
-     module(NULL), linker(new llvm::Module("", context)) {}
+     module(NULL), linker(new llvm::Module("", context)), terminated(false) {}
 
     llvm::LLVMContext& getLLVMContext() { return context; }
 
     std::string codegenAST(AST *ast, WLConfig param);
     protected:
+
+    bool isTerminated() { return terminated; }
+    bool setTerminated(bool b) { terminated = b; }
 
     // codegen type
     llvm::Type *codegenArrayType(ASTType *ty);
@@ -123,15 +151,15 @@ class IRCodegenContext : public CodegenContext
     llvm::Value *codegenLValue(ASTValue *v);
 
     //debug
-    llvm::DIDescriptor diScope(){ return scope.top()->debug; }
+    llvm::DIDescriptor diScope(){ return scope->debug; }
 
     public:
     //scope
-    void pushScope(IRScope *sc) { scope.push(sc);}
-    IRScope *popScope() { IRScope *tbl = scope.top(); scope.pop(); return tbl;}
-    IRScope *getScope() { return scope.top(); }
-    Identifier *lookup(std::string str){ return scope.top()->lookup(str); }
-    Identifier *getInScope(std::string str) { return scope.top()->getInScope(str); }
+    void pushScope(IRScope *sc) { sc->parent = scope; scope = sc;}
+    IRScope *popScope() { IRScope *tbl = scope; scope = scope->parent; return tbl;}
+    IRScope *getScope() { return scope; }
+    Identifier *lookup(std::string str){ return scope->lookup(str); }
+    Identifier *getInScope(std::string str) { return scope->getInScope(str); }
 
     protected:
 

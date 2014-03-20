@@ -258,6 +258,20 @@ static unsigned xdigittoi(unsigned dig)
     assert(false && "attempt to parse invalid HEX string");
 }
 
+static unsigned odigittoi(unsigned dig)
+{
+    if(dig >= '0' && dig < '8')
+    {
+        return dig - '0';
+    }
+    assert(false && "attempt to parse invalid OCT string");
+}
+
+static bool isodigit(unsigned dig)
+{
+    return dig >= '0' && dig < '8';
+}
+
 Token Lexer::lexNumber()
 {
     //TODO hexstrings fp, etc
@@ -267,32 +281,55 @@ Token Lexer::lexNumber()
     if(numstr[0] == '0' && tolower(peekChar()) == 'x') //hex
     {
         ignoreChar(); // ignore 'x'
-        numstr = ""; // empty the string
+        //numstr = ""; // empty the string
+        unsigned num = 0;
         while(isxdigit(peekChar()) || peekChar() == '.')
         {
             if(peekChar() == '.') {
                 assert(!fp && "invalid numeric constant, hexadecimal floating point not supported");
                 fp = true;
+            } else
+            {
+                num = num << 4;
+                num += xdigittoi(getChar());
             }
-            numstr += getChar();
-        }
-
-        double num = 0;
-        unsigned lsh = 0;
-        for(int i = numstr.size() - 1; i >= 0; i--)
-        {
-            num += xdigittoi(numstr[i]) << lsh;
-            lsh += 4;
         }
         return Token(tok::intNum, num);
 
     } else if(numstr[0] == '0' && tolower(peekChar()) == 'o') //octal
     {
-        assert(false && "octal lexing not impl");
-
+        ignoreChar(); // ignore 'b'
+        unsigned num = 0;
+        numstr = ""; // empty the string
+        while(isodigit(peekChar()) || peekChar() == '.')
+        {
+            if(peekChar() == '.') {
+                assert(!fp && "invalid numeric constant, binary floating point not supported");
+                fp = true;
+            } else
+            {
+                num = num << 3;
+                num += odigittoi(getChar());
+            }
+        }
+        return Token(tok::intNum, num);
     } else if(numstr[0] == '0' && tolower(peekChar()) == 'b') // binary
     {
-        assert(false && "binary lexing not impl");
+        ignoreChar(); // ignore 'b'
+        unsigned num = 0;
+        while(peekChar()  == '0' || peekChar() == '1' || peekChar() == '.')
+        {
+            if(peekChar() == '.') {
+                assert(!fp && "invalid numeric constant, binary floating point not supported");
+                fp = true;
+            } else
+            {
+                num = num << 1;
+                if(getChar() == '1') num++;
+            }
+        }
+
+        return Token(tok::intNum, num);
     } else //normal decinal number
     {
         while(isdigit(peekChar()) || peekChar() == '.')

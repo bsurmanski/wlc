@@ -62,16 +62,15 @@ int getBinaryPrecidence(tok::TokenKind tkind)
         case tok::greater:
         case tok::greaterequal:
                 return 9;
-        case tok::lessless:
-        case tok::greatergreater:
-                return 10;
         case tok::plus:
         case tok::minus:
-                return 11;
+                return 10;
+        case tok::lessless:
+        case tok::greatergreater:
         case tok::star:
         case tok::slash:
         case tok::percent:
-                return 12;
+                return 11;
         default:
                 return 0;
     }

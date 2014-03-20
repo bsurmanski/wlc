@@ -28,3 +28,10 @@ have a 'wlx' utility that will transform the source. eg. transform to-from exten
 infix casting for chained dot expressions. example: MyClass. MyOtherClass: member.function()
 
 null coelescing operator
+
+ASM can have a syntax similar to other functions: 
+asm [ax, bx] somefunc(rax, eax, al)
+{
+    addl %1 %0
+    xorl %%eax %%eax
+}

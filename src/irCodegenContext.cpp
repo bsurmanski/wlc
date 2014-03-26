@@ -442,6 +442,9 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         } else if(SwitchExpression *sexp = exp->switchExpression())
         {
             value = codegenSwitchExpression(sexp);
+        } else if(ElseExpression *eexp = exp->elseExpression())
+        {
+            value = codegenElseExpression(eexp);
         }
         popScope();
         return value;
@@ -579,6 +582,18 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
     return NULL;
 }
 
+ASTValue *IRCodegenContext::codegenElseExpression(ElseExpression *exp)
+{
+    if(!exp->body)
+    {
+        emit_message(msg::ERROR, "else keyword expects body", exp->loc);
+        return NULL;
+    }
+
+    codegenStatement(exp->body);
+    return NULL; //TODO: value?
+}
+
 ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
 {
     ASTValue *cond = codegenExpression(exp->condition);
@@ -600,7 +615,7 @@ ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
         ir->CreateBr(endif);
 
     ir->SetInsertPoint(onfalse);
-    if(exp->elsebr) codegenStatement(exp->elsebr);
+    if(exp->elsebr) codegenExpression(exp->elsebr);
     ir->CreateBr(endif);
 
     ir->SetInsertPoint(endif);
@@ -648,7 +663,7 @@ ASTValue *IRCodegenContext::codegenLoopExpression(LoopExpression *exp)
     ir->CreateBr(loopBB);
 
     ir->SetInsertPoint(onfalse);
-    if(exp->elsebr) codegenStatement(exp->elsebr);
+    if(exp->elsebr) codegenExpression(exp->elsebr); //TODO: scoping might be weird. ifScope is on stack
     ir->CreateBr(loopend);
 
     ir->SetInsertPoint(loopend);

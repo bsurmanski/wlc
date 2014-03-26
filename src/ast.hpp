@@ -582,6 +582,7 @@ struct StringExpression;
 struct DeclarationExpression;
 struct CompoundExpression;
 struct BlockExpression;
+struct ElseExpression;
 struct IfExpression;
 struct LoopExpression;
 struct WhileExpression;
@@ -638,6 +639,7 @@ struct Expression
     virtual DeclarationExpression *declarationExpression() { return NULL; }
     virtual CompoundExpression *compoundExpression() { return NULL; }
     virtual BlockExpression *blockExpression() { return NULL; }
+    virtual ElseExpression *elseExpression() { return NULL; }
     virtual IfExpression *ifExpression() { return NULL; }
     virtual LoopExpression *loopExpression() { return NULL; }
     virtual WhileExpression *whileExpression() { return NULL; }
@@ -846,13 +848,20 @@ struct BlockExpression : public Expression
         scope(sc), body(b), Expression(l) {}
 };
 
+struct ElseExpression : public BlockExpression
+{
+    ElseExpression(SymbolTable *sc, Statement *b, SourceLocation l = SourceLocation()) :
+        BlockExpression(sc, b, l) {}
+    virtual ElseExpression *elseExpression() { return this; }
+};
+
 // value of following expression. usually block, with (bool) 0 / (bool) 1 pass
 struct IfExpression : public BlockExpression
 {
     Expression *condition;
-    Statement *elsebr;
+    ElseExpression *elsebr;
     virtual IfExpression *ifExpression() { return this; }
-    IfExpression(SymbolTable *sc, Expression *c, Statement *b, Statement *e,
+    IfExpression(SymbolTable *sc, Expression *c, Statement *b, ElseExpression *e,
             SourceLocation l = SourceLocation()) :
         BlockExpression(sc, b, l), condition(c), elsebr(e) {}
 };
@@ -861,9 +870,9 @@ struct LoopExpression : public BlockExpression
 {
     Expression *condition;
     Statement *update;
-    Statement *elsebr;
+    ElseExpression *elsebr;
     LoopExpression *loopExpression() { return this; }
-    LoopExpression(SymbolTable *sc, Expression *c, Statement *u, Statement *b, Statement *el,
+    LoopExpression(SymbolTable *sc, Expression *c, Statement *u, Statement *b, ElseExpression *el,
             SourceLocation l = SourceLocation()) : BlockExpression(sc, b, l), condition(c),
                                                 update(u), elsebr(el) {}
 };
@@ -872,7 +881,7 @@ struct LoopExpression : public BlockExpression
 struct WhileExpression : public LoopExpression
 {
     virtual WhileExpression *whileExpression() { return this; }
-    WhileExpression(SymbolTable *sc, Expression *c, Statement *b, Statement *e,
+    WhileExpression(SymbolTable *sc, Expression *c, Statement *b, ElseExpression *e,
             SourceLocation l = SourceLocation()) :
         LoopExpression(sc, c, NULL, b, e, l) {}
 };
@@ -882,7 +891,7 @@ struct ForExpression : public LoopExpression
     Statement *decl;
     virtual ForExpression *forExpression() { return this; }
     ForExpression(SymbolTable *sc, Statement *d, Expression *c, Statement *u,
-            Statement *b, Statement *e,
+            Statement *b, ElseExpression *e,
             SourceLocation l = SourceLocation()) : LoopExpression(sc, c, u, b, e, l),
         decl(d) {}
 };

@@ -178,6 +178,7 @@ class IRCodegenContext : public CodegenContext
 
     ASTValue *codegenIdentifier(Identifier *id);
     ASTValue *codegenIfExpression(IfExpression *exp);
+    ASTValue *codegenElseExpression(ElseExpression *exp);
     ASTValue *codegenLoopExpression(LoopExpression *exp);
     ASTValue *codegenSwitchExpression(SwitchExpression *exp);
     ASTValue *codegenCallExpression(CallExpression *exp);

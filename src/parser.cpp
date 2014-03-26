@@ -2,10 +2,6 @@
 #include <cstdio>
 #include <unistd.h>
 
-#include <llvm/IR/Module.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/IRBuilder.h>
-
 #include <clang-c/Index.h>
 
 #include <fstream>
@@ -644,8 +640,9 @@ Expression *ParseContext::parseIfExpression()
     SourceLocation loc = peek().loc;
     Expression *cond = NULL;
     Statement *body = NULL;
-    Statement *els = NULL;
-    SymbolTable *scope = new SymbolTable(getScope());
+    ElseExpression *els = NULL;
+    SymbolTable *parentScope = getScope();
+    SymbolTable *scope = new SymbolTable(parentScope);
     pushScope(scope);
     assert_message(peek().is(tok::kw_if), msg::ERROR, "expected 'if' keyword", peek().loc);
     ignore(); // ignore if
@@ -667,13 +664,18 @@ Expression *ParseContext::parseIfExpression()
     ignore();
 
     body = parseStatement();
+    popScope();
+
     if(peek().is(tok::kw_else))
     {
+        SourceLocation elseLoc = peek().loc;
         ignore(); // else kw
-        els = parseStatement();
-    } //TODO: 'else' should have seperate scope
+        SymbolTable *elseScope = new SymbolTable(parentScope);
+        pushScope(elseScope);
+        els = new ElseExpression(elseScope, parseStatement(), elseLoc);
+        popScope();
+    }
 
-    popScope();
 
     return new IfExpression(scope, cond, body, els, loc);
 }
@@ -683,8 +685,9 @@ Expression *ParseContext::parseWhileExpression()
     SourceLocation loc = peek().loc;
     Expression *cond = NULL;
     Statement *body = NULL;
-    Statement *els = NULL;
-    SymbolTable *scope = new SymbolTable(getScope());
+    ElseExpression *els = NULL;
+    SymbolTable *parentScope = getScope();
+    SymbolTable *scope = new SymbolTable(parentScope);
     pushScope(scope);
     assert_message(peek().is(tok::kw_while), msg::ERROR, "expected 'while' keyword", peek().loc);
     ignore(); // eat 'while'
@@ -698,14 +701,18 @@ Expression *ParseContext::parseWhileExpression()
     ignore(); // eat ')'
 
     body = parseStatement();
+    popScope();
 
     if(peek().is(tok::kw_else))
     {
         ignore(); // else kw
-        els = parseStatement();
-    } //TODO: 'else' should have seperate scope
+        SourceLocation eloc = peek().loc;
+        SymbolTable *elseScope = new SymbolTable(parentScope);
+        pushScope(elseScope);
+        els = new ElseExpression(elseScope, parseStatement(), eloc);
+        popScope();
+    }
 
-    popScope();
 
     return new WhileExpression(scope, cond, body, els, loc);
 }
@@ -717,8 +724,9 @@ Expression *ParseContext::parseForExpression()
     Expression *cond = NULL;
     Statement *upd = NULL;
     Statement *body = NULL;
-    Statement *els = NULL;
-    SymbolTable *scope = new SymbolTable(getScope());
+    ElseExpression *els = NULL;
+    SymbolTable *parentScope = getScope();
+    SymbolTable *scope = new SymbolTable(parentScope);
     pushScope(scope);
 
     if(!peek().is(tok::kw_for)) {
@@ -756,14 +764,18 @@ Expression *ParseContext::parseForExpression()
     ignore(); // eat ')'
 
     body = parseStatement();
+    popScope();
 
     if(peek().is(tok::kw_else))
     {
+        SourceLocation eloc = peek().loc;
         ignore();
-        els = parseStatement();
+        SymbolTable *elseScope = new SymbolTable(parentScope);
+        pushScope(elseScope);
+        els = new ElseExpression(elseScope, parseStatement(), eloc);
+        popScope();
     }
 
-    popScope(); //TODO: else should have seperate scope
 
     return new ForExpression(scope, decl, cond, upd, body, els, loc);
 }

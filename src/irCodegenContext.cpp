@@ -17,6 +17,16 @@ using namespace llvm;
 
 SourceLocation currentLoc;
 
+std::string IRFunction::getName(bool mangle)
+{
+    if(mangle){
+
+    } else
+    {
+        return declaration->getName();
+    }
+}
+
 void IRCodegenContext::dwarfStopPoint(int ln)
 {
     llvm::DebugLoc loc = llvm::DebugLoc::get(ln, 1, diScope());
@@ -994,58 +1004,22 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 return NULL;
             }
 
-            if(lhs->getType()->isStruct())
+            if(lhs->getType()->isStruct() || lhs->getType()->isUnion())
             {
-                StructTypeInfo *sti = (StructTypeInfo*) lhs->getType()->getTypeInfo();
-                int offset = 0;
-                for(int i = 0; i < sti->members.size(); i++)
+                HetrogenTypeInfo *hti = (HetrogenTypeInfo*) lhs->getType()->getTypeInfo();
+                Declaration *mdecl = hti->getMemberDeclaration(dexp->rhs);
+                if(!mdecl)
                 {
-                    // XXX better way to compare equality?
-                    if(sti->members[i]->identifier->getName() == dexp->rhs)
-                    {
-                        if(VariableDeclaration *vdecl =
-                                dynamic_cast<VariableDeclaration*>(sti->members[i]))
-                        {
-                            //TODO proper struct GEP
-
-                            ASTType *ty = vdecl->type;
-                            std::vector<Value*> gep;
-                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), offset));
-                            Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                            return new ASTValue(ty, llval, true);
-                        } else emit_message(msg::UNIMPLEMENTED,
-                                "this should not be in a struct (right now)", sti->members[i]->loc);
-                    }
-                    offset++;
+                    emit_message(msg::ERROR, "member not in struct: " + hti->getName() + "." + dexp->rhs,
+                            dexp->loc);
                 }
-                emit_message(msg::ERROR, "member not in struct: " + sti->getName() + "." + dexp->rhs,
-                        dexp->loc);
-            } else if(lhs->getType()->isUnion())
-            {
-                UnionTypeInfo *sti = (UnionTypeInfo*) lhs->getType()->getTypeInfo();
-                for(int i = 0; i < sti->members.size(); i++)
-                {
-                    // XXX better way to compare equality?
-                    if(sti->members[i]->identifier->getName() == dexp->rhs)
-                    {
-                        if(VariableDeclaration *vdecl =
-                                dynamic_cast<VariableDeclaration*>(sti->members[i]))
-                        {
-                            //TODO proper struct GEP
-
-                            ASTType *ty = vdecl->type;
-                            std::vector<Value*> gep;
-                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                            Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                            llval = ir->CreateBitCast(llval, codegenType(ty)->getPointerTo());
-                            return new ASTValue(ty, llval, true);
-                        } else emit_message(msg::UNIMPLEMENTED,
-                                "this should not be in a union (right now)", sti->members[i]->loc);
-                    }
-                }
-                emit_message(msg::ERROR, "member not in struct", dexp->loc);
+                ASTType *ty = mdecl->getType();
+                std::vector<Value*> gep;
+                gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
+                                            hti->getMemberIndex(dexp->rhs)));
+                Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
+                return new ASTValue(ty, llval, true);
             } else if(lhs->getType()->type == TYPE_DYNAMIC_ARRAY)
             {
                 ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(lhs->getType()->info);
@@ -1627,7 +1601,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         currentFunction = IRFunction(fdecl);
         //FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
         //Function *func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
-        Function *func = module->getFunction(fdecl->getName());
+        Function *func = module->getFunction(currentFunction.getName());
         func->addFnAttr("no-frame-pointer-elim", "true");
         if(fdecl->body)
         {

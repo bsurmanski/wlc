@@ -196,35 +196,42 @@ struct ArrayTypeInfo : public CompositeTypeInfo
     std::string getName();
 };
 
-struct StructUnionInfo : public CompositeTypeInfo
+struct HetrogenTypeInfo : public CompositeTypeInfo
 {
     SymbolTable *scope;
     Identifier *identifier;
     std::vector<Declaration*> members; // <type, name>
-    StructUnionInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
+    HetrogenTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
         identifier(id), scope(sc), members(m){}
     std::string getName() { return identifier->getName(); }
     virtual ASTType *getContainedType(unsigned i);
+    virtual size_t getMemberOffset(std::string member) = 0;
+    virtual size_t getMemberIndex(std::string member) = 0;
+    Declaration *getMemberDeclaration(std::string member);
     virtual size_t getAlign();
     StructUnionDeclaration *getDeclaration() { return (StructUnionDeclaration*) identifier->getDeclaration(); }
 };
 
-struct StructTypeInfo : public StructUnionInfo
+struct StructTypeInfo : public HetrogenTypeInfo
 {
     bool packed;
     StructTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
-        StructUnionInfo(id, sc, m) {}
+        HetrogenTypeInfo(id, sc, m) {}
     virtual size_t length() { return members.size(); }
     virtual size_t getSize();
+    virtual size_t getMemberOffset(std::string member);
+    virtual size_t getMemberIndex(std::string member);
 };
 
-struct UnionTypeInfo : public StructUnionInfo
+struct UnionTypeInfo : public HetrogenTypeInfo
 {
     UnionTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
-        StructUnionInfo(id, sc, m) {}
+        HetrogenTypeInfo(id, sc, m) {}
     std::string getName() { return identifier->getName(); }
     virtual size_t length() { return members.size(); }
     virtual size_t getSize();
+    virtual size_t getMemberOffset(std::string member) { return 0; }
+    virtual size_t getMemberIndex(std::string member) { return 0; }
 };
 
 struct NamedUnknownInfo : public TypeInfo
@@ -251,6 +258,18 @@ struct TupleTypeInfo : public CompositeTypeInfo
     virtual size_t getSize();
     virtual size_t getAlign();
     TupleTypeInfo(std::vector<ASTType*> t) : types(t) {}
+};
+
+struct ClassTypeInfo : public HetrogenTypeInfo
+{
+    ClassTypeInfo *base;
+
+    ClassTypeInfo(Identifier *id, SymbolTable *sc, ClassTypeInfo *b, std::vector<Declaration*> m) :
+        HetrogenTypeInfo(id, sc, m), base(b) {}
+    virtual size_t length() { return members.size(); }
+    //virtual size_t getSize();
+    virtual size_t getMemberOffset(std::string member) { return 0; } // TODO
+    virtual size_t getMemberIndex(std::string member) { return 0; } // TODO
 };
 
 
@@ -496,7 +515,11 @@ struct Declaration
     bool external;
     Declaration(Identifier *id, SourceLocation l, bool ext = false) : identifier(id), loc(l), external(ext) {}
     virtual ~Declaration(){}
-    virtual std::string getName() { if(identifier) return identifier->getName(); return ""; }
+    virtual std::string getName(bool mangle=false)
+    {
+        if(identifier) return identifier->getName();
+        return "";
+    }
     virtual ASTType *getType() = 0;
 
     virtual FunctionDeclaration *functionDeclaration() { return NULL; }
@@ -520,6 +543,13 @@ struct FunctionDeclaration : public Declaration
     void *cgValue;
     FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st, SourceLocation loc) : Declaration(id, loc), prototype(p), scope(sc), body(st), cgValue(NULL) {}
     virtual FunctionDeclaration *functionDeclaration() { return this; }
+    virtual std::string getName(bool mangle=false)
+    {
+        if(mangle){}
+        else {
+            return Declaration::getName();
+        }
+    }
     SymbolTable *getScope() { return scope; }
     ASTType *getReturnType() { return prototype->returnType; }
 

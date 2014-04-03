@@ -1,7 +1,7 @@
 
 #include "lexer.hpp"
 
-#include <llvm/Support/ErrorHandling.h>
+#include <assert.h>
 #include <string>
 
 using namespace std;

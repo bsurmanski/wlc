@@ -8,23 +8,60 @@ size_t StructTypeInfo::getSize()
     for(int i = 0; i < members.size(); i++)
     {
         vd = members[i]->variableDeclaration();
-        assert(vd && "expected variable decl, found something else");
+        if(!vd) continue;
 
         align = vd->getType()->align();
-        if(sz % align)
+        if(!packed && sz % align)
             sz += (align - (sz % align));
         sz += vd->type->size();
     }
     return sz;
-    //TODO: handle packed
 }
 
-ASTType *StructUnionInfo::getContainedType(unsigned i)
+size_t StructTypeInfo::getMemberOffset(std::string member)
+{
+    size_t offset = 0;
+    unsigned align = 0;
+    VariableDeclaration *vd;
+    for(int i = 0; i < members.size(); i++)
+    {
+        if(members[i]->identifier->getName() == member)
+        {
+            return offset;
+        }
+        vd = members[i]->variableDeclaration();
+        if(!vd) continue;
+        align = vd->getType()->align();
+        if(!packed && offset % align)
+            offset += (align - (offset % align));
+        offset += vd->getType()->size();
+    }
+}
+
+size_t StructTypeInfo::getMemberIndex(std::string member)
+{
+    for(int i = 0; i < members.size(); i++)
+    {
+        if(members[i]->identifier->getName() == member)
+        {
+            return i; //TODO: mangling
+        }
+    }
+}
+
+Declaration *HetrogenTypeInfo::getMemberDeclaration(std::string member)
+{
+    for(int i = 0; i < members.size(); i++)
+        if(members[i]->identifier->getName() == member)
+            return members[i];
+}
+
+ASTType *HetrogenTypeInfo::getContainedType(unsigned i)
 {
     return members[i]->getType();
 }
 
-size_t StructUnionInfo::getAlign()
+size_t HetrogenTypeInfo::getAlign()
 {
     size_t align = 0;
     VariableDeclaration *vd;

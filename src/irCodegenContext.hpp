@@ -25,6 +25,8 @@ struct IRFunction
     llvm::BasicBlock *exit;
     bool terminated;
 
+    std::string getName(bool mangle=false);
+
     IRFunction(): declaration(NULL), retVal(NULL), terminated(false) {}
     IRFunction(FunctionDeclaration *decl) : declaration(decl), terminated(false) {}
 };

@@ -466,14 +466,16 @@ PARSEEXP:
 
 Declaration *ParseContext::parseDeclaration()
 {
+    SourceLocation loc = peek().loc;
     bool external = false;
+
     if(peek().is(tok::kw_extern)) { external = true; ignore(); }
 
     //TODO: parse function decl specs
-    if(peek().is(tok::kw_struct) || peek().is(tok::kw_union)) //parse struct
+    if(peek().is(tok::kw_struct) || peek().is(tok::kw_union) || peek().is(tok::kw_class)) //parse struct
     {
-        bool isUnion = peek().is(tok::kw_union);
-        ignore(); // eat "struct"
+        TokenKind kind = peek().kind;
+        ignore(); // eat "struct" etc
 
         Token t_id = get(); // eat ID
         if(t_id.isNot(tok::identifier)){
@@ -493,12 +495,26 @@ Declaration *ParseContext::parseDeclaration()
         }
 
         Identifier *id = getScope()->get(t_id.toString());
+        Identifier *baseId = NULL;
+
+        if(peek().is(tok::colon))
+        {
+            if(kind != kw_class)
+            {
+                emit_message(msg::ERROR, "only classes can inherit from a base", peek().loc);
+            }
+
+            baseId = getScope()->get(get().toString());
+            emit_message(msg::UNIMPLEMENTED, "inheritance not implemented", peek().loc);
+        }
+
         if(peek().isNot(tok::lbrace) && peek().isNot(tok::semicolon)){
             emit_message(msg::ERROR,
                 "expected '{' following struct declarator", peek().loc);
             dropLine();
             return NULL;
         }
+
 
         SymbolTable *tbl = new SymbolTable(getScope());
         pushScope(tbl);
@@ -515,20 +531,29 @@ Declaration *ParseContext::parseDeclaration()
             ignore(); //eat rbrace
         } else ignore(); // eat semicolon
 
-        StructUnionInfo *sui = 0;
+        HetrogenTypeInfo *sui = 0;
         StructUnionDeclaration *sud = 0;
         StructUnionDeclaration *sdecl = new StructUnionDeclaration(id, NULL, members, t_id.loc);
 
-        if(isUnion)
+        switch(kind)
         {
-            sui = new UnionTypeInfo(id, tbl, members); //TODO: use info
-            id->declaredType()->setTypeInfo(sui, TYPE_UNION);
-            id->setDeclaration(sdecl, Identifier::ID_UNION);
-        } else
-        {
-            sui = new StructTypeInfo(id, tbl, members); //TODO: use info
-            id->declaredType()->setTypeInfo(sui, TYPE_STRUCT);
-            id->setDeclaration(sdecl, Identifier::ID_STRUCT);
+            case kw_union:
+                sui = new UnionTypeInfo(id, tbl, members); //TODO: use info
+                id->declaredType()->setTypeInfo(sui, TYPE_UNION);
+                id->setDeclaration(sdecl, Identifier::ID_UNION);
+                break;
+            case kw_struct:
+                sui = new StructTypeInfo(id, tbl, members); //TODO: use info
+                id->declaredType()->setTypeInfo(sui, TYPE_STRUCT);
+                id->setDeclaration(sdecl, Identifier::ID_STRUCT);
+                break;
+            case kw_class:
+                sui = new ClassTypeInfo(id, tbl, NULL, members); //TODO: use info
+                id->declaredType()->setTypeInfo(sui, TYPE_STRUCT);
+                id->setDeclaration(sdecl, Identifier::ID_STRUCT);
+                break;
+            default:
+                emit_message(msg::FAILURE, "unknown declaration kind", loc);
         }
 
         popScope();

@@ -269,6 +269,9 @@ llvm::DIType IRDebug::createType(ASTType *ty)
             case TYPE_TUPLE:
                 dity = createTupleType(ty);
                 break;
+            case TYPE_UNKNOWN: //XXX workaround
+                dity = di.createBasicType("void", 8, 8, dwarf::DW_ATE_address);
+                break;
             default:
                 assert(false && "debug info not yet added for type");
         }

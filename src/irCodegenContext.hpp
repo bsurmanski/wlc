@@ -128,6 +128,7 @@ class IRCodegenContext : public CodegenContext
     IRDebug *debug;
     IRScope *scope;
     bool terminated;
+    WLConfig config;
 
     IRCodegenContext() : context(llvm::getGlobalContext()),
     ir(new llvm::IRBuilder<>(context)),

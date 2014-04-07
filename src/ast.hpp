@@ -82,7 +82,7 @@ struct TranslationUnit : public Package
     TranslationUnit(Identifier *id, std::string fn = "") : Package(id), filenm(fn), expl(false) {}
     ~TranslationUnit() { }
     virtual bool isTranslationUnit() { return true; }
-    std::string getName() { return ""; }
+    std::string getName() { return identifier->getName(); }
 };
 
 struct AST
@@ -258,6 +258,7 @@ struct NamedUnknownInfo : public TypeInfo
     SymbolTable *scope;
     Identifier *identifier;
     NamedUnknownInfo(Identifier *id, SymbolTable *sc) : identifier(id), scope(sc) {}
+    virtual std::string getName() { return identifier->getName(); }
 };
 
 struct AliasTypeInfo : public TypeInfo
@@ -312,6 +313,9 @@ struct ASTType
     TypeInfo *getTypeInfo() { return info; }
 
     ASTType(enum ASTTypeEnum ty) : type(ty), pointerTy(0), cgType(0), info(0)
+    {}
+
+    ASTType(enum ASTTypeEnum ty, TypeInfo *i) : type(ty), pointerTy(0), cgType(0), info(i)
     {}
 
     ASTType() : type(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL), info(0) {}
@@ -509,22 +513,6 @@ struct ASTType
     //static ASTType *getTupleTy(std::vector<ASTType *ty> t);
 };
 
-struct ASTValueInfo
-{
-    virtual ~ASTValueInfo(){}
-};
-
-struct ASTValue
-{
-    bool lValue;
-    ASTType *type;
-    llvm::Value *cgValue; //XXX
-    llvm::DIVariable debug; //XXX
-    ASTType *getType() { return type; }
-    ASTValue(ASTType *ty, void *cgv = NULL, bool lv = false) : type(ty),
-        cgValue((llvm::Value*) cgv), lValue(lv) {}
-    bool isLValue() { return lValue; }
-};
 
 /***
  *
@@ -610,6 +598,7 @@ struct TypeDeclaration : public Declaration
     TypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) : Declaration(id, loc), type(ty) {}
 
     virtual ASTType *getType() { return type; }
+    virtual ASTType *setType(ASTType *ty) { type = ty; }
 };
 
 struct StructUnionDeclaration : public TypeDeclaration

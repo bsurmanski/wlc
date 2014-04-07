@@ -2,6 +2,7 @@
 #define _CODEGENCONTEXT_HPP
 
 #include "ast.hpp"
+#include "astValue.hpp"
 
 class CodegenContext
 {

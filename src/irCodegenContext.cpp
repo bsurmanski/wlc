@@ -49,11 +49,17 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
     }
 
     StructTypeInfo *sti = (StructTypeInfo*) ty->info;
-    llvm::Type* llvmty = NULL;
 
     if(unit->types.count(sti->identifier->getName())){
-        return unit->types[sti->identifier->getName()];
+        llvm::Type *llty = unit->types[sti->identifier->getName()];
+        return llty;
     }
+
+    std::cout << "generating struct: " << sti->identifier->getName() <<
+        " in " << unit->unit->getName() << std::endl;
+
+    StructType *sty = StructType::create(context, sti->identifier->getName());
+    unit->types[sti->identifier->getName()] = sty;
 
     std::vector<Type*> structVec;
     for(int i = 0; i < sti->members.size(); i++)
@@ -66,16 +72,11 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
     }
     if(sti->members.size())
     {
-        StructType *sty = StructType::create(context, sti->identifier->getName());
         sty->setBody(structVec);
-        llvmty = sty;
     }
-    else llvmty = Type::getInt8Ty(context); //allow fwd declared types, TODO: cleaner
 
     debug->createStructType(ty);
-
-    unit->types[sti->identifier->getName()] = llvmty;
-    return(llvm::Type*) llvmty;
+    return(llvm::Type*) sty;
 }
 
 llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
@@ -204,6 +205,10 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
             if(TypeDeclaration* tdecl = dynamic_cast<TypeDeclaration*>(decl))
             {
                 ty = tdecl->type;
+                if(!tdecl->type)
+                {
+                    emit_message(msg::FATAL, "error, invalid type");
+                }
             } else {
                 emit_message(msg::FATAL, "error, invalid type");
                 return NULL;
@@ -1317,8 +1322,13 @@ ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs, bool
 {
     if(!lhs->isLValue())
     {
-        emit_message(msg::ERROR, "assignment requires lvalue", lhs->loc);
-        return NULL;
+        // XXX work around. if lhs is unknown, isLValue will fail on expression
+        ASTValue *vlhs = codegenExpression(lhs);
+        if(!vlhs->isLValue())
+        {
+            emit_message(msg::ERROR, "assignment requires lvalue", lhs->loc);
+            return NULL;
+        }
     }
 
     // codegen tuple assignment
@@ -2003,9 +2013,6 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 
     popScope();
 
-    //fprintf(stderr, "~~~~~~");
-    //((llvm::Module*) u->cgValue)->dump();
-    //fprintf(stderr, "~~~~~~");
     delete debug;
 }
 
@@ -2019,7 +2026,13 @@ void IRCodegenContext::codegenPackage(Package *p)
         unit->module = m;
         p->cgValue = 0;
         codegenTranslationUnit(unit);
+
+        // XXX debug, output all modules
+        std::string outputll = config.tempName + "/" + unit->unit->getName() + ".ll";
+        raw_fd_ostream output(outputll.c_str(), err);
+        m->print(output, 0);
         linker.linkInModule(m, (unsigned) Linker::DestroySource, &err);
+
     } else // generate all leaves ...
     {
         for(int i = 0; i < p->children.size(); i++)
@@ -2034,6 +2047,7 @@ void IRCodegenContext::codegenPackage(Package *p)
 
 std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
 {
+    this->config = config;
     codegenPackage(ast->getRootPackage());
     if(currentErrorLevel() > msg::WARNING)
     {

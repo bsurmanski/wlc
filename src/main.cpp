@@ -10,6 +10,7 @@ using namespace std;
 #include <unistd.h>
 #include <vector>
 #include <llvm/Linker.h>
+#include <string.h>
 
 void link(WLConfig params, std::string outputo)
 {
@@ -64,6 +65,11 @@ void compile(WLConfig params)
             if(!ast->getUnit(params.files[i])) // check if file already parsed
             {
                 TranslationUnit *unit = new TranslationUnit(NULL, params.files[i]); //TODO
+                //XXX: work around
+                std::string filenm = params.files[i];
+                unit->identifier = unit->getScope()->get(
+                        basename(filenm.c_str()));
+
                 unit->expl = true;
                 ast->addUnit(params.files[i], unit);
                 parser.parseFile(unit, params.files[i]);

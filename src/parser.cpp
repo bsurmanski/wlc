@@ -310,7 +310,10 @@ ImportExpression *ParseContext::parseImport()
         importedUnit = parser->getAST()->getUnit(sexp->string);
         if(!importedUnit) // This TU hasnt been loaded from file yet, DOIT
         {
-            importedUnit = new TranslationUnit(NULL, sexp->string);  //TODO: identifier
+            std::string filenm = sexp->string;
+            importedUnit = new TranslationUnit(getScope()->get(
+                        basename(filenm.c_str())),
+                    sexp->string);  //TODO: identifier
             parser->getAST()->addUnit(sexp->string, importedUnit);
 
             if(special)
@@ -537,19 +540,22 @@ Declaration *ParseContext::parseDeclaration()
         switch(kind)
         {
             case kw_union:
-                sui = new UnionTypeInfo(id, tbl, members); //TODO: use info
+                sui = new UnionTypeInfo(id, tbl, members);
+                sdecl->setType(new ASTType(TYPE_UNION, sui));
                 id->declaredType()->setTypeInfo(sui, TYPE_UNION);
                 id->setDeclaration(sdecl, Identifier::ID_UNION);
                 break;
             case kw_struct:
-                sui = new StructTypeInfo(id, tbl, members); //TODO: use info
+                sui = new StructTypeInfo(id, tbl, members);
+                sdecl->setType(new ASTType(TYPE_STRUCT, sui));
                 id->declaredType()->setTypeInfo(sui, TYPE_STRUCT);
                 id->setDeclaration(sdecl, Identifier::ID_STRUCT);
                 break;
             case kw_class:
                 sui = new ClassTypeInfo(id, tbl, NULL, members); //TODO: use info
-                id->declaredType()->setTypeInfo(sui, TYPE_STRUCT);
-                id->setDeclaration(sdecl, Identifier::ID_STRUCT);
+                sdecl->setType(new ASTType(TYPE_CLASS, sui));
+                id->declaredType()->setTypeInfo(sui, TYPE_CLASS);
+                id->setDeclaration(sdecl, Identifier::ID_CLASS);
                 break;
             default:
                 emit_message(msg::FAILURE, "unknown declaration kind", loc);
@@ -579,7 +585,7 @@ Declaration *ParseContext::parseDeclaration()
         return NULL;
     }
 
-    Identifier *id = getScope()->get(t_id.toString());
+    Identifier *id = getScope()->getInScope(t_id.toString());
 
     //TODO parse decl specs
 

@@ -208,3 +208,4 @@ ASTType *ASTType::getDynamicTy()
     if(!DynamicTy) DynamicTy = new ASTType(TYPE_DYNAMIC);
     return DynamicTy;
 }
+

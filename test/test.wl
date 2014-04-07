@@ -161,4 +161,5 @@ struct MyNewStruct
     int a
     int b
     int c
+    MyNewStruct ^st
 }

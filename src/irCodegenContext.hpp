@@ -168,6 +168,8 @@ class IRCodegenContext : public CodegenContext
     void dwarfStopPoint(int ln);
     void dwarfStopPoint(SourceLocation l);
 
+    ASTValue *indexValue(ASTValue *val, int i);
+
     ASTValue *loadValue(ASTValue *val);
     ASTValue *storeValue(ASTValue *dest, ASTValue *val);
 
@@ -187,6 +189,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);
     ASTValue *codegenUnaryExpression(UnaryExpression *exp);
     ASTValue *codegenBinaryExpression(BinaryExpression *exp);
+    ASTValue *codegenAssign(Expression *lhs, Expression *rhs);
 
     // promote
     ASTValue *promoteType(ASTValue *val, ASTType *type);

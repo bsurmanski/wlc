@@ -1,6 +1,9 @@
 #ifndef _SOURCELOCATION_HPP
 #define _SOURCELOCATION_HPP
 
+#include <string>
+#include <stdio.h>
+
 struct TranslationUnit;
 
 struct SourceLocation
@@ -11,6 +14,12 @@ struct SourceLocation
     bool isUnknown() { return !line && !ch; }
     SourceLocation() : filenm(NULL), line(1), ch(1) {}
     SourceLocation(const char *fn, int l, int cha = 1) : filenm(fn), line(l), ch(cha) {}
+    std::string toString()
+    {
+        char buf[20];
+        sprintf(buf, "%d", line);
+        return std::string(filenm) + ":" + std::string(buf);
+    }
 };
 
 struct SourceSlice

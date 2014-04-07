@@ -133,7 +133,6 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
         if(peek().is(tok::caret))
         {
             ignore(); // eat ^
-            if(type == ASTType::getVoidTy()) type = ASTType::getCharTy(); // cannot have void*, use char*
             type = type->getPointerTy();
             continue;
         }

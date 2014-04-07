@@ -97,8 +97,12 @@ std::string ArrayTypeInfo::getName(){
     return "array[" + arrayOf->getName() + "]";
 }
 
-size_t ArrayTypeInfo::getAlign(){
+size_t StaticArrayTypeInfo::getAlign(){
     return arrayOf->align();
+}
+
+size_t DynamicArrayTypeInfo::getAlign(){
+    return ASTType::getCharTy()->getPointerTy()->align();
 }
 
 ASTType *ASTType::getPointerTy()
@@ -117,7 +121,7 @@ ASTType *ASTType::getArrayTy()
     if(!dynamicArrayTy)
     {
         ASTType *aty = new ASTType(TYPE_DYNAMIC_ARRAY);
-        aty->setTypeInfo(new ArrayTypeInfo(this));
+        aty->setTypeInfo(new DynamicArrayTypeInfo(this));
         dynamicArrayTy = aty;
     }
     return dynamicArrayTy;
@@ -129,17 +133,18 @@ ASTType *ASTType::getArrayTy(int sz)
     if(!arrayTy.count(sz))
     {
         aty = new ASTType(TYPE_ARRAY);
-        aty->setTypeInfo(new ArrayTypeInfo(this, sz));
+        aty->setTypeInfo(new StaticArrayTypeInfo(this, sz));
         arrayTy[sz] = aty;
     } else aty = arrayTy[sz];
     return aty;
 }
 
-size_t ArrayTypeInfo::getSize() {
-    if(isDynamic())
-        return ASTType::getCharTy()->getPointerTy()->size() + ASTType::getULongTy()->size();
-    else
-        return size * arrayOf->size();
+size_t DynamicArrayTypeInfo::getSize() {
+    return ASTType::getCharTy()->getPointerTy()->size() + ASTType::getULongTy()->size();
+}
+
+size_t StaticArrayTypeInfo::getSize() {
+    return size * arrayOf->size();
 }
 
 size_t AliasTypeInfo::getSize()

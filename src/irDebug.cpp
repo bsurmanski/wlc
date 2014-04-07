@@ -80,7 +80,7 @@ llvm::DICompositeType IRDebug::createArrayType(ASTType *ty)
     llvm::DIDescriptor DIContext(currentFile());
     ArrayTypeInfo *ati = (ArrayTypeInfo*) ty->info;
     assert(!ati->isDynamic());
-    return di.createArrayType(ati->size, ati->arrayOf->align(),
+    return di.createArrayType(ati->length(), ati->arrayOf->align(),
             createType(ati->arrayOf),
             DIArray());
 }

@@ -9,7 +9,8 @@ void Identifier::setDeclaration(Declaration *decl, IDType ty)
     if(!fdecl || (fdecl && fdecl->body))
         if(declaration)
         {
-            emit_message(msg::FATAL, "redefinition");
+            emit_message(msg::FATAL, "redefinition of " + getName() +
+                    "originally defined at " + declaration->loc.toString(), decl->loc);
         }
     declaration = decl;
     type = ty;

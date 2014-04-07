@@ -185,15 +185,33 @@ struct PointerTypeInfo : public TypeInfo
 struct ArrayTypeInfo : public CompositeTypeInfo
 {
     ASTType *arrayOf;
-    unsigned size;
     virtual ASTType *getReferenceTy() { return arrayOf; }
     virtual ASTType *getContainedType(unsigned i) { return arrayOf; }
+    virtual size_t getSize() = 0;
+    virtual size_t getAlign() = 0;
+    virtual bool isDynamic() = 0;
+    virtual size_t length() = 0;
+    ArrayTypeInfo(ASTType *pto) : arrayOf(pto) {}
+    std::string getName();
+};
+
+struct StaticArrayTypeInfo : ArrayTypeInfo
+{
+    unsigned size;
     virtual size_t getSize();
     virtual size_t getAlign();
+    virtual bool isDynamic() { return false; }
     virtual size_t length() { return size; }
-    ArrayTypeInfo(ASTType *pto, int sz = 0) : arrayOf(pto), size(sz) {}
-    bool isDynamic() { return size == 0; }
-    std::string getName();
+    StaticArrayTypeInfo(ASTType *pto, int sz) : ArrayTypeInfo(pto), size(sz) {}
+};
+
+struct DynamicArrayTypeInfo : ArrayTypeInfo
+{
+    virtual size_t getSize();
+    virtual size_t getAlign();
+    virtual bool isDynamic() { return true; }
+    virtual size_t length() { return 0; }
+    DynamicArrayTypeInfo(ASTType *pto) : ArrayTypeInfo(pto) {}
 };
 
 struct HetrogenTypeInfo : public CompositeTypeInfo
@@ -372,7 +390,9 @@ struct ASTType
         switch(type)
         {
             case TYPE_POINTER:
-                return ty->isInteger() || ty == this; //TODO: check if compatible pointer
+                return ty->isInteger() || ty == this ||
+                    getReferencedTy()->type == TYPE_VOID || ty->getReferencedTy()->type == TYPE_VOID;
+                //TODO: check if compatible pointer
             case TYPE_BOOL:
             case TYPE_UCHAR:
             case TYPE_CHAR:
@@ -441,11 +461,14 @@ struct ASTType
             case TYPE_UINT: return "uint";
             case TYPE_LONG: return "long";
             case TYPE_ULONG: return "ulong";
+            case TYPE_FLOAT: return "float";
+            case TYPE_DOUBLE: return "double";
+            case TYPE_VOID: return "void";
             default: return info->getName();
         }
     }
 
-    ASTType *getReferencedTy() { return info->getReferenceTy(); }
+    ASTType *getReferencedTy() const { return info->getReferenceTy(); }
     bool isAggregate() { return type == TYPE_STRUCT || type == TYPE_UNION || type == TYPE_CLASS; }
     bool isClass() { return type == TYPE_CLASS; }
     bool isStruct() { return type == TYPE_STRUCT; }
@@ -625,6 +648,7 @@ struct PackageExpression;
 struct CastExpression;
 struct TypeExpression;
 struct UseExpression;
+struct TupleExpression;
 
 struct Expression
 {
@@ -653,6 +677,7 @@ struct Expression
     void setLocation(SourceLocation l) { loc = l; }
     SourceLocation loc;
 
+    virtual bool isLValue() { return false; }
     virtual bool isConstant() { return false; }
     virtual ASTType *getType() { return NULL; }
 
@@ -682,6 +707,7 @@ struct Expression
     virtual CastExpression *castExpression() { return NULL; }
     virtual UseExpression *useExpression() { return NULL; }
     virtual TypeExpression *typeExpression() { return NULL; }
+    virtual TupleExpression *tupleExpression() { return NULL; }
 
     //TODO: overrides
 };
@@ -710,8 +736,15 @@ struct DeleteExpression : public Expression
 struct TupleExpression : public Expression
 {
     std::vector<Expression*> members;
+    virtual bool isLValue() {
+        bool ret = members.size() > 0;
+        for(int i = 0; i < members.size() && ret; i++)
+            if(!members[i]->isLValue()) ret = false;
+        return ret;
+    }
     TupleExpression(std::vector<Expression*> e, SourceLocation l = SourceLocation()) :
         Expression(l), members(e) {}
+    virtual TupleExpression *tupleExpression() { return this; }
 };
 
 struct CastExpression : public Expression
@@ -743,6 +776,7 @@ struct CallExpression : public PostfixExpression
 struct IndexExpression : public PostfixExpression
 {
     virtual IndexExpression *indexExpression() { return this; }
+    virtual bool isLValue() { return lhs->isLValue(); }
     Expression *lhs;
     Expression *index;
     IndexExpression(Expression *l, Expression *i, SourceLocation lo = SourceLocation()) :
@@ -761,6 +795,7 @@ struct DotExpression : public PostfixExpression
 {
     Expression *lhs;
     std::string rhs;
+    virtual bool isLValue() { return lhs->isLValue(); }
     DotExpression(Expression *l, std::string r, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), rhs(r) {}
 };
@@ -796,6 +831,7 @@ struct PrimaryExpression : public Expression
 struct IdentifierExpression : public PrimaryExpression
 {
     Identifier *id;
+    virtual bool isLValue() { return id->isVariable(); }
     IdentifierExpression(Identifier *i, SourceLocation l = SourceLocation()) :
         PrimaryExpression(l), id(i) {}
     Identifier *identifier() { return id; }

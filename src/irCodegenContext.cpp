@@ -51,8 +51,9 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
     StructTypeInfo *sti = (StructTypeInfo*) ty->info;
     llvm::Type* llvmty = NULL;
 
-    if(unit->types.count(sti->identifier->getName()))
+    if(unit->types.count(sti->identifier->getName())){
         return unit->types[sti->identifier->getName()];
+    }
 
     std::vector<Type*> structVec;
     for(int i = 0; i < sti->members.size(); i++)
@@ -182,7 +183,7 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
         debug->createDynamicArrayType(ty);
     } else
     {
-        llvm::ArrayType *aty = ArrayType::get(codegenType(ati->arrayOf), ati->size);
+        llvm::ArrayType *aty = ArrayType::get(codegenType(ati->arrayOf), ati->length());
         ty->cgType = aty;
 
         debug->createArrayType(ty);
@@ -272,6 +273,22 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
     }
 
     return (llvm::Type *) llvmty;
+}
+
+ASTValue *IRCodegenContext::indexValue(ASTValue *val, int i)
+{
+    CompositeTypeInfo *cti = dynamic_cast<CompositeTypeInfo*>(val->type->info);
+    if(!cti)
+    {
+        emit_message(msg::FAILURE, "cannot index non-composite type");
+        return NULL;
+    }
+
+    std::vector<Value*> gep;
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), i));
+    Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+    return new ASTValue(cti->getContainedType(i), llval, true);
 }
 
 llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
@@ -607,9 +624,7 @@ ASTValue *IRCodegenContext::codegenElseExpression(ElseExpression *exp)
 ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
 {
     ASTValue *cond = codegenExpression(exp->condition);
-    //ASTValue *zero = new ASTValue(ASTType::getIntTy(), ConstantInt::get(Type::getInt32Ty(context), 0));
-    //codegenResolveBinaryTypes(&cond, &zero, 0);
-    //ASTValue *icond = new ASTValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(cond), codegenValue(zero)));
+
     ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
     llvm::BasicBlock *ontrue = BasicBlock::Create(context, "true",
             ir->GetInsertBlock()->getParent());
@@ -621,14 +636,19 @@ ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
 
     ir->SetInsertPoint(ontrue);
     codegenStatement(exp->body);
-    if(!dynamic_cast<ReturnStatement*>(exp->body))
+    if(!isTerminated())
         ir->CreateBr(endif);
+    setTerminated(false);
 
     ir->SetInsertPoint(onfalse);
     if(exp->elsebr) codegenExpression(exp->elsebr);
-    ir->CreateBr(endif);
+    if(!isTerminated())
+        ir->CreateBr(endif);
+    setTerminated(false);
 
     ir->SetInsertPoint(endif);
+    setTerminated(false);
+
     return NULL;
 }
 
@@ -1004,7 +1024,18 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 return NULL;
             }
 
-            if(lhs->getType()->isStruct() || lhs->getType()->isUnion())
+            if(lhs->getType()->isStruct())
+            {
+                HetrogenTypeInfo *hti = (HetrogenTypeInfo*) lhs->getType()->getTypeInfo();
+
+                int i = hti->getMemberIndex(dexp->rhs);
+                if(i < 0)
+                {
+                    emit_message(msg::ERROR, "member not in struct: " + hti->getName() + "." + dexp->rhs,
+                            dexp->loc);
+                }
+                return indexValue(lhs, i);
+            } else if (lhs->getType()->isUnion())
             {
                 HetrogenTypeInfo *hti = (HetrogenTypeInfo*) lhs->getType()->getTypeInfo();
                 Declaration *mdecl = hti->getMemberDeclaration(dexp->rhs);
@@ -1020,7 +1051,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                                             hti->getMemberIndex(dexp->rhs)));
                 Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
                 return new ASTValue(ty, llval, true);
-            } else if(lhs->getType()->type == TYPE_DYNAMIC_ARRAY)
+            }else if(lhs->getType()->type == TYPE_DYNAMIC_ARRAY)
             {
                 ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(lhs->getType()->info);
                 if(!ati){
@@ -1060,7 +1091,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 if(dexp->rhs == "size")
                 {
                     return new ASTValue(ASTType::getULongTy(),
-                            ConstantInt::get(Type::getInt64Ty(context), ati->size));
+                            ConstantInt::get(Type::getInt64Ty(context), ati->length()));
                 }
             }
         emit_message(msg::ERROR, "unknown dot expression", exp->loc);
@@ -1278,6 +1309,35 @@ void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, u
         }
         if((*v2)->type->priority() > (*v1)->type->priority()) *v1 = promoteType(*v1, (*v2)->type);
         else *v2 = promoteType(*v2, (*v1)->type);
+    }
+}
+
+ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs)
+{
+    if(!lhs->isLValue())
+    {
+        emit_message(msg::ERROR, "assignment requires lvalue", lhs->loc);
+        return NULL;
+    }
+
+    // codegen tuple assignment
+    if(TupleExpression *tlhs = lhs->tupleExpression())
+    {
+        if(TupleExpression *trhs = rhs->tupleExpression())
+        {
+            if(tlhs->members.size() > trhs->members.size())
+            {
+                emit_message(msg::ERROR, "tuple assignment requires compatible tuple types", lhs->loc);
+                return NULL;
+            }
+            for(int i = 0; i < tlhs->members.size(); i++)
+            {
+                codegenAssign(tlhs->members[i], trhs->members[i]);
+            }
+        } else {
+            emit_message(msg::ERROR, "tuple assignment requires a tuple on rhs", lhs->loc);
+            return NULL;
+        }
     }
 }
 

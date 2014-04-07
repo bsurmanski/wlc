@@ -7,8 +7,6 @@ void ^memcpy(void^ dest, void^ src, long n);
 int RAND_MAX = 2147483647
 
 import "sdl.wl"
-//import "cstdlib.wl"
-//import "cstdio.wl"
 import(C) "/usr/include/stdlib.h"
 import(C) "/usr/include/stdio.h"
 
@@ -32,13 +30,14 @@ union SomeUnion
 
 bool pixelIsWhite(SDL_Surface^ s, int i, int j)
 {
-    bool ret = s.pixels[i * s.format.BytesPerPixel + j * s.pitch]
-    return ret
+    int^ pxl = &s.pixels[i * s.format.BytesPerPixel + j * s.pitch]
+    return ^pxl
 }
 
 void setPixel(SDL_Surface^ s, int i, int j, int val) 
 {
-    s.pixels[i * s.format.BytesPerPixel + j * s.pitch] = val
+    int^ pxl = &s.pixels[i * s.format.BytesPerPixel + j * s.pitch]
+    ^pxl = val
 }
 
 void update()

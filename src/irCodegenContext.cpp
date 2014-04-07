@@ -1312,7 +1312,8 @@ void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, u
     }
 }
 
-ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs)
+//TODO: should take astvalue's?
+ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs, bool convert)
 {
     if(!lhs->isLValue())
     {
@@ -1338,7 +1339,28 @@ ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs)
             emit_message(msg::ERROR, "tuple assignment requires a tuple on rhs", lhs->loc);
             return NULL;
         }
+        return codegenExpression(rhs);
     }
+
+    ASTValue *vlhs = codegenExpression(lhs);
+    ASTValue *vrhs = codegenExpression(rhs);
+
+    //if(vrhs->type != vlhs->type)
+    {
+            vrhs = promoteType(vrhs, vlhs->getType());
+        if(vrhs->type->coercesTo(vlhs->type) || (convert && vrhs->type->castsTo(vlhs->type)))
+        {
+            vrhs = promoteType(vrhs, vlhs->getType());
+        }
+        else
+        {
+            emit_message(msg::ERROR, "cannot assign value of type '" + vrhs->type->getName() +
+                    "' to type '" + vlhs->type->getName() + "'", lhs->loc);
+            return NULL;
+        }
+    }
+    storeValue(vlhs, vrhs);
+    return vrhs;
 }
 
 ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
@@ -1356,6 +1378,10 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
             return promoteType(rhs, ty);
         } else emit_message(msg::ERROR, "need to cast to type", exp->loc);
     }
+
+    //XXX temp. shortcut to allow LValue tuples
+    if(exp->op == tok::equal || exp->op == tok::colonequal)
+            return codegenAssign(exp->lhs, exp->rhs, exp->op == tok::colonequal);
 
     ASTValue *lhs = codegenExpression(exp->lhs);
     ASTValue *rhs = codegenExpression(exp->rhs);
@@ -1377,12 +1403,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         //ASSIGN
         case tok::equal:
         case tok::colonequal:
-            if(!lhs->isLValue()){
-                emit_message(msg::ERROR, "LHS must be LValue", exp->loc);
-                return NULL;
-            }
-            retValue = rhs; //TODO: merge with decl assign
-            break;
+            return codegenAssign(exp->lhs, exp->rhs, exp->op == tok::colonequal);
 
         // I dont know, do something with a comma eventually
         case tok::comma:
@@ -1762,6 +1783,9 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
             vty = defaultValue->getType();
             vdecl->type = vty;
+        } else if(defaultValue)
+        {
+            defaultValue = promoteType(defaultValue, vty);
         }
 
         //XXX work around for undeclared struct

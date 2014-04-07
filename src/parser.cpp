@@ -908,8 +908,6 @@ Expression *ParseContext::parseExpression(int prec)
             return parseSwitchExpression();
         case tok::kw_import:
             return parseImport();
-        case tok::lbracket:
-            return parseTupleExpression();
         case tok::kw_new:
             return parseNewExpression();
         case tok::kw_delete:
@@ -1063,6 +1061,11 @@ Expression *ParseContext::parsePrimaryExpression()
     if(peek().is(tok::charstring))
     {
         return new StringExpression(get().stringData(), loc);
+    }
+
+    if(peek().is(tok::lbracket))
+    {
+        return parseTupleExpression();
     }
 
     if(peek().is(tok::intNum))

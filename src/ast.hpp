@@ -12,6 +12,7 @@
 #include "symbolTable.hpp"
 #include "identifier.hpp"
 #include "sourceLocation.hpp"
+#include "token.hpp"
 
 struct Statement;
 struct Declaration;
@@ -806,6 +807,7 @@ struct UnaryExpression : public Expression
     Expression *lhs;
     unsigned op;
 
+    virtual bool isLValue() { return op == tok::caret; }
     virtual bool isConstant() { return lhs->isConstant(); }
     UnaryExpression(unsigned o, Expression *l, SourceLocation lo = SourceLocation()) :
         Expression(lo), lhs(l), op(o) {}

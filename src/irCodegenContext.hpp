@@ -189,7 +189,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);
     ASTValue *codegenUnaryExpression(UnaryExpression *exp);
     ASTValue *codegenBinaryExpression(BinaryExpression *exp);
-    ASTValue *codegenAssign(Expression *lhs, Expression *rhs);
+    ASTValue *codegenAssign(Expression *lhs, Expression *rhs, bool convert=false);
 
     // promote
     ASTValue *promoteType(ASTValue *val, ASTType *type);

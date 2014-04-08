@@ -720,6 +720,7 @@ ASTValue *IRCodegenContext::codegenSwitchExpression(SwitchExpression *exp)
     //TODO: set cases
 
     getScope()->switchExp = exp;
+    getScope()->breakLabel = switchend;
 
     setTerminated(true);
     if(exp->body) codegenStatement(exp->body);

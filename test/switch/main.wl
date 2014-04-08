@@ -6,10 +6,10 @@ int main(int argc, char^^ argv)
     {
         case 1
             printf("1 argument passed!\n");
-            //break
+            break
         case 2
             printf("2 argument passed!\n");
-            //break
+            break
     }
     return 0
 }

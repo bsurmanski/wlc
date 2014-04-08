@@ -47,7 +47,8 @@ struct Identifier
     Expression *getExpression() { return expression; }
     std::string getName() { return name; }
     ASTType *getType();
-    ASTType *declaredType();
+    ASTType *getDeclaredType();
+    void setDeclaredType(ASTType *ty);
     ASTValue *getReference();
     ASTValue *getValue();
     void setValue(ASTValue *value);

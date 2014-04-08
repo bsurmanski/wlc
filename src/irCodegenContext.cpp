@@ -204,8 +204,8 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
             Declaration* decl = id->getDeclaration();
             if(TypeDeclaration* tdecl = dynamic_cast<TypeDeclaration*>(decl))
             {
-                ty = tdecl->type;
-                if(!tdecl->type)
+                ty = tdecl->getDeclaredType();
+                if(!tdecl->getDeclaredType())
                 {
                     emit_message(msg::FATAL, "error, invalid type");
                 }
@@ -368,7 +368,7 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
         id->setValue(new ASTValue(NULL, llvmfunc));
     } else if(id->isStruct())
     {
-        id->setValue(new ASTValue(id->declaredType(), NULL));
+        id->setValue(new ASTValue(id->getDeclaredType(), NULL));
     } else if(id->isExpression())
     {
         id->setValue(codegenExpression(id->getExpression()));
@@ -1384,7 +1384,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         ASTValue *rhs = codegenExpression(exp->rhs);
         if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->lhs))
         {
-            ASTType *ty = iexp->identifier()->declaredType();
+            ASTType *ty = iexp->identifier()->getDeclaredType();
             return promoteType(rhs, ty);
         } else emit_message(msg::ERROR, "need to cast to type", exp->loc);
     }
@@ -1809,7 +1809,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                     emit_message(msg::ERROR, "undeclared struct: " + id->getName(), vdecl->loc);
                     return;
                 }
-                vty = id->declaredType();
+                vty = id->getDeclaredType();
             }
         }
 

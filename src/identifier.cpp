@@ -24,7 +24,7 @@ ASTType *Identifier::getType()
     }
 }
 
-ASTType *Identifier::declaredType()
+ASTType *Identifier::getDeclaredType()
 {
     //TODO: class
     if(type != ID_STRUCT && type != ID_UNKNOWN && type != ID_UNION) {
@@ -37,6 +37,11 @@ ASTType *Identifier::declaredType()
         astType->info = new NamedUnknownInfo(this, NULL);
     }
     return astType;
+}
+
+void Identifier::setDeclaredType(ASTType *ty)
+{
+    astType = ty;
 }
 
 ASTValue *Identifier::getReference()

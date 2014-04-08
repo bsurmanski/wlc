@@ -594,17 +594,32 @@ struct ArrayDeclaration : public VariableDeclaration
 
 struct TypeDeclaration : public Declaration
 {
-    ASTType *type;
-    TypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) : Declaration(id, loc), type(ty) {}
+    TypeDeclaration(Identifier *id, SourceLocation loc) : Declaration(id, loc) {}
 
-    virtual ASTType *getType() { return type; }
-    virtual ASTType *setType(ASTType *ty) { type = ty; }
+    virtual ASTType *getType() { return NULL; } // XXX return a 'type' type?
+    virtual ASTType *getDeclaredType() = 0;
+    virtual ASTType *setDeclaredType(ASTType *ty) = 0;
+};
+
+struct BasicTypeDeclaration : public TypeDeclaration
+{
+    ASTType *type;
+    BasicTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) :
+        TypeDeclaration(id, loc), type(ty)
+    {
+    }
+
+    virtual ASTType *getDeclaredType() { return type; }
+    virtual ASTType *setDeclaredType(ASTType *ty) { type = ty; }
 };
 
 struct StructUnionDeclaration : public TypeDeclaration
 {
     std::vector<Declaration*> members;
-    StructUnionDeclaration(Identifier *id, ASTType *ty, std::vector<Declaration*> m, SourceLocation loc) : TypeDeclaration(id, ty, loc), members(m) {}
+    StructUnionDeclaration(Identifier *id, ASTType *ty, std::vector<Declaration*> m, SourceLocation loc) : TypeDeclaration(id, loc), members(m) {}
+
+    virtual ASTType *getDeclaredType() { return identifier->getDeclaredType(); }
+    virtual ASTType *setDeclaredType(ASTType *ty) { identifier->setDeclaredType(ty); }
 };
 
 /***

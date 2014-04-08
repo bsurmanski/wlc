@@ -124,7 +124,7 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
             emit_message(msg::ERROR, "unknown type or variable", t.loc);
             return NULL;
         }
-        type = id->declaredType();
+        type = id->getDeclaredType();
         //TODO: do something with id...
     }
 
@@ -541,20 +541,20 @@ Declaration *ParseContext::parseDeclaration()
         {
             case kw_union:
                 sui = new UnionTypeInfo(id, tbl, members);
-                sdecl->setType(new ASTType(TYPE_UNION, sui));
-                id->declaredType()->setTypeInfo(sui, TYPE_UNION);
+                sdecl->setDeclaredType(new ASTType(TYPE_UNION, sui));
+                id->getDeclaredType()->setTypeInfo(sui, TYPE_UNION);
                 id->setDeclaration(sdecl, Identifier::ID_UNION);
                 break;
             case kw_struct:
                 sui = new StructTypeInfo(id, tbl, members);
-                sdecl->setType(new ASTType(TYPE_STRUCT, sui));
-                id->declaredType()->setTypeInfo(sui, TYPE_STRUCT);
+                sdecl->setDeclaredType(new ASTType(TYPE_STRUCT, sui));
+                id->getDeclaredType()->setTypeInfo(sui, TYPE_STRUCT);
                 id->setDeclaration(sdecl, Identifier::ID_STRUCT);
                 break;
             case kw_class:
                 sui = new ClassTypeInfo(id, tbl, NULL, members); //TODO: use info
-                sdecl->setType(new ASTType(TYPE_CLASS, sui));
-                id->declaredType()->setTypeInfo(sui, TYPE_CLASS);
+                sdecl->setDeclaredType(new ASTType(TYPE_CLASS, sui));
+                id->getDeclaredType()->setTypeInfo(sui, TYPE_CLASS);
                 id->setDeclaration(sdecl, Identifier::ID_CLASS);
                 break;
             default:
@@ -1297,13 +1297,13 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
         StructTypeInfo *sti = new StructTypeInfo(id, tbl, members);
         StructUnionDeclaration *sdecl =
             new StructUnionDeclaration(id, NULL, members, SourceLocation());
-        id->declaredType()->setTypeInfo(sti,
+        id->getDeclaredType()->setTypeInfo(sti,
                 typeDecl.kind == CXCursor_StructDecl ? TYPE_STRUCT : TYPE_UNION);
         id->setDeclaration(sdecl,
                 typeDecl.kind == CXCursor_StructDecl ? Identifier::ID_STRUCT : Identifier::ID_UNION);
     }
 
-    return id->declaredType();
+    return id->getDeclaredType();
 }
 
 

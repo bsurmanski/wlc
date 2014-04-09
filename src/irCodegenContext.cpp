@@ -51,12 +51,11 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
     StructTypeInfo *sti = (StructTypeInfo*) ty->info;
 
     if(unit->types.count(sti->identifier->getName())){
-        llvm::Type *llty = unit->types[sti->identifier->getName()];
+        Type *llty = unit->types[sti->identifier->getName()];
+        //if(llty->isStructTy() && ((StructType*)llty)->isOpaque())
+        //    return codegenType(ASTType::getCharTy()->getPointerTy());
         return llty;
     }
-
-    std::cout << "generating struct: " << sti->identifier->getName() <<
-        " in " << unit->unit->getName() << std::endl;
 
     StructType *sty = StructType::create(context, sti->identifier->getName());
     unit->types[sti->identifier->getName()] = sty;
@@ -76,7 +75,7 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
     }
 
     debug->createStructType(ty);
-    return(llvm::Type*) sty;
+    return sty;
 }
 
 llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
@@ -292,7 +291,8 @@ ASTValue *IRCodegenContext::indexValue(ASTValue *val, int i)
     std::vector<Value*> gep;
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), i));
-    Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+    Value *v = codegenLValue(val);
+    Value *llval = ir->CreateInBoundsGEP(v, gep);
     return new ASTValue(cti->getContainedType(i), llval, true);
 }
 

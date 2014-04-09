@@ -1,4 +1,4 @@
-SRCFILES=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier.cpp symbolTable.cpp ast.cpp irDebug.cpp message.cpp
+SRCFILES=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier.cpp symbolTable.cpp astType.cpp irDebug.cpp message.cpp parsec.cpp
 
 CLANGLIBS=\
 /usr/lib/libclang.a\

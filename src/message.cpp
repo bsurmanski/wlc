@@ -29,30 +29,30 @@ void emit_message(int level, std::string msg, SourceLocation loc)
     if(level > errLvl) errLvl = level;
 
     if(loc.filenm)
-        cout << loc.filenm << ":";
+        cerr << loc.filenm << ":";
 
     if(loc.line)
-        cout << loc.line << ": ";
+        cerr << loc.line << ": ";
 
     switch(level)
     {
         case OUTPUT:
             break;
         case WARNING:
-            cout << "warning: "; break;
+            cerr << "warning: "; break;
         case ERROR:
-            cout << "error: "; break;
+            cerr << "error: "; break;
         case FAILURE:
-            cout << "compiler failure: "; break;
+            cerr << "compiler failure: "; break;
         case UNIMPLEMENTED:
-            cout << "unimplemented feature: "; break;
+            cerr << "unimplemented feature: "; break;
         case FATAL:
-            cout << "fatal error: "; break;
+            cerr << "fatal error: "; break;
         default:
             break;
     }
 
-    cout << msg << endl;
+    cerr << msg << endl;
 
     if(level == FATAL) assert(false);
     if(level == FAILURE) assert(false); //throw a fit, this compiler isnt working

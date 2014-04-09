@@ -209,3 +209,11 @@ ASTType *ASTType::getDynamicTy()
     return DynamicTy;
 }
 
+
+ASTType *ASTType::getTupleTy(std::vector<ASTType *> t)
+{
+    // TODO: type cache
+    ASTType *ty = new ASTType();
+    ty->setTypeInfo(new TupleTypeInfo(t), TYPE_TUPLE);
+    return ty;
+}

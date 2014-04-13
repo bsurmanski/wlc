@@ -7,6 +7,7 @@ struct Declaration;
 struct Expression;
 struct ASTType;
 struct ASTValue;
+struct SymbolTable;
 
 struct Identifier
 {
@@ -30,6 +31,7 @@ struct Identifier
     std::string name;
     Declaration *declaration;
     Expression *expression;
+    SymbolTable *table;
     union
     {
         struct
@@ -40,7 +42,8 @@ struct Identifier
         ASTType *astType;
     };
 
-    Identifier(std::string s, IDType t = ID_UNKNOWN) : type(t), name(s), declaration(NULL), astValue(NULL) {}
+    Identifier(SymbolTable *ta, std::string s, IDType t = ID_UNKNOWN) :
+        table(ta), type(t), name(s), declaration(NULL), astValue(NULL) {}
     void setDeclaration(Declaration *decl, IDType t = ID_UNKNOWN);
     Declaration *getDeclaration() { return declaration; }
     void setExpression(Expression *e) { expression = e; type = ID_EXPRESSION; }
@@ -51,6 +54,7 @@ struct Identifier
     void setDeclaredType(ASTType *ty);
     ASTValue *getReference();
     ASTValue *getValue();
+    SymbolTable *getScope() { return table; }
     void setValue(ASTValue *value);
     bool isUndeclared() { return type == ID_UNKNOWN; }
     bool isVariable() { return type == ID_VARIABLE; }

@@ -517,7 +517,7 @@ Declaration *ParseContext::parseDeclaration()
         }
 
 
-        SymbolTable *tbl = new SymbolTable(getScope());
+        SymbolTable *tbl = new SymbolTable(getScope(), SymbolTable::Scope_Struct);
         pushScope(tbl);
         vector<Declaration*> members;
         if(peek().is(tok::lbrace))

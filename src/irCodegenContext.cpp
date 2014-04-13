@@ -50,15 +50,19 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
 
     StructTypeInfo *sti = (StructTypeInfo*) ty->info;
 
+    if(StructType *sty = module->getTypeByName(sti->identifier->getName()))
+    {
+        return sty;
+    }
+
     if(unit->types.count(sti->identifier->getName())){
         Type *llty = unit->types[sti->identifier->getName()];
-        //if(llty->isStructTy() && ((StructType*)llty)->isOpaque())
-        //    return codegenType(ASTType::getCharTy()->getPointerTy());
         return llty;
     }
 
-    StructType *sty = StructType::create(context, sti->identifier->getName());
-    unit->types[sti->identifier->getName()] = sty;
+    StructType *sty = StructType::create(context);
+    sty->setName(sti->identifier->getName());
+    unit->types[sti->identifier->getName()] = IRType(ty, sty);
 
     std::vector<Type*> structVec;
     for(int i = 0; i < sti->members.size(); i++)
@@ -195,6 +199,7 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
 llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 {
     llvm::Type *llvmty = NULL;
+    if(ty->cgType) return (Type*) ty->cgType;
     //if(!ty->cgType)
     {
         if(ty->type == TYPE_UNKNOWN || ty->type == TYPE_UNKNOWN_USER)
@@ -276,6 +281,8 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
         }
     }
 
+    ty->cgType = llvmty;
+
     return (llvm::Type *) llvmty;
 }
 
@@ -342,8 +349,6 @@ ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
 
 ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
 {
-    if(id->getValue()) return id->getValue();
-
     ///XXX work around for forward declarations of variables in parent scopes
     if(id->isUndeclared())
     {
@@ -354,16 +359,36 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
             return NULL;
         }
     }
+
     if(id->isVariable())
     {
-        emit_message(msg::FAILURE, "failed to codegen identifier");
-        return id->getValue(); //TODO
+        if(id->getScope()->getUnit() != unit->unit) // id not declared in current TU
+        {
+            if(unit->globals.count(id->getName()))
+            {
+                return unit->globals[id->getName()];
+            } else
+            {
+                Declaration *decl = id->getDeclaration();
+                GlobalValue::LinkageTypes linkage = decl->isExternal() ?
+                    GlobalValue::ExternalLinkage : GlobalValue::ExternalWeakLinkage;
+                GlobalVariable *GV = new GlobalVariable(*module,
+                        codegenType(id->getType()),
+                        false,
+                        linkage,
+                        NULL,
+                        id->getName());
+                IRValue irval = IRValue(new ASTValue(id->getType(), GV, true), GV);
+                unit->globals[id->getName()] = irval;
+                return irval;
+            }
+            emit_message(msg::FAILURE, "failed to codegen identifier");
+        }
 
-    //} else if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration()))
+        return id->getValue(); // else declared in current TU, so we are good
     } else if(id->isFunction())
     {
-        //Value *llvmfunc = module->getFunction(id->getName());
-        Value *llvmfunc = (Value*) ((FunctionDeclaration*) id->declaration)->cgValue;
+        Value *llvmfunc = unit->functions[id->getName()];
         //TODO: proper function CGType (llvmfunc->getFunctionType())
         id->setValue(new ASTValue(NULL, llvmfunc));
     } else if(id->isStruct())
@@ -1674,6 +1699,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
 
 FunctionType *IRCodegenContext::codegenFunctionPrototype(FunctionPrototype *proto)
 {
+    if(proto->llty) return proto->llty;
     ASTType *rty = proto->returnType;
     vector<Type*> params;
     for(int i = 0; i < proto->parameters.size(); i++)
@@ -1682,6 +1708,7 @@ FunctionType *IRCodegenContext::codegenFunctionPrototype(FunctionPrototype *prot
     }
     // XXX return, args, varargs
     FunctionType *fty = FunctionType::get(codegenType(rty), params, proto->vararg);
+    proto->llty = fty;
     return fty;
 }
 
@@ -1694,7 +1721,6 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         //FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
         //Function *func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
         Function *func = module->getFunction(currentFunction.getName());
-        func->addFnAttr("no-frame-pointer-elim", "true");
         if(fdecl->body)
         {
             BasicBlock *BB = BasicBlock::Create(context, "entry", func);
@@ -1857,31 +1883,14 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                 }
             }
         }
-
-    } else if(StructUnionDeclaration *sdecl = dynamic_cast<StructUnionDeclaration*>(decl))
-    {
-        //XXX should be generated in the Declaration stuff of the package?
-        /*
-        std::vector<Type*> arr;
-        arr.push_back(Type::getInt32Ty(context));
-        arr.push_back(Type::getInt32Ty(context));
-        StructType *st = StructType::get(context, arr);
-        //sdecl->identifier->setType(st);
-        printf("CG struct decl\n");
-        */
     }
+    ///NOTE type declarations are not Codegen'd like values, accesible across Modules
 }
 
 void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc)
 {
-    /*
-    for(int i = 0; i < unit->types.size(); i++) //XXX what about recursive types?
-    {
-        Declaration *decl = unit->types[i];
-        codegenDeclaration(decl);
-    }*/
-
     // alloc globals before codegen'ing functions
+    /*
     for(int i = 0; i < inc->globals.size(); i++)
     {
         Identifier *id = inc->globals[i]->identifier;
@@ -1890,7 +1899,8 @@ void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, Translatio
             ASTType *idTy = id->getType();
             //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
             GlobalValue::LinkageTypes linkage = inc->globals[i]->external ?
-                GlobalValue::ExternalLinkage : GlobalValue::WeakAnyLinkage;
+                GlobalValue::ExternalLinkage : GlobalValue::ExternalWeakLinkage;
+            linkage = GlobalValue::WeakAnyLinkage;
             GlobalVariable *llvmval = new GlobalVariable(*current->module,
                     codegenType(idTy),
                     false,
@@ -1904,16 +1914,20 @@ void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, Translatio
         {
             //TODO: declare func
         }
-    }
+    }*/
 
     // declare functions prototypes
     for(int i = 0; i < inc->functions.size(); i++)
     {
         FunctionDeclaration *fdecl = inc->functions[i];
+
+        if(current->functions.count(fdecl->getName())) continue;
+
         FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
-        fdecl->cgValue = Function::Create(fty,
-                Function::ExternalWeakLinkage,
+        Function *func = Function::Create(fty, Function::ExternalWeakLinkage,
                 fdecl->getName(), current->module);
+
+        current->functions[fdecl->getName()] = func;
     }
 }
 
@@ -1930,13 +1944,6 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
         codegenIncludeUnit(this->unit, unit->unit->importUnits[i]);
     }
 
-    /*
-    for(int i = 0; i < unit->types.size(); i++) //XXX what about recursive types?
-    {
-        Declaration *decl = unit->types[i];
-        codegenDeclaration(decl);
-    }*/
-
     // alloc globals before codegen'ing functions
     std::vector<VariableDeclaration*>& globals = unit->getGlobals();
     for(int i = 0; i < globals.size(); i++)
@@ -1947,7 +1954,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
             ASTType *idTy = id->getType();
             //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
             GlobalValue::LinkageTypes linkage = globals[i]->external ?
-                GlobalValue::ExternalLinkage : GlobalValue::WeakAnyLinkage;
+                GlobalValue::ExternalLinkage : GlobalValue::ExternalLinkage;
 
             //TODO: correct type for global storage (esspecially pointers?)
             ASTValue *idValue = 0;
@@ -2003,10 +2010,18 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
     {
         FunctionDeclaration *fdecl = functions[i];
         FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
-        if(fdecl->body)
-        fdecl->cgValue = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
-        else
-        fdecl->cgValue = Function::Create(fty, Function::ExternalWeakLinkage, fdecl->getName(), module);
+        Function *func;
+
+        if(unit->functions.count(fdecl->getName())) continue; // XXX duplicate?
+
+        if(fdecl->body) {
+        func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
+        }
+        else {
+        func = Function::Create(fty, Function::ExternalWeakLinkage, fdecl->getName(), module);
+        }
+
+        unit->functions[fdecl->getName()] = func;
     }
         // codegen function bodys
     for(int i = 0; i < functions.size(); i++)
@@ -2032,6 +2047,7 @@ void IRCodegenContext::codegenPackage(Package *p)
         std::string outputll = config.tempName + "/" + unit->unit->getName() + ".ll";
         raw_fd_ostream output(outputll.c_str(), err);
         m->print(output, 0);
+
         linker.linkInModule(m, (unsigned) Linker::DestroySource, &err);
 
     } else // generate all leaves ...
@@ -2057,9 +2073,8 @@ std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
     }
 
     createIdentMetadata(linker.getModule());
-    linker.getModule()->MaterializeAll();
+    //linker.getModule()->MaterializeAll();
 
-    /*
     if(verifyModule(*linker.getModule(), PrintMessageAction))
     {
         emit_message(msg::OUTPUT, "failed to compile source code");
@@ -2067,7 +2082,7 @@ std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
     } else
     {
         emit_message(msg::OUTPUT, "successfully compiled source");
-    }*/
+    }
 
     std::string err;
     std::string outputll;

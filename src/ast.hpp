@@ -46,7 +46,11 @@ struct Package
     virtual ~Package() { if(scope) delete scope; }
 
     Identifier *getIdentifier() { return identifier; }
-    SymbolTable *getScope() { if(!scope) scope = new SymbolTable; return scope; } //TODO: subscope of parent
+    SymbolTable *getScope() {
+        if(!scope)
+            scope = new SymbolTable(NULL, SymbolTable::Scope_Global, this);
+        return scope;
+    } //TODO: subscope of parent
 
     std::vector<Package*> children;
 
@@ -133,18 +137,21 @@ struct Declaration
         if(identifier) return identifier->getName();
         return "";
     }
+    bool isExternal() { return external; }
     virtual ASTType *getType() = 0;
 
     virtual FunctionDeclaration *functionDeclaration() { return NULL; }
     virtual VariableDeclaration *variableDeclaration() { return NULL; }
 };
 
+#include <llvm/IR/Module.h>
 struct FunctionPrototype
 {
     ASTType *returnType;
     std::vector<std::pair<ASTType*, std::string> > parameters;
     bool vararg;
-    FunctionPrototype(ASTType *rty, std::vector<std::pair<ASTType*, std::string> > param, bool varg = false) : returnType(rty), parameters(param), vararg(varg) {}
+    llvm::FunctionType *llty;
+    FunctionPrototype(ASTType *rty, std::vector<std::pair<ASTType*, std::string> > param, bool varg = false) : returnType(rty), parameters(param), vararg(varg), llty(0) {}
 };
 
 struct FunctionDeclaration : public Declaration

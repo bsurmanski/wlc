@@ -142,7 +142,7 @@ class ParseContext
     Expression *parseBinaryExpression(int prec = 0);
     Expression *parseTupleExpression();
 
-    void parseCImport(TranslationUnit *unit, std::string filenm, SourceLocation loc = SourceLocation());
+    //void parseCImport(TranslationUnit *unit, std::string filenm, SourceLocation loc = SourceLocation());
 };
 
 #endif

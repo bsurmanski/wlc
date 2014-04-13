@@ -36,7 +36,7 @@ Identifier *SymbolTable::getInScope(std::string str)
         return symbols[str];
     } else
     {
-        Identifier *id = new Identifier(str);
+        Identifier *id = new Identifier(this, str);
         symbols[str] = id;
         return id;
     }
@@ -48,7 +48,7 @@ Identifier *SymbolTable::get(std::string str)
 
     if(!id)
     {
-        id = new Identifier(str);
+        id = new Identifier(this, str);
         symbols[str] = id;
     }
 
@@ -87,4 +87,9 @@ Identifier *SymbolTable::lookup(std::string str, bool imports)
     }
 
     return ret;
+}
+
+TranslationUnit *SymbolTable::getUnit()
+{
+    return dynamic_cast<TranslationUnit*>(package);
 }

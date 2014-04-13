@@ -40,14 +40,27 @@ struct IRSwitchCase
         astCase(e), irCase(i), irBlock(ir) {}
 };
 
-/*
-struct IRLoop
+struct IRType
 {
-    llvm::BasicBlock *end; // where to go after break
-    llvm::BasicBlock *udp; // where to go after continue
+    ASTType *type;
+    llvm::Type *llvmType;
+    IRType() : type(0), llvmType(0) {}
+    IRType(ASTType *ty, llvm::Type *llty) : type(ty), llvmType(llty) {}
 
-    IRLoop(IRCodegenContext *c, LoopExpression *exp);
-};*/
+    operator ASTType*() const { return type; }
+    operator llvm::Type*() const { return llvmType; }
+};
+
+struct IRValue
+{
+    ASTValue *value;
+    llvm::Value *llvmValue;
+    IRValue() : value(0), llvmValue(0) {}
+    IRValue(ASTValue *val, llvm::Value *llval) : value(val), llvmValue(llval) {}
+
+    operator ASTValue*() const { return value; }
+    operator llvm::Value*() const { return llvmValue; }
+};
 
 struct IRScope
 {
@@ -107,7 +120,9 @@ struct IRTranslationUnit
     llvm::Module *module;
 
 
-    std::map<std::string, llvm::Type*> types;
+    std::map<std::string, IRType> types;
+    std::map<std::string, IRValue> globals;
+    std::map<std::string, llvm::Function*> functions;
 
     std::vector<VariableDeclaration*>& getGlobals() { return unit->globals; }
     std::vector<FunctionDeclaration*>& getFunctions() { return unit->functions; }

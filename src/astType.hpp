@@ -121,7 +121,7 @@ struct StructTypeInfo : public HetrogenTypeInfo
 {
     bool packed;
     StructTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
-        HetrogenTypeInfo(id, sc, m) {}
+        HetrogenTypeInfo(id, sc, m), packed(false) {}
     virtual size_t length() { return members.size(); }
     virtual size_t getSize();
     virtual size_t getMemberOffset(std::string member);

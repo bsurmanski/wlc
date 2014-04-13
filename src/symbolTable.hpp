@@ -7,6 +7,8 @@
 #include "identifier.hpp"
 
 typedef std::map<std::string, Identifier*>::iterator SymbolIterator;
+struct Package;
+struct TranslationUnit;
 
 struct SymbolTable
 {
@@ -14,6 +16,17 @@ struct SymbolTable
     std::vector<SymbolTable*> siblings;
     std::map<std::string, Identifier *> symbols;
     std::map<std::string, bool> extensions;
+    Package *package;
+
+    enum ScopeType
+    {
+        Scope_Global,
+        Scope_FunctionParameter,
+        Scope_Struct,
+        Scope_Local,
+    };
+
+    ScopeType type;
 
     bool extensionEnabled(std::string s)
     {
@@ -26,7 +39,17 @@ struct SymbolTable
     }
 
     void dump();
-    SymbolTable(SymbolTable *par = NULL) : parent(par) { if(!par) addBuiltin(); }
+    SymbolTable(SymbolTable *par = NULL, ScopeType st = Scope_Local, Package *pkg=0) :
+        package(pkg), parent(par), type(st)
+    {
+        if(!par) addBuiltin();
+        if(par) package = par->package;
+    }
+
+    Package *getPackage() { return package; }
+    TranslationUnit *getUnit();
+
+    ScopeType getScopeType() { return type; }
     SymbolIterator begin() { return symbols.begin(); }
     SymbolIterator end() { return symbols.end(); }
     void addSibling(SymbolTable *t);

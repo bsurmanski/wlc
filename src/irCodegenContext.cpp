@@ -2014,12 +2014,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 
         if(unit->functions.count(fdecl->getName())) continue; // XXX duplicate?
 
-        if(fdecl->body) {
         func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
-        }
-        else {
-        func = Function::Create(fty, Function::ExternalWeakLinkage, fdecl->getName(), module);
-        }
 
         unit->functions[fdecl->getName()] = func;
     }

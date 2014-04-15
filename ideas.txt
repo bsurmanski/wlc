@@ -35,3 +35,19 @@ asm [ax, bx] somefunc(rax, eax, al)
     addl %1 %0
     xorl %%eax %%eax
 }
+
+
+eschew 'default' keyword. 'default' should be whatever content comes before
+the  first explicit case:
+
+switch(myValue)
+{
+    print("ERROR, invalid value")
+    case 1
+        print("I Have one argument")
+    case 2
+        print("I Have one argument")
+}
+
+if myValue is '3', then 'ERROR' will be printed
+

@@ -732,22 +732,23 @@ ASTValue *IRCodegenContext::codegenLoopExpression(LoopExpression *exp)
 
 ASTValue *IRCodegenContext::codegenSwitchExpression(SwitchExpression *exp)
 {
-    //BasicBlock *switchBB = BasicBlock::Create(context, "switch",
-    //                                     ir->GetInsertBlock()->getParent());
+    BasicBlock *switch_default = BasicBlock::Create(context, "switch_default",
+                                         ir->GetInsertBlock()->getParent());
 
-    BasicBlock *switchend = BasicBlock::Create(context, "switch_end",
+    BasicBlock *switch_end = BasicBlock::Create(context, "switch_end",
                                          ir->GetInsertBlock()->getParent());
 
     BasicBlock *preSwitch = ir->GetInsertBlock();
 
     ASTValue *cond = codegenExpression(exp->condition);
-    SwitchInst *sinst = ir->CreateSwitch(codegenValue(cond), switchend);
+    SwitchInst *sinst = ir->CreateSwitch(codegenValue(cond), switch_default);
     //TODO: set cases
 
     getScope()->switchExp = exp;
-    getScope()->breakLabel = switchend;
+    getScope()->breakLabel = switch_end;
 
-    setTerminated(true);
+    //setTerminated(true);
+    ir->SetInsertPoint(switch_default);
     if(exp->body) codegenStatement(exp->body);
 
     for(int i = 0; i < getScope()->cases.size(); i++)
@@ -763,8 +764,8 @@ ASTValue *IRCodegenContext::codegenSwitchExpression(SwitchExpression *exp)
     }
 
     if(!isTerminated())
-        ir->CreateBr(switchend);
-    ir->SetInsertPoint(switchend);
+        ir->CreateBr(switch_end);
+    ir->SetInsertPoint(switch_end);
     setTerminated(false);
 
     return NULL; //TODO:
@@ -1647,7 +1648,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         {
             emit_message(msg::ERROR, "case value must be a constant", cstmt->loc);
         }
-        BasicBlock *caseBB = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent());
+        BasicBlock *caseBB = BasicBlock::Create(context, "case", ir->GetInsertBlock()->getParent());
 
         if(!isTerminated())
             ir->CreateBr(caseBB);

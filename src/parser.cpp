@@ -818,9 +818,17 @@ CaseStatement *ParseContext::parseCaseStatement()
         return NULL;
     }
     ignore(); // eat 'case'
-    Expression *exp = parseExpression();
 
-    return new CaseStatement(exp, loc);
+    std::vector<Expression*> cases;
+
+    cases.push_back(parseExpression());
+    while(peek().is(tok::comma))
+    {
+        ignore(); // ignore comma
+        cases.push_back(parseExpression());
+    }
+
+    return new CaseStatement(cases, loc);
 }
 
 Expression *ParseContext::parseSwitchExpression()

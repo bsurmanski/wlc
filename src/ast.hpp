@@ -50,7 +50,7 @@ struct Package
         if(!scope)
             scope = new SymbolTable(NULL, SymbolTable::Scope_Global, this);
         return scope;
-    } //TODO: subscope of parent
+    } //TODO: subscope of parent ?
 
     std::vector<Package*> children;
 
@@ -655,9 +655,9 @@ struct LabelStatement : Statement
 
 struct CaseStatement : public Statement
 {
-    Expression *value;
-    CaseStatement(Expression *exp, SourceLocation l = SourceLocation()) :
-        Statement(l), value(exp) {}
+    std::vector<Expression *> values;
+    CaseStatement(std::vector<Expression*> vals, SourceLocation l = SourceLocation()) :
+        Statement(l), values(vals) {}
 };
 
 struct GotoStatement : Statement

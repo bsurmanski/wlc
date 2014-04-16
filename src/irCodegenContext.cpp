@@ -1644,19 +1644,24 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         codegenReturnStatement(rstmt);
     } else if(CaseStatement *cstmt = dynamic_cast<CaseStatement*>(stmt))
     {
-        if(!cstmt->value->isConstant())
-        {
-            emit_message(msg::ERROR, "case value must be a constant", cstmt->loc);
-        }
         BasicBlock *caseBB = BasicBlock::Create(context, "case", ir->GetInsertBlock()->getParent());
 
         if(!isTerminated())
-            ir->CreateBr(caseBB);
+            ir->CreateBr(getScope()->getBreak());
 
         setTerminated(false);
 
         ir->SetInsertPoint(caseBB);
-        getScope()->addCase(cstmt->value, codegenExpression(cstmt->value), caseBB);
+
+        for(int i = 0; i < cstmt->values.size(); i++)
+        {
+            Expression *value = cstmt->values[i];
+            if(!value->isConstant())
+            {
+                emit_message(msg::ERROR, "case value must be a constant", cstmt->loc);
+            }
+            getScope()->addCase(value, codegenExpression(value), caseBB);
+        }
 
     } else if(LabelStatement *lstmt = dynamic_cast<LabelStatement*>(stmt))
     {

@@ -196,6 +196,23 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
     return (llvm::Type*) ty->cgType;
 }
 
+llvm::Type *IRCodegenContext::codegenFunctionType(ASTType *ty) {
+    FunctionTypeInfo *fti = dynamic_cast<FunctionTypeInfo*>(ty->info);
+    if(!fti) {
+        emit_message(msg::FAILURE, "attempt to codegen invalid function type");
+        return NULL;
+    }
+
+    vector<Type*> params;
+    for(int i = 0; i < fti->params.size(); i++)
+    {
+        params.push_back(codegenType(fti->params[i]));
+    }
+
+    FunctionType *fty = FunctionType::get(codegenType(fti->ret), params, fti->vararg);
+    return fty;
+}
+
 llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 {
     llvm::Type *llvmty = NULL;
@@ -275,6 +292,9 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 break;
             case TYPE_DYNAMIC_ARRAY:
                 llvmty = codegenArrayType(ty);
+                break;
+            case TYPE_FUNCTION:
+                llvmty = codegenFunctionType(ty);
                 break;
             default:
                 emit_message(msg::FAILURE, "type not handled", currentLoc);
@@ -389,8 +409,9 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
     } else if(id->isFunction())
     {
         Value *llvmfunc = unit->functions[id->getName()];
-        //TODO: proper function CGType (llvmfunc->getFunctionType())
-        id->setValue(new ASTValue(NULL, llvmfunc));
+        FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
+        if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
+        id->setValue(new ASTValue(fdecl->prototype, llvmfunc));
     } else if(id->isStruct())
     {
         id->setValue(new ASTValue(id->getDeclaredType(), NULL));
@@ -783,21 +804,26 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     //FunctionType *fty = (FunctionType*) func.llvmTy();
     //TODO: once proper type passing is done, check if callable above
 
-    FunctionPrototype *ftype = NULL;
+    FunctionTypeInfo *fti = NULL;
     ASTType *rtype = NULL;
     //TODO: very messy, should be able to get return value of function type
     if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->function))
     {
         // XXX messy, not always true
-        FunctionDeclaration *fdecl = (FunctionDeclaration*) iexp->id->declaration;
-        if(fdecl)
+        if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->declaration))
         {
-            rtype = fdecl->prototype->returnType;
-            ftype = fdecl->prototype;
+            fti = dynamic_cast<FunctionTypeInfo*>(fdecl->prototype->info);
+            rtype = fti->ret;
+            //ftype = fdecl->prototype;
+        } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(iexp->id->declaration))
+        {
+            ASTType *pty = vdecl->getType();
+            fti = dynamic_cast<FunctionTypeInfo*>(pty->getReferencedTy()->info);
+            rtype = fti->ret;
         }
     } else emit_message(msg::FAILURE, "unknown function type?", exp->loc);
 
-    if((ftype->parameters.size() != exp->args.size()) && !ftype->vararg)
+    if((fti->params.size() != exp->args.size()) && !fti->vararg)
     {
         emit_message(msg::ERROR, "invalid number of arguments provided for function call", exp->loc);
     }
@@ -807,10 +833,10 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     for(int i = 0; i < exp->args.size(); i++)
     {
         ASTValue *val = codegenExpression(exp->args[i]);
-        if(!ftype->vararg || (ftype->parameters.size() > i && ftype->parameters[i].first))
-            val = promoteType(val, ftype->parameters[i].first);
+        if(!fti->vararg || (fti->params.size() > i && fti->params[i]))
+            val = promoteType(val, fti->params[i]);
 
-        else if(ftype->vararg)
+        else if(fti->vararg)
         {
             if(val->getType()->isFloating())
                 val = promoteType(val, ASTType::getDoubleTy());
@@ -1703,6 +1729,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
 
 }
 
+/*
 FunctionType *IRCodegenContext::codegenFunctionPrototype(FunctionPrototype *proto)
 {
     if(proto->llty) return proto->llty;
@@ -1716,7 +1743,7 @@ FunctionType *IRCodegenContext::codegenFunctionPrototype(FunctionPrototype *prot
     FunctionType *fty = FunctionType::get(codegenType(rty), params, proto->vararg);
     proto->llty = fty;
     return fty;
-}
+} */
 
 void IRCodegenContext::codegenDeclaration(Declaration *decl)
 {
@@ -1748,30 +1775,33 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             pushScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
             dwarfStopPoint(decl->loc);
 
+            FunctionTypeInfo *fti = dynamic_cast<FunctionTypeInfo*>(fdecl->prototype->info);
             int idx = 0;
             for(Function::arg_iterator AI = func->arg_begin(); AI != func->arg_end(); AI++, idx++)
             {
-                if(fdecl->prototype->parameters.size() < idx){
+                if(fti->params.size() < idx){
                         emit_message(msg::FAILURE,
                                 "argument counts dont seem to match up...", decl->loc);
                         return;
                 }
-                pair<ASTType*, std::string> param_i = fdecl->prototype->parameters[idx];
-                AI->setName(param_i.second);
-                AllocaInst *alloc = new AllocaInst(codegenType(param_i.first), 0, param_i.second, BB);
+                //pair<ASTType*, std::string> param_i = fdecl->prototype->parameters[idx];
+                AI->setName(fdecl->paramNames[idx]);
+                AllocaInst *alloc = new AllocaInst(codegenType(fti->params[idx]),
+                                                   0, fdecl->paramNames[idx], BB);
                     //ir->CreateAlloca(codegenType(param_i.first), 0, param_i.second);
                 alloc->setAlignment(8);
-                ASTValue *alloca = new ASTValue(param_i.first, alloc, true);
+                ASTValue *alloca = new ASTValue(fti->params[idx], alloc, true);
                 new StoreInst(AI, codegenLValue(alloca), BB);
                 //ir->CreateStore(AI, codegenLValue(alloca));
 
-                Identifier *id = getInScope(param_i.second);
+                Identifier *id = getInScope(fdecl->paramNames[idx]);
                 id->setDeclaration(NULL, Identifier::ID_VARIABLE);
                 id->setValue(alloca);
 
                 //register debug params
                 //XXX hacky with Instruction, and setDebugLoc manually
-                Instruction *ainst = debug->createVariable(param_i.second, alloca, BB, decl->loc, idx+1);
+                Instruction *ainst = debug->createVariable(fdecl->paramNames[idx],
+                                                          alloca, BB, decl->loc, idx+1);
                 ainst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
                 //TODO: register value to scope
             }
@@ -1862,9 +1892,10 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         }
         vdecl->identifier->setValue(idValue);
 
+        /*
         if(ArrayDeclaration *adecl = dynamic_cast<ArrayDeclaration*>(decl))
         {
-            if(adecl->sz)
+            if(DynamicArrayTypeInfo *dti = dynamic_cast<DynamicArrayTypeInfo*>(adecl->type->info))
             {
                 NumericExpression *nsz = dynamic_cast<NumericExpression *>(adecl->sz);
 
@@ -1888,7 +1919,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                     return;
                 }
             }
-        }
+        } */
     }
     ///NOTE type declarations are not Codegen'd like values, accesible across Modules
 }
@@ -1929,7 +1960,7 @@ void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, Translatio
 
         if(current->functions.count(fdecl->getName())) continue;
 
-        FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
+        FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
         Function *func = Function::Create(fty, Function::ExternalWeakLinkage,
                 fdecl->getName(), current->module);
 
@@ -2015,7 +2046,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
     for(int i = 0; i < functions.size(); i++)
     {
         FunctionDeclaration *fdecl = functions[i];
-        FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
+        FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
         Function *func;
 
         if(unit->functions.count(fdecl->getName())) continue; // XXX duplicate?

@@ -49,7 +49,7 @@ void ParseContext::recover()
     }
 }
 
-ASTType *ParseContext::parseType(Expression **arrayInit)
+ASTType *ParseContext::parseType()
 {
     std::vector<ASTType*> tupleTypes;
     ASTType *type = NULL;
@@ -106,7 +106,7 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
             // lbracket already got
             while(peek().isNot(tok::rbracket))
             {
-                tupleTypes.push_back(parseType(NULL));
+                tupleTypes.push_back(parseType());
                 if(peek().is(tok::comma)) ignore();
             }
             ignore(); // eat ]
@@ -139,7 +139,6 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
         if(peek().is(tok::lbracket)) // XXX should this be parsed as part of the type, or as a postfix expression?
         {
             ignore(); // eat [
-            //type = type->getArrayTy();
             if(peek().isNot(tok::rbracket))
             {
                 if(peek().isNot(tok::intNum))
@@ -150,9 +149,6 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
 
                 int sz = get().intData();
                 type = type->getArrayTy(sz);
-
-                //Expression *rsz = parseExpression(); //TODO: array size
-                //if(arrayInit) *arrayInit = rsz;
             } else
             {
                 type = type->getArrayTy();
@@ -168,6 +164,36 @@ ASTType *ParseContext::parseType(Expression **arrayInit)
         }
 
         break; // if no post-modifiers are found, exit loop
+    }
+
+    if(peek().is(tok::kw_function))
+    {
+        ASTType *ret = type;
+        ignore(); // eat 'function'
+        if(peek().isNot(tok::lparen)) {
+            emit_message(msg::ERROR, "expected '(' in function pointer type specification");
+            return NULL;
+        }
+        ignore(); // eat '('
+
+        std::vector<ASTType*> params;
+        while(peek().isNot(tok::rparen)){
+            ASTType *param = parseType();
+            params.push_back(param);
+
+            if(peek().is(tok::comma)) {
+                ignore();
+            } else if(peek().is(tok::rparen)) {
+                break;
+            } else {
+                emit_message(msg::ERROR, "expected ',' or ')' in function type specification");
+                return NULL;
+            } // TODO: vararg
+        }
+
+        ignore(); //eat ')' of function type
+
+        type = ASTType::getFunctionTy(ret, params)->getPointerTy(); // 'function' is a pointer
     }
 
     return type;
@@ -364,7 +390,7 @@ Statement *ParseContext::parseStatement()
             {
         case tok::lbracket:
                 pushRecover();
-                declType = parseType(NULL);
+                declType = parseType();
                 if(declType && peek().is(tok::identifier)) //look ahead to see if decl
                 {
                     recover();
@@ -563,11 +589,9 @@ Declaration *ParseContext::parseDeclaration()
         popScope();
 
         return sdecl;
-        //return new TypeDeclaration();
     }
 
-    Expression *arrayInit = 0;
-    ASTType *type = parseType(&arrayInit);
+    ASTType *type = parseType();
 
     Token t_id = get();
     if(t_id.isNot(tok::identifier)){
@@ -590,7 +614,9 @@ Declaration *ParseContext::parseDeclaration()
 
     if(peek().is(tok::lparen)) // function decl
     {
-        vector<pair<ASTType*, std::string> > args;
+        //vector<pair<ASTType*, std::string> > args;
+        std::vector<ASTType *> params;
+        std::vector<std::string> paramNames;
         ignore(); // lparen
         bool vararg = false;
         while(!peek().is(tok::rparen))
@@ -610,9 +636,11 @@ Declaration *ParseContext::parseDeclaration()
                 break;
             }
 
-            ASTType *aty = parseType(NULL);
+            ASTType *aty = parseType();
             Token t_name = get();
-            args.push_back(pair<ASTType*, std::string>(aty, t_name.toString()));
+            //args.push_back(pair<ASTType*, std::string>(aty, t_name.toString()));
+            params.push_back(aty);
+            paramNames.push_back(t_name.toString());
             if(peek().is(tok::comma))
             {
                 ignore();
@@ -634,8 +662,8 @@ Declaration *ParseContext::parseDeclaration()
         Statement *stmt = parseStatement();
         popScope();
 
-        FunctionPrototype *proto = new FunctionPrototype(type, args, vararg);
-        Declaration *decl = new FunctionDeclaration(id, proto, funcScope, stmt, t_id.loc);
+        ASTType *proto = ASTType::getFunctionTy(type, params, vararg);
+        Declaration *decl = new FunctionDeclaration(id, proto, paramNames, funcScope, stmt, t_id.loc);
         id->setDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;
     }
@@ -652,7 +680,7 @@ Declaration *ParseContext::parseDeclaration()
 
     if(ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(type->info))
     {
-        Declaration *adecl = new ArrayDeclaration(type, id, defaultValue, arrayInit, t_id.loc, external);
+        Declaration *adecl = new ArrayDeclaration(type, id, defaultValue, t_id.loc, external);
         id->setDeclaration(adecl, Identifier::ID_VARIABLE);
         return adecl;
     }
@@ -871,7 +899,7 @@ Expression *ParseContext::parseSwitchExpression()
 Expression *ParseContext::parseCastExpression(int prec)
 {
     SourceLocation loc = peek().loc;
-    ASTType *type = parseType(NULL);
+    ASTType *type = parseType();
     if(!peek().is(tok::colon)) {
         emit_message(msg::ERROR, "expected colon for cast operator!", peek().loc);
         dropLine();
@@ -895,7 +923,7 @@ Expression *ParseContext::parseNewExpression()
     SourceLocation loc = peek().loc;
     assert(peek().is(tok::kw_new));
     ignore(); //ignore 'new'
-    ASTType *t = parseType(0);
+    ASTType *t = parseType();
     return new NewExpression(t, loc);
 }
 
@@ -1005,7 +1033,7 @@ Expression *ParseContext::parsePostfixExpression(int prec)
             {
                 if(lookAhead(n).is(tok::colon)) // infix cast detected
                 {
-                    ASTType *type = parseType(NULL);
+                    ASTType *type = parseType();
                     if(peek().isNot(tok::colon)){
                         emit_message(msg::ERROR,
                                 "expected colon while parsing infix cast", peek().loc);
@@ -1147,7 +1175,7 @@ Expression *ParseContext::parsePrimaryExpression()
 
     if(peek().isKeywordType())
     {
-        return new TypeExpression(parseType(0),loc);
+        return new TypeExpression(parseType(),loc);
     }
 }
 

@@ -187,7 +187,9 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 
         CXType fType = clang_getCursorType(cursor);
         int nargs = clang_getNumArgTypes(fType);
-        vector<pair<ASTType*, std::string> > argType;
+
+        vector<ASTType*> params;
+        vector<std::string> paramNames;
 
         for(int i = 0; i < nargs; i++)
         {
@@ -196,9 +198,8 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
                             clang_getCanonicalType(clang_getArgType(fType, i)));
             if(!astArgTy) goto ERR;
 
-            argType.push_back( pair<ASTType*, std::string>(
-                        astArgTy, "")
-                    );
+            params.push_back(astArgTy);
+            paramNames.push_back("");
         }
 
         ASTType *rType = ASTTypeFromCType(unit, clang_getResultType(fType));
@@ -206,9 +207,10 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         if(!rType) goto ERR;
 
         Identifier *id = unit->getScope()->get(name);
-        FunctionPrototype *proto = new FunctionPrototype(rType, argType,
-                clang_isFunctionTypeVariadic(fType));
-        FunctionDeclaration *fdecl = new FunctionDeclaration(id, proto, 0, 0, loc);
+
+        ASTType *functionType = ASTType::getFunctionTy(rType, params,
+                                        clang_isFunctionTypeVariadic(fType));
+        FunctionDeclaration *fdecl = new FunctionDeclaration(id, functionType, paramNames, 0, 0, loc);
         id->setDeclaration(fdecl, Identifier::ID_FUNCTION);
 
         unit->functions.push_back(fdecl);

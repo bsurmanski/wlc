@@ -8,6 +8,7 @@
 #include <map>
 #include <stdlib.h>
 #include <limits.h>
+#include <unistd.h>
 
 #include "symbolTable.hpp"
 #include "identifier.hpp"
@@ -103,8 +104,6 @@ struct AST
         realpath(str.c_str(), APATH);
         std::string astr = std::string(str);
         if(units.count(astr)) return units[astr];
-        //TranslationUnit *nunit = new TranslationUnit(NULL); //TODO: identifier ?
-        //return nunit;
         return NULL;
     }
     void addUnit(std::string str, TranslationUnit *u)
@@ -144,24 +143,15 @@ struct Declaration
     virtual VariableDeclaration *variableDeclaration() { return NULL; }
 };
 
-#include <llvm/IR/Module.h>
-struct FunctionPrototype
-{
-    ASTType *returnType;
-    std::vector<std::pair<ASTType*, std::string> > parameters;
-    bool vararg;
-    llvm::FunctionType *llty;
-    FunctionPrototype(ASTType *rty, std::vector<std::pair<ASTType*, std::string> > param, bool varg = false) : returnType(rty), parameters(param), vararg(varg), llty(0) {}
-};
-
 struct FunctionDeclaration : public Declaration
 {
     llvm::DISubprogram diSubprogram;
-    FunctionPrototype *prototype;
+    ASTType *prototype;
+    std::vector<std::string> paramNames;
     SymbolTable *scope;
     Statement *body;
     void *cgValue;
-    FunctionDeclaration(Identifier *id, FunctionPrototype *p, SymbolTable *sc, Statement *st, SourceLocation loc) : Declaration(id, loc), prototype(p), scope(sc), body(st), cgValue(NULL) {}
+    FunctionDeclaration(Identifier *id, ASTType *p, std::vector<std::string> pname, SymbolTable *sc, Statement *st, SourceLocation loc) : Declaration(id, loc), prototype(p), paramNames(pname), scope(sc), body(st), cgValue(NULL) {}
     virtual FunctionDeclaration *functionDeclaration() { return this; }
     virtual std::string getName(bool mangle=false)
     {
@@ -171,9 +161,9 @@ struct FunctionDeclaration : public Declaration
         }
     }
     SymbolTable *getScope() { return scope; }
-    ASTType *getReturnType() { return prototype->returnType; }
+    ASTType *getReturnType() { return dynamic_cast<FunctionTypeInfo*>(prototype->info)->ret; }
 
-    virtual ASTType *getType() { return prototype->returnType; } //TODO: prototype should be type?
+    virtual ASTType *getType() { return prototype;  } //TODO: prototype should be type?
 };
 
 struct LabelDeclaration : public Declaration
@@ -194,9 +184,8 @@ struct VariableDeclaration : public Declaration
 
 struct ArrayDeclaration : public VariableDeclaration
 {
-    Expression *sz;
-    ArrayDeclaration(ASTType *ty, Identifier *nm, Expression *val, Expression *s, SourceLocation loc, bool ext = false) :
-        VariableDeclaration(ty, nm, val, loc, ext), sz(s) {}
+    ArrayDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) :
+        VariableDeclaration(ty, nm, val, loc, ext) {}
     virtual ArrayDeclaration *arrayDeclaration() { return this; }
 };
 

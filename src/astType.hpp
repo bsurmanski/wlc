@@ -61,6 +61,24 @@ struct CompositeTypeInfo : TypeInfo
     virtual ASTType *getContainedType(unsigned index) = 0;
 };
 
+struct FunctionTypeInfo : CompositeTypeInfo
+{
+    ASTType *ret;
+    std::vector<ASTType*> params;
+    bool vararg;
+
+    FunctionTypeInfo(ASTType *r, std::vector<ASTType *> p, bool va = false) :
+        ret(r), params(p), vararg(va) {}
+
+    bool isVararg() { return vararg; }
+
+    ASTType *getContainedType(unsigned index)
+    {
+        if(index == 0) return ret;
+        return params[index-1];
+    }
+};
+
 struct PointerTypeInfo : public TypeInfo
 {
     ASTType *ptrTo;
@@ -397,6 +415,8 @@ struct ASTType
 
     static ASTType *DynamicTy; static ASTType *getDynamicTy();
     static ASTType *getTupleTy(std::vector<ASTType *> t);
+
+    static ASTType *getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg=false);
 };
 
 #endif

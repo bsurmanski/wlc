@@ -46,7 +46,7 @@ hi def link wDeclaration Keyword
 hi def link wUse Keyword
 
 " Types
-syn keyword Structure class struct union
+syn keyword Structure class struct union function
 syn keyword Enum enum
 syn keyword Type char uchar byte ubyte short ushort int uint long ulong
 syn keyword Type int8 uint8 int16 uint16 int32 uint32 int64 uint64

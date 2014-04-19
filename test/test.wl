@@ -102,6 +102,7 @@ int main(int argc, char^^ argv)
     var title = "Life"
     SDL_WM_SetCaption(title, null)
 
+
     var tuple = [1, 2, 3]
     MyNewStruct st = [1, 2, 3]
 
@@ -142,6 +143,8 @@ int main(int argc, char^^ argv)
     int^ mymalloc = new int
     delete mymalloc
 
+    void function() testFunc = update
+
     int8 spc = 0
     while(!spc) 
     {
@@ -150,7 +153,8 @@ int main(int argc, char^^ argv)
         spc = keystate[SDLK_SPACE]
         SDL_Delay(32)
         SDL_Flip(surf)
-        update()
+        testFunc()
+        //update()
     }
 
     return 0

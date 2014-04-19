@@ -217,3 +217,9 @@ ASTType *ASTType::getTupleTy(std::vector<ASTType *> t)
     ty->setTypeInfo(new TupleTypeInfo(t), TYPE_TUPLE);
     return ty;
 }
+
+ASTType *ASTType::getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg)
+{
+    //TODO: type cache?
+    return new ASTType(TYPE_FUNCTION, new FunctionTypeInfo(ret, param, vararg));
+}

@@ -1,5 +1,5 @@
 all:
-	wlc test.wl -lSDL -o program
+	wlc test.wl -lSDL -lSDL_mixer -o program
 
 ll:  
 	wlc test.wl -lSDL -S

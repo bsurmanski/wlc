@@ -161,7 +161,9 @@ class IRCodegenContext : public CodegenContext
     llvm::Type *codegenArrayType(ASTType *ty);
     llvm::Type *codegenStructType(ASTType *ty);
     llvm::Type *codegenUnionType(ASTType *ty);
+    llvm::Type *codegenClassType(ASTType *ty);
     llvm::Type *codegenTupleType(ASTType *ty);
+    llvm::Type *codegenFunctionType(ASTType *ty);
     llvm::Type *codegenType(ASTType *ty);
 
     // codegen value
@@ -223,7 +225,6 @@ class IRCodegenContext : public CodegenContext
     void codegenStatement(Statement *stmt);
 
     // codegen declaration
-    llvm::FunctionType *codegenFunctionPrototype(FunctionPrototype *proto);
     void codegenDeclaration(Declaration *decl);
 
     // codegen etc

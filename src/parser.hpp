@@ -118,7 +118,7 @@ class ParseContext
     void pushRecover();
     void popRecover();
     void recover();
-    ASTType *parseType(Expression **arrayInit); //XXX array init? omg hax
+    ASTType *parseType();
     void parseInclude();
     ImportExpression *parseImport();
     Statement *parseDeclarationStatement();

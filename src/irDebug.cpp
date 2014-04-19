@@ -269,6 +269,9 @@ llvm::DIType IRDebug::createType(ASTType *ty)
             case TYPE_TUPLE:
                 dity = createTupleType(ty);
                 break;
+            case TYPE_FUNCTION:
+                dity = createPrototype(ty);
+                break;
             case TYPE_UNKNOWN: //XXX workaround
                 dity = di.createBasicType("void", 8, 8, dwarf::DW_ATE_address);
                 break;
@@ -281,14 +284,17 @@ llvm::DIType IRDebug::createType(ASTType *ty)
     return ty->diType;
 }
 
-llvm::DICompositeType IRDebug::createPrototype(FunctionPrototype *p)
+llvm::DICompositeType IRDebug::createPrototype(ASTType *p)
 {
+    FunctionTypeInfo *fti = dynamic_cast<FunctionTypeInfo*>(p->info);
+    assert(fti);
+
     vector<Value*> vec;
 
-    vec.push_back(createType(p->returnType));
-    for(int i = 0; i < p->parameters.size(); i++)
+    vec.push_back(createType(fti->ret));
+    for(int i = 0; i < fti->params.size(); i++)
     {
-        vec.push_back(createType(p->parameters[i].first));
+        vec.push_back(createType(fti->params[i]));
     }
 
     DIArray arr = di.getOrCreateArray(vec);
@@ -314,7 +320,7 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
             false, //isoptimized
             (Function*) f->cgValue);
 
-    for(int i = 0; i < f->prototype->parameters.size(); i++)
+    //for(int i = 0; i < f->prototype->parameters.size(); i++)
     {
     }
     }

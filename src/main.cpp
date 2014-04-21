@@ -60,15 +60,18 @@ void compile(WLConfig params)
     {
         Parser parser;
         AST *ast = parser.getAST();
+
+        TranslationUnit *runtime = new TranslationUnit(ast->getRootPackage(),
+                "/usr/local/include/wl/runtime.wl");
+        ast->setRuntimeUnit(runtime);
+        parser.parseFile(runtime, "/usr/local/include/wl/runtime.wl");
+
         for(int i = 0; i < params.files.size(); i++)
         {
             if(!ast->getUnit(params.files[i])) // check if file already parsed
             {
-                TranslationUnit *unit = new TranslationUnit(NULL, params.files[i]); //TODO
-                //XXX: work around
+                TranslationUnit *unit = new TranslationUnit(ast->getRootPackage(), params.files[i]);
                 std::string filenm = params.files[i];
-                unit->identifier = unit->getScope()->get(
-                        basename(filenm.c_str()));
 
                 unit->expl = true;
                 ast->addUnit(params.files[i], unit);

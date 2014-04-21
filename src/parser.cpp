@@ -329,17 +329,16 @@ ImportExpression *ParseContext::parseImport()
     Expression *importExpression = parseExpression();
 
     TranslationUnit *importedUnit = NULL;
+    AST *ast = parser->getAST();
     //XXX deffer importing to end of TU parse? Would allow 'package' expression and subsequent imports to work as expected, I imagine
     if(StringExpression *sexp = dynamic_cast<StringExpression*>(importExpression))
     {
-        importedUnit = parser->getAST()->getUnit(sexp->string);
+        importedUnit = ast->getUnit(sexp->string);
         if(!importedUnit) // This TU hasnt been loaded from file yet, DOIT
         {
             std::string filenm = sexp->string;
-            importedUnit = new TranslationUnit(getScope()->get(
-                        basename(filenm.c_str())),
-                    sexp->string);  //TODO: identifier
-            parser->getAST()->addUnit(sexp->string, importedUnit);
+            importedUnit = new TranslationUnit(ast->getRootPackage(), sexp->string);  //TODO: identifier
+            ast->addUnit(sexp->string, importedUnit);
 
             if(special)
             {
@@ -407,6 +406,7 @@ Statement *ParseContext::parseStatement()
 
         case tok::kw_extern:
         case tok::kw_union:
+        case tok::kw_class:
         case tok::kw_struct:
         case tok::kw_var:
 #define BTYPE(X,SZ,SN) case tok::kw_##X:
@@ -673,7 +673,7 @@ Declaration *ParseContext::parseDeclaration()
     {
         ignore(); // ignore =
         defaultValue = parseExpression();
-    } else if(type->type == TYPE_DYNAMIC)
+    } else if(type->kind == TYPE_DYNAMIC) //XXX make isDynamic() function
     {
         emit_message(msg::ERROR, "dynamic type 'var' without initializer", t_id.loc);
     }

@@ -43,9 +43,10 @@ struct IRSwitchCase
 struct IRType
 {
     ASTType *type;
+    llvm::Value *vtable; // vtable if class type
     llvm::Type *llvmType;
     IRType() : type(0), llvmType(0) {}
-    IRType(ASTType *ty, llvm::Type *llty) : type(ty), llvmType(llty) {}
+    IRType(ASTType *ty, llvm::Type *llty) : type(ty), llvmType(llty), vtable(0) {}
 
     operator ASTType*() const { return type; }
     operator llvm::Type*() const { return llvmType; }
@@ -142,12 +143,13 @@ class IRCodegenContext : public CodegenContext
     IRTranslationUnit *unit;
     IRDebug *debug;
     IRScope *scope;
+    AST *ast;
     bool terminated;
     WLConfig config;
 
     IRCodegenContext() : context(llvm::getGlobalContext()),
     ir(new llvm::IRBuilder<>(context)),
-     module(NULL), linker(new llvm::Module("", context)), terminated(false) {}
+     module(NULL), linker(new llvm::Module("", context)), terminated(false), ast(0) {}
 
     llvm::LLVMContext& getLLVMContext() { return context; }
 

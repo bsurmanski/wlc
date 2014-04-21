@@ -93,3 +93,8 @@ TranslationUnit *SymbolTable::getUnit()
 {
     return dynamic_cast<TranslationUnit*>(package);
 }
+
+std::string SymbolTable::getMangledName()
+{
+    return package->getMangledName();
+}

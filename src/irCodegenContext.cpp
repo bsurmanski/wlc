@@ -20,7 +20,7 @@ SourceLocation currentLoc;
 std::string IRFunction::getName(bool mangle)
 {
     if(mangle){
-
+        return declaration->identifier->getMangledName();
     } else
     {
         return declaration->getName();
@@ -98,15 +98,15 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
     {
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(sti->members[i]))
         {
-            if(vd->getType()->align() > align)
+            if(vd->getType()->getAlign() > align)
             {
                 alignedType = vd->type;
-                align = vd->getType()->align();
+                align = vd->getType()->getAlign();
             }
 
-            if(vd->getType()->size() > size)
+            if(vd->getType()->getSize() > size)
             {
-                size = vd->getType()->size();
+                size = vd->getType()->getSize();
             }
             //unionVec.push_back(codegenType(vd->type));
         } else
@@ -116,8 +116,9 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
     if(sti->members.size())
     {
         unionVec.push_back(codegenType(alignedType));
-        if(size - alignedType->size())
-            unionVec.push_back(ArrayType::get(Type::getInt8Ty(context), size - alignedType->size()));
+        if(size - alignedType->getSize())
+            unionVec.push_back(ArrayType::get(Type::getInt8Ty(context),
+                        size - alignedType->getSize()));
         StructType *sty = StructType::create(context, sti->identifier->getName());
         sty->setBody(unionVec);
         ty->cgType = sty;
@@ -128,10 +129,17 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
     return(llvm::Type*) ty->cgType;
 }
 
+llvm::Type *IRCodegenContext::codegenClassType(ASTType *ty)
+{
+    ClassTypeInfo *cti = (ClassTypeInfo*) ty->info;
+    //TODO: generate class type
+    return NULL;
+}
+
 llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
 {
     TupleTypeInfo *tti = dynamic_cast<TupleTypeInfo*>(ty->info);
-    if(ty->type != TYPE_TUPLE || !tti)
+    if(ty->kind != TYPE_TUPLE || !tti)
     {
         emit_message(msg::FAILURE, "invalid tuple type codegen");
         return NULL;
@@ -177,6 +185,10 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
 
     if(ati->isDynamic())
     {
+        //Identifier *id = ast->getRuntimeUnit()->getScope()->lookup("DynamicArray");
+        //ASTType *arrayty = id->getDeclaredType();
+        //ty->cgType = codegenType(arrayty);
+
         vector<Type*> members;
         members.push_back(codegenType(ati->arrayOf->getPointerTy()));
         members.push_back(codegenType(ASTType::getLongTy()));
@@ -219,7 +231,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
     if(ty->cgType) return (Type*) ty->cgType;
     //if(!ty->cgType)
     {
-        if(ty->type == TYPE_UNKNOWN || ty->type == TYPE_UNKNOWN_USER)
+        if(ty->kind == TYPE_UNKNOWN || ty->kind == TYPE_UNKNOWN_USER)
         {
             Identifier* id = lookup(ty->getName());
             Declaration* decl = id->getDeclaration();
@@ -243,7 +255,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
         }
 
         ASTType *tmp;
-        switch(ty->type)
+        switch(ty->kind)
         {
             case TYPE_BOOL:
                 llvmty = Type::getInt1Ty(context);
@@ -275,7 +287,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 break;
             case TYPE_POINTER:
                 tmp = ty->getReferencedTy();
-                if(tmp->type == TYPE_VOID) tmp = ASTType::getCharTy();
+                if(tmp->kind == TYPE_VOID) tmp = ASTType::getCharTy();
                 llvmty = codegenType(tmp)->getPointerTo();
                 break;
             case TYPE_STRUCT:
@@ -283,6 +295,9 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
                 break;
             case TYPE_UNION:
                 llvmty = codegenUnionType(ty);
+                break;
+            case TYPE_CLASS:
+                llvmty = codegenClassType(ty);
                 break;
             case TYPE_TUPLE:
                 llvmty = codegenTupleType(ty);
@@ -320,6 +335,7 @@ ASTValue *IRCodegenContext::indexValue(ASTValue *val, int i)
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), i));
     Value *v = codegenLValue(val);
     Value *llval = ir->CreateInBoundsGEP(v, gep);
+    llval = ir->CreateBitCast(llval, codegenType(cti->getContainedType(i)->getPointerTy()));
     return new ASTValue(cti->getContainedType(i), llval, true);
 }
 
@@ -606,7 +622,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
 
 ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 {
-    if(exp->type->type == TYPE_DYNAMIC_ARRAY)
+    if(exp->type->kind == TYPE_DYNAMIC_ARRAY)
     {
         emit_message(msg::ERROR, "cannot created unsized array. meaningless alloaction", exp->loc);
         return NULL;
@@ -614,7 +630,8 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 
     ASTType *ty = exp->type;
     vector<Value*> llargs;
-    llargs.push_back(ConstantInt::get(codegenType(ASTType::getULongTy()), exp->type->size()));
+    llargs.push_back(ConstantInt::get(codegenType(ASTType::getULongTy()),
+                exp->type->getSize()));
     Function *mallocFunc = module->getFunction("malloc");
     Value *value;
     value = ir->CreateCall(mallocFunc, llargs);
@@ -640,7 +657,7 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
     vector<Value*> llargs;
     ASTValue *val = codegenExpression(exp->expression);
 
-    if(val->type->isArray() && val->type->type == TYPE_DYNAMIC_ARRAY)
+    if(val->type->isArray() && val->type->kind == TYPE_DYNAMIC_ARRAY)
     {
         //TODO: duplicate of ".ptr". make a function for this
         std::vector<Value*> gep;
@@ -841,10 +858,10 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
             if(val->getType()->isFloating())
                 val = promoteType(val, ASTType::getDoubleTy());
             else if(val->getType()->isInteger() && val->getType()->isSigned() &&
-                    val->getType()->size() < ASTType::getIntTy()->size())
+                    val->getType()->getSize() < ASTType::getIntTy()->getSize())
                 val = promoteType(val, ASTType::getIntTy());
             else if(val->getType()->isInteger() &&
-                    val->getType()->size() < ASTType::getIntTy()->size())
+                    val->getType()->getSize() < ASTType::getIntTy()->getSize())
                 val = promoteType(val, ASTType::getUIntTy());
         }
 
@@ -951,14 +968,15 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
     {
         ASTValue *arr = codegenExpression(iexp->lhs);
         ASTValue *ind = codegenExpression(iexp->index);
-        if(arr->getType()->type == TYPE_DYNAMIC_ARRAY)
+        if(arr->getType()->kind == TYPE_DYNAMIC_ARRAY)
         {
             ASTType *indexedType = arr->getType()->getReferencedTy();
             Value *val = ir->CreateStructGEP(codegenLValue(arr), 0);
             val = ir->CreateLoad(val);
             val = ir->CreateInBoundsGEP(val, codegenValue(ind));
+            val = ir->CreateBitCast(val, codegenType(indexedType->getPointerTy()));
             return new ASTValue(indexedType, val, true);
-        }  else if(arr->getType()->type == TYPE_ARRAY)
+        }  else if(arr->getType()->kind == TYPE_ARRAY)
         {
             ASTType *indexedType = arr->getType()->getReferencedTy();
             Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), codegenValue(ind));
@@ -969,7 +987,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             ASTType *indexedType = arr->getType()->getReferencedTy();
             Value *val = ir->CreateInBoundsGEP(codegenValue(arr), codegenValue(ind));
             return new ASTValue(indexedType, val, true);
-        } else if(arr->getType()->type == TYPE_TUPLE)
+        } else if(arr->getType()->kind == TYPE_TUPLE)
         {
             if(ConstantInt *llci = dynamic_cast<ConstantInt*>(codegenValue(ind)))
             {
@@ -1044,7 +1062,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 {
                     return new ASTValue(ASTType::getULongTy(),
                             ConstantInt::get(Type::getInt64Ty(context),
-                                tyexp->type->size()));
+                                tyexp->type->getSize()));
                 } else if(dexp->rhs == "offsetof")
                 {
                     emit_message(msg::UNIMPLEMENTED,
@@ -1064,7 +1082,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 {
                     return new ASTValue(ASTType::getULongTy(),
                             ConstantInt::get(Type::getInt64Ty(context),
-                                lhs->getType()->size()));
+                                lhs->getType()->getSize()));
                 } else if(dexp->rhs == "offsetof")
                 {
                     emit_message(msg::UNIMPLEMENTED,
@@ -1077,7 +1095,8 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 
             if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(),
                     codegenValue(lhs), true);
-            if(!lhs->getType()->isStruct() && !lhs->getType()->isArray() && !lhs->getType()->isUnion()) {
+            if(!lhs->getType()->isStruct() && !lhs->getType()->isArray() &&
+                    !lhs->getType()->isUnion()) {
                 emit_message(msg::ERROR, "can only index struct or array type", dexp->loc);
                 return NULL;
             }
@@ -1089,7 +1108,8 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 int i = hti->getMemberIndex(dexp->rhs);
                 if(i < 0)
                 {
-                    emit_message(msg::ERROR, "member not in struct: " + hti->getName() + "." + dexp->rhs,
+                    emit_message(msg::ERROR, "member not in struct: " + hti->getName() + "." +
+                            dexp->rhs,
                             dexp->loc);
                 }
                 return indexValue(lhs, i);
@@ -1099,7 +1119,8 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 Declaration *mdecl = hti->getMemberDeclaration(dexp->rhs);
                 if(!mdecl)
                 {
-                    emit_message(msg::ERROR, "member not in struct: " + hti->getName() + "." + dexp->rhs,
+                    emit_message(msg::ERROR, "member not in struct: " + hti->getName() + "." +
+                            dexp->rhs,
                             dexp->loc);
                 }
                 ASTType *ty = mdecl->getType();
@@ -1109,7 +1130,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                                             hti->getMemberIndex(dexp->rhs)));
                 Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
                 return new ASTValue(ty, llval, true);
-            }else if(lhs->getType()->type == TYPE_DYNAMIC_ARRAY)
+            }else if(lhs->getType()->kind == TYPE_DYNAMIC_ARRAY)
             {
                 ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(lhs->getType()->info);
                 if(!ati){
@@ -1135,7 +1156,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
                     return new ASTValue(ASTType::getULongTy(), llval, true);
                 }
-            } else if(lhs->getType()->type == TYPE_ARRAY)
+            } else if(lhs->getType()->kind == TYPE_ARRAY)
             {
                 ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(lhs->getType()->info);
                 ASTType *ty = ati->getReferenceTy();
@@ -1229,7 +1250,7 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
 
 ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
 {
-    if(toType->type == TYPE_STRUCT)
+    if(toType->kind == TYPE_STRUCT)
     {
         if(((TupleTypeInfo*) val->type->info)->types.size() ==
                 ((StructTypeInfo*) toType->info)->members.size()) //TODO proper test
@@ -1242,7 +1263,7 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
             emit_message(msg::ERROR, "cannot convert tuple to struct");
             return NULL;
         }
-    } else if(toType->type == TYPE_TUPLE)
+    } else if(toType->kind == TYPE_TUPLE)
     {
         if(((TupleTypeInfo*) val->type->info)->types.size() ==
                 ((TupleTypeInfo*) toType->info)->types.size())
@@ -1266,7 +1287,7 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
             emit_message(msg::ERROR, "cannot convert tuple to incompatible tuple");
             return NULL;
         }
-    } else if(toType->type == TYPE_ARRAY)
+    } else if(toType->kind == TYPE_ARRAY)
     {
         Value *toPtr;
         if(val->isLValue())
@@ -1279,7 +1300,7 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
         }
 
         return new ASTValue(toType, toPtr, true);
-    } else if(toType->type == TYPE_DYNAMIC_ARRAY)
+    } else if(toType->kind == TYPE_DYNAMIC_ARRAY)
     {
         Value *toPtr;
         Value *toSize;
@@ -1305,9 +1326,9 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
 
 ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
 {
-    if(val->type->type == TYPE_ARRAY)
+    if(val->type->kind == TYPE_ARRAY)
     {
-        if(toType->type == TYPE_POINTER)
+        if(toType->kind == TYPE_POINTER)
         {
             ArrayTypeInfo *ati = (ArrayTypeInfo*) val->type->info;
             if(ati->arrayOf != toType->getReferencedTy())
@@ -1319,7 +1340,7 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
             ptr = ir->CreateBitCast(ptr, codegenType(toType));
             return new ASTValue(toType, ptr, false); //TODO: should be lvalue, but that causes it to load incorrectly
         }
-    } else if(val->type->type == TYPE_DYNAMIC_ARRAY)
+    } else if(val->type->kind == TYPE_DYNAMIC_ARRAY)
     {
 
     }
@@ -1343,7 +1364,7 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
         {
             return promotePointer(val, toType);
         }
-        else if(val->type->type == TYPE_TUPLE)
+        else if(val->type->kind == TYPE_TUPLE)
         {
             return promoteTuple(val, toType);
         } if(val->type->isArray())
@@ -1365,8 +1386,10 @@ void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, u
             // TODO: loc
             emit_message(msg::UNIMPLEMENTED, "cannot convert structs (yet)");
         }
-        if((*v2)->type->priority() > (*v1)->type->priority()) *v1 = promoteType(*v1, (*v2)->type);
-        else *v2 = promoteType(*v2, (*v1)->type);
+        if((*v2)->type->getPriority() > (*v1)->type->getPriority())
+            *v1 = promoteType(*v1, (*v2)->type);
+        else
+            *v2 = promoteType(*v2, (*v1)->type);
     }
 }
 
@@ -1450,7 +1473,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     ASTValue *rhs = codegenExpression(exp->rhs);
     if(!isAssignOp((tok::TokenKind) exp->op)) //XXX messy
         codegenResolveBinaryTypes(&lhs, &rhs, exp->op);
-    else if(lhs->type->type == TYPE_ARRAY)
+    else if(lhs->type->kind == TYPE_ARRAY)
     {
         emit_message(msg::ERROR, "cannot assign to statically defined array", exp->loc);
     }
@@ -1729,30 +1752,13 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
 
 }
 
-/*
-FunctionType *IRCodegenContext::codegenFunctionPrototype(FunctionPrototype *proto)
-{
-    if(proto->llty) return proto->llty;
-    ASTType *rty = proto->returnType;
-    vector<Type*> params;
-    for(int i = 0; i < proto->parameters.size(); i++)
-    {
-        params.push_back(codegenType(proto->parameters[i].first));
-    }
-    // XXX return, args, varargs
-    FunctionType *fty = FunctionType::get(codegenType(rty), params, proto->vararg);
-    proto->llty = fty;
-    return fty;
-} */
-
 void IRCodegenContext::codegenDeclaration(Declaration *decl)
 {
     if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(decl))
     {
         IRFunction backup = currentFunction;
         currentFunction = IRFunction(fdecl);
-        //FunctionType *fty = codegenFunctionPrototype(fdecl->prototype);
-        //Function *func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
+        // create on declaration(?) No, then other references my be invalid
         Function *func = module->getFunction(currentFunction.getName());
         if(fdecl->body)
         {
@@ -1846,7 +1852,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             }
         }
 
-        if(vty->type == TYPE_DYNAMIC)
+        if(vty->kind == TYPE_DYNAMIC)
         {
             if(!defaultValue)
             {
@@ -1920,10 +1926,14 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                 }
             }
         } */
+    } else if(TypeDeclaration *tdecl = dynamic_cast<TypeDeclaration*>(decl))
+    {
+        //codegenType(tdecl->getType()); // make sure types are present in Module
     }
     ///NOTE type declarations are not Codegen'd like values, accesible across Modules
 }
 
+//XXX should be 'import'?
 void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc)
 {
     // alloc globals before codegen'ing functions
@@ -1998,7 +2008,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
             if(globals[i]->value)
                 idValue = codegenExpression(globals[i]->value);
 
-            if(idTy->type == TYPE_DYNAMIC)
+            if(idTy->kind == TYPE_DYNAMIC)
             {
                 if(!idValue)
                     emit_message(msg::FAILURE,
@@ -2037,7 +2047,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 
         } else if(id->isFunction())
         {
-            //TODO: declare func
+            //TODO: declare func?
         }
     }
 
@@ -2051,6 +2061,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 
         if(unit->functions.count(fdecl->getName())) continue; // XXX duplicate?
 
+        //cout << "CG: " << fdecl->getName() << " : " << fdecl->identifier->getMangledName() << endl;
         func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
 
         unit->functions[fdecl->getName()] = func;
@@ -2096,6 +2107,7 @@ void IRCodegenContext::codegenPackage(Package *p)
 
 std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
 {
+    this->ast = ast;
     this->config = config;
     codegenPackage(ast->getRootPackage());
     if(currentErrorLevel() > msg::WARNING)

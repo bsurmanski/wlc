@@ -46,6 +46,8 @@ struct SymbolTable
         if(par) package = par->package;
     }
 
+    std::string getMangledName();
+
     Package *getPackage() { return package; }
     TranslationUnit *getUnit();
 

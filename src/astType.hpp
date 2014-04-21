@@ -200,7 +200,7 @@ struct ClassTypeInfo : public HetrogenTypeInfo
 #include <llvm/DebugInfo.h> //XXX
 struct ASTType
 {
-    ASTTypeEnum type;
+    ASTTypeEnum kind;
     ASTType *pointerTy;
     ASTType *dynamicArrayTy;
     llvm::Type *cgType; //TODO: should not have llvm in here!
@@ -212,26 +212,26 @@ struct ASTType
     void setTypeInfo(TypeInfo *i, ASTTypeEnum en = TYPE_UNKNOWN)
     {
         info = i;
-        if(en != TYPE_UNKNOWN) type = en;
+        if(en != TYPE_UNKNOWN) kind = en;
     }
     TypeInfo *getTypeInfo() { return info; }
 
-    ASTType(enum ASTTypeEnum ty) : type(ty), pointerTy(0), cgType(0), info(0)
+    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), cgType(0), info(0)
     {}
 
-    ASTType(enum ASTTypeEnum ty, TypeInfo *i) : type(ty), pointerTy(0), cgType(0), info(i)
+    ASTType(enum ASTTypeEnum ty, TypeInfo *i) : kind(ty), pointerTy(0), cgType(0), info(i)
     {}
 
-    ASTType() : type(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL), info(0) {}
+    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL), info(0) {}
     //ASTType(ASTTypeQual q) : qual(q), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
     //virtual ~ASTType() { delete pointerTy; }
     //ASTType *getUnqual();
     ASTType *getPointerTy();
     ASTType *getArrayTy(int sz);
     ASTType *getArrayTy();
-    size_t size() const
+    size_t getSize() const
     {
-        switch(type)
+        switch(kind)
         {
             case TYPE_CHAR:
             case TYPE_UCHAR:
@@ -254,9 +254,9 @@ struct ASTType
     }
 
     // conversion priority
-    unsigned priority() const
+    unsigned getPriority() const
     {
-        switch(type)
+        switch(kind)
         {
             case TYPE_UNION:
             case TYPE_STRUCT:
@@ -296,11 +296,11 @@ struct ASTType
 
     bool coercesTo(ASTType *ty) const
     {
-        switch(type)
+        switch(kind)
         {
             case TYPE_POINTER:
                 return ty->isInteger() || ty == this ||
-                    getReferencedTy()->type == TYPE_VOID || ty->getReferencedTy()->type == TYPE_VOID;
+                    getReferencedTy()->kind == TYPE_VOID || ty->getReferencedTy()->kind == TYPE_VOID;
                 //TODO: check if compatible pointer
             case TYPE_BOOL:
             case TYPE_UCHAR:
@@ -326,7 +326,7 @@ struct ASTType
 
     size_t length() const
     {
-        switch(type)
+        switch(kind)
         {
             case TYPE_ARRAY:
             case TYPE_DYNAMIC_ARRAY:
@@ -335,10 +335,10 @@ struct ASTType
         }
     }
 
-    size_t align() const
+    size_t getAlign() const
     {
 
-        switch(type)
+        switch(kind)
         {
             case TYPE_CHAR:
             case TYPE_UCHAR:
@@ -359,7 +359,7 @@ struct ASTType
 
     std::string getName()
     {
-        switch(type)
+        switch(kind)
         {
             case TYPE_CHAR: return "char";
             case TYPE_UCHAR: return "uchar";
@@ -378,21 +378,21 @@ struct ASTType
     }
 
     ASTType *getReferencedTy() const { return info->getReferenceTy(); }
-    bool isAggregate() { return type == TYPE_STRUCT || type == TYPE_UNION || type == TYPE_CLASS; }
-    bool isClass() { return type == TYPE_CLASS; }
-    bool isStruct() { return type == TYPE_STRUCT; }
-    bool isUnion() { return type == TYPE_UNION; }
-    bool isBool() { return type == TYPE_BOOL; }
-    bool isInteger() { return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_SHORT ||
-        type == TYPE_INT || type == TYPE_LONG ||
-        type == TYPE_UCHAR || type == TYPE_USHORT || type == TYPE_UINT || type == TYPE_ULONG; }
-    bool isSigned() { return type == TYPE_CHAR || type == TYPE_SHORT ||
-        type == TYPE_INT || type == TYPE_LONG; }
-    bool isFloating() { return type == TYPE_FLOAT || type == TYPE_DOUBLE; }
+    bool isAggregate() { return kind == TYPE_STRUCT || kind == TYPE_UNION || kind == TYPE_CLASS; }
+    bool isClass() { return kind == TYPE_CLASS; }
+    bool isStruct() { return kind == TYPE_STRUCT; }
+    bool isUnion() { return kind == TYPE_UNION; }
+    bool isBool() { return kind == TYPE_BOOL; }
+    bool isInteger() { return kind == TYPE_BOOL || kind == TYPE_CHAR || kind == TYPE_SHORT ||
+        kind == TYPE_INT || kind == TYPE_LONG ||
+        kind == TYPE_UCHAR || kind == TYPE_USHORT || kind == TYPE_UINT || kind == TYPE_ULONG; }
+    bool isSigned() { return kind == TYPE_CHAR || kind == TYPE_SHORT ||
+        kind == TYPE_INT || kind == TYPE_LONG; }
+    bool isFloating() { return kind == TYPE_FLOAT || kind == TYPE_DOUBLE; }
     bool isNumeric() { return isFloating() || isInteger(); }
-    bool isVector() { return type == TYPE_VEC; }
-    bool isArray() { return type == TYPE_ARRAY || type == TYPE_DYNAMIC_ARRAY; }
-    bool isPointer() { return this && type == TYPE_POINTER; } //TODO: shouldnt need to test for this
+    bool isVector() { return kind == TYPE_VEC; }
+    bool isArray() { return kind == TYPE_ARRAY || kind == TYPE_DYNAMIC_ARRAY; }
+    bool isPointer() { return this && kind == TYPE_POINTER; } //TODO: shouldnt need to test for this
     bool isComposite() { return dynamic_cast<CompositeTypeInfo*>(info); }
 
 #define DECLTY(NM) static ASTType *NM; static ASTType *get##NM();

@@ -3,6 +3,12 @@
 
 #include <assert.h>
 
+Identifier::Identifier(SymbolTable *ta, std::string s, IDType t) :
+    table(ta), type(t), name(s), declaration(NULL), astValue(NULL), isMangled(false)
+{
+    mangled = "";
+}
+
 void Identifier::setDeclaration(Declaration *decl, IDType ty)
 {
     FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(declaration);
@@ -57,4 +63,12 @@ ASTValue *Identifier::getValue()
 void Identifier::setValue(ASTValue *val)
 {
     astValue = val;
+}
+
+std::string Identifier::getMangledName() {
+    if(!isMangled) {
+        mangled = mangled = table->getMangledName() + getName();
+        isMangled = true;
+    }
+    return mangled;
 }

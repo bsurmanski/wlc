@@ -80,7 +80,7 @@ llvm::DICompositeType IRDebug::createArrayType(ASTType *ty)
     llvm::DIDescriptor DIContext(currentFile());
     ArrayTypeInfo *ati = (ArrayTypeInfo*) ty->info;
     assert(!ati->isDynamic());
-    return di.createArrayType(ati->length(), ati->arrayOf->align(),
+    return di.createArrayType(ati->length(), ati->arrayOf->getAlign(),
             createType(ati->arrayOf),
             DIArray());
 }
@@ -88,15 +88,15 @@ llvm::DICompositeType IRDebug::createArrayType(ASTType *ty)
 llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
 {
 
-    assert(ty->type == TYPE_TUPLE && "expected struct");
+    assert(ty->kind == TYPE_TUPLE && "expected struct");
     llvm::DIDescriptor DIContext(currentFile());
     TupleTypeInfo *tti = (TupleTypeInfo*) ty->info;
     vector<Value *> vec;
     int offset = 0;
     for(int i = 0; i < tti->types.size(); i++)
     {
-        unsigned size = tti->types[i]->size();
-        unsigned align = tti->types[i]->align();
+        unsigned size = tti->types[i]->getSize();
+        unsigned align = tti->types[i]->getAlign();
         if(offset % align)
             offset += (align - (offset % align));
         stringstream ss;
@@ -111,7 +111,7 @@ llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
                     offset * 8,
                     0,
                     createType(tti->types[i])));
-        offset += tti->types[i]->size();
+        offset += tti->types[i]->getSize();
         //TODO: members
     }
 
@@ -121,8 +121,8 @@ llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
             ty->getName(),
             currentFile(), //TODO: defined file
             0, //line num //TODO line num
-            ty->size() * 8,
-            ty->align() * 8,
+            ty->getSize() * 8,
+            ty->getAlign() * 8,
             0, // flags
             llvm::DIType(),
             arr
@@ -140,8 +140,8 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
     {
         VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(sti->members[i]);
         assert(vdecl);
-        unsigned size = vdecl->getType()->size();
-        unsigned align = vdecl->getType()->align();
+        unsigned size = vdecl->getType()->getSize();
+        unsigned align = vdecl->getType()->getAlign();
         if(offset % align)
             offset += (align - (offset % align));
         vec.push_back(di.createMemberType(
@@ -154,7 +154,7 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
                     offset * 8,
                     0,
                     createType(vdecl->getType())));
-        offset += vdecl->getType()->size();
+        offset += vdecl->getType()->getSize();
         //TODO: members
     }
 
@@ -164,8 +164,8 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
             ty->getName(),
             currentFile(), //TODO: defined file
             sti->getDeclaration()->loc.line, //line num
-            ty->size() * 8,
-            ty->align() * 8,
+            ty->getSize() * 8,
+            ty->getAlign() * 8,
             0, // flags
             llvm::DIType(),
             arr
@@ -182,8 +182,8 @@ llvm::DICompositeType IRDebug::createUnionType(ASTType *ty)
     {
         VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(sti->members[i]);
         assert(vdecl);
-        unsigned size = vdecl->getType()->size();
-        unsigned align = vdecl->getType()->align();
+        unsigned size = vdecl->getType()->getSize();
+        unsigned align = vdecl->getType()->getAlign();
         vec.push_back(di.createMemberType(
                     DIContext,
                     vdecl->getName(),
@@ -203,8 +203,8 @@ llvm::DICompositeType IRDebug::createUnionType(ASTType *ty)
             ty->getName(),
             currentFile(), //TODO: defined file
             sti->getDeclaration()->loc.line, //line num
-            ty->size() * 8,
-            ty->align() * 8,
+            ty->getSize() * 8,
+            ty->getAlign() * 8,
             0, // flags
             arr
             );
@@ -215,7 +215,7 @@ llvm::DIType IRDebug::createType(ASTType *ty)
     //if(!ty->diType)
     {
         llvm::DIType dity;
-        switch(ty->type)
+        switch(ty->kind)
         {
             case TYPE_BOOL:
                 dity = di.createBasicType("bool", 8, 8, dwarf::DW_ATE_boolean);

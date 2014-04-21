@@ -36,6 +36,7 @@ all:
 install: wlc
 	sudo cp wlc /usr/local/bin/
 	cp wl.vim ~/.vim/syntax/
+	sudo cp -R lib/* /usr/local/include/wl
 
 installsyntax:
 	cp wl.vim ~/.vim/syntax/

@@ -27,8 +27,10 @@ struct Identifier
         ID_LABEL,
     };
 
+    bool isMangled;
     IDType type;
     std::string name;
+    std::string mangled;
     Declaration *declaration;
     Expression *expression;
     SymbolTable *table;
@@ -42,13 +44,13 @@ struct Identifier
         ASTType *astType;
     };
 
-    Identifier(SymbolTable *ta, std::string s, IDType t = ID_UNKNOWN) :
-        table(ta), type(t), name(s), declaration(NULL), astValue(NULL) {}
+    Identifier(SymbolTable *ta, std::string s, IDType t = ID_UNKNOWN);
     void setDeclaration(Declaration *decl, IDType t = ID_UNKNOWN);
     Declaration *getDeclaration() { return declaration; }
     void setExpression(Expression *e) { expression = e; type = ID_EXPRESSION; }
     Expression *getExpression() { return expression; }
     std::string getName() { return name; }
+    std::string getMangledName();
     ASTType *getType();
     ASTType *getDeclaredType();
     void setDeclaredType(ASTType *ty);

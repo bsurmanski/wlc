@@ -35,14 +35,17 @@ struct TypeDeclaration;
 struct Package
 {
     SymbolTable *scope;
-    Identifier *parent;
+    Package *parent;
     Identifier *identifier;
     void *cgValue; // opaque pointer to specific codegen information
+    std::string name;
 
-    Package() : identifier(NULL), scope(NULL), cgValue(NULL) {}
-    Package(Identifier *id) : identifier(id), scope(NULL), cgValue(NULL) {
-        if(id) id->type = Identifier::ID_PACKAGE;
-        //TODO: scope should have parent?
+    Package(Package *par=0, std::string nm="wl") : parent(par), scope(NULL), cgValue(NULL),
+        identifier(NULL)
+    {
+        name = nm;
+        if(parent)
+            identifier = parent->getScope()->getInScope(name);
     }
     virtual ~Package() { if(scope) delete scope; }
 
@@ -57,13 +60,21 @@ struct Package
 
     void setParent(Package *p)
     {
-        parent = p->getIdentifier();
+        assert(false); // dont use this?XXX
+        //parent = p->getIdentifier();
     }
 
     void addPackage(Package *p) {
-        //scope->add(str, p->getIdentifier());
-        p->setParent(this);
+        // XXX add identifier in scope ?
+        //p->setParent(this);
         children.push_back(p);
+    }
+
+    std::string getMangledName()
+    {
+        if(parent)
+            return parent->getMangledName() + identifier->getName();
+        return identifier->getName();
     }
 
     Identifier *lookup(std::string str) { return getScope()->lookup(str); }
@@ -84,7 +95,16 @@ struct TranslationUnit : public Package
 
     std::string filenm;
     bool expl; // explicitly requested for compile. eg, not included
-    TranslationUnit(Identifier *id, std::string fn = "") : Package(id), filenm(fn), expl(false) {}
+    static std::string getFilebase(std::string s)
+    {
+        size_t lastDot = s.find_last_of(".");
+        if(lastDot != std::string::npos)
+            s = s.substr(0, lastDot);
+        return basename(s.c_str());
+    }
+
+    TranslationUnit(Package *parent, std::string fn = "") :
+        Package(parent, getFilebase(fn)), filenm(fn), expl(false) {}
     ~TranslationUnit() { }
     virtual bool isTranslationUnit() { return true; }
     std::string getName() { return identifier->getName(); }
@@ -94,6 +114,7 @@ struct AST
 {
     Package *root;
     std::map<std::string, TranslationUnit*> units;
+    TranslationUnit *runtime;
 
     AST() { root = new Package; }
     ~AST() { delete root; }
@@ -114,6 +135,14 @@ struct AST
         assert(!units.count(astr) && "reimport of translation unit!");
         units[str] = u;
     }
+
+    void setRuntimeUnit(TranslationUnit *u)
+    {
+        units["/usr/local/include/wl/runtime.wl"] = u;
+        runtime = u;
+    }
+
+    TranslationUnit *getRuntimeUnit() { return runtime; }
 };
 
 struct FunctionDeclaration;

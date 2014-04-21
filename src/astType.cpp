@@ -10,10 +10,10 @@ size_t StructTypeInfo::getSize()
         vd = members[i]->variableDeclaration();
         if(!vd) continue;
 
-        align = vd->getType()->align();
+        align = vd->getType()->getAlign();
         if(!packed && sz % align)
             sz += (align - (sz % align));
-        sz += vd->type->size();
+        sz += vd->type->getSize();
     }
     return sz;
 }
@@ -31,10 +31,10 @@ size_t StructTypeInfo::getMemberOffset(std::string member)
         }
         vd = members[i]->variableDeclaration();
         if(!vd) continue;
-        align = vd->getType()->align();
+        align = vd->getType()->getAlign();
         if(!packed && offset % align)
             offset += (align - (offset % align));
-        offset += vd->getType()->size();
+        offset += vd->getType()->getSize();
     }
 }
 
@@ -69,8 +69,8 @@ size_t HetrogenTypeInfo::getAlign()
     {
         vd = members[i]->variableDeclaration();
         assert(vd && "expected variable decl, found something else");
-        if(vd->getType()->align() > align)
-            align = vd->getType()->align();
+        if(vd->getType()->getAlign() > align)
+            align = vd->getType()->getAlign();
     }
     if(align == 0) return 1; //TODO: empty struct, bad!
     return align;
@@ -84,8 +84,8 @@ size_t UnionTypeInfo::getSize()
     for(int i = 0; i < members.size(); i++)
     {
         vd = members[i]->variableDeclaration();
-        if(vd->getType()->size() > sz)
-            sz = vd->getType()->size();
+        if(vd->getType()->getSize() > sz)
+            sz = vd->getType()->getSize();
     }
 }
 
@@ -98,11 +98,11 @@ std::string ArrayTypeInfo::getName(){
 }
 
 size_t StaticArrayTypeInfo::getAlign(){
-    return arrayOf->align();
+    return arrayOf->getAlign();
 }
 
 size_t DynamicArrayTypeInfo::getAlign(){
-    return ASTType::getCharTy()->getPointerTy()->align();
+    return ASTType::getCharTy()->getPointerTy()->getAlign();
 }
 
 ASTType *ASTType::getPointerTy()
@@ -140,21 +140,21 @@ ASTType *ASTType::getArrayTy(int sz)
 }
 
 size_t DynamicArrayTypeInfo::getSize() {
-    return ASTType::getCharTy()->getPointerTy()->size() + ASTType::getULongTy()->size();
+    return ASTType::getCharTy()->getPointerTy()->getSize() + ASTType::getULongTy()->getSize();
 }
 
 size_t StaticArrayTypeInfo::getSize() {
-    return size * arrayOf->size();
+    return size * arrayOf->getSize();
 }
 
 size_t AliasTypeInfo::getSize()
 {
-    return alias->size();
+    return alias->getSize();
 }
 
 size_t AliasTypeInfo::getAlign()
 {
-    return alias->align();
+    return alias->getAlign();
 }
 
 size_t TupleTypeInfo::getSize()
@@ -163,10 +163,10 @@ size_t TupleTypeInfo::getSize()
     unsigned align;
     for(int i = 0; i < types.size(); i++)
     {
-        align = types[i]->align();
+        align = types[i]->getAlign();
         if(sz % align)
             sz += (align - (sz % align));
-        sz += types[i]->size();
+        sz += types[i]->getSize();
     }
     return sz;
 }
@@ -176,8 +176,8 @@ size_t TupleTypeInfo::getAlign()
     size_t max = 0;
     for(int i = 0; i < types.size(); i++)
     {
-        if(types[i]->align() > max)
-            max = types[i]->align();
+        if(types[i]->getAlign() > max)
+            max = types[i]->getAlign();
     }
     return max;
 }

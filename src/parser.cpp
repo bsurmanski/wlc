@@ -614,14 +614,14 @@ Declaration *ParseContext::parseDeclaration()
 
     if(peek().is(tok::lparen)) // function decl
     {
-        //vector<pair<ASTType*, std::string> > args;
         std::vector<ASTType *> params;
         std::vector<std::string> paramNames;
+        std::vector<Expression*> paramValues;
         ignore(); // lparen
         bool vararg = false;
+        bool expectsDefault = false;
         while(!peek().is(tok::rparen))
         {
-            //Token at_type = get();
             if(peek().is(tok::dotdotdot))
             {
                 vararg = true;
@@ -638,9 +638,24 @@ Declaration *ParseContext::parseDeclaration()
 
             ASTType *aty = parseType();
             Token t_name = get();
-            //args.push_back(pair<ASTType*, std::string>(aty, t_name.toString()));
             params.push_back(aty);
             paramNames.push_back(t_name.toString());
+
+            if(peek().is(tok::equal))
+            {
+                ignore(); // eat '='
+                expectsDefault = true;
+                Expression *defaultValue = parseExpression();
+                paramValues.push_back(defaultValue);
+            } else
+            {
+                if(expectsDefault)
+                {
+                    emit_message(msg::ERROR, "default argument missing for function", peek().loc);
+                }
+                paramValues.push_back(NULL);
+            }
+
             if(peek().is(tok::comma))
             {
                 ignore();
@@ -663,7 +678,8 @@ Declaration *ParseContext::parseDeclaration()
         popScope();
 
         ASTType *proto = ASTType::getFunctionTy(type, params, vararg);
-        Declaration *decl = new FunctionDeclaration(id, proto, paramNames, funcScope, stmt, t_id.loc);
+        Declaration *decl = new FunctionDeclaration(id, proto, paramNames, paramValues,
+                funcScope, stmt, t_id.loc);
         id->setDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;
     }

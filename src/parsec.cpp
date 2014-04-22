@@ -190,6 +190,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 
         vector<ASTType*> params;
         vector<std::string> paramNames;
+        vector<Expression*> paramValues;
 
         for(int i = 0; i < nargs; i++)
         {
@@ -200,6 +201,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 
             params.push_back(astArgTy);
             paramNames.push_back("");
+            paramValues.push_back(NULL);
         }
 
         ASTType *rType = ASTTypeFromCType(unit, clang_getResultType(fType));
@@ -210,7 +212,8 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 
         ASTType *functionType = ASTType::getFunctionTy(rType, params,
                                         clang_isFunctionTypeVariadic(fType));
-        FunctionDeclaration *fdecl = new FunctionDeclaration(id, functionType, paramNames, 0, 0, loc);
+        FunctionDeclaration *fdecl = new FunctionDeclaration(id, functionType,
+                paramNames, paramValues, 0, 0, loc);
         id->setDeclaration(fdecl, Identifier::ID_FUNCTION);
 
         unit->functions.push_back(fdecl);

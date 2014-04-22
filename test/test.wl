@@ -40,6 +40,11 @@ void setPixel(SDL_Surface^ s, int i, int j, int val)
     ^pxl = val
 }
 
+int addFunc(int i = 0, int j = 5)
+{
+    return i + j 
+}
+
 void update()
 {
     int n = 0 // neighbors
@@ -116,6 +121,11 @@ int main(int argc, char^^ argv)
     printf("myFloatb: %f\n", myfloat);
     myfloat = 0o333
     printf("myFloato: %f\n", myfloat);
+
+    int add = addFunc(5, 7)
+    printf("addFunc: %d\n", addFunc())
+    printf("addFunc: %d\n", addFunc(5))
+    printf("addFunc: %d\n", addFunc(5, 7))
 
     uint mySize = SDL_Surface.sizeof
 

@@ -177,10 +177,15 @@ struct FunctionDeclaration : public Declaration
     llvm::DISubprogram diSubprogram;
     ASTType *prototype;
     std::vector<std::string> paramNames;
+    std::vector<Expression*> paramValues;
     SymbolTable *scope;
     Statement *body;
     void *cgValue;
-    FunctionDeclaration(Identifier *id, ASTType *p, std::vector<std::string> pname, SymbolTable *sc, Statement *st, SourceLocation loc) : Declaration(id, loc), prototype(p), paramNames(pname), scope(sc), body(st), cgValue(NULL) {}
+    FunctionDeclaration(Identifier *id, ASTType *p, std::vector<std::string> pname,
+            std::vector<Expression*> pvals, SymbolTable *sc,
+            Statement *st, SourceLocation loc) :
+        Declaration(id, loc), prototype(p), paramNames(pname), paramValues(pvals), scope(sc),
+        body(st), cgValue(NULL) {}
     virtual FunctionDeclaration *functionDeclaration() { return this; }
     virtual std::string getName(bool mangle=false)
     {
@@ -192,7 +197,7 @@ struct FunctionDeclaration : public Declaration
     SymbolTable *getScope() { return scope; }
     ASTType *getReturnType() { return dynamic_cast<FunctionTypeInfo*>(prototype->info)->ret; }
 
-    virtual ASTType *getType() { return prototype;  } //TODO: prototype should be type?
+    virtual ASTType *getType() { return prototype;  } //TODO: 'prototype' should be 'type'?
 };
 
 struct LabelDeclaration : public Declaration

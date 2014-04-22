@@ -822,15 +822,17 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     //TODO: once proper type passing is done, check if callable above
 
     FunctionTypeInfo *fti = NULL;
+    FunctionDeclaration *fdecl = NULL;
     ASTType *rtype = NULL;
     //TODO: very messy, should be able to get return value of function type
     if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->function))
     {
         // XXX messy, not always true
-        if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->declaration))
+        if(FunctionDeclaration *fdecla = dynamic_cast<FunctionDeclaration*>(iexp->id->declaration))
         {
-            fti = dynamic_cast<FunctionTypeInfo*>(fdecl->prototype->info);
+            fti = dynamic_cast<FunctionTypeInfo*>(fdecla->prototype->info);
             rtype = fti->ret;
+            fdecl = fdecla;
             //ftype = fdecl->prototype;
         } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(iexp->id->declaration))
         {
@@ -840,18 +842,23 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         }
     } else emit_message(msg::FAILURE, "unknown function type?", exp->loc);
 
+    //TODO: reinsert 'number of parameter' assertion; take into account 'default params'
+    /*
     if((fti->params.size() != exp->args.size()) && !fti->vararg)
     {
         emit_message(msg::ERROR, "invalid number of arguments provided for function call", exp->loc);
-    }
+    }*/
 
     vector<ASTValue*> cargs;
     vector<Value*> llargs;
     for(int i = 0; i < exp->args.size(); i++)
     {
-        ASTValue *val = codegenExpression(exp->args[i]);
-        if(!fti->vararg || (fti->params.size() > i && fti->params[i]))
+        ASTValue *val = NULL;
+        val = codegenExpression(exp->args[i]);
+
+        if(fti->params.size() > i && fti->params[i]){
             val = promoteType(val, fti->params[i]);
+        }
 
         else if(fti->vararg)
         {
@@ -873,6 +880,39 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         cargs.push_back(val);
         llargs.push_back(codegenValue(cargs[i]));
     }
+
+    //TODO: duplicate of above
+    if(fti->params.size() > exp->args.size())
+    {
+        for(int i = exp->args.size(); i < fti->params.size(); i++)
+        {
+            ASTValue *val = NULL;
+            val = codegenExpression(fdecl->paramValues[i]);
+
+            val = promoteType(val, fti->params[i]);
+
+            if(fti->vararg)
+            {
+                if(val->getType()->isFloating())
+                    val = promoteType(val, ASTType::getDoubleTy());
+                else if(val->getType()->isInteger() && val->getType()->isSigned() &&
+                        val->getType()->getSize() < ASTType::getIntTy()->getSize())
+                    val = promoteType(val, ASTType::getIntTy());
+                else if(val->getType()->isInteger() &&
+                        val->getType()->getSize() < ASTType::getIntTy()->getSize())
+                    val = promoteType(val, ASTType::getUIntTy());
+            }
+
+            if(!val)
+            {
+                emit_message(msg::ERROR, "invalid arguement provided for function", exp->loc);
+            }
+
+            cargs.push_back(val);
+            llargs.push_back(codegenValue(cargs[i]));
+        }
+    }
+
     llvm::Value *value = ir->CreateCall(codegenValue(func), llargs);
     return new ASTValue(rtype, value);
 }

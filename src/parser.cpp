@@ -254,7 +254,7 @@ TopLevelExpression *ParseContext::parseTopLevelExpression()
 {
     switch(peek().kind)
     {
-
+        //XXX
     }
 }
 
@@ -305,6 +305,11 @@ void ParseContext::parseInclude()
 ImportExpression *ParseContext::parseImport()
 {
     SourceLocation loc = peek().loc;
+
+    if(peek().isNot(tok::kw_import)){
+        emit_message(msg::FAILURE, "expected 'import' keyword", peek().loc);
+        return NULL;
+    }
 
     ignore(); // ignore import
 
@@ -399,7 +404,7 @@ Statement *ParseContext::parseStatement()
                     recover();
                     goto PARSEEXP; // this seems to be an expression?
                 }
-            } else if(id->isStruct() || id->isUnion()) //XXX Class
+            } else if(id->isStruct() || id->isUnion() || id->isClass()) //XXX Class
             {
                 //FALLTHROUGH TO DECL
             } else goto PARSEEXP; //IF NOT UNDECLARED OR STRUCT, THIS IS PROBABLY AN EXPRESSION
@@ -619,7 +624,6 @@ Declaration *ParseContext::parseDeclaration()
         std::vector<Expression*> paramValues;
         ignore(); // lparen
         bool vararg = false;
-        bool expectsDefault = false;
         while(!peek().is(tok::rparen))
         {
             if(peek().is(tok::dotdotdot))
@@ -644,15 +648,10 @@ Declaration *ParseContext::parseDeclaration()
             if(peek().is(tok::equal))
             {
                 ignore(); // eat '='
-                expectsDefault = true;
                 Expression *defaultValue = parseExpression();
                 paramValues.push_back(defaultValue);
             } else
             {
-                if(expectsDefault)
-                {
-                    emit_message(msg::ERROR, "default argument missing for function", peek().loc);
-                }
                 paramValues.push_back(NULL);
             }
 
@@ -1193,6 +1192,9 @@ Expression *ParseContext::parsePrimaryExpression()
     {
         return new TypeExpression(parseType(),loc);
     }
+
+    emit_message(msg::FAILURE, "primary expression expected", peek().loc);
+    return NULL;
 }
 
 Expression *ParseContext::parseBinaryExpression(int prec)

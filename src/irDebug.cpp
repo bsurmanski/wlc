@@ -210,6 +210,58 @@ llvm::DICompositeType IRDebug::createUnionType(ASTType *ty)
             );
 }
 
+llvm::DICompositeType IRDebug::createClassType(ASTType *ty)
+{
+    assert(ty->isClass() && "expected struct for debug info generation");
+    llvm::DIDescriptor DIContext(currentFile());
+    ClassTypeInfo *sti = (ClassTypeInfo*) ty->info;
+    vector<Value *> vec;
+
+    vec.push_back(di.createMemberType(DIContext, "vtable", currentFile(),
+                sti->members[0]->loc.line, 8 * 8, 8 * 8, 0, 0,
+                createType(ASTType::getVoidTy()->getPointerTy())));
+
+    vec.push_back(di.createMemberType(DIContext, "refs", currentFile(),
+                sti->members[0]->loc.line, 8 * 8, 8 * 8, 8 * 8, 0,
+                createType(ASTType::getLongTy())));
+
+    int offset = 16;
+    for(int i = 0; i < sti->members.size(); i++)
+    {
+        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(sti->members[i]);
+        assert(vdecl);
+        unsigned size = vdecl->getType()->getSize();
+        unsigned align = vdecl->getType()->getAlign();
+        if(offset % align)
+            offset += (align - (offset % align));
+        vec.push_back(di.createMemberType(
+                    DIContext,
+                    vdecl->getName(),
+                    currentFile(),
+                    sti->members[0]->loc.line,
+                    size * 8,
+                    align * 8,
+                    offset * 8,
+                    0,
+                    createType(vdecl->getType())));
+        offset += vdecl->getType()->getSize();
+        //TODO: members
+    }
+
+    DIArray arr = di.getOrCreateArray(vec);
+
+    return di.createStructType(DIContext, //TODO: defined scope
+            ty->getName(),
+            currentFile(), //TODO: defined file
+            sti->getDeclaration()->loc.line, //line num
+            ty->getSize() * 8,
+            ty->getAlign() * 8,
+            0, // flags
+            llvm::DIType(),
+            arr
+            );
+}
+
 llvm::DIType IRDebug::createType(ASTType *ty)
 {
     //if(!ty->diType)

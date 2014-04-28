@@ -16,7 +16,8 @@ struct DynamicArray
     long size
 }
 
-void SOMERUNTIMEFUNC()
+class Object
 {
-    
+    VTable^ vtable
+    long refcount
 }

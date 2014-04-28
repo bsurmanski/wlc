@@ -58,7 +58,10 @@ class ParseContext
     std::deque<Token> rqueue; // recovery queue
     std::deque<Token> tqueue; // token lookahead queue
 
-    void ignoreComments() { while(lexer->peek().kind == tok::comment) lexer->ignore(); }
+    void ignoreComments() {
+        while(lexer->peek().is(tok::comment))
+            lexer->ignore();
+    }
     //void push() { tqueue.push(getBuffer()); }
     Token get() {
         Token t;

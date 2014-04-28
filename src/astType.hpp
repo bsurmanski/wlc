@@ -119,6 +119,8 @@ struct DynamicArrayTypeInfo : ArrayTypeInfo
     DynamicArrayTypeInfo(ASTType *pto) : ArrayTypeInfo(pto) {}
 };
 
+// hetrogeneous type info
+// some type that contains internal types which are not guarenteed to be of the same type
 struct HetrogenTypeInfo : public CompositeTypeInfo
 {
     SymbolTable *scope;
@@ -127,12 +129,16 @@ struct HetrogenTypeInfo : public CompositeTypeInfo
     HetrogenTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
         identifier(id), scope(sc), members(m){}
     std::string getName() { return identifier->getName(); }
+    virtual size_t length() { return members.size(); }
     virtual ASTType *getContainedType(unsigned i);
     virtual size_t getMemberOffset(std::string member) = 0;
     virtual size_t getMemberIndex(std::string member) = 0;
-    Declaration *getMemberDeclaration(std::string member);
+    virtual Declaration *getMember(size_t index);
+    virtual Declaration *getMemberByName(std::string member);
     virtual size_t getAlign();
-    StructUnionDeclaration *getDeclaration() { return (StructUnionDeclaration*) identifier->getDeclaration(); }
+    StructUnionDeclaration *getDeclaration() {
+        return (StructUnionDeclaration*) identifier->getDeclaration();
+    }
 };
 
 struct StructTypeInfo : public HetrogenTypeInfo
@@ -140,7 +146,6 @@ struct StructTypeInfo : public HetrogenTypeInfo
     bool packed;
     StructTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
         HetrogenTypeInfo(id, sc, m), packed(false) {}
-    virtual size_t length() { return members.size(); }
     virtual size_t getSize();
     virtual size_t getMemberOffset(std::string member);
     virtual size_t getMemberIndex(std::string member);
@@ -151,7 +156,6 @@ struct UnionTypeInfo : public HetrogenTypeInfo
     UnionTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
         HetrogenTypeInfo(id, sc, m) {}
     std::string getName() { return identifier->getName(); }
-    virtual size_t length() { return members.size(); }
     virtual size_t getSize();
     virtual size_t getMemberOffset(std::string member) { return 0; }
     virtual size_t getMemberIndex(std::string member) { return 0; }
@@ -174,6 +178,7 @@ struct AliasTypeInfo : public TypeInfo
     virtual size_t getAlign();
 };
 
+// XXX this should totally be a 'hetrogenTypeInfo'
 struct TupleTypeInfo : public CompositeTypeInfo
 {
     std::vector<ASTType*> types;
@@ -186,14 +191,17 @@ struct TupleTypeInfo : public CompositeTypeInfo
 
 struct ClassTypeInfo : public HetrogenTypeInfo
 {
-    ClassTypeInfo *base;
+    ASTType *base;
 
-    ClassTypeInfo(Identifier *id, SymbolTable *sc, ClassTypeInfo *b, std::vector<Declaration*> m) :
+    ClassTypeInfo(Identifier *id, SymbolTable *sc, ASTType *b, std::vector<Declaration*> m) :
         HetrogenTypeInfo(id, sc, m), base(b) {}
-    virtual size_t length() { return members.size(); }
-    //virtual size_t getSize();
-    virtual size_t getMemberOffset(std::string member) { return 0; } // TODO
-    virtual size_t getMemberIndex(std::string member) { return 0; } // TODO
+    HetrogenTypeInfo *baseHetrogenTypeInfo();
+    virtual Declaration *getMember(size_t index);
+    virtual size_t length();
+    virtual size_t getSize();
+    void sortMembers();
+    virtual size_t getMemberOffset(std::string member);
+    virtual size_t getMemberIndex(std::string member);
 };
 
 
@@ -249,6 +257,8 @@ struct ASTType
             case TYPE_ARRAY:
             case TYPE_DYNAMIC_ARRAY:
             case TYPE_STRUCT:
+            case TYPE_UNION:
+            case TYPE_CLASS:
             default: return info->getSize();
         }
     }
@@ -260,6 +270,7 @@ struct ASTType
         {
             case TYPE_UNION:
             case TYPE_STRUCT:
+            case TYPE_CLASS:
                 return 0;
             case TYPE_TUPLE:
                 return 1;

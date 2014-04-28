@@ -33,7 +33,7 @@ ASTType *Identifier::getType()
 ASTType *Identifier::getDeclaredType()
 {
     //TODO: class
-    if(type != ID_STRUCT && type != ID_UNKNOWN && type != ID_UNION) {
+    if(type != ID_STRUCT && type != ID_UNKNOWN && type != ID_UNION && type != ID_CLASS) {
         //emit_message(msg::FAILURE, "this doesnt look like a type");
         return NULL;
     }

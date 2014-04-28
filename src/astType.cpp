@@ -1,5 +1,8 @@
 #include "ast.hpp"
 
+//
+// StructTypeInfo
+//
 size_t StructTypeInfo::getSize()
 {
     size_t sz = 0;
@@ -49,7 +52,14 @@ size_t StructTypeInfo::getMemberIndex(std::string member)
     }
 }
 
-Declaration *HetrogenTypeInfo::getMemberDeclaration(std::string member)
+//
+// HetrogenTypeInfo
+//
+Declaration *HetrogenTypeInfo::getMember(size_t i){
+    return members[i];
+}
+
+Declaration *HetrogenTypeInfo::getMemberByName(std::string member)
 {
     for(int i = 0; i < members.size(); i++)
         if(members[i]->identifier->getName() == member)
@@ -77,6 +87,9 @@ size_t HetrogenTypeInfo::getAlign()
     //TODO: handle packed
 }
 
+//
+// UnionTypeInfo
+//
 size_t UnionTypeInfo::getSize()
 {
     size_t sz = 0;
@@ -89,22 +102,184 @@ size_t UnionTypeInfo::getSize()
     }
 }
 
+//
+// ClassTypeInfo
+//
+
+// sort members in descending order for most efficient packing
+bool classSort(Declaration *decla, Declaration *declb){
+    return decla->getType()->getSize() > declb->getType()->getSize();
+}
+
+void ClassTypeInfo::sortMembers() {
+    std::stable_sort(members.begin(), members.end(), classSort);
+}
+
+HetrogenTypeInfo *ClassTypeInfo::baseHetrogenTypeInfo() {
+    if(base){
+        return dynamic_cast<HetrogenTypeInfo*>(base->info);
+    }
+}
+
+size_t ClassTypeInfo::getSize() {
+    sortMembers();
+
+    size_t sz = base ? base->getSize() : 0;
+    VariableDeclaration *vd;
+    unsigned align; //TODO: padding past base?
+    for(int i = 0; i < members.size(); i++)
+    {
+        vd = members[i]->variableDeclaration();
+        if(!vd) continue;
+
+        align = vd->getType()->getAlign();
+        if(sz % align)
+            sz += (align - (sz % align));
+        sz += vd->type->getSize();
+    }
+    return sz;
+}
+
+size_t ClassTypeInfo::length(){
+    size_t count = members.size();
+    if(HetrogenTypeInfo *hti = baseHetrogenTypeInfo())
+    {
+        count += hti->length();
+    }
+    return count;
+}
+
+Declaration *ClassTypeInfo::getMember(size_t index) {
+    size_t baselen = 0;
+    if(HetrogenTypeInfo *hti = baseHetrogenTypeInfo()){
+        baselen = hti->length();
+        if(index < baselen) return hti->getMember(index);
+    }
+    index -= baselen;
+    if(index > members.size()) return NULL;
+    return members[index];
+}
+
+size_t ClassTypeInfo::getMemberOffset(std::string member){
+    if(member == "vtable") return 0;
+    if(member == "refs") return 8;
+
+    sortMembers();
+
+    size_t offset = 16;
+    unsigned align = 0;
+
+    VariableDeclaration *vd;
+    for(int i = 0; i < members.size(); i++)
+    {
+        if(members[i]->identifier->getName() == member)
+        {
+            return offset;
+        }
+        vd = members[i]->variableDeclaration();
+        if(!vd) continue;
+        align = vd->getType()->getAlign();
+        if(offset % align)
+            offset += (align - (offset % align));
+        offset += vd->getType()->getSize();
+    }
+}
+
+size_t ClassTypeInfo::getMemberIndex(std::string member){
+    if(member == "vtable") return 0;
+    if(member == "refs") return 1;
+
+    sortMembers();
+
+    for(int i = 0; i < members.size(); i++)
+    {
+        if(members[i]->identifier->getName() == member)
+        {
+            return i + 2;
+        }
+    }
+}
+
+//
+// PointerTypeInfo
+//
 std::string PointerTypeInfo::getName(){
     return ptrTo->getName() + "^";
 }
 
+//
+// ArrayTypeInfo
+//
 std::string ArrayTypeInfo::getName(){
     return "array[" + arrayOf->getName() + "]";
 }
 
+//
+// StaticArrayTypeInfo
+//
 size_t StaticArrayTypeInfo::getAlign(){
     return arrayOf->getAlign();
 }
 
+size_t StaticArrayTypeInfo::getSize() {
+    return size * arrayOf->getSize();
+}
+
+//
+// DynamicArrayTypeInfo
+//
 size_t DynamicArrayTypeInfo::getAlign(){
     return ASTType::getCharTy()->getPointerTy()->getAlign();
 }
 
+size_t DynamicArrayTypeInfo::getSize() {
+    return ASTType::getCharTy()->getPointerTy()->getSize() + ASTType::getULongTy()->getSize();
+}
+
+//
+// AliasTypeInfo
+//
+size_t AliasTypeInfo::getSize()
+{
+    return alias->getSize();
+}
+
+size_t AliasTypeInfo::getAlign()
+{
+    return alias->getAlign();
+}
+
+//
+// TupleTypeInfo
+//
+size_t TupleTypeInfo::getSize()
+{
+    size_t sz = 0;
+    unsigned align;
+    for(int i = 0; i < types.size(); i++)
+    {
+        align = types[i]->getAlign();
+        if(sz % align)
+            sz += (align - (sz % align));
+        sz += types[i]->getSize();
+    }
+    return sz;
+}
+
+size_t TupleTypeInfo::getAlign()
+{
+    size_t max = 0;
+    for(int i = 0; i < types.size(); i++)
+    {
+        if(types[i]->getAlign() > max)
+            max = types[i]->getAlign();
+    }
+    return max;
+}
+
+//
+// ASTType
+//
 ASTType *ASTType::getPointerTy()
 {
     if(!pointerTy)
@@ -137,49 +312,6 @@ ASTType *ASTType::getArrayTy(int sz)
         arrayTy[sz] = aty;
     } else aty = arrayTy[sz];
     return aty;
-}
-
-size_t DynamicArrayTypeInfo::getSize() {
-    return ASTType::getCharTy()->getPointerTy()->getSize() + ASTType::getULongTy()->getSize();
-}
-
-size_t StaticArrayTypeInfo::getSize() {
-    return size * arrayOf->getSize();
-}
-
-size_t AliasTypeInfo::getSize()
-{
-    return alias->getSize();
-}
-
-size_t AliasTypeInfo::getAlign()
-{
-    return alias->getAlign();
-}
-
-size_t TupleTypeInfo::getSize()
-{
-    size_t sz = 0;
-    unsigned align;
-    for(int i = 0; i < types.size(); i++)
-    {
-        align = types[i]->getAlign();
-        if(sz % align)
-            sz += (align - (sz % align));
-        sz += types[i]->getSize();
-    }
-    return sz;
-}
-
-size_t TupleTypeInfo::getAlign()
-{
-    size_t max = 0;
-    for(int i = 0; i < types.size(); i++)
-    {
-        if(types[i]->getAlign() > max)
-            max = types[i]->getAlign();
-    }
-    return max;
 }
 
 // declare all of the static ASTType instances, and their getter methods
@@ -223,3 +355,4 @@ ASTType *ASTType::getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool
     //TODO: type cache?
     return new ASTType(TYPE_FUNCTION, new FunctionTypeInfo(ret, param, vararg));
 }
+

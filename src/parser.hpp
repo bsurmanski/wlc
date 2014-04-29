@@ -53,6 +53,8 @@ class ParseContext
         package(p) {}
     ~ParseContext() { }
 
+    AST *getAST() { return parser->getAST(); }
+
     protected:
     std::deque<int> recoveryState; // tokens left over in rqueue after current recover
     std::deque<Token> rqueue; // recovery queue

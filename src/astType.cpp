@@ -41,7 +41,24 @@ size_t StructTypeInfo::getMemberOffset(std::string member)
     }
 }
 
-size_t StructTypeInfo::getMemberIndex(std::string member)
+size_t StructTypeInfo::getMemberOffset(size_t index)
+{
+    size_t offset = 0;
+    unsigned align = 0;
+    VariableDeclaration *vd;
+    for(int i = 0; i < index; i++)
+    {
+        vd = members[i]->variableDeclaration();
+        if(!vd) continue;
+        align = vd->getType()->getAlign();
+        if(!packed && offset % align)
+            offset += (align - (offset % align));
+        offset += vd->getType()->getSize();
+    }
+    return offset;
+}
+
+long StructTypeInfo::getMemberIndex(std::string member)
 {
     for(int i = 0; i < members.size(); i++)
     {
@@ -117,14 +134,14 @@ void ClassTypeInfo::sortMembers() {
 
 HetrogenTypeInfo *ClassTypeInfo::baseHetrogenTypeInfo() {
     if(base){
-        return dynamic_cast<HetrogenTypeInfo*>(base->info);
+        return dynamic_cast<HetrogenTypeInfo*>(base->getDeclaredType()->info);
     }
 }
 
 size_t ClassTypeInfo::getSize() {
     sortMembers();
 
-    size_t sz = base ? base->getSize() : 0;
+    size_t sz = base ? base->getDeclaredType()->getSize() : 0;
     VariableDeclaration *vd;
     unsigned align; //TODO: padding past base?
     for(int i = 0; i < members.size(); i++)
@@ -160,6 +177,23 @@ Declaration *ClassTypeInfo::getMember(size_t index) {
     return members[index];
 }
 
+size_t ClassTypeInfo::getMemberOffset(size_t index)
+{
+    size_t offset = 0;
+    unsigned align = 0;
+    VariableDeclaration *vd;
+    for(int i = 0; i < index; i++)
+    {
+        vd = members[i]->variableDeclaration();
+        if(!vd) continue;
+        align = vd->getType()->getAlign();
+        if(offset % align)
+            offset += (align - (offset % align));
+        offset += vd->getType()->getSize();
+    }
+    return offset;
+}
+
 size_t ClassTypeInfo::getMemberOffset(std::string member){
     if(member == "vtable") return 0;
     if(member == "refs") return 8;
@@ -185,19 +219,41 @@ size_t ClassTypeInfo::getMemberOffset(std::string member){
     }
 }
 
-size_t ClassTypeInfo::getMemberIndex(std::string member){
-    if(member == "vtable") return 0;
-    if(member == "refs") return 1;
+long ClassTypeInfo::getMemberIndex(std::string member) {
+    //if(member == "vtable") return 0;
+    //if(member == "refs") return 1;
 
     sortMembers();
+
+    long index;
+    if(base && (index = baseHetrogenTypeInfo()->getMemberIndex(member)) >= 0 ){
+        return index;
+    }
 
     for(int i = 0; i < members.size(); i++)
     {
         if(members[i]->identifier->getName() == member)
         {
-            return i + 2;
+            return i + (base ? baseHetrogenTypeInfo()->length() : 0);
         }
     }
+
+    return -1;
+}
+
+Declaration *ClassTypeInfo::getMemberByName(std::string member){
+    Declaration *decl = NULL;
+    if(base && (decl = baseHetrogenTypeInfo()->getMemberByName(member))){
+        return decl;
+    }
+    for(int i = 0; i < members.size(); i++)
+    {
+        if(members[i]->identifier->getName() == member) {
+            return members[i];
+        }
+    }
+
+    return NULL;
 }
 
 //

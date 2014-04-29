@@ -131,8 +131,9 @@ struct HetrogenTypeInfo : public CompositeTypeInfo
     std::string getName() { return identifier->getName(); }
     virtual size_t length() { return members.size(); }
     virtual ASTType *getContainedType(unsigned i);
+    virtual size_t getMemberOffset(size_t i) = 0;
     virtual size_t getMemberOffset(std::string member) = 0;
-    virtual size_t getMemberIndex(std::string member) = 0;
+    virtual long getMemberIndex(std::string member) = 0;
     virtual Declaration *getMember(size_t index);
     virtual Declaration *getMemberByName(std::string member);
     virtual size_t getAlign();
@@ -147,8 +148,9 @@ struct StructTypeInfo : public HetrogenTypeInfo
     StructTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
         HetrogenTypeInfo(id, sc, m), packed(false) {}
     virtual size_t getSize();
+    virtual size_t getMemberOffset(size_t i);
     virtual size_t getMemberOffset(std::string member);
-    virtual size_t getMemberIndex(std::string member);
+    virtual long getMemberIndex(std::string member);
 };
 
 struct UnionTypeInfo : public HetrogenTypeInfo
@@ -157,8 +159,26 @@ struct UnionTypeInfo : public HetrogenTypeInfo
         HetrogenTypeInfo(id, sc, m) {}
     std::string getName() { return identifier->getName(); }
     virtual size_t getSize();
+    virtual size_t getMemberOffset(size_t i) { return 0; }
     virtual size_t getMemberOffset(std::string member) { return 0; }
-    virtual size_t getMemberIndex(std::string member) { return 0; }
+    virtual long getMemberIndex(std::string member) { return 0; }
+};
+
+struct ClassTypeInfo : public HetrogenTypeInfo
+{
+    Identifier *base; //XXX what about basic types?
+
+    ClassTypeInfo(Identifier *id, SymbolTable *sc, Identifier *b, std::vector<Declaration*> m) :
+        HetrogenTypeInfo(id, sc, m), base(b) {}
+    HetrogenTypeInfo *baseHetrogenTypeInfo();
+    virtual Declaration *getMember(size_t index);
+    virtual size_t length();
+    virtual size_t getSize();
+    void sortMembers();
+    virtual size_t getMemberOffset(size_t i);
+    virtual size_t getMemberOffset(std::string member);
+    virtual long getMemberIndex(std::string member);
+    virtual Declaration *getMemberByName(std::string member);
 };
 
 struct NamedUnknownInfo : public TypeInfo
@@ -188,22 +208,6 @@ struct TupleTypeInfo : public CompositeTypeInfo
     virtual size_t getAlign();
     TupleTypeInfo(std::vector<ASTType*> t) : types(t) {}
 };
-
-struct ClassTypeInfo : public HetrogenTypeInfo
-{
-    ASTType *base;
-
-    ClassTypeInfo(Identifier *id, SymbolTable *sc, ASTType *b, std::vector<Declaration*> m) :
-        HetrogenTypeInfo(id, sc, m), base(b) {}
-    HetrogenTypeInfo *baseHetrogenTypeInfo();
-    virtual Declaration *getMember(size_t index);
-    virtual size_t length();
-    virtual size_t getSize();
-    void sortMembers();
-    virtual size_t getMemberOffset(std::string member);
-    virtual size_t getMemberIndex(std::string member);
-};
-
 
 #include <llvm/DebugInfo.h> //XXX
 struct ASTType

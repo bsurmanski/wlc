@@ -531,13 +531,22 @@ Declaration *ParseContext::parseDeclaration()
 
         if(peek().is(tok::colon))
         {
+            ignore(); // eat ':'
             if(kind != kw_class)
             {
                 emit_message(msg::ERROR, "only classes can inherit from a base", peek().loc);
             }
 
             baseId = getScope()->get(get().toString());
-            emit_message(msg::UNIMPLEMENTED, "inheritance not implemented", peek().loc);
+            //emit_message(msg::UNIMPLEMENTED, "inheritance not implemented", peek().loc);
+        } else if(kind == kw_class && id->getName() != "Object") { //TODO: inherits void
+            static Identifier *objectId = NULL;
+            if(!objectId) objectId = getAST()->getRuntimeUnit()->lookup("Object");
+            if(!objectId) {
+                emit_message(msg::FAILURE, "runtime package not found");
+            }
+
+            baseId = objectId;
         }
 
         if(peek().isNot(tok::lbrace) && peek().isNot(tok::semicolon)){
@@ -582,7 +591,7 @@ Declaration *ParseContext::parseDeclaration()
                 id->setDeclaration(sdecl, Identifier::ID_STRUCT);
                 break;
             case kw_class:
-                sui = new ClassTypeInfo(id, tbl, NULL, members); //TODO: use info
+                sui = new ClassTypeInfo(id, tbl, baseId, members); //TODO: use info
                 sdecl->setDeclaredType(new ASTType(TYPE_CLASS, sui));
                 id->getDeclaredType()->setTypeInfo(sui, TYPE_CLASS);
                 id->setDeclaration(sdecl, Identifier::ID_CLASS);

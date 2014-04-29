@@ -129,6 +129,45 @@ llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
             );
 }
 
+llvm::DICompositeType IRDebug::createHetrogenType(ASTType *ty) //TODO: proper calculation
+{
+    llvm::DIDescriptor DIContext(currentFile());
+    HetrogenTypeInfo *hti = (HetrogenTypeInfo*) ty->info;
+    vector<Value *> vec;
+    int offset = 0;
+    for(int i = 0; i < hti->members.size(); i++)
+    {
+        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(hti->members[i]);
+        assert(vdecl);
+        ASTType *vtype = hti->getContainedType(i);
+        unsigned size = vtype->getSize();
+        unsigned align = vtype->getAlign();
+        vec.push_back(di.createMemberType(
+                    DIContext,
+                    vdecl->getName(),
+                    currentFile(),
+                    hti->members[0]->loc.line,
+                    size * 8,
+                    align * 8,
+                    hti->getMemberOffset(i) * 8,
+                    0,
+                    createType(vdecl->getType())));
+    }
+
+    DIArray arr = di.getOrCreateArray(vec);
+
+    return di.createStructType(DIContext, //TODO: defined scope
+            ty->getName(),
+            currentFile(), //TODO: defined file
+            hti->getDeclaration()->loc.line, //line num
+            ty->getSize() * 8,
+            ty->getAlign() * 8,
+            0, // flags
+            llvm::DIType(),
+            arr
+            );
+}
+
 llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
 {
     assert(ty->isStruct() && "expected struct for debug info generation");

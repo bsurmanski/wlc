@@ -1,5 +1,8 @@
 #include "ast.hpp"
 
+Validity ASTType::validate() {
+}
+
 //
 // StructTypeInfo
 //
@@ -371,7 +374,25 @@ ASTType *ASTType::getArrayTy(int sz)
 }
 
 // declare all of the static ASTType instances, and their getter methods
-#define DECLTY(TY,NM) ASTType *ASTType::NM = 0; ASTType *ASTType::get##NM() { if(!NM) NM = new ASTType(TY); return NM; }
+#if 0
+#define DECLTY(TY,NM) ASTType *ASTType::NM = 0; ASTType *ASTType::get##NM() { \
+    if(!NM) NM = new ASTType(TY); return NM; \
+}
+#endif
+
+std::vector<ASTType *> ASTType::typeCache;
+
+#define DECLTY(TY, NM) ASTType *ASTType::get##NM() { \
+    static int id = -1; \
+    ASTType *ty; \
+    if(id < 0) { \
+        ty = new ASTType(TY); \
+        id = typeCache.size(); \
+        typeCache.push_back(ty); \
+    } \
+    return ASTType::typeCache[id]; \
+}
+
     DECLTY(TYPE_VOID, VoidTy)
     DECLTY(TYPE_BOOL, BoolTy)
 
@@ -387,16 +408,10 @@ ASTType *ASTType::getArrayTy(int sz)
 
     DECLTY(TYPE_FLOAT, FloatTy)
     DECLTY(TYPE_DOUBLE, DoubleTy)
+    DECLTY(TYPE_DYNAMIC, DynamicTy)
 #undef DECLTY
 
 ASTType *ASTType::DynamicTy = 0;
-
-ASTType *ASTType::getDynamicTy()
-{
-    if(!DynamicTy) DynamicTy = new ASTType(TYPE_DYNAMIC);
-    return DynamicTy;
-}
-
 
 ASTType *ASTType::getTupleTy(std::vector<ASTType *> t)
 {
@@ -412,3 +427,7 @@ ASTType *ASTType::getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool
     return new ASTType(TYPE_FUNCTION, new FunctionTypeInfo(ret, param, vararg));
 }
 
+void ASTType::accept(ASTVisitor *v) {
+    v->visitType(this);
+    //TODO subtypes, etc
+}

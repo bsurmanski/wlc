@@ -20,6 +20,8 @@ struct ASTValue
     bool isLValue() { return lValue; }
 };
 
+// TODO: use polymorphic values
+
 struct TupleValue : public ASTValue
 {
     TupleExpression *tuple;

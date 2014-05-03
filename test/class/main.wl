@@ -7,6 +7,10 @@ class MyClass
 class MySpecialClass : MyClass
 {
     char svar
+
+    int myFunction(int c, int b) {
+        return c + b + svar
+    }
 }
 
 int main(int argc, char^^ argv)

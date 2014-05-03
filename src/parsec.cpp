@@ -96,7 +96,7 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
 
         StructTypeInfo *sti = new StructTypeInfo(id, tbl, members);
         StructUnionDeclaration *sdecl =
-            new StructUnionDeclaration(id, NULL, members, SourceLocation());
+            new StructUnionDeclaration(id, NULL, SourceLocation());
         id->getDeclaredType()->setTypeInfo(sti,
                 typeDecl.kind == CXCursor_StructDecl ? TYPE_STRUCT : TYPE_UNION);
         id->setDeclaration(sdecl,

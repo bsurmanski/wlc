@@ -2009,7 +2009,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 
     pushScope(new IRScope(unit->unit->getScope(), debug->getCompileUnit()));
 
-    for(int i = 0; i < unit->unit->imports.size(); i++) //TODO: import symbols.
+    for(int i = 0; i < unit->unit->importUnits.size(); i++) //TODO: import symbols.
     {
         codegenIncludeUnit(this->unit, unit->unit->importUnits[i]);
     }

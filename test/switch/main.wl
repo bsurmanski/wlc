@@ -6,7 +6,8 @@ int main(int argc, char^^ argv)
     {
         printf("default here!\n")
         case 1
-            printf("1 argument passed!\n")
+            int i = argc
+            printf("1 argument passed! %d\n", i)
         case 2,3,4
             printf("2 argument passed!\n")
     }

@@ -1,6 +1,10 @@
 #ifndef _ASTTYPE_HPP
 #define _ASTTYPE_HPP
 
+#include "validate.hpp"
+
+struct ASTVisitor;
+
 struct ASTTypeQual
 {
     bool isConst;
@@ -40,17 +44,22 @@ enum ASTTypeEnum
 
 struct TypeInfo
 {
-    virtual ~TypeInfo() {}
+    Validity validity;
+    TypeInfo() : validity(UNCHECKED) {}
+    virtual ~TypeInfo(){}
     virtual ASTType *getReferenceTy() { return NULL; }
     virtual std::string getName() { return ""; }
     virtual size_t getSize() { assert(false && "size of type is unknown"); }
     virtual size_t getAlign() { assert(false && "alignment of type is unknown"); }
     virtual size_t length() { return 1; }
+
+    virtual Validity validate() = 0;
 };
 
 
 struct DynamicTypeInfo : public TypeInfo
 {
+    virtual Validity validate();
 };
 
 struct VariableDeclaration;
@@ -77,6 +86,8 @@ struct FunctionTypeInfo : CompositeTypeInfo
         if(index == 0) return ret;
         return params[index-1];
     }
+
+    virtual Validity validate();
 };
 
 struct PointerTypeInfo : public TypeInfo
@@ -85,6 +96,7 @@ struct PointerTypeInfo : public TypeInfo
     virtual ASTType *getReferenceTy() { return ptrTo; }
     PointerTypeInfo(ASTType *pto) : ptrTo(pto) {}
     std::string getName();
+    virtual Validity validate();
 };
 
 struct ArrayTypeInfo : public CompositeTypeInfo
@@ -108,6 +120,7 @@ struct StaticArrayTypeInfo : ArrayTypeInfo
     virtual bool isDynamic() { return false; }
     virtual size_t length() { return size; }
     StaticArrayTypeInfo(ASTType *pto, int sz) : ArrayTypeInfo(pto), size(sz) {}
+    virtual Validity validate();
 };
 
 struct DynamicArrayTypeInfo : ArrayTypeInfo
@@ -117,6 +130,7 @@ struct DynamicArrayTypeInfo : ArrayTypeInfo
     virtual bool isDynamic() { return true; }
     virtual size_t length() { return 0; }
     DynamicArrayTypeInfo(ASTType *pto) : ArrayTypeInfo(pto) {}
+    virtual Validity validate();
 };
 
 // hetrogeneous type info
@@ -140,6 +154,8 @@ struct HetrogenTypeInfo : public CompositeTypeInfo
     StructUnionDeclaration *getDeclaration() {
         return (StructUnionDeclaration*) identifier->getDeclaration();
     }
+
+    virtual Validity validate();
 };
 
 struct StructTypeInfo : public HetrogenTypeInfo
@@ -151,6 +167,7 @@ struct StructTypeInfo : public HetrogenTypeInfo
     virtual size_t getMemberOffset(size_t i);
     virtual size_t getMemberOffset(std::string member);
     virtual long getMemberIndex(std::string member);
+    virtual Validity validate();
 };
 
 struct UnionTypeInfo : public HetrogenTypeInfo
@@ -162,6 +179,7 @@ struct UnionTypeInfo : public HetrogenTypeInfo
     virtual size_t getMemberOffset(size_t i) { return 0; }
     virtual size_t getMemberOffset(std::string member) { return 0; }
     virtual long getMemberIndex(std::string member) { return 0; }
+    virtual Validity validate();
 };
 
 struct ClassTypeInfo : public HetrogenTypeInfo
@@ -179,6 +197,7 @@ struct ClassTypeInfo : public HetrogenTypeInfo
     virtual size_t getMemberOffset(std::string member);
     virtual long getMemberIndex(std::string member);
     virtual Declaration *getMemberByName(std::string member);
+    virtual Validity validate();
 };
 
 struct NamedUnknownInfo : public TypeInfo
@@ -187,6 +206,7 @@ struct NamedUnknownInfo : public TypeInfo
     Identifier *identifier;
     NamedUnknownInfo(Identifier *id, SymbolTable *sc) : identifier(id), scope(sc) {}
     virtual std::string getName() { return identifier->getName(); }
+    virtual Validity validate();
 };
 
 struct AliasTypeInfo : public TypeInfo
@@ -196,6 +216,7 @@ struct AliasTypeInfo : public TypeInfo
     AliasTypeInfo(Identifier *id, ASTType *a) :identifier(id), alias(a) {}
     virtual size_t getSize();
     virtual size_t getAlign();
+    virtual Validity validate();
 };
 
 // XXX this should totally be a 'hetrogenTypeInfo'
@@ -207,11 +228,14 @@ struct TupleTypeInfo : public CompositeTypeInfo
     virtual size_t getSize();
     virtual size_t getAlign();
     TupleTypeInfo(std::vector<ASTType*> t) : types(t) {}
+    virtual Validity validate();
 };
 
 #include <llvm/DebugInfo.h> //XXX
 struct ASTType
 {
+    Validity validity; //FROM: AST.HPP
+
     ASTTypeEnum kind;
     ASTType *pointerTy;
     ASTType *dynamicArrayTy;
@@ -228,13 +252,17 @@ struct ASTType
     }
     TypeInfo *getTypeInfo() { return info; }
 
-    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), cgType(0), info(0)
+    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), cgType(0), info(0), validity(UNCHECKED)
     {}
 
-    ASTType(enum ASTTypeEnum ty, TypeInfo *i) : kind(ty), pointerTy(0), cgType(0), info(i)
+    ASTType(enum ASTTypeEnum ty, TypeInfo *i) :
+        kind(ty), pointerTy(0), cgType(0), info(i), validity(UNCHECKED)
     {}
 
-    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL), info(0) {}
+    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL), info(0), validity(UNCHECKED) {}
+
+    void accept(ASTVisitor *v);
+    Validity validate();
     //ASTType(ASTTypeQual q) : qual(q), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
     //virtual ~ASTType() { delete pointerTy; }
     //ASTType *getUnqual();
@@ -410,6 +438,7 @@ struct ASTType
     bool isPointer() { return this && kind == TYPE_POINTER; } //TODO: shouldnt need to test for this
     bool isComposite() { return dynamic_cast<CompositeTypeInfo*>(info); }
 
+    static std::vector<ASTType *> typeCache;
 #define DECLTY(NM) static ASTType *NM; static ASTType *get##NM();
     DECLTY(VoidTy)
     DECLTY(BoolTy)

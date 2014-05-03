@@ -574,7 +574,7 @@ Declaration *ParseContext::parseDeclaration()
 
         HetrogenTypeInfo *sui = 0;
         StructUnionDeclaration *sud = 0;
-        StructUnionDeclaration *sdecl = new StructUnionDeclaration(id, NULL, members, t_id.loc);
+        StructUnionDeclaration *sdecl = new StructUnionDeclaration(id, NULL, t_id.loc);
 
         switch(kind)
         {

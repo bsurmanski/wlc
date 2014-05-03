@@ -15,6 +15,9 @@
 #include "sourceLocation.hpp"
 #include "token.hpp"
 #include "astType.hpp"
+#include "validate.hpp"
+
+struct ASTVisitor;
 
 struct Statement;
 struct Declaration;
@@ -29,10 +32,57 @@ struct ImportExpression;
 struct PackageExpression;
 struct TypeDeclaration;
 
-//TODO: switch, dowhile
+//TODO: dowhile
 
-//TODO: use
-struct Package
+struct Package;
+struct TranslationUnit;
+
+struct AST
+{
+    Package *root;
+    std::map<std::string, TranslationUnit*> units;
+    std::vector<ASTType*> types;
+    TranslationUnit *runtime;
+
+    AST();
+    ~AST();
+    Package *getRootPackage() { return root; }
+    TranslationUnit *getUnit(std::string str)
+    {
+        char APATH[PATH_MAX + 1];
+        realpath(str.c_str(), APATH);
+        std::string astr = std::string(str);
+        if(units.count(astr)) return units[astr];
+        return NULL;
+    }
+    void addUnit(std::string str, TranslationUnit *u)
+    {
+        char APATH[PATH_MAX + 1];
+        realpath(str.c_str(), APATH);
+        std::string astr = std::string(str);
+        assert(!units.count(astr) && "reimport of translation unit!");
+        units[str] = u;
+    }
+
+    void setRuntimeUnit(TranslationUnit *u)
+    {
+        units["/usr/local/include/wl/runtime.wl"] = u;
+        runtime = u;
+    }
+
+    TranslationUnit *getRuntimeUnit() { return runtime; }
+
+    void accept(ASTVisitor *v);
+    bool validate();
+};
+
+struct ASTNode {
+    Validity validity;
+    ASTNode() : validity(UNCHECKED) {}
+    virtual Validity validate() = 0;
+};
+
+struct Package : public ASTNode
 {
     SymbolTable *scope;
     Package *parent;
@@ -80,9 +130,13 @@ struct Package
     Identifier *lookup(std::string str) { return getScope()->lookup(str); }
 
     virtual bool isTranslationUnit() { return false; }
+
+    virtual Validity validate();
+    virtual void accept(ASTVisitor *v);
 };
 
 // also Module
+//TODO: should TU and Package be seperate? or maybe merged?
 struct TranslationUnit : public Package
 {
     std::vector<ImportExpression*> imports; //TODO: aliased imports?
@@ -108,44 +162,10 @@ struct TranslationUnit : public Package
     ~TranslationUnit() { }
     virtual bool isTranslationUnit() { return true; }
     std::string getName() { return identifier->getName(); }
+    virtual Validity validate();
+    virtual void accept(ASTVisitor *v);
 };
 
-struct AST
-{
-    Package *root;
-    std::map<std::string, TranslationUnit*> units;
-    TranslationUnit *runtime;
-
-    AST() { root = new Package; }
-    ~AST() { delete root; }
-    Package *getRootPackage() { return root; }
-    TranslationUnit *getUnit(std::string str)
-    {
-        char APATH[PATH_MAX + 1];
-        realpath(str.c_str(), APATH);
-        std::string astr = std::string(str);
-        if(units.count(astr)) return units[astr];
-        return NULL;
-    }
-    void addUnit(std::string str, TranslationUnit *u)
-    {
-        char APATH[PATH_MAX + 1];
-        realpath(str.c_str(), APATH);
-        std::string astr = std::string(str);
-        assert(!units.count(astr) && "reimport of translation unit!");
-        units[str] = u;
-    }
-
-    void setRuntimeUnit(TranslationUnit *u)
-    {
-        units["/usr/local/include/wl/runtime.wl"] = u;
-        runtime = u;
-    }
-
-    TranslationUnit *getRuntimeUnit() { return runtime; }
-};
-
-struct FunctionDeclaration;
 
 /***
  *
@@ -153,12 +173,13 @@ struct FunctionDeclaration;
  *
  ***/
 
-struct Declaration
+struct Declaration : public ASTNode
 {
     Identifier *identifier;
     SourceLocation loc;
     bool external;
-    Declaration(Identifier *id, SourceLocation l, bool ext = false) : identifier(id), loc(l), external(ext) {}
+    Declaration(Identifier *id, SourceLocation l, bool ext = false) :
+        identifier(id), loc(l), external(ext) {}
     virtual ~Declaration(){}
     virtual std::string getName(bool mangle=false)
     {
@@ -170,6 +191,9 @@ struct Declaration
 
     virtual FunctionDeclaration *functionDeclaration() { return NULL; }
     virtual VariableDeclaration *variableDeclaration() { return NULL; }
+
+    virtual Validity validate() = 0;
+    void accept(ASTVisitor *v);
 };
 
 struct FunctionDeclaration : public Declaration
@@ -198,12 +222,14 @@ struct FunctionDeclaration : public Declaration
     ASTType *getReturnType() { return dynamic_cast<FunctionTypeInfo*>(prototype->info)->ret; }
 
     virtual ASTType *getType() { return prototype;  } //TODO: 'prototype' should be 'type'?
+    virtual Validity validate();
 };
 
 struct LabelDeclaration : public Declaration
 {
     LabelDeclaration(Identifier *id, SourceLocation loc) : Declaration(id, loc) {}
     virtual ASTType *getType() { return 0; }
+    virtual Validity validate();
 };
 
 struct VariableDeclaration : public Declaration
@@ -214,13 +240,16 @@ struct VariableDeclaration : public Declaration
     VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) : Declaration(nm, loc, ext), type(ty), value(val) {}
     virtual VariableDeclaration *variableDeclaration() { return this; }
     virtual ASTType *getType() { return type; }
+    virtual Validity validate();
 };
 
+// XXX seems pretty useless, bounce down to VariableDeclaraation ?
 struct ArrayDeclaration : public VariableDeclaration
 {
     ArrayDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) :
         VariableDeclaration(ty, nm, val, loc, ext) {}
     virtual ArrayDeclaration *arrayDeclaration() { return this; }
+    virtual Validity validate();
 };
 
 struct TypeDeclaration : public Declaration
@@ -232,25 +261,19 @@ struct TypeDeclaration : public Declaration
     virtual ASTType *setDeclaredType(ASTType *ty) = 0;
 };
 
-struct BasicTypeDeclaration : public TypeDeclaration
-{
-    ASTType *type;
-    BasicTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) :
-        TypeDeclaration(id, loc), type(ty)
-    {
-    }
-
-    virtual ASTType *getDeclaredType() { return type; }
-    virtual ASTType *setDeclaredType(ASTType *ty) { type = ty; }
-};
-
+//TODO: rename to 'Hetrogen'? Used in classes as well as struct, union
 struct StructUnionDeclaration : public TypeDeclaration
 {
-    std::vector<Declaration*> members;
-    StructUnionDeclaration(Identifier *id, ASTType *ty, std::vector<Declaration*> m, SourceLocation loc) : TypeDeclaration(id, loc), members(m) {}
+    ASTType *type;
+    StructUnionDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) :
+        TypeDeclaration(id, loc), type(ty) {}
 
-    virtual ASTType *getDeclaredType() { return identifier->getDeclaredType(); }
-    virtual ASTType *setDeclaredType(ASTType *ty) { identifier->setDeclaredType(ty); }
+    virtual ASTType *getDeclaredType() { return type; }
+    virtual ASTType *setDeclaredType(ASTType *ty) {
+        identifier->setDeclaredType(ty);
+        type = ty;
+    }
+    virtual Validity validate();
 };
 
 /***
@@ -286,30 +309,9 @@ struct TypeExpression;
 struct UseExpression;
 struct TupleExpression;
 
-struct Expression
+struct Expression : public ASTNode
 {
-    /*
-    enum ExpressionType
-    {
-        EXP_UNARY,
-        EXP_BINARY,
-        EXP_PRIMARY,
-        EXP_CALL,
-        EXP_POSTFIX,
-        EXP_INDEX,
-        EXP_MEMBER,
-        EXP_IDENTIFIER,
-        EXP_NUMERIC,
-        EXP_DECLARATION,
-        EXP_BLOCK,
-        EXP_IF,
-        EXP_WHILE,
-        EXP_FOR,
-        EXP_PASS,
-        EXP_SWITCH,
-        EXP_IMPORT,
-    };
-    */
+
     void setLocation(SourceLocation l) { loc = l; }
     SourceLocation loc;
 
@@ -327,7 +329,6 @@ struct Expression
     virtual IdentifierExpression *identifierExpression() { return NULL; }
     virtual NumericExpression *numericExpression() { return NULL; }
     virtual StringExpression *stringExpression() { return NULL; }
-    virtual DeclarationExpression *declarationExpression() { return NULL; }
     virtual CompoundExpression *compoundExpression() { return NULL; }
     virtual BlockExpression *blockExpression() { return NULL; }
     virtual ElseExpression *elseExpression() { return NULL; }
@@ -346,6 +347,9 @@ struct Expression
     virtual TupleExpression *tupleExpression() { return NULL; }
 
     //TODO: overrides
+
+    virtual Validity validate(){}; //TODO: PURE VIRTUAL
+    void accept(ASTVisitor *v);
 };
 
 struct TypeExpression : public Expression
@@ -518,14 +522,6 @@ struct NumericExpression : public PrimaryExpression
     virtual NumericExpression *numericExpression() { return this; }
 };
 
-struct DeclarationExpression : public Expression
-{
-    Declaration *decl;
-    virtual ASTType *getType() { return decl->getType(); }
-    DeclarationExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
-    virtual DeclarationExpression *declarationExpression() { return this; }
-};
-
 struct Statement;
 
 
@@ -651,26 +647,28 @@ struct IncludeExpression : public TopLevelExpression
  *
  ***/
 
-struct Statement
+struct Statement : public ASTNode
 {
     Statement(SourceLocation l) : loc(l) {}
     virtual ~Statement(){}
     SourceLocation loc;
     SourceLocation getLocation() { return loc; }
+    virtual Validity validate(){} //TODO PURE VIRTUAL;
+    void accept(ASTVisitor *v);
 };
 
-struct BreakStatement : Statement
+struct BreakStatement : public Statement
 {
     BreakStatement(SourceLocation l) : Statement(l) {}
 };
 
-struct ContinueStatement : Statement
+struct ContinueStatement : public Statement
 {
     ContinueStatement(SourceLocation l) : Statement(l) {}
 };
 
 
-struct LabelStatement : Statement
+struct LabelStatement : public Statement
 {
     Identifier *identifier;
     LabelStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
@@ -718,6 +716,16 @@ struct OnceStatement : public Statement
 {
     Statement *stmt;
     OnceStatement(SourceLocation l) : Statement(l) {}
+};
+
+struct ASTVisitor {
+    virtual void visitPackage(Package *pak) {}
+    virtual void visitTranslationUnit(TranslationUnit *tu) {}
+
+    virtual void visitDeclaration(Declaration *decl){}
+    virtual void visitExpression(Expression *exp){}
+    virtual void visitStatement(Statement *stmt){}
+    virtual void visitType(ASTType *ty){}
 };
 
 #endif

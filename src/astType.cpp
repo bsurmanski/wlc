@@ -1,8 +1,5 @@
 #include "ast.hpp"
 
-Validity ASTType::validate() {
-}
-
 //
 // StructTypeInfo
 //
@@ -296,19 +293,6 @@ size_t DynamicArrayTypeInfo::getSize() {
 }
 
 //
-// AliasTypeInfo
-//
-size_t AliasTypeInfo::getSize()
-{
-    return alias->getSize();
-}
-
-size_t AliasTypeInfo::getAlign()
-{
-    return alias->getAlign();
-}
-
-//
 // TupleTypeInfo
 //
 size_t TupleTypeInfo::getSize()
@@ -428,6 +412,6 @@ ASTType *ASTType::getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool
 }
 
 void ASTType::accept(ASTVisitor *v) {
-    v->visitType(this);
+    //v->visitType(this);
     //TODO subtypes, etc
 }

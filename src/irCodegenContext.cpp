@@ -237,91 +237,90 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 {
     llvm::Type *llvmty = NULL;
     if(ty->cgType) return (Type*) ty->cgType;
-    //if(!ty->cgType)
-    {
-        if(ty->kind == TYPE_UNKNOWN || ty->kind == TYPE_UNKNOWN_USER)
-        {
-            Identifier* id = lookup(ty->getName());
-            Declaration* decl = id->getDeclaration();
-            if(TypeDeclaration* tdecl = dynamic_cast<TypeDeclaration*>(decl))
-            {
-                ty = tdecl->getDeclaredType();
-                if(!tdecl->getDeclaredType())
-                {
-                    emit_message(msg::FATAL, "error, invalid type");
-                }
-            } else {
-                emit_message(msg::FATAL, "error, invalid type");
-                return NULL;
-            }
-            //TODO
-            if(id->isUndeclared()) {
-                emit_message(msg::ERROR, string("undeclared type'") +
-                        id->getName() + string("' in scope"));
-                return NULL;
-            }
-        }
 
-        ASTType *tmp;
-        switch(ty->kind)
+    // XXX: type resolution is below; should be in some other pass, not codegen
+    if(ty->kind == TYPE_UNKNOWN || ty->kind == TYPE_UNKNOWN_USER)
+    {
+        Identifier* id = lookup(ty->getName());
+        Declaration* decl = id->getDeclaration();
+        if(TypeDeclaration* tdecl = dynamic_cast<TypeDeclaration*>(decl))
         {
-            case TYPE_BOOL:
-                llvmty = Type::getInt1Ty(context);
-                break;
-            case TYPE_CHAR:
-            case TYPE_UCHAR:
-                llvmty = Type::getInt8Ty(context);
-                break;
-            case TYPE_SHORT:
-            case TYPE_USHORT:
-                llvmty = Type::getInt16Ty(context);
-                break;
-            case TYPE_INT:
-            case TYPE_UINT:
-                llvmty = Type::getInt32Ty(context);
-                break;
-            case TYPE_LONG:
-            case TYPE_ULONG:
-                llvmty = Type::getInt64Ty(context);
-                break;
-            case TYPE_FLOAT:
-                llvmty = Type::getFloatTy(context);
-                break;
-            case TYPE_DOUBLE:
-                llvmty = Type::getDoubleTy(context);
-                break;
-            case TYPE_VOID:
-                llvmty = Type::getVoidTy(context);
-                break;
-            case TYPE_POINTER:
-                tmp = ty->getReferencedTy();
-                if(tmp->kind == TYPE_VOID) tmp = ASTType::getCharTy();
-                llvmty = codegenType(tmp)->getPointerTo();
-                break;
-            case TYPE_STRUCT:
-                llvmty = codegenStructType(ty);
-                break;
-            case TYPE_UNION:
-                llvmty = codegenUnionType(ty);
-                break;
-            case TYPE_CLASS:
-                llvmty = codegenClassType(ty);
-                break;
-            case TYPE_TUPLE:
-                llvmty = codegenTupleType(ty);
-                break;
-            case TYPE_ARRAY:
-                llvmty = codegenArrayType(ty);
-                break;
-            case TYPE_DYNAMIC_ARRAY:
-                llvmty = codegenArrayType(ty);
-                break;
-            case TYPE_FUNCTION:
-                llvmty = codegenFunctionType(ty);
-                break;
-            default:
-                emit_message(msg::FAILURE, "type not handled", currentLoc);
+            ty = tdecl->getDeclaredType();
+            if(!tdecl->getDeclaredType())
+            {
+                emit_message(msg::FATAL, "error, invalid type");
+            }
+        } else {
+            emit_message(msg::FATAL, "error, invalid type");
+            return NULL;
         }
+        //TODO
+        if(id->isUndeclared()) {
+            emit_message(msg::ERROR, string("undeclared type'") +
+                    id->getName() + string("' in scope"));
+            return NULL;
+        }
+    }
+
+    ASTType *tmp;
+    switch(ty->kind)
+    {
+        case TYPE_BOOL:
+            llvmty = Type::getInt1Ty(context);
+            break;
+        case TYPE_CHAR:
+        case TYPE_UCHAR:
+            llvmty = Type::getInt8Ty(context);
+            break;
+        case TYPE_SHORT:
+        case TYPE_USHORT:
+            llvmty = Type::getInt16Ty(context);
+            break;
+        case TYPE_INT:
+        case TYPE_UINT:
+            llvmty = Type::getInt32Ty(context);
+            break;
+        case TYPE_LONG:
+        case TYPE_ULONG:
+            llvmty = Type::getInt64Ty(context);
+            break;
+        case TYPE_FLOAT:
+            llvmty = Type::getFloatTy(context);
+            break;
+        case TYPE_DOUBLE:
+            llvmty = Type::getDoubleTy(context);
+            break;
+        case TYPE_VOID:
+            llvmty = Type::getVoidTy(context);
+            break;
+        case TYPE_POINTER:
+            tmp = ty->getReferencedTy();
+            if(tmp->kind == TYPE_VOID) tmp = ASTType::getCharTy();
+            llvmty = codegenType(tmp)->getPointerTo();
+            break;
+        case TYPE_STRUCT:
+            llvmty = codegenStructType(ty);
+            break;
+        case TYPE_UNION:
+            llvmty = codegenUnionType(ty);
+            break;
+        case TYPE_CLASS:
+            llvmty = codegenClassType(ty);
+            break;
+        case TYPE_TUPLE:
+            llvmty = codegenTupleType(ty);
+            break;
+        case TYPE_ARRAY:
+            llvmty = codegenArrayType(ty);
+            break;
+        case TYPE_DYNAMIC_ARRAY:
+            llvmty = codegenArrayType(ty);
+            break;
+        case TYPE_FUNCTION:
+            llvmty = codegenFunctionType(ty);
+            break;
+        default:
+            emit_message(msg::FAILURE, "type not handled", currentLoc);
     }
 
     ty->cgType = llvmty;

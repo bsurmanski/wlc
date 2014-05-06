@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <stack>
 #include <map>
 #include <stdlib.h>
 #include <limits.h>
@@ -15,7 +16,6 @@
 #include "sourceLocation.hpp"
 #include "token.hpp"
 #include "astType.hpp"
-#include "validate.hpp"
 
 struct ASTVisitor;
 
@@ -41,7 +41,6 @@ struct AST
 {
     Package *root;
     std::map<std::string, TranslationUnit*> units;
-    std::vector<ASTType*> types;
     TranslationUnit *runtime;
 
     AST();
@@ -77,9 +76,8 @@ struct AST
 };
 
 struct ASTNode {
-    Validity validity;
-    ASTNode() : validity(UNCHECKED) {}
-    virtual Validity validate() = 0;
+    ASTNode() {}
+    virtual void accept(ASTVisitor *v) = 0;
 };
 
 struct Package : public ASTNode
@@ -131,7 +129,6 @@ struct Package : public ASTNode
 
     virtual bool isTranslationUnit() { return false; }
 
-    virtual Validity validate();
     virtual void accept(ASTVisitor *v);
 };
 
@@ -162,7 +159,6 @@ struct TranslationUnit : public Package
     ~TranslationUnit() { }
     virtual bool isTranslationUnit() { return true; }
     std::string getName() { return identifier->getName(); }
-    virtual Validity validate();
     virtual void accept(ASTVisitor *v);
 };
 
@@ -192,8 +188,7 @@ struct Declaration : public ASTNode
     virtual FunctionDeclaration *functionDeclaration() { return NULL; }
     virtual VariableDeclaration *variableDeclaration() { return NULL; }
 
-    virtual Validity validate() = 0;
-    void accept(ASTVisitor *v);
+    virtual void accept(ASTVisitor *v);
 };
 
 struct FunctionDeclaration : public Declaration
@@ -222,14 +217,14 @@ struct FunctionDeclaration : public Declaration
     ASTType *getReturnType() { return dynamic_cast<FunctionTypeInfo*>(prototype->info)->ret; }
 
     virtual ASTType *getType() { return prototype;  } //TODO: 'prototype' should be 'type'?
-    virtual Validity validate();
+    virtual void accept(ASTVisitor *v);
 };
 
 struct LabelDeclaration : public Declaration
 {
     LabelDeclaration(Identifier *id, SourceLocation loc) : Declaration(id, loc) {}
     virtual ASTType *getType() { return 0; }
-    virtual Validity validate();
+    virtual void accept(ASTVisitor *v);
 };
 
 struct VariableDeclaration : public Declaration
@@ -240,7 +235,7 @@ struct VariableDeclaration : public Declaration
     VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) : Declaration(nm, loc, ext), type(ty), value(val) {}
     virtual VariableDeclaration *variableDeclaration() { return this; }
     virtual ASTType *getType() { return type; }
-    virtual Validity validate();
+    virtual void accept(ASTVisitor *v);
 };
 
 // XXX seems pretty useless, bounce down to VariableDeclaraation ?
@@ -249,7 +244,6 @@ struct ArrayDeclaration : public VariableDeclaration
     ArrayDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) :
         VariableDeclaration(ty, nm, val, loc, ext) {}
     virtual ArrayDeclaration *arrayDeclaration() { return this; }
-    virtual Validity validate();
 };
 
 struct TypeDeclaration : public Declaration
@@ -259,6 +253,7 @@ struct TypeDeclaration : public Declaration
     virtual ASTType *getType() { return NULL; } // XXX return a 'type' type?
     virtual ASTType *getDeclaredType() = 0;
     virtual ASTType *setDeclaredType(ASTType *ty) = 0;
+    virtual void accept(ASTVisitor *v);
 };
 
 //TODO: rename to 'Hetrogen'? Used in classes as well as struct, union
@@ -273,7 +268,7 @@ struct StructUnionDeclaration : public TypeDeclaration
         identifier->setDeclaredType(ty);
         type = ty;
     }
-    virtual Validity validate();
+    virtual void accept(ASTVisitor *v);
 };
 
 /***
@@ -308,6 +303,9 @@ struct CastExpression;
 struct TypeExpression;
 struct UseExpression;
 struct TupleExpression;
+struct DotExpression;
+struct NewExpression;
+struct DeleteExpression;
 
 struct Expression : public ASTNode
 {
@@ -345,11 +343,13 @@ struct Expression : public ASTNode
     virtual UseExpression *useExpression() { return NULL; }
     virtual TypeExpression *typeExpression() { return NULL; }
     virtual TupleExpression *tupleExpression() { return NULL; }
+    virtual DotExpression *dotExpression() { return NULL; }
+    virtual NewExpression *newExpression() { return NULL; }
+    virtual DeleteExpression *deleteExpression() { return NULL; }
 
     //TODO: overrides
 
-    virtual Validity validate(){}; //TODO: PURE VIRTUAL
-    void accept(ASTVisitor *v);
+    virtual void accept(ASTVisitor *v);
 };
 
 struct TypeExpression : public Expression
@@ -357,6 +357,7 @@ struct TypeExpression : public Expression
     ASTType *type;
     TypeExpression(ASTType *t, SourceLocation l = SourceLocation()) : Expression(l), type(t) {}
     virtual TypeExpression *typeExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 struct NewExpression : public Expression
@@ -364,6 +365,8 @@ struct NewExpression : public Expression
     ASTType *type;
     virtual ASTType *getType() { return type; }
     NewExpression(ASTType *t, SourceLocation l = SourceLocation()) : Expression(l), type(t) {}
+    virtual NewExpression *newExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 struct DeleteExpression : public Expression
@@ -371,6 +374,8 @@ struct DeleteExpression : public Expression
     IdentifierExpression *expression;
     DeleteExpression(IdentifierExpression *e, SourceLocation l = SourceLocation()) :
         Expression(l), expression(e){}
+    virtual DeleteExpression *deleteExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 struct TupleExpression : public Expression
@@ -385,6 +390,7 @@ struct TupleExpression : public Expression
     TupleExpression(std::vector<Expression*> e, SourceLocation l = SourceLocation()) :
         Expression(l), members(e) {}
     virtual TupleExpression *tupleExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 struct CastExpression : public Expression
@@ -395,12 +401,14 @@ struct CastExpression : public Expression
     virtual CastExpression *castExpression() { return this; }
     CastExpression(ASTType *ty, Expression *exp, SourceLocation l = SourceLocation()) :
         Expression(l), type(ty), expression(exp){}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct PostfixExpression : public Expression
 {
     PostfixExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
     virtual PostfixExpression *postfixExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 struct CallExpression : public PostfixExpression
@@ -411,6 +419,7 @@ struct CallExpression : public PostfixExpression
     std::vector<Expression *> args;
     CallExpression(Expression *f, std::vector<Expression*> a, SourceLocation l = SourceLocation()) :
         PostfixExpression(l), function(f), args(a) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct IndexExpression : public PostfixExpression
@@ -421,6 +430,7 @@ struct IndexExpression : public PostfixExpression
     Expression *index;
     IndexExpression(Expression *l, Expression *i, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), index(i) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct PostfixOpExpression : public PostfixExpression
@@ -429,6 +439,7 @@ struct PostfixOpExpression : public PostfixExpression
     Expression *lhs;
     PostfixOpExpression(Expression *l, int o, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), op(o) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct DotExpression : public PostfixExpression
@@ -438,6 +449,8 @@ struct DotExpression : public PostfixExpression
     virtual bool isLValue() { return lhs->isLValue(); }
     DotExpression(Expression *l, std::string r, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), rhs(r) {}
+    virtual DotExpression *dotExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 struct UnaryExpression : public Expression
@@ -450,6 +463,7 @@ struct UnaryExpression : public Expression
     virtual bool isConstant() { return lhs->isConstant(); }
     UnaryExpression(unsigned o, Expression *l, SourceLocation lo = SourceLocation()) :
         Expression(lo), lhs(l), op(o) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct BinaryExpression : public Expression
@@ -461,12 +475,14 @@ struct BinaryExpression : public Expression
     virtual bool isConstant() { return lhs->isConstant() && rhs->isConstant(); }
     BinaryExpression(unsigned o, Expression *l, Expression *r, SourceLocation lo = SourceLocation()) :
         Expression(lo), lhs(l), rhs(r), op(o) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct PrimaryExpression : public Expression
 {
     PrimaryExpression(SourceLocation l = SourceLocation()) : Expression(l){}
     virtual PrimaryExpression *primaryExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 struct IdentifierExpression : public PrimaryExpression
@@ -478,6 +494,7 @@ struct IdentifierExpression : public PrimaryExpression
     Identifier *identifier() { return id; }
     std::string getName() { return id->getName(); }
     virtual IdentifierExpression *identifierExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 //struct TypeExpression : public Expression
@@ -490,6 +507,7 @@ struct StringExpression : public PrimaryExpression
     StringExpression(std::string str, SourceLocation l = SourceLocation()) :
         PrimaryExpression(l), string(str) {}
     virtual StringExpression *stringExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 // XXX super ugly. Maybe just hold an ASTValue* or something instead of this mess?
@@ -520,6 +538,7 @@ struct NumericExpression : public PrimaryExpression
     NumericExpression(NumericType t, ASTType *ty, uint64_t val, SourceLocation l = SourceLocation()) :
         PrimaryExpression(l), type(t), astType(ty), intValue(val) {}
     virtual NumericExpression *numericExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 struct Statement;
@@ -530,10 +549,13 @@ struct Statement;
 struct CompoundExpression : public Expression
 {
     //TODO: sym table
+    SymbolTable *scope;
+    SymbolTable *getScope() { return scope; }
     std::vector<Statement*> statements;
-    CompoundExpression(std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
-        Expression(l), statements(s) {}
+    CompoundExpression(SymbolTable *sc, std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
+        scope(sc), Expression(l), statements(s) {}
     virtual CompoundExpression *compoundExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 // value of following expression, or (bool) 1 if not found
@@ -541,10 +563,12 @@ struct CompoundExpression : public Expression
 struct BlockExpression : public Expression
 {
     SymbolTable *scope;
+    SymbolTable *getScope() { return scope; }
     Statement *body;
     virtual BlockExpression *blockExpression() { return this; }
     BlockExpression(SymbolTable *sc, Statement *b, SourceLocation l = SourceLocation()) :
         scope(sc), body(b), Expression(l) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct ElseExpression : public BlockExpression
@@ -552,6 +576,7 @@ struct ElseExpression : public BlockExpression
     ElseExpression(SymbolTable *sc, Statement *b, SourceLocation l = SourceLocation()) :
         BlockExpression(sc, b, l) {}
     virtual ElseExpression *elseExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 // value of following expression. usually block, with (bool) 0 / (bool) 1 pass
@@ -563,6 +588,7 @@ struct IfExpression : public BlockExpression
     IfExpression(SymbolTable *sc, Expression *c, Statement *b, ElseExpression *e,
             SourceLocation l = SourceLocation()) :
         BlockExpression(sc, b, l), condition(c), elsebr(e) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct LoopExpression : public BlockExpression
@@ -574,6 +600,7 @@ struct LoopExpression : public BlockExpression
     LoopExpression(SymbolTable *sc, Expression *c, Statement *u, Statement *b, ElseExpression *el,
             SourceLocation l = SourceLocation()) : BlockExpression(sc, b, l), condition(c),
                                                 update(u), elsebr(el) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 // value same as if
@@ -583,6 +610,7 @@ struct WhileExpression : public LoopExpression
     WhileExpression(SymbolTable *sc, Expression *c, Statement *b, ElseExpression *e,
             SourceLocation l = SourceLocation()) :
         LoopExpression(sc, c, NULL, b, e, l) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct ForExpression : public LoopExpression
@@ -593,6 +621,7 @@ struct ForExpression : public LoopExpression
             Statement *b, ElseExpression *e,
             SourceLocation l = SourceLocation()) : LoopExpression(sc, c, u, b, e, l),
         decl(d) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct SwitchExpression : public BlockExpression
@@ -602,6 +631,7 @@ struct SwitchExpression : public BlockExpression
     SwitchExpression(SymbolTable *sc, Expression *cond, Statement *b,
             SourceLocation l = SourceLocation())
         : BlockExpression(sc, b, l), condition(cond) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct PackageExpression : public Expression
@@ -610,6 +640,7 @@ struct PackageExpression : public Expression
     virtual PackageExpression *packageExpression() { return this; }
     PackageExpression(Expression *p, SourceLocation l = SourceLocation())
         : Expression(l), package(p) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 
@@ -622,6 +653,7 @@ struct TopLevelExpression : public Expression
 struct UseExpression : public TopLevelExpression
 {
     virtual UseExpression *useExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 // import <STRING> |
@@ -633,6 +665,7 @@ struct ImportExpression : public TopLevelExpression
     virtual ImportExpression *importExpression() { return this; }
     ImportExpression(Expression *im, TranslationUnit *u, SourceLocation l = SourceLocation()) :
         TopLevelExpression(l), expression(im), unit(u) { }
+    virtual void accept(ASTVisitor *v);
 };
 
 struct IncludeExpression : public TopLevelExpression
@@ -653,18 +686,19 @@ struct Statement : public ASTNode
     virtual ~Statement(){}
     SourceLocation loc;
     SourceLocation getLocation() { return loc; }
-    virtual Validity validate(){} //TODO PURE VIRTUAL;
-    void accept(ASTVisitor *v);
+    virtual void accept(ASTVisitor *v);
 };
 
 struct BreakStatement : public Statement
 {
     BreakStatement(SourceLocation l) : Statement(l) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct ContinueStatement : public Statement
 {
     ContinueStatement(SourceLocation l) : Statement(l) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 
@@ -672,6 +706,7 @@ struct LabelStatement : public Statement
 {
     Identifier *identifier;
     LabelStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct CaseStatement : public Statement
@@ -679,24 +714,28 @@ struct CaseStatement : public Statement
     std::vector<Expression *> values;
     CaseStatement(std::vector<Expression*> vals, SourceLocation l = SourceLocation()) :
         Statement(l), values(vals) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct GotoStatement : Statement
 {
     Identifier *identifier;
     GotoStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct DeclarationStatement : public Statement
 {
     Declaration *declaration;
     DeclarationStatement(Declaration *decl, SourceLocation l) : Statement(l), declaration(decl) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 struct ExpressionStatement : public Statement
 {
     Expression *expression;
     ExpressionStatement(Expression *exp, SourceLocation l) : Statement(l), expression(exp){}
+    virtual void accept(ASTVisitor *v);
 };
 
 // also works like pass. will assign to $ ?
@@ -704,6 +743,7 @@ struct ReturnStatement : public Statement
 {
     Expression *expression;
     ReturnStatement(Expression *exp, SourceLocation l) : Statement(l), expression(exp) {}
+    virtual void accept(ASTVisitor *v);
 };
 
 /*
@@ -718,14 +758,73 @@ struct OnceStatement : public Statement
     OnceStatement(SourceLocation l) : Statement(l) {}
 };
 
-struct ASTVisitor {
+class ASTVisitor {
+    std::stack<SymbolTable*> scope;
+    std::stack<FunctionDeclaration*> function;
+
+    public:
+    SymbolTable *getCurrentScope() { return scope.top(); }
+    void pushScope(SymbolTable *sc) { scope.push(sc); }
+    SymbolTable *popScope() { SymbolTable *sc = scope.top(); scope.pop(); return sc; }
+
+    FunctionDeclaration *getCurrentFunction() { return function.top(); }
+    void pushFunction(FunctionDeclaration *fdecl) { function.push(fdecl); }
+    FunctionDeclaration *popFunction() {
+        FunctionDeclaration *fd = function.top();
+        function.pop();
+        return fd;
+    }
+
     virtual void visitPackage(Package *pak) {}
     virtual void visitTranslationUnit(TranslationUnit *tu) {}
 
     virtual void visitDeclaration(Declaration *decl){}
     virtual void visitExpression(Expression *exp){}
     virtual void visitStatement(Statement *stmt){}
-    virtual void visitType(ASTType *ty){}
+    //virtual void visitType(ASTType *ty){}
+
+    virtual void visitFunctionDeclaration(FunctionDeclaration *decl){}
+    virtual void visitLabelDeclaration(LabelDeclaration *decl){}
+    virtual void visitVariableDeclaration(VariableDeclaration *decl){}
+    virtual void visitTypeDeclaration(TypeDeclaration *decl){}
+    virtual void visitStructUnionDeclaration(StructUnionDeclaration *decl){}
+
+    virtual void visitUnaryExpression(UnaryExpression *exp){}
+    virtual void visitBinaryExpression(BinaryExpression *exp){}
+    virtual void visitPostfixExpression(PostfixExpression *exp){}
+    virtual void visitPostfixOpExpression(PostfixOpExpression *exp){}
+    virtual void visitPrimaryExpression(PrimaryExpression *exp){}
+    virtual void visitCallExpression(CallExpression *exp){}
+    virtual void visitIndexExpression(IndexExpression *exp){}
+    virtual void visitIdentifierExpression(IdentifierExpression *exp){}
+    virtual void visitNumericExpression(NumericExpression *exp){}
+    virtual void visitStringExpression(StringExpression *exp){}
+    virtual void visitCompoundExpression(CompoundExpression *exp){}
+    virtual void visitBlockExpression(BlockExpression *exp){}
+    virtual void visitElseExpression(ElseExpression *exp){}
+    virtual void visitIfExpression(IfExpression *exp){}
+    virtual void visitLoopExpression(LoopExpression *exp){}
+    virtual void visitWhileExpression(WhileExpression *exp){}
+    virtual void visitForExpression(ForExpression *exp){}
+    virtual void visitSwitchExpression(SwitchExpression *exp){}
+    virtual void visitImportExpression(ImportExpression *exp){}
+    virtual void visitPackageExpression(PackageExpression *exp){}
+    virtual void visitCastExpression(CastExpression *exp){}
+    virtual void visitUseExpression(UseExpression *exp){}
+    virtual void visitTypeExpression(TypeExpression *exp){}
+    virtual void visitTupleExpression(TupleExpression *exp){}
+    virtual void visitDotExpression(DotExpression *exp){}
+    virtual void visitNewExpression(NewExpression *exp){}
+    virtual void visitDeleteExpression(DeleteExpression *exp){}
+
+    virtual void visitBreakStatement(BreakStatement *stmt){}
+    virtual void visitContinueStatement(ContinueStatement *stmt){}
+    virtual void visitLabelStatement(LabelStatement *stmt){}
+    virtual void visitCaseStatement(CaseStatement *stmt){}
+    virtual void visitGotoStatement(GotoStatement *stmt){}
+    virtual void visitDeclarationStatement(DeclarationStatement *stmt){}
+    virtual void visitExpressionStatement(ExpressionStatement *stmt){}
+    virtual void visitReturnStatement(ReturnStatement *stmt){}
 };
 
 #endif

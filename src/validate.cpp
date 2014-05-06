@@ -1,18 +1,20 @@
 #include "ast.hpp"
 #include "astType.hpp"
+#include "validate.hpp"
 
 //
 // Code for AST traversal, validation, and
 //
+
 
 //
 // AST
 //
 
 bool AST::validate() {
-    return root->validate() == VALID;
 }
 
+/*
 //
 // Package
 //
@@ -93,13 +95,6 @@ Validity ArrayDeclaration::validate() {
     return VariableDeclaration::validate();
 }
 
-/*
-Validity TypeDeclaration::validate() {
-    if(validity != UNCHECKED) return validity;
-    validity = VALID;
-    return INVALID; //TODO
-} */
-
 Validity StructUnionDeclaration::validate() {
     if(validity != UNCHECKED) return validity;
     validity = VALID;
@@ -165,4 +160,178 @@ Validity AliasTypeInfo::validate() {
 
 Validity TupleTypeInfo::validate() {
     return VALID;
+}
+
+*/
+
+void ValidationVisitor::visitPackage(Package *pak){
+
+}
+
+void ValidationVisitor::visitTranslationUnit(TranslationUnit *tu){
+
+}
+
+void ValidationVisitor::visitDeclaration(Declaration *decl){
+
+}
+
+void ValidationVisitor::visitExpression(Expression *exp){
+
+}
+
+void ValidationVisitor::visitStatement(Statement *stmt){
+
+}
+
+void ValidationVisitor::visitFunctionDeclaration(FunctionDeclaration *decl){
+
+}
+
+void ValidationVisitor::visitLabelDeclaration(LabelDeclaration *decl){
+
+}
+
+void ValidationVisitor::visitVariableDeclaration(VariableDeclaration *decl){
+
+}
+
+void ValidationVisitor::visitTypeDeclaration(TypeDeclaration *decl){
+
+}
+
+void ValidationVisitor::visitStructUnionDeclaration(StructUnionDeclaration *decl){
+
+}
+
+void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp){
+
+}
+
+void ValidationVisitor::visitBinaryExpression(BinaryExpression *exp){
+
+}
+
+void ValidationVisitor::visitPrimaryExpression(PrimaryExpression *exp){
+
+}
+
+void ValidationVisitor::visitCallExpression(CallExpression *exp){
+
+}
+
+void ValidationVisitor::visitIndexExpression(IndexExpression *exp){
+
+}
+
+void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp){
+
+}
+
+void ValidationVisitor::visitNumericExpression(NumericExpression *exp){
+
+}
+
+void ValidationVisitor::visitStringExpression(StringExpression *exp){
+
+}
+
+void ValidationVisitor::visitCompoundExpression(CompoundExpression *exp){
+
+}
+
+void ValidationVisitor::visitBlockExpression(BlockExpression *exp){
+
+}
+
+void ValidationVisitor::visitElseExpression(ElseExpression *exp){
+
+}
+
+void ValidationVisitor::visitIfExpression(IfExpression *exp){
+
+}
+
+void ValidationVisitor::visitLoopExpression(LoopExpression *exp){
+
+}
+
+void ValidationVisitor::visitWhileExpression(WhileExpression *exp){
+
+}
+
+void ValidationVisitor::visitForExpression(ForExpression *exp){
+
+}
+
+void ValidationVisitor::visitSwitchExpression(SwitchExpression *exp){
+
+}
+
+void ValidationVisitor::visitImportExpression(ImportExpression *exp){
+
+}
+
+void ValidationVisitor::visitPackageExpression(PackageExpression *exp){
+
+}
+
+void ValidationVisitor::visitCastExpression(CastExpression *exp){
+
+}
+
+void ValidationVisitor::visitUseExpression(UseExpression *exp){
+
+}
+
+void ValidationVisitor::visitTypeExpression(TypeExpression *exp){
+
+}
+
+void ValidationVisitor::visitTupleExpression(TupleExpression *exp){
+
+}
+
+void ValidationVisitor::visitDotExpression(DotExpression *exp){
+
+}
+
+void ValidationVisitor::visitNewExpression(NewExpression *exp){
+
+}
+
+void ValidationVisitor::visitDeleteExpression(DeleteExpression *exp){
+
+}
+
+void ValidationVisitor::visitBreakStatement(BreakStatement *stmt){
+
+}
+
+void ValidationVisitor::visitContinueStatement(ContinueStatement *stmt){
+
+}
+
+void ValidationVisitor::visitLabelStatement(LabelStatement *stmt){
+
+}
+
+void ValidationVisitor::visitCaseStatement(CaseStatement *stmt){
+
+}
+
+void ValidationVisitor::visitGotoStatement(GotoStatement *stmt){
+
+}
+
+void ValidationVisitor::visitDeclarationStatement(DeclarationStatement *stmt){
+
+}
+
+void ValidationVisitor::visitExpressionStatement(ExpressionStatement *stmt){
+
+}
+
+void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt){
+
 }

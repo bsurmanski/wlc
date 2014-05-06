@@ -1181,14 +1181,16 @@ Expression *ParseContext::parsePrimaryExpression()
     if(peek().is(tok::lbrace))
     {
         ignore(); // eat lbrace
-
+        SymbolTable *tbl = new SymbolTable(getScope());
+        pushScope(tbl);
         vector<Statement*> stmts;
         while(peek().isNot(tok::rbrace))
         {
             stmts.push_back(parseStatement());
         }
+        popScope();
         ignore(); // eat rbrace
-        return new CompoundExpression(stmts, loc);
+        return new CompoundExpression(tbl, stmts, loc);
     }
 
     if(peek().is(tok::identifier))

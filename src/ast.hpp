@@ -195,12 +195,12 @@ struct FunctionDeclaration : public Declaration
 {
     llvm::DISubprogram diSubprogram;
     ASTType *prototype;
-    std::vector<std::string> paramNames;
+    std::vector<Identifier*> paramNames;
     std::vector<Expression*> paramValues;
     SymbolTable *scope;
     Statement *body;
     void *cgValue;
-    FunctionDeclaration(Identifier *id, ASTType *p, std::vector<std::string> pname,
+    FunctionDeclaration(Identifier *id, ASTType *p, std::vector<Identifier*> pname,
             std::vector<Expression*> pvals, SymbolTable *sc,
             Statement *st, SourceLocation loc) :
         Declaration(id, loc), prototype(p), paramNames(pname), paramValues(pvals), scope(sc),

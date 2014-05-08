@@ -10,7 +10,11 @@ enum Validity {
 };
 
 class ValidationVisitor : public ASTVisitor {
+    bool valid;
+
     public:
+    bool isValid() { return valid; }
+    ValidationVisitor();
     virtual void visitPackage(Package *pak);
     virtual void visitTranslationUnit(TranslationUnit *tu);
 

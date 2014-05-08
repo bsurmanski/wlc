@@ -392,17 +392,6 @@ ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
 
 ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
 {
-    ///XXX work around for forward declarations of variables in parent scopes
-    if(id->isUndeclared())
-    {
-        //id = lookup(iexp->id->getName());
-        if(id->isUndeclared()) {
-            emit_message(msg::ERROR, string("undeclared variable '") +
-                    id->getName() + string("' in scope"));
-            return NULL;
-        }
-    }
-
     if(id->isVariable())
     {
         if(id->getScope()->getUnit() != unit->unit) // id not declared in current TU
@@ -518,17 +507,6 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         return codegenCallExpression(cexp);
     } else if(IdentifierExpression *iexp = exp->identifierExpression())
     {
-        ///XXX work around for forward declarations of variables in parent scopes
-        if(iexp->identifier()->isUndeclared())
-        {
-            iexp->id = lookup(iexp->id->getName());
-            //TODO
-            if(iexp->id->isUndeclared()) {
-                emit_message(msg::ERROR, string("undeclared variable '") +
-                        iexp->id->getName() + string("' in scope"), iexp->loc);
-                return NULL;
-            }
-        }
         return codegenIdentifier(iexp->id);
     } else if(BlockExpression *bexp = exp->blockExpression())
     {
@@ -1813,22 +1791,20 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                         return;
                 }
                 //pair<ASTType*, std::string> param_i = fdecl->prototype->parameters[idx];
-                AI->setName(fdecl->paramNames[idx]);
+                AI->setName(fdecl->paramNames[idx]->getName());
                 AllocaInst *alloc = new AllocaInst(codegenType(fti->params[idx]),
-                                                   0, fdecl->paramNames[idx], BB);
+                                                   0, fdecl->paramNames[idx]->getName(), BB);
                     //ir->CreateAlloca(codegenType(param_i.first), 0, param_i.second);
                 alloc->setAlignment(8);
                 ASTValue *alloca = new ASTValue(fti->params[idx], alloc, true);
                 new StoreInst(AI, codegenLValue(alloca), BB);
                 //ir->CreateStore(AI, codegenLValue(alloca));
 
-                Identifier *id = getInScope(fdecl->paramNames[idx]);
-                id->setDeclaration(NULL, Identifier::ID_VARIABLE);
-                id->setValue(alloca);
+                fdecl->paramNames[idx]->setValue(alloca);
 
                 //register debug params
                 //XXX hacky with Instruction, and setDebugLoc manually
-                Instruction *ainst = debug->createVariable(fdecl->paramNames[idx],
+                Instruction *ainst = debug->createVariable(fdecl->paramNames[idx]->getName(),
                                                           alloca, BB, decl->loc, idx+1);
                 ainst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
                 //TODO: register value to scope

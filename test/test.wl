@@ -116,11 +116,11 @@ int main(int argc, char^^ argv)
     float myfloat = 0x1234
     printf("myFloat: %f, my tuple: %d\n", myfloat, intTuple[0])
     ++myfloat
-    printf("myFloat2: %f\n", myfloat);
+    printf("myFloat2: %f\n", myfloat)
     myfloat = 0b1010
-    printf("myFloatb: %f\n", myfloat);
+    printf("myFloatb: %f\n", myfloat)
     myfloat = 0o333
-    printf("myFloato: %f\n", myfloat);
+    printf("myFloato: %f\n", myfloat)
 
     int add = addFunc(5, 7)
     printf("addFunc: %d\n", addFunc())

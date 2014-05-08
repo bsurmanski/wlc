@@ -629,9 +629,13 @@ Declaration *ParseContext::parseDeclaration()
     if(peek().is(tok::lparen)) // function decl
     {
         std::vector<ASTType *> params;
-        std::vector<std::string> paramNames;
+        std::vector<Identifier*> paramNames;
         std::vector<Expression*> paramValues;
         ignore(); // lparen
+
+        SymbolTable *funcScope = new SymbolTable(getScope());
+        pushScope(funcScope);
+
         bool vararg = false;
         while(!peek().is(tok::rparen))
         {
@@ -652,7 +656,9 @@ Declaration *ParseContext::parseDeclaration()
             ASTType *aty = parseType();
             Token t_name = get();
             params.push_back(aty);
-            paramNames.push_back(t_name.toString());
+            Identifier *paramId = getScope()->getInScope(t_name.toString());
+            paramId->setDeclaration(NULL, Identifier::ID_VARIABLE);
+            paramNames.push_back(paramId);
 
             if(peek().is(tok::equal))
             {
@@ -680,8 +686,7 @@ Declaration *ParseContext::parseDeclaration()
         }
         ignore(); //rparen
 
-        SymbolTable *funcScope = new SymbolTable(getScope());
-        pushScope(funcScope);
+        // body
         Statement *stmt = parseStatement();
         popScope();
 
@@ -1186,7 +1191,8 @@ Expression *ParseContext::parsePrimaryExpression()
         vector<Statement*> stmts;
         while(peek().isNot(tok::rbrace))
         {
-            stmts.push_back(parseStatement());
+            if(Statement *stmt = parseStatement())
+                stmts.push_back(stmt);
         }
         popScope();
         ignore(); // eat rbrace

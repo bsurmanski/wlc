@@ -82,6 +82,11 @@ void compile(WLConfig params)
                 u->expl = true;
             }
         }
+
+        if(!ast->validate()){
+            emit_message(msg::ERROR, "invalid AST");
+        }
+
         IRCodegenContext cg;
         std::string outputo = cg.codegenAST(ast, params);
 

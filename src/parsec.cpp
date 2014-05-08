@@ -189,7 +189,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         int nargs = clang_getNumArgTypes(fType);
 
         vector<ASTType*> params;
-        vector<std::string> paramNames;
+        vector<Identifier*> paramNames;
         vector<Expression*> paramValues;
 
         for(int i = 0; i < nargs; i++)
@@ -200,7 +200,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
             if(!astArgTy) goto ERR;
 
             params.push_back(astArgTy);
-            paramNames.push_back("");
+            paramNames.push_back(NULL);
             paramValues.push_back(NULL);
         }
 

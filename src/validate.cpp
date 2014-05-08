@@ -1,179 +1,56 @@
+#include <string>
 #include "ast.hpp"
 #include "astType.hpp"
 #include "validate.hpp"
+#include "message.hpp"
+
+using namespace std;
 
 //
 // Code for AST traversal, validation, and
 //
-
 
 //
 // AST
 //
 
 bool AST::validate() {
-}
-
-/*
-//
-// Package
-//
-
-Validity Package::validate() {
-    if(validity != UNCHECKED) return validity; // only check once
-
-    validity = VALID; // avoid circular reference livelock
-
-    for(int i = 0; i < children.size(); i++){
-        if(children[i]->validate() != VALID)
-            validity = INVALID;
-    }
-    return validity;
+    ValidationVisitor visitor;
+    getRootPackage()->accept(&visitor);
+    return visitor.isValid();
 }
 
 //
-// TranslationUnit
+// ValidationVisitor
 //
 
-Validity TranslationUnit::validate() {
-    if(validity != UNCHECKED) return validity;
-
-    validity = VALID;
-    if(Package::validate() != VALID)
-        validity = INVALID;
-
-    for(int i = 0; i < imports.size(); i++) {
-        if(imports[i]->validate() != VALID)
-            validity = INVALID;
-    }
-
-    return validity;
+ValidationVisitor::ValidationVisitor() : ASTVisitor() {
+    valid = true;
 }
-
-//
-// Declaration
-//
-
-Validity FunctionDeclaration::validate() {
-    if(validity != UNCHECKED) return validity;
-    validity = VALID;
-
-    //XXX valdiate scope?
-    if(body && body->validate() != VALID) validity = INVALID;
-    if(!prototype || prototype->validate() != VALID) validity = INVALID;
-
-    for(int i = 0; i < paramValues.size(); i++){
-        if(paramValues[i]) {
-            if(paramValues[i]->validate() != VALID) validity = INVALID;
-        }
-    }
-
-    //TODO: validate uniqueness of paramNames
-
-    //TODO
-    return validity;
-}
-
-Validity VariableDeclaration::validate(){
-    if(validity != UNCHECKED) return validity;
-    validity = VALID;
-
-    if(!type || type->validate() != VALID) validity = INVALID;
-    if(value && value->validate() != VALID) validity = INVALID;
-
-    return INVALID; //TODO
-}
-
-Validity LabelDeclaration::validate() {
-    if(validity != UNCHECKED) return validity;
-    validity = VALID;
-    return validity; //TODO
-}
-
-Validity ArrayDeclaration::validate() {
-    if(validity != UNCHECKED) return validity;
-    return VariableDeclaration::validate();
-}
-
-Validity StructUnionDeclaration::validate() {
-    if(validity != UNCHECKED) return validity;
-    validity = VALID;
-    if(!type || identifier->getDeclaredType() != type) validity = INVALID;
-    if(type->validate() != VALID) validity = INVALID;
-    return validity;
-}
-
-//
-// Expression
-//
-
-//
-// Statement
-//
-
-//
-// ASTType
-//
-Validity DynamicTypeInfo::validate() {
-    return VALID;
-}
-
-Validity FunctionTypeInfo::validate() {
-    return VALID;
-}
-
-Validity PointerTypeInfo::validate() {
-    return VALID;
-}
-
-Validity StaticArrayTypeInfo::validate() {
-    return VALID;
-}
-
-Validity DynamicArrayTypeInfo::validate() {
-    return VALID;
-}
-
-Validity HetrogenTypeInfo::validate() {
-    return VALID;
-}
-
-Validity StructTypeInfo::validate() {
-    return VALID;
-}
-
-Validity UnionTypeInfo::validate() {
-    return VALID;
-}
-
-Validity ClassTypeInfo::validate() {
-    return VALID;
-}
-
-Validity NamedUnknownInfo::validate() {
-    return INVALID;
-}
-
-Validity AliasTypeInfo::validate() {
-    return VALID;
-}
-
-Validity TupleTypeInfo::validate() {
-    return VALID;
-}
-
-*/
 
 void ValidationVisitor::visitPackage(Package *pak){
-
+    if(!pak->getScope()) valid = false;
 }
 
 void ValidationVisitor::visitTranslationUnit(TranslationUnit *tu){
-
+    for(int i = 0; i < tu->imports.size(); i++){
+        if(!tu->imports[i]){
+            valid = false;
+            emit_message(msg::ERROR, "invalid translation unit found, null import");
+        }
+    }
 }
 
 void ValidationVisitor::visitDeclaration(Declaration *decl){
+    if(!decl->identifier) {
+        valid = false;
+        emit_message(msg::ERROR, "null identifier in declaration");
+    }
 
+    if(decl->identifier->isUndeclared()){
+        valid = false;
+        emit_message(msg::ERROR, "inconsistant AST, undeclared identifier in definition");
+    }
 }
 
 void ValidationVisitor::visitExpression(Expression *exp){
@@ -185,7 +62,16 @@ void ValidationVisitor::visitStatement(Statement *stmt){
 }
 
 void ValidationVisitor::visitFunctionDeclaration(FunctionDeclaration *decl){
+    //TODO: validate prototype
+    if(!decl->prototype){
+        valid = false;
+        emit_message(msg::ERROR, "function declaration missing prototype");
+    }
 
+    if(!decl->getScope() && decl->body){
+        valid = false;
+        emit_message(msg::ERROR, "function has body without scope");
+    }
 }
 
 void ValidationVisitor::visitLabelDeclaration(LabelDeclaration *decl){
@@ -197,7 +83,10 @@ void ValidationVisitor::visitVariableDeclaration(VariableDeclaration *decl){
 }
 
 void ValidationVisitor::visitTypeDeclaration(TypeDeclaration *decl){
-
+    if(!decl->getDeclaredType()){
+        valid = false;
+        emit_message(msg::ERROR, "invalid type declaration");
+    }
 }
 
 void ValidationVisitor::visitStructUnionDeclaration(StructUnionDeclaration *decl){
@@ -205,11 +94,24 @@ void ValidationVisitor::visitStructUnionDeclaration(StructUnionDeclaration *decl
 }
 
 void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp){
-
+    //TODO: insert coersion cast
+    if(!exp->lhs){
+        valid = false;
+        emit_message(msg::ERROR, "unary operator is missing expression");
+    }
 }
 
 void ValidationVisitor::visitBinaryExpression(BinaryExpression *exp){
+    //TODO: insert coersion cast
+    if(!exp->lhs){
+        valid = false;
+        emit_message(msg::ERROR, "binary operator is missing left hand expression");
+    }
 
+    if(!exp->rhs){
+        valid = false;
+        emit_message(msg::ERROR, "binary operator is missing right hand expression");
+    }
 }
 
 void ValidationVisitor::visitPrimaryExpression(PrimaryExpression *exp){
@@ -225,11 +127,21 @@ void ValidationVisitor::visitIndexExpression(IndexExpression *exp){
 }
 
 void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp){
+    // resolve identifier
+    if(exp->id->isUndeclared()){
+        exp->id = getCurrentScope()->lookup(exp->id->getName());
+    }
 
+    // error if unresolvable
+    if(exp->id->isUndeclared()){
+        valid = false;
+        emit_message(msg::ERROR, string("undeclared variable '") + exp->id->getName()
+                + string("' in scope"), exp->loc);
+    }
 }
 
 void ValidationVisitor::visitNumericExpression(NumericExpression *exp){
-
+    // TODO: validate type
 }
 
 void ValidationVisitor::visitStringExpression(StringExpression *exp){
@@ -237,19 +149,43 @@ void ValidationVisitor::visitStringExpression(StringExpression *exp){
 }
 
 void ValidationVisitor::visitCompoundExpression(CompoundExpression *exp){
+    if(!exp->getScope() && exp->statements.size()){
+        valid = false;
+        emit_message(msg::ERROR, "compound expression is missing scope");
+    }
 
+#ifdef DEBUG
+    for(int i = 0; i < exp->statements.size(); i++){
+        if(!exp->statements[i]){
+            valid = false;
+            emit_message(msg::ERROR, "null statement in compound expression");
+        }
+    }
+#endif
 }
 
 void ValidationVisitor::visitBlockExpression(BlockExpression *exp){
+#ifdef DEBUG
+    if(exp->getScope() && exp->body){
+        valid = false;
+        emit_message(msg::ERROR, "null scope in block expression");
+    }
+#endif
 
 }
 
 void ValidationVisitor::visitElseExpression(ElseExpression *exp){
-
+    if(!exp->body){
+        valid = false;
+        emit_message(msg::ERROR, "else expression expects body statement");
+    }
 }
 
 void ValidationVisitor::visitIfExpression(IfExpression *exp){
-
+    if(!exp->body){
+        valid = false;
+        emit_message(msg::ERROR, "if expression expects body statement");
+    }
 }
 
 void ValidationVisitor::visitLoopExpression(LoopExpression *exp){
@@ -265,11 +201,22 @@ void ValidationVisitor::visitForExpression(ForExpression *exp){
 }
 
 void ValidationVisitor::visitSwitchExpression(SwitchExpression *exp){
-
+    if(!exp->condition){
+        valid = false;
+        emit_message(msg::ERROR, "switch expression expects condition");
+    }
 }
 
 void ValidationVisitor::visitImportExpression(ImportExpression *exp){
+    if(!exp->expression){
+        valid = false;
+        emit_message(msg::ERROR, "import expression expects following expression");
+    }
 
+    if(!dynamic_cast<StringExpression*>(exp->expression)){
+        valid = false;
+        emit_message(msg::ERROR, "import expression expects following expression to be package string");
+    }
 }
 
 void ValidationVisitor::visitPackageExpression(PackageExpression *exp){
@@ -313,25 +260,48 @@ void ValidationVisitor::visitContinueStatement(ContinueStatement *stmt){
 }
 
 void ValidationVisitor::visitLabelStatement(LabelStatement *stmt){
-
+    if(!stmt->identifier){
+        valid = false;
+        emit_message(msg::ERROR, "label statement expects following identifier");
+    }
 }
 
 void ValidationVisitor::visitCaseStatement(CaseStatement *stmt){
-
+    for(int i = 0; i < stmt->values.size(); i++){
+        if(!stmt->values[i]){
+            valid = false;
+            emit_message(msg::ERROR, "invalid case value");
+        }
+    }
 }
 
 void ValidationVisitor::visitGotoStatement(GotoStatement *stmt){
-
+    if(!stmt->identifier){
+        valid = false;
+        emit_message(msg::ERROR, "goto statement expects following identifier");
+    }
 }
 
 void ValidationVisitor::visitDeclarationStatement(DeclarationStatement *stmt){
+#ifdef DEBUG
+    if(!stmt->declaration){
+        valid = false;
+        emit_message(msg::ERROR, "null declaration in declaration statement");
+    }
+#endif
 
 }
 
 void ValidationVisitor::visitExpressionStatement(ExpressionStatement *stmt){
+#ifdef DEBUG
+    if(!stmt->expression){
+        valid = false;
+        emit_message(msg::ERROR, "null expression in expression statement");
+    }
+#endif
 
 }
 
 void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt){
-
+    //TODO: assert this value can be coerced to current function return
 }

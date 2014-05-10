@@ -126,13 +126,16 @@ struct DynamicArrayTypeInfo : ArrayTypeInfo
 
 // hetrogeneous type info
 // some type that contains internal types which are not guarenteed to be of the same type
+struct FunctionDeclaration;
 struct HetrogenTypeInfo : public CompositeTypeInfo
 {
     SymbolTable *scope;
     Identifier *identifier;
     std::vector<Declaration*> members; // <type, name>
-    HetrogenTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
-        identifier(id), scope(sc), members(m){}
+    std::vector<FunctionDeclaration*> methods;
+    HetrogenTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m,
+            std::vector<FunctionDeclaration*> mt) :
+        identifier(id), scope(sc), members(m), methods(mt){}
     std::string getName() { return identifier->getName(); }
     virtual size_t length() { return members.size(); }
     virtual ASTType *getContainedType(unsigned i);
@@ -150,8 +153,9 @@ struct HetrogenTypeInfo : public CompositeTypeInfo
 struct StructTypeInfo : public HetrogenTypeInfo
 {
     bool packed;
-    StructTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
-        HetrogenTypeInfo(id, sc, m), packed(false) {}
+    StructTypeInfo(Identifier *id, SymbolTable *sc,
+            std::vector<Declaration*> m, std::vector<FunctionDeclaration*> mt) :
+        HetrogenTypeInfo(id, sc, m, mt), packed(false) {}
     virtual size_t getSize();
     virtual size_t getMemberOffset(size_t i);
     virtual size_t getMemberOffset(std::string member);
@@ -160,8 +164,9 @@ struct StructTypeInfo : public HetrogenTypeInfo
 
 struct UnionTypeInfo : public HetrogenTypeInfo
 {
-    UnionTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m) :
-        HetrogenTypeInfo(id, sc, m) {}
+    UnionTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m,
+            std::vector<FunctionDeclaration*> mt) :
+        HetrogenTypeInfo(id, sc, m, mt) {}
     std::string getName() { return identifier->getName(); }
     virtual size_t getSize();
     virtual size_t getMemberOffset(size_t i) { return 0; }
@@ -173,8 +178,9 @@ struct ClassTypeInfo : public HetrogenTypeInfo
 {
     Identifier *base; //XXX what about basic types?
 
-    ClassTypeInfo(Identifier *id, SymbolTable *sc, Identifier *b, std::vector<Declaration*> m) :
-        HetrogenTypeInfo(id, sc, m), base(b) {}
+    ClassTypeInfo(Identifier *id, SymbolTable *sc, Identifier *b, std::vector<Declaration*> m,
+            std::vector<FunctionDeclaration*> mt) :
+        HetrogenTypeInfo(id, sc, m, mt), base(b) {}
     HetrogenTypeInfo *baseHetrogenTypeInfo();
     virtual Declaration *getMember(size_t index);
     virtual size_t length();

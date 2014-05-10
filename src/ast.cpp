@@ -82,6 +82,7 @@ void StructUnionDeclaration::accept(ASTVisitor *v){
 
 
 void Expression::accept(ASTVisitor *v) {
+    Statement::accept(v);
     v->visitExpression(this);
 }
 
@@ -306,13 +307,6 @@ void DeclarationStatement::accept(ASTVisitor *v){
     v->visitDeclarationStatement(this);
     if(declaration)
         declaration->accept(v);
-}
-
-void ExpressionStatement::accept(ASTVisitor *v){
-    Statement::accept(v);
-    v->visitExpressionStatement(this);
-    if(expression)
-        expression->accept(v);
 }
 
 void ReturnStatement::accept(ASTVisitor *v){

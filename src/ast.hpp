@@ -273,6 +273,84 @@ struct StructUnionDeclaration : public TypeDeclaration
 
 /***
  *
+ * STATEMENTS
+ *
+ ***/
+
+struct Statement : public ASTNode
+{
+    Statement(SourceLocation l) : loc(l) {}
+    virtual ~Statement(){}
+    SourceLocation loc;
+    void setLocation(SourceLocation l) { loc = l; }
+    SourceLocation getLocation() { return loc; }
+    virtual void accept(ASTVisitor *v);
+};
+
+struct BreakStatement : public Statement
+{
+    BreakStatement(SourceLocation l) : Statement(l) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct ContinueStatement : public Statement
+{
+    ContinueStatement(SourceLocation l) : Statement(l) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+
+struct LabelStatement : public Statement
+{
+    Identifier *identifier;
+    LabelStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct CaseStatement : public Statement
+{
+    std::vector<Expression *> values;
+    CaseStatement(std::vector<Expression*> vals, SourceLocation l = SourceLocation()) :
+        Statement(l), values(vals) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct GotoStatement : Statement
+{
+    Identifier *identifier;
+    GotoStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct DeclarationStatement : public Statement
+{
+    Declaration *declaration;
+    DeclarationStatement(Declaration *decl, SourceLocation l) : Statement(l), declaration(decl) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+// also works like pass. will assign to $ ?
+struct ReturnStatement : public Statement
+{
+    Expression *expression;
+    ReturnStatement(Expression *exp, SourceLocation l) : Statement(l), expression(exp) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+/*
+ * once
+ * {
+ *  DOSTUFF
+ * }; : DOSTUFF will only happen once, on first encounter of the once statement
+ */
+struct OnceStatement : public Statement
+{
+    Statement *stmt;
+    OnceStatement(SourceLocation l) : Statement(l) {}
+};
+
+/***
+ *
  * EXPRESSIONS
  *
  ***/
@@ -307,17 +385,14 @@ struct DotExpression;
 struct NewExpression;
 struct DeleteExpression;
 
-struct Expression : public ASTNode
+struct Expression : public Statement
 {
-
-    void setLocation(SourceLocation l) { loc = l; }
-    SourceLocation loc;
 
     virtual bool isLValue() { return false; }
     virtual bool isConstant() { return false; }
     virtual ASTType *getType() { return NULL; }
 
-    Expression(SourceLocation l = SourceLocation()) : loc(l) {}
+    Expression(SourceLocation l = SourceLocation()) : Statement(l) {}
     virtual UnaryExpression *unaryExpression() { return NULL; }
     virtual BinaryExpression *binaryExpression() { return NULL; }
     virtual PrimaryExpression *primaryExpression() { return NULL; }
@@ -464,6 +539,23 @@ struct UnaryExpression : public Expression
     UnaryExpression(unsigned o, Expression *l, SourceLocation lo = SourceLocation()) :
         Expression(lo), lhs(l), op(o) {}
     virtual void accept(ASTVisitor *v);
+
+    virtual ASTType *getType() {
+        switch(op){
+            case tok::plusplus:
+            case tok::minusminus:
+            case tok::plus:
+            case tok::minus:
+            case tok::tilde:
+                     return lhs->getType();
+            case tok::bang:
+                     return ASTType::getBoolTy();
+            case tok::caret:
+                     return lhs->getType()->getReferencedTy();
+            case tok::amp:
+                     return lhs->getType()->getPointerTy();
+        }
+    }
 };
 
 struct BinaryExpression : public Expression
@@ -476,6 +568,43 @@ struct BinaryExpression : public Expression
     BinaryExpression(unsigned o, Expression *l, Expression *r, SourceLocation lo = SourceLocation()) :
         Expression(lo), lhs(l), rhs(r), op(o) {}
     virtual void accept(ASTVisitor *v);
+    virtual ASTType *getType() {
+        switch(op){
+            case tok::equal:
+            case tok::colonequal:
+            case tok::plusequal:
+            case tok::minusequal:
+            case tok::starequal:
+            case tok::slashequal:
+            case tok::ampequal:
+            case tok::barequal:
+            case tok::caretequal:
+            case tok::percentequal:
+                return lhs->getType();
+            case tok::barbar:
+            case tok::kw_or:
+            case tok::ampamp:
+            case tok::kw_and:
+            case tok::bangequal:
+            case tok::equalequal:
+            case tok::less:
+            case tok::lessequal:
+            case tok::greater:
+            case tok::greaterequal:
+                return ASTType::getBoolTy();
+            case tok::plus:
+            case tok::minus:
+            case tok::lessless:
+            case tok::greatergreater:
+            case tok::star:
+            case tok::slash:
+            case tok::percent:
+            case tok::bar:
+            case tok::amp:
+                //TODO: resolve type
+                return lhs->getType();
+        }
+    }
 };
 
 struct PrimaryExpression : public Expression
@@ -495,6 +624,7 @@ struct IdentifierExpression : public PrimaryExpression
     std::string getName() { return id->getName(); }
     virtual IdentifierExpression *identifierExpression() { return this; }
     virtual void accept(ASTVisitor *v);
+    virtual ASTType *getType() { return id->getType(); }
 };
 
 //struct TypeExpression : public Expression
@@ -674,89 +804,6 @@ struct IncludeExpression : public TopLevelExpression
 };
 
 
-/***
- *
- * STATEMENTS
- *
- ***/
-
-struct Statement : public ASTNode
-{
-    Statement(SourceLocation l) : loc(l) {}
-    virtual ~Statement(){}
-    SourceLocation loc;
-    SourceLocation getLocation() { return loc; }
-    virtual void accept(ASTVisitor *v);
-};
-
-struct BreakStatement : public Statement
-{
-    BreakStatement(SourceLocation l) : Statement(l) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct ContinueStatement : public Statement
-{
-    ContinueStatement(SourceLocation l) : Statement(l) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-
-struct LabelStatement : public Statement
-{
-    Identifier *identifier;
-    LabelStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct CaseStatement : public Statement
-{
-    std::vector<Expression *> values;
-    CaseStatement(std::vector<Expression*> vals, SourceLocation l = SourceLocation()) :
-        Statement(l), values(vals) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct GotoStatement : Statement
-{
-    Identifier *identifier;
-    GotoStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct DeclarationStatement : public Statement
-{
-    Declaration *declaration;
-    DeclarationStatement(Declaration *decl, SourceLocation l) : Statement(l), declaration(decl) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct ExpressionStatement : public Statement
-{
-    Expression *expression;
-    ExpressionStatement(Expression *exp, SourceLocation l) : Statement(l), expression(exp){}
-    virtual void accept(ASTVisitor *v);
-};
-
-// also works like pass. will assign to $ ?
-struct ReturnStatement : public Statement
-{
-    Expression *expression;
-    ReturnStatement(Expression *exp, SourceLocation l) : Statement(l), expression(exp) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-/*
- * once
- * {
- *  DOSTUFF
- * }; : DOSTUFF will only happen once, on first encounter of the once statement
- */
-struct OnceStatement : public Statement
-{
-    Statement *stmt;
-    OnceStatement(SourceLocation l) : Statement(l) {}
-};
 
 class ASTVisitor {
     std::stack<SymbolTable*> scope;
@@ -823,7 +870,6 @@ class ASTVisitor {
     virtual void visitCaseStatement(CaseStatement *stmt){}
     virtual void visitGotoStatement(GotoStatement *stmt){}
     virtual void visitDeclarationStatement(DeclarationStatement *stmt){}
-    virtual void visitExpressionStatement(ExpressionStatement *stmt){}
     virtual void visitReturnStatement(ReturnStatement *stmt){}
 };
 

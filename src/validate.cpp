@@ -292,16 +292,10 @@ void ValidationVisitor::visitDeclarationStatement(DeclarationStatement *stmt){
 
 }
 
-void ValidationVisitor::visitExpressionStatement(ExpressionStatement *stmt){
-#ifdef DEBUG
-    if(!stmt->expression){
-        valid = false;
-        emit_message(msg::ERROR, "null expression in expression statement");
-    }
-#endif
-
-}
-
 void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt){
-    //TODO: assert this value can be coerced to current function return
+    /*TODO: reenable when expression->getType() always works
+    if(!stmt->expression->getType()->coercesTo(getCurrentFunction()->getReturnType())){
+        valid = false;
+        emit_message(msg::ERROR, "returned value can not be converted to return type", stmt->loc);
+    }*/
 }

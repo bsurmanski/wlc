@@ -1,7 +1,13 @@
-class MyClass
+int main(int argc, char^^ argv)
 {
-    int a
-    int b
+    MyClass cl
+    MySpecialClass scl
+    cl.a = 5
+    scl.svar = 10
+    scl.a = 2
+    scl.b = 11
+    scl.myFunction(1,2)
+    return 0    
 }
 
 class MySpecialClass : MyClass
@@ -13,13 +19,8 @@ class MySpecialClass : MyClass
     }
 }
 
-int main(int argc, char^^ argv)
+class MyClass
 {
-    MyClass cl
-    MySpecialClass scl
-    cl.a = 5
-    scl.svar = 10
-    scl.a = 2
-    scl.b = 11
-    return 0    
+    int a
+    int b
 }

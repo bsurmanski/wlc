@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <iterator>
 #include "identifier.hpp"
 
 typedef std::map<std::string, Identifier*>::iterator SymbolIterator;

@@ -69,8 +69,15 @@ llvm::Type *IRCodegenContext::codegenHetrogenType(ASTType *ty)
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(hti->getMember(i)))
         {
             structVec.push_back(codegenType(vd->type));
-        } else
+        } else {
             emit_message(msg::UNIMPLEMENTED, "this cant be declared in a struct (yet?)");
+        }
+    }
+
+    for(int i = 0; i < hti->methods.size(); i++)
+    {
+        FunctionDeclaration *fdecl = hti->methods[i];
+            codegenDeclaration(fdecl);
     }
 
     if(hti->members.size())
@@ -139,8 +146,6 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
 
 llvm::Type *IRCodegenContext::codegenClassType(ASTType *ty) //TODO: actual codegen
 {
-    ClassTypeInfo *cti = (ClassTypeInfo*) ty->info;
-    cti->sortMembers();
     return codegenHetrogenType(ty);
 }
 
@@ -1682,9 +1687,9 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
 {
     if(!stmt) return;
     dwarfStopPoint(stmt->loc);
-    if(ExpressionStatement *estmt = dynamic_cast<ExpressionStatement*>(stmt))
+    if(Expression *estmt = dynamic_cast<Expression*>(stmt))
     {
-        codegenExpression(estmt->expression);
+        codegenExpression(estmt);
     } else if (DeclarationStatement *dstmt = dynamic_cast<DeclarationStatement*>(stmt))
     {
         codegenDeclaration(dstmt->declaration);

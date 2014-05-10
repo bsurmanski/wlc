@@ -60,7 +60,6 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitCaseStatement(CaseStatement *stmt);
     virtual void visitGotoStatement(GotoStatement *stmt);
     virtual void visitDeclarationStatement(DeclarationStatement *stmt);
-    virtual void visitExpressionStatement(ExpressionStatement *stmt);
     virtual void visitReturnStatement(ReturnStatement *stmt);
 };
 

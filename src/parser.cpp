@@ -447,7 +447,7 @@ Statement *ParseContext::parseStatement()
         case tok::minusminus:
         case tok::lparen:
 PARSEEXP:
-            return new ExpressionStatement(parseExpression(), loc);
+            return parseExpression();
 
         case tok::kw_return:
             ignore();
@@ -492,7 +492,7 @@ PARSEEXP:
             ignore();
             return NULL;
         default:
-            return new ExpressionStatement(parseExpression(), loc);
+            return parseExpression();
     }
 }
 
@@ -560,13 +560,17 @@ Declaration *ParseContext::parseDeclaration()
         SymbolTable *tbl = new SymbolTable(getScope(), SymbolTable::Scope_Struct);
         pushScope(tbl);
         vector<Declaration*> members;
+        vector<FunctionDeclaration*> methods;
         if(peek().is(tok::lbrace))
         {
             ignore(); // eat lbrace
             while(peek().isNot(tok::rbrace))
             {
                 Declaration *d = parseDeclaration();
-                members.push_back(d);
+                if(d->functionDeclaration())
+                    methods.push_back(d->functionDeclaration());
+                else
+                    members.push_back(d);
                 while(peek().is(tok::semicolon)) ignore();
             }
             ignore(); //eat rbrace
@@ -579,20 +583,21 @@ Declaration *ParseContext::parseDeclaration()
         switch(kind)
         {
             case kw_union:
-                sui = new UnionTypeInfo(id, tbl, members);
+                sui = new UnionTypeInfo(id, tbl, members, methods);
                 sdecl->setDeclaredType(new ASTType(TYPE_UNION, sui));
                 id->getDeclaredType()->setTypeInfo(sui, TYPE_UNION);
                 id->setDeclaration(sdecl, Identifier::ID_UNION);
                 break;
             case kw_struct:
-                sui = new StructTypeInfo(id, tbl, members);
+                sui = new StructTypeInfo(id, tbl, members, methods);
                 sdecl->setDeclaredType(new ASTType(TYPE_STRUCT, sui));
                 id->getDeclaredType()->setTypeInfo(sui, TYPE_STRUCT);
                 id->setDeclaration(sdecl, Identifier::ID_STRUCT);
                 break;
             case kw_class:
-                sui = new ClassTypeInfo(id, tbl, baseId, members); //TODO: use info
+                sui = new ClassTypeInfo(id, tbl, baseId, members, methods); //TODO: use info
                 sdecl->setDeclaredType(new ASTType(TYPE_CLASS, sui));
+                ((ClassTypeInfo*)sui)->sortMembers();
                 id->getDeclaredType()->setTypeInfo(sui, TYPE_CLASS);
                 id->setDeclaration(sdecl, Identifier::ID_CLASS);
                 break;

@@ -36,14 +36,6 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitIdentifierExpression(IdentifierExpression *exp);
     virtual void visitNumericExpression(NumericExpression *exp);
     virtual void visitStringExpression(StringExpression *exp);
-    virtual void visitCompoundExpression(CompoundExpression *exp);
-    virtual void visitBlockExpression(BlockExpression *exp);
-    virtual void visitElseExpression(ElseExpression *exp);
-    virtual void visitIfExpression(IfExpression *exp);
-    virtual void visitLoopExpression(LoopExpression *exp);
-    virtual void visitWhileExpression(WhileExpression *exp);
-    virtual void visitForExpression(ForExpression *exp);
-    virtual void visitSwitchExpression(SwitchExpression *exp);
     virtual void visitImportExpression(ImportExpression *exp);
     virtual void visitPackageExpression(PackageExpression *exp);
     virtual void visitCastExpression(CastExpression *exp);
@@ -61,6 +53,15 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitGotoStatement(GotoStatement *stmt);
     virtual void visitDeclarationStatement(DeclarationStatement *stmt);
     virtual void visitReturnStatement(ReturnStatement *stmt);
+
+    virtual void visitCompoundStatement(CompoundStatement *exp);
+    virtual void visitBlockStatement(BlockStatement *exp);
+    virtual void visitElseStatement(ElseStatement *exp);
+    virtual void visitIfStatement(IfStatement *exp);
+    virtual void visitLoopStatement(LoopStatement *exp);
+    virtual void visitWhileStatement(WhileStatement *exp);
+    virtual void visitForStatement(ForStatement *exp);
+    virtual void visitSwitchStatement(SwitchStatement *exp);
 };
 
 #endif

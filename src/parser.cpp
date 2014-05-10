@@ -199,7 +199,6 @@ ASTType *ParseContext::parseType()
     return type;
 }
 
-
 // parse top level expression and apply to translation unit
 void ParseContext::parseTopLevel(TranslationUnit *unit)
 {
@@ -429,12 +428,7 @@ Statement *ParseContext::parseStatement()
                 return parseDeclarationStatement();
             }*/
             goto PARSEEXP;
-        case tok::lbrace: // TODO: lbrace as statement instead of expression?
         case tok::kw_import:
-        case tok::kw_if:
-        case tok::kw_while:
-        case tok::kw_for:
-        case tok::kw_switch:
         case tok::intNum:
         case tok::floatNum:
         case tok::kw_true:
@@ -491,6 +485,16 @@ PARSEEXP:
         case tok::semicolon:
             ignore();
             return NULL;
+        case tok::kw_if:
+            return parseIfStatement();
+        case tok::kw_while:
+            return parseWhileStatement();
+        case tok::kw_for:
+            return parseForStatement();
+        case tok::kw_switch:
+            return parseSwitchStatement();
+        case tok::lbrace: // TODO: lbrace as statement instead of expression?
+            return parseCompoundStatement();
         default:
             return parseExpression();
     }
@@ -555,7 +559,6 @@ Declaration *ParseContext::parseDeclaration()
             dropLine();
             return NULL;
         }
-
 
         SymbolTable *tbl = new SymbolTable(getScope(), SymbolTable::Scope_Struct);
         pushScope(tbl);
@@ -726,12 +729,28 @@ Declaration *ParseContext::parseDeclaration()
     return decl;
 }
 
-Expression *ParseContext::parseIfExpression()
+Statement *ParseContext::parseCompoundStatement(){
+    SourceLocation loc = peek().getLocation();
+    ignore(); // eat lbrace
+    SymbolTable *tbl = new SymbolTable(getScope());
+    pushScope(tbl);
+    vector<Statement*> stmts;
+    while(peek().isNot(tok::rbrace))
+    {
+        if(Statement *stmt = parseStatement())
+            stmts.push_back(stmt);
+    }
+    popScope();
+    ignore(); // eat rbrace
+    return new CompoundStatement(tbl, stmts, loc);
+}
+
+Statement *ParseContext::parseIfStatement()
 {
     SourceLocation loc = peek().loc;
     Expression *cond = NULL;
     Statement *body = NULL;
-    ElseExpression *els = NULL;
+    ElseStatement *els = NULL;
     SymbolTable *parentScope = getScope();
     SymbolTable *scope = new SymbolTable(parentScope);
     pushScope(scope);
@@ -763,20 +782,19 @@ Expression *ParseContext::parseIfExpression()
         ignore(); // else kw
         SymbolTable *elseScope = new SymbolTable(parentScope);
         pushScope(elseScope);
-        els = new ElseExpression(elseScope, parseStatement(), elseLoc);
+        els = new ElseStatement(elseScope, parseStatement(), elseLoc);
         popScope();
     }
 
-
-    return new IfExpression(scope, cond, body, els, loc);
+    return new IfStatement(scope, cond, body, els, loc);
 }
 
-Expression *ParseContext::parseWhileExpression()
+Statement *ParseContext::parseWhileStatement()
 {
     SourceLocation loc = peek().loc;
     Expression *cond = NULL;
     Statement *body = NULL;
-    ElseExpression *els = NULL;
+    ElseStatement *els = NULL;
     SymbolTable *parentScope = getScope();
     SymbolTable *scope = new SymbolTable(parentScope);
     pushScope(scope);
@@ -800,22 +818,21 @@ Expression *ParseContext::parseWhileExpression()
         SourceLocation eloc = peek().loc;
         SymbolTable *elseScope = new SymbolTable(parentScope);
         pushScope(elseScope);
-        els = new ElseExpression(elseScope, parseStatement(), eloc);
+        els = new ElseStatement(elseScope, parseStatement(), eloc);
         popScope();
     }
 
-
-    return new WhileExpression(scope, cond, body, els, loc);
+    return new WhileStatement(scope, cond, body, els, loc);
 }
 
-Expression *ParseContext::parseForExpression()
+Statement *ParseContext::parseForStatement()
 {
     SourceLocation loc = peek().loc;
     Statement *decl = NULL;
     Expression *cond = NULL;
     Statement *upd = NULL;
     Statement *body = NULL;
-    ElseExpression *els = NULL;
+    ElseStatement *els = NULL;
     SymbolTable *parentScope = getScope();
     SymbolTable *scope = new SymbolTable(parentScope);
     pushScope(scope);
@@ -863,12 +880,11 @@ Expression *ParseContext::parseForExpression()
         ignore();
         SymbolTable *elseScope = new SymbolTable(parentScope);
         pushScope(elseScope);
-        els = new ElseExpression(elseScope, parseStatement(), eloc);
+        els = new ElseStatement(elseScope, parseStatement(), eloc);
         popScope();
     }
 
-
-    return new ForExpression(scope, decl, cond, upd, body, els, loc);
+    return new ForStatement(scope, decl, cond, upd, body, els, loc);
 }
 
 CaseStatement *ParseContext::parseCaseStatement()
@@ -893,7 +909,7 @@ CaseStatement *ParseContext::parseCaseStatement()
     return new CaseStatement(cases, loc);
 }
 
-Expression *ParseContext::parseSwitchExpression()
+Statement *ParseContext::parseSwitchStatement()
 {
     SourceLocation loc = peek().loc;
     SymbolTable *scope = new SymbolTable(getScope());
@@ -927,7 +943,7 @@ Expression *ParseContext::parseSwitchExpression()
     Statement *body = parseStatement();
     popScope();
 
-    return new SwitchExpression(scope, exp, body, loc);
+    return new SwitchStatement(scope, exp, body, loc);
 }
 
 Expression *ParseContext::parseCastExpression(int prec)
@@ -973,14 +989,6 @@ Expression *ParseContext::parseExpression(int prec)
 
     switch(peek().kind)
     {
-        case tok::kw_if:
-            return parseIfExpression();
-        case tok::kw_while:
-            return parseWhileExpression();
-        case tok::kw_for:
-            return parseForExpression();
-        case tok::kw_switch:
-            return parseSwitchExpression();
         case tok::kw_import:
             return parseImport();
         case tok::kw_new:
@@ -1186,22 +1194,6 @@ Expression *ParseContext::parsePrimaryExpression()
         }
         ignore();
         return exp;
-    }
-
-    if(peek().is(tok::lbrace))
-    {
-        ignore(); // eat lbrace
-        SymbolTable *tbl = new SymbolTable(getScope());
-        pushScope(tbl);
-        vector<Statement*> stmts;
-        while(peek().isNot(tok::rbrace))
-        {
-            if(Statement *stmt = parseStatement())
-                stmts.push_back(stmt);
-        }
-        popScope();
-        ignore(); // eat rbrace
-        return new CompoundExpression(tbl, stmts, loc);
     }
 
     if(peek().is(tok::identifier))

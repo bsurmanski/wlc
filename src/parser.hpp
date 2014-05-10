@@ -129,13 +129,14 @@ class ParseContext
     Statement *parseDeclarationStatement();
     Statement *parseStatement();
     CaseStatement *parseCaseStatement();
+    Statement *parseIfStatement();
+    Statement *parseSwitchStatement();
+    Statement *parseWhileStatement();
+    Statement *parseForStatement();
+    Statement *parseCompoundStatement();
     Declaration *parseDeclaration();
     TopLevelExpression *parseTopLevelExpression();
     UseExpression *parseUseExpression();
-    Expression *parseIfExpression();
-    Expression *parseSwitchExpression();
-    Expression *parseWhileExpression();
-    Expression *parseForExpression();
     Expression *parseCastExpression(int prec = 0);
     Expression *parseExpression(int prec = 0);
     Expression *parseNewExpression();

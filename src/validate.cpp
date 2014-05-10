@@ -148,65 +148,6 @@ void ValidationVisitor::visitStringExpression(StringExpression *exp){
 
 }
 
-void ValidationVisitor::visitCompoundExpression(CompoundExpression *exp){
-    if(!exp->getScope() && exp->statements.size()){
-        valid = false;
-        emit_message(msg::ERROR, "compound expression is missing scope");
-    }
-
-#ifdef DEBUG
-    for(int i = 0; i < exp->statements.size(); i++){
-        if(!exp->statements[i]){
-            valid = false;
-            emit_message(msg::ERROR, "null statement in compound expression");
-        }
-    }
-#endif
-}
-
-void ValidationVisitor::visitBlockExpression(BlockExpression *exp){
-#ifdef DEBUG
-    if(exp->getScope() && exp->body){
-        valid = false;
-        emit_message(msg::ERROR, "null scope in block expression");
-    }
-#endif
-
-}
-
-void ValidationVisitor::visitElseExpression(ElseExpression *exp){
-    if(!exp->body){
-        valid = false;
-        emit_message(msg::ERROR, "else expression expects body statement");
-    }
-}
-
-void ValidationVisitor::visitIfExpression(IfExpression *exp){
-    if(!exp->body){
-        valid = false;
-        emit_message(msg::ERROR, "if expression expects body statement");
-    }
-}
-
-void ValidationVisitor::visitLoopExpression(LoopExpression *exp){
-
-}
-
-void ValidationVisitor::visitWhileExpression(WhileExpression *exp){
-
-}
-
-void ValidationVisitor::visitForExpression(ForExpression *exp){
-
-}
-
-void ValidationVisitor::visitSwitchExpression(SwitchExpression *exp){
-    if(!exp->condition){
-        valid = false;
-        emit_message(msg::ERROR, "switch expression expects condition");
-    }
-}
-
 void ValidationVisitor::visitImportExpression(ImportExpression *exp){
     if(!exp->expression){
         valid = false;
@@ -290,6 +231,65 @@ void ValidationVisitor::visitDeclarationStatement(DeclarationStatement *stmt){
     }
 #endif
 
+}
+
+void ValidationVisitor::visitCompoundStatement(CompoundStatement *stmt){
+    if(!stmt->getScope() && stmt->statements.size()){
+        valid = false;
+        emit_message(msg::ERROR, "compound stmtression is missing scope");
+    }
+
+#ifdef DEBUG
+    for(int i = 0; i < stmt->statements.size(); i++){
+        if(!stmt->statements[i]){
+            valid = false;
+            emit_message(msg::ERROR, "null statement in compound stmtression");
+        }
+    }
+#endif
+}
+
+void ValidationVisitor::visitBlockStatement(BlockStatement *stmt){
+#ifdef DEBUG
+    if(stmt->getScope() && stmt->body){
+        valid = false;
+        emit_message(msg::ERROR, "null scope in block stmtression");
+    }
+#endif
+
+}
+
+void ValidationVisitor::visitElseStatement(ElseStatement *stmt){
+    if(!stmt->body){
+        valid = false;
+        emit_message(msg::ERROR, "else stmtression stmtects body statement");
+    }
+}
+
+void ValidationVisitor::visitIfStatement(IfStatement *stmt){
+    if(!stmt->body){
+        valid = false;
+        emit_message(msg::ERROR, "if stmtression stmtects body statement");
+    }
+}
+
+void ValidationVisitor::visitLoopStatement(LoopStatement *stmt){
+
+}
+
+void ValidationVisitor::visitWhileStatement(WhileStatement *stmt){
+
+}
+
+void ValidationVisitor::visitForStatement(ForStatement *stmt){
+
+}
+
+void ValidationVisitor::visitSwitchStatement(SwitchStatement *stmt){
+    if(!stmt->condition){
+        valid = false;
+        emit_message(msg::ERROR, "switch stmtression stmtects condition");
+    }
 }
 
 void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt){

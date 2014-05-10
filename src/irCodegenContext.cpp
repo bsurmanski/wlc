@@ -446,17 +446,7 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
 
 ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
 {
-    if(CompoundExpression *cexp = exp->compoundExpression())
-    {
-        for(int i = 0; i < cexp->statements.size(); i++)
-        {
-            if(!isTerminated() || (dynamic_cast<LabelStatement*>(cexp->statements[i]) ||
-                              dynamic_cast<CaseStatement*>(cexp->statements[i])))
-                codegenStatement(cexp->statements[i]);
-        }
-        return NULL; //TODO: value?
-    }
-    else if(NumericExpression *nexp = exp->numericExpression())
+    if(NumericExpression *nexp = exp->numericExpression())
     {
         llvm::Value *llvmval;
         ASTType *ty;
@@ -513,25 +503,6 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(IdentifierExpression *iexp = exp->identifierExpression())
     {
         return codegenIdentifier(iexp->id);
-    } else if(BlockExpression *bexp = exp->blockExpression())
-    {
-        ASTValue *value = NULL;
-        pushScope(new IRScope(bexp->scope, debug->createScope(getScope()->debug, bexp->loc)));
-        if(IfExpression *iexp = exp->ifExpression())
-        {
-            value = codegenIfExpression(iexp);
-        } else if(LoopExpression *lexp = exp->loopExpression())
-        {
-            value = codegenLoopExpression(lexp);
-        } else if(SwitchExpression *sexp = exp->switchExpression())
-        {
-            value = codegenSwitchExpression(sexp);
-        } else if(ElseExpression *eexp = exp->elseExpression())
-        {
-            value = codegenElseExpression(eexp);
-        }
-        popScope();
-        return value;
     } else if(ImportExpression *iexp = exp->importExpression())
     {
         //TODO: should it return something? probably. Some sort of const package ptr or something...
@@ -667,21 +638,20 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
     return NULL;
 }
 
-ASTValue *IRCodegenContext::codegenElseExpression(ElseExpression *exp)
+void IRCodegenContext::codegenElseStatement(ElseStatement *stmt)
 {
-    if(!exp->body)
+    if(!stmt->body)
     {
-        emit_message(msg::ERROR, "else keyword expects body", exp->loc);
-        return NULL;
+        emit_message(msg::ERROR, "else keyword expects body", stmt->loc);
+        return;
     }
 
-    codegenStatement(exp->body);
-    return NULL; //TODO: value?
+    codegenStatement(stmt->body);
 }
 
-ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
+void IRCodegenContext::codegenIfStatement(IfStatement *stmt)
 {
-    ASTValue *cond = codegenExpression(exp->condition);
+    ASTValue *cond = codegenExpression(stmt->condition);
 
     ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
     llvm::BasicBlock *ontrue = BasicBlock::Create(context, "true",
@@ -693,13 +663,13 @@ ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
     ir->CreateCondBr(codegenValue(icond), ontrue, onfalse);
 
     ir->SetInsertPoint(ontrue);
-    codegenStatement(exp->body);
+    codegenStatement(stmt->body);
     if(!isTerminated())
         ir->CreateBr(endif);
     setTerminated(false);
 
     ir->SetInsertPoint(onfalse);
-    if(exp->elsebr) codegenExpression(exp->elsebr);
+    if(stmt->elsebr) codegenStatement(stmt->elsebr);
     if(!isTerminated())
         ir->CreateBr(endif);
     setTerminated(false);
@@ -707,10 +677,10 @@ ASTValue *IRCodegenContext::codegenIfExpression(IfExpression *exp)
     ir->SetInsertPoint(endif);
     setTerminated(false);
 
-    return NULL;
+    return;
 }
 
-ASTValue *IRCodegenContext::codegenLoopExpression(LoopExpression *exp)
+void IRCodegenContext::codegenLoopStatement(LoopStatement *stmt)
 {
     llvm::BasicBlock *loopBB = BasicBlock::Create(context, "loop_condition",
             ir->GetInsertBlock()->getParent());
@@ -723,17 +693,17 @@ ASTValue *IRCodegenContext::codegenLoopExpression(LoopExpression *exp)
     llvm::BasicBlock *loopend = BasicBlock::Create(context, "loop_end",
             ir->GetInsertBlock()->getParent());
 
-    if(ForExpression *fexp = exp->forExpression())
+    if(ForStatement *fstmt = stmt->forStatement())
     {
-        if(fexp->decl) codegenStatement(fexp->decl);
+        if(fstmt->decl) codegenStatement(fstmt->decl);
     }
 
     ir->CreateBr(loopBB);
     ir->SetInsertPoint(loopBB);
 
-    if(exp->condition)
+    if(stmt->condition)
     {
-        ASTValue *cond = codegenExpression(exp->condition);
+        ASTValue *cond = codegenExpression(stmt->condition);
         ASTValue *icond = promoteType(cond, ASTType::getBoolTy());
         ir->CreateCondBr(codegenValue(icond), ontrue, onfalse);
     } else ir->CreateBr(ontrue);
@@ -744,21 +714,22 @@ ASTValue *IRCodegenContext::codegenLoopExpression(LoopExpression *exp)
     if(!loopupdate) getScope()->continueLabel = loopBB;
 
     ir->SetInsertPoint(ontrue);
-    if(exp->body) codegenStatement(exp->body);
+    if(stmt->body) codegenStatement(stmt->body);
     ir->CreateBr(loopupdate);
     ir->SetInsertPoint(loopupdate);
-    if(exp->update) codegenStatement(exp->update);
+    if(stmt->update) codegenStatement(stmt->update);
     ir->CreateBr(loopBB);
 
     ir->SetInsertPoint(onfalse);
-    if(exp->elsebr) codegenExpression(exp->elsebr); //TODO: scoping might be weird. ifScope is on stack
+    //TODO: scoping might be weird. ifScope is on stack
+    if(stmt->elsebr) codegenStatement(stmt->elsebr);
     ir->CreateBr(loopend);
 
     ir->SetInsertPoint(loopend);
-    return NULL;
+    return;
 }
 
-ASTValue *IRCodegenContext::codegenSwitchExpression(SwitchExpression *exp)
+void IRCodegenContext::codegenSwitchStatement(SwitchStatement *stmt)
 {
     BasicBlock *switch_default = BasicBlock::Create(context, "switch_default",
                                          ir->GetInsertBlock()->getParent());
@@ -768,16 +739,16 @@ ASTValue *IRCodegenContext::codegenSwitchExpression(SwitchExpression *exp)
 
     BasicBlock *preSwitch = ir->GetInsertBlock();
 
-    ASTValue *cond = codegenExpression(exp->condition);
+    ASTValue *cond = codegenExpression(stmt->condition);
     SwitchInst *sinst = ir->CreateSwitch(codegenValue(cond), switch_default);
     //TODO: set cases
 
-    getScope()->switchExp = exp;
+    getScope()->switchStmt = stmt;
     getScope()->breakLabel = switch_end;
 
     //setTerminated(true);
     ir->SetInsertPoint(switch_default);
-    if(exp->body) codegenStatement(exp->body);
+    if(stmt->body) codegenStatement(stmt->body);
 
     for(int i = 0; i < getScope()->cases.size(); i++)
     {
@@ -796,7 +767,7 @@ ASTValue *IRCodegenContext::codegenSwitchExpression(SwitchExpression *exp)
     ir->SetInsertPoint(switch_end);
     setTerminated(false);
 
-    return NULL; //TODO:
+    return;
 }
 
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
@@ -1753,8 +1724,34 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
 
         ir->CreateBr(cont);
         ir->SetInsertPoint(BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()));
+    } else if(CompoundStatement *cstmt = stmt->compoundStatement())
+    {
+        for(int i = 0; i < cstmt->statements.size(); i++)
+        {
+            if(!isTerminated() || (dynamic_cast<LabelStatement*>(cstmt->statements[i]) ||
+                              dynamic_cast<CaseStatement*>(cstmt->statements[i])))
+                codegenStatement(cstmt->statements[i]);
+        }
+        return;
+    } else if(BlockStatement *bstmt = stmt->blockStatement())
+    {
+        ASTValue *value = NULL;
+        pushScope(new IRScope(bstmt->scope, debug->createScope(getScope()->debug, bstmt->loc)));
+        if(IfStatement *istmt = stmt->ifStatement())
+        {
+            codegenIfStatement(istmt);
+        } else if(LoopStatement *lstmt = stmt->loopStatement())
+        {
+            codegenLoopStatement(lstmt);
+        } else if(SwitchStatement *sstmt = stmt->switchStatement())
+        {
+            codegenSwitchStatement(sstmt);
+        } else if(ElseStatement *estmt = stmt->elseStatement())
+        {
+            codegenElseStatement(estmt);
+        }
+        popScope();
     } else emit_message(msg::FAILURE, "i dont know what kind of statmeent this isssss", stmt->loc);
-
 }
 
 void IRCodegenContext::codegenDeclaration(Declaration *decl)

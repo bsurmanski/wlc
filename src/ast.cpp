@@ -150,67 +150,6 @@ void StringExpression::accept(ASTVisitor *v){
     v->visitStringExpression(this);
 }
 
-void CompoundExpression::accept(ASTVisitor *v){
-    Expression::accept(v);
-    v->visitCompoundExpression(this);
-    v->pushScope(scope);
-    for(int i = 0; i < statements.size(); i++)
-        if(statements[i])
-            statements[i]->accept(v);
-    v->popScope();
-}
-
-void BlockExpression::accept(ASTVisitor *v){
-    Expression::accept(v);
-    v->visitBlockExpression(this);
-    v->pushScope(scope);
-    if(body)
-        body->accept(v);
-    v->popScope();
-}
-
-void ElseExpression::accept(ASTVisitor *v){
-    Expression::accept(v);
-    v->visitElseExpression(this);
-}
-
-void IfExpression::accept(ASTVisitor *v){
-    Expression::accept(v);
-    v->visitIfExpression(this);
-    condition->accept(v);
-    if(elsebr)
-        elsebr->accept(v);
-}
-
-void LoopExpression::accept(ASTVisitor *v){
-    Expression::accept(v);
-    v->visitLoopExpression(this);
-    if(condition)
-        condition->accept(v);
-    if(update)
-        update->accept(v);
-    if(elsebr)
-        elsebr->accept(v);
-}
-
-void WhileExpression::accept(ASTVisitor *v){
-    Expression::accept(v);
-    v->visitWhileExpression(this);
-}
-
-void ForExpression::accept(ASTVisitor *v){
-    Expression::accept(v);
-    v->visitForExpression(this);
-    if(decl)
-        decl->accept(v);
-}
-
-void SwitchExpression::accept(ASTVisitor *v){
-    Expression::accept(v);
-    v->visitSwitchExpression(this);
-    if(condition)
-        condition->accept(v);
-}
 
 void ImportExpression::accept(ASTVisitor *v){
     Expression::accept(v);
@@ -316,3 +255,64 @@ void ReturnStatement::accept(ASTVisitor *v){
         expression->accept(v);
 }
 
+void CompoundStatement::accept(ASTVisitor *v){
+    Statement::accept(v);
+    v->visitCompoundStatement(this);
+    v->pushScope(scope);
+    for(int i = 0; i < statements.size(); i++)
+        if(statements[i])
+            statements[i]->accept(v);
+    v->popScope();
+}
+
+void BlockStatement::accept(ASTVisitor *v){
+    Statement::accept(v);
+    v->visitBlockStatement(this);
+    v->pushScope(scope);
+    if(body)
+        body->accept(v);
+    v->popScope();
+}
+
+void ElseStatement::accept(ASTVisitor *v){
+    Statement::accept(v);
+    v->visitElseStatement(this);
+}
+
+void IfStatement::accept(ASTVisitor *v){
+    Statement::accept(v);
+    v->visitIfStatement(this);
+    condition->accept(v);
+    if(elsebr)
+        elsebr->accept(v);
+}
+
+void LoopStatement::accept(ASTVisitor *v){
+    Statement::accept(v);
+    v->visitLoopStatement(this);
+    if(condition)
+        condition->accept(v);
+    if(update)
+        update->accept(v);
+    if(elsebr)
+        elsebr->accept(v);
+}
+
+void WhileStatement::accept(ASTVisitor *v){
+    Statement::accept(v);
+    v->visitWhileStatement(this);
+}
+
+void ForStatement::accept(ASTVisitor *v){
+    Statement::accept(v);
+    v->visitForStatement(this);
+    if(decl)
+        decl->accept(v);
+}
+
+void SwitchStatement::accept(ASTVisitor *v){
+    Statement::accept(v);
+    v->visitSwitchStatement(this);
+    if(condition)
+        condition->accept(v);
+}

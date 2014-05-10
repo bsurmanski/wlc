@@ -276,6 +276,14 @@ struct StructUnionDeclaration : public TypeDeclaration
  * STATEMENTS
  *
  ***/
+struct CompoundStatement;
+struct BlockStatement;
+struct ElseStatement;
+struct IfStatement;
+struct LoopStatement;
+struct WhileStatement;
+struct ForStatement;
+struct SwitchStatement;
 
 struct Statement : public ASTNode
 {
@@ -285,6 +293,15 @@ struct Statement : public ASTNode
     void setLocation(SourceLocation l) { loc = l; }
     SourceLocation getLocation() { return loc; }
     virtual void accept(ASTVisitor *v);
+
+    virtual CompoundStatement *compoundStatement() { return NULL; }
+    virtual BlockStatement *blockStatement() { return NULL; }
+    virtual ElseStatement *elseStatement() { return NULL; }
+    virtual IfStatement *ifStatement() { return NULL; }
+    virtual LoopStatement *loopStatement() { return NULL; }
+    virtual WhileStatement *whileStatement() { return NULL; }
+    virtual ForStatement *forStatement() { return NULL; }
+    virtual SwitchStatement *switchStatement() { return NULL; }
 };
 
 struct BreakStatement : public Statement
@@ -337,6 +354,96 @@ struct ReturnStatement : public Statement
     virtual void accept(ASTVisitor *v);
 };
 
+// value of (bool) 0. if 'pass' is encountered, value of pass
+//TODO: probably shouldn't be an expression
+struct CompoundStatement : public Statement
+{
+    //TODO: sym table
+    SymbolTable *scope;
+    SymbolTable *getScope() { return scope; }
+    std::vector<Statement*> statements;
+    CompoundStatement(SymbolTable *sc, std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
+        scope(sc), Statement(l), statements(s) {}
+    virtual CompoundStatement *compoundStatement() { return this; }
+    virtual void accept(ASTVisitor *v);
+};
+
+// value of following expression, or (bool) 1 if not found
+
+struct BlockStatement : public Statement
+{
+    SymbolTable *scope;
+    SymbolTable *getScope() { return scope; }
+    Statement *body;
+    virtual BlockStatement *blockStatement() { return this; }
+    BlockStatement(SymbolTable *sc, Statement *b, SourceLocation l = SourceLocation()) :
+        scope(sc), body(b), Statement(l) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct ElseStatement : public BlockStatement
+{
+    ElseStatement(SymbolTable *sc, Statement *b, SourceLocation l = SourceLocation()) :
+        BlockStatement(sc, b, l) {}
+    virtual ElseStatement *elseStatement() { return this; }
+    virtual void accept(ASTVisitor *v);
+};
+
+// value of following expression. usually block, with (bool) 0 / (bool) 1 pass
+struct IfStatement : public BlockStatement
+{
+    Expression *condition;
+    ElseStatement *elsebr;
+    virtual IfStatement *ifStatement() { return this; }
+    IfStatement(SymbolTable *sc, Expression *c, Statement *b, ElseStatement *e,
+            SourceLocation l = SourceLocation()) :
+        BlockStatement(sc, b, l), condition(c), elsebr(e) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct LoopStatement : public BlockStatement
+{
+    Expression *condition;
+    Statement *update;
+    ElseStatement *elsebr;
+    LoopStatement *loopStatement() { return this; }
+    LoopStatement(SymbolTable *sc, Expression *c, Statement *u, Statement *b, ElseStatement *el,
+            SourceLocation l = SourceLocation()) : BlockStatement(sc, b, l), condition(c),
+                                                update(u), elsebr(el) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+// value same as if
+struct WhileStatement : public LoopStatement
+{
+    virtual WhileStatement *whileStatement() { return this; }
+    WhileStatement(SymbolTable *sc, Expression *c, Statement *b, ElseStatement *e,
+            SourceLocation l = SourceLocation()) :
+        LoopStatement(sc, c, NULL, b, e, l) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct ForStatement : public LoopStatement
+{
+    Statement *decl;
+    virtual ForStatement *forStatement() { return this; }
+    ForStatement(SymbolTable *sc, Statement *d, Expression *c, Statement *u,
+            Statement *b, ElseStatement *e,
+            SourceLocation l = SourceLocation()) : LoopStatement(sc, c, u, b, e, l),
+        decl(d) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct SwitchStatement : public BlockStatement
+{
+    Expression *condition;
+    virtual SwitchStatement *switchStatement() { return this; }
+    SwitchStatement(SymbolTable *sc, Expression *cond, Statement *b,
+            SourceLocation l = SourceLocation())
+        : BlockStatement(sc, b, l), condition(cond) {}
+    virtual void accept(ASTVisitor *v);
+};
+
 /*
  * once
  * {
@@ -365,15 +472,7 @@ struct IdentifierExpression;
 struct NumericExpression;
 struct StringExpression;
 struct DeclarationExpression;
-struct CompoundExpression;
-struct BlockExpression;
-struct ElseExpression;
-struct IfExpression;
-struct LoopExpression;
-struct WhileExpression;
-struct ForExpression;
 struct PassExpression;
-struct SwitchExpression;
 struct TopLevelExpression;
 struct ImportExpression;
 struct PackageExpression;
@@ -402,15 +501,7 @@ struct Expression : public Statement
     virtual IdentifierExpression *identifierExpression() { return NULL; }
     virtual NumericExpression *numericExpression() { return NULL; }
     virtual StringExpression *stringExpression() { return NULL; }
-    virtual CompoundExpression *compoundExpression() { return NULL; }
-    virtual BlockExpression *blockExpression() { return NULL; }
-    virtual ElseExpression *elseExpression() { return NULL; }
-    virtual IfExpression *ifExpression() { return NULL; }
-    virtual LoopExpression *loopExpression() { return NULL; }
-    virtual WhileExpression *whileExpression() { return NULL; }
-    virtual ForExpression *forExpression() { return NULL; }
     virtual PassExpression *passExpression() { return NULL; }
-    virtual SwitchExpression *switchExpression() { return NULL; }
     virtual TopLevelExpression *topLevelExpression() { return NULL; }
     virtual ImportExpression *importExpression() { return NULL; }
     virtual PackageExpression *packageExpression() { return NULL; }
@@ -674,95 +765,6 @@ struct NumericExpression : public PrimaryExpression
 struct Statement;
 
 
-// value of (bool) 0. if 'pass' is encountered, value of pass
-//TODO: probably shouldn't be an expression
-struct CompoundExpression : public Expression
-{
-    //TODO: sym table
-    SymbolTable *scope;
-    SymbolTable *getScope() { return scope; }
-    std::vector<Statement*> statements;
-    CompoundExpression(SymbolTable *sc, std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
-        scope(sc), Expression(l), statements(s) {}
-    virtual CompoundExpression *compoundExpression() { return this; }
-    virtual void accept(ASTVisitor *v);
-};
-
-// value of following expression, or (bool) 1 if not found
-
-struct BlockExpression : public Expression
-{
-    SymbolTable *scope;
-    SymbolTable *getScope() { return scope; }
-    Statement *body;
-    virtual BlockExpression *blockExpression() { return this; }
-    BlockExpression(SymbolTable *sc, Statement *b, SourceLocation l = SourceLocation()) :
-        scope(sc), body(b), Expression(l) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct ElseExpression : public BlockExpression
-{
-    ElseExpression(SymbolTable *sc, Statement *b, SourceLocation l = SourceLocation()) :
-        BlockExpression(sc, b, l) {}
-    virtual ElseExpression *elseExpression() { return this; }
-    virtual void accept(ASTVisitor *v);
-};
-
-// value of following expression. usually block, with (bool) 0 / (bool) 1 pass
-struct IfExpression : public BlockExpression
-{
-    Expression *condition;
-    ElseExpression *elsebr;
-    virtual IfExpression *ifExpression() { return this; }
-    IfExpression(SymbolTable *sc, Expression *c, Statement *b, ElseExpression *e,
-            SourceLocation l = SourceLocation()) :
-        BlockExpression(sc, b, l), condition(c), elsebr(e) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct LoopExpression : public BlockExpression
-{
-    Expression *condition;
-    Statement *update;
-    ElseExpression *elsebr;
-    LoopExpression *loopExpression() { return this; }
-    LoopExpression(SymbolTable *sc, Expression *c, Statement *u, Statement *b, ElseExpression *el,
-            SourceLocation l = SourceLocation()) : BlockExpression(sc, b, l), condition(c),
-                                                update(u), elsebr(el) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-// value same as if
-struct WhileExpression : public LoopExpression
-{
-    virtual WhileExpression *whileExpression() { return this; }
-    WhileExpression(SymbolTable *sc, Expression *c, Statement *b, ElseExpression *e,
-            SourceLocation l = SourceLocation()) :
-        LoopExpression(sc, c, NULL, b, e, l) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct ForExpression : public LoopExpression
-{
-    Statement *decl;
-    virtual ForExpression *forExpression() { return this; }
-    ForExpression(SymbolTable *sc, Statement *d, Expression *c, Statement *u,
-            Statement *b, ElseExpression *e,
-            SourceLocation l = SourceLocation()) : LoopExpression(sc, c, u, b, e, l),
-        decl(d) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct SwitchExpression : public BlockExpression
-{
-    Expression *condition;
-    virtual SwitchExpression *switchExpression() { return this; }
-    SwitchExpression(SymbolTable *sc, Expression *cond, Statement *b,
-            SourceLocation l = SourceLocation())
-        : BlockExpression(sc, b, l), condition(cond) {}
-    virtual void accept(ASTVisitor *v);
-};
 
 struct PackageExpression : public Expression
 {
@@ -846,14 +848,6 @@ class ASTVisitor {
     virtual void visitIdentifierExpression(IdentifierExpression *exp){}
     virtual void visitNumericExpression(NumericExpression *exp){}
     virtual void visitStringExpression(StringExpression *exp){}
-    virtual void visitCompoundExpression(CompoundExpression *exp){}
-    virtual void visitBlockExpression(BlockExpression *exp){}
-    virtual void visitElseExpression(ElseExpression *exp){}
-    virtual void visitIfExpression(IfExpression *exp){}
-    virtual void visitLoopExpression(LoopExpression *exp){}
-    virtual void visitWhileExpression(WhileExpression *exp){}
-    virtual void visitForExpression(ForExpression *exp){}
-    virtual void visitSwitchExpression(SwitchExpression *exp){}
     virtual void visitImportExpression(ImportExpression *exp){}
     virtual void visitPackageExpression(PackageExpression *exp){}
     virtual void visitCastExpression(CastExpression *exp){}
@@ -871,6 +865,15 @@ class ASTVisitor {
     virtual void visitGotoStatement(GotoStatement *stmt){}
     virtual void visitDeclarationStatement(DeclarationStatement *stmt){}
     virtual void visitReturnStatement(ReturnStatement *stmt){}
+
+    virtual void visitCompoundStatement(CompoundStatement *exp){}
+    virtual void visitBlockStatement(BlockStatement *exp){}
+    virtual void visitElseStatement(ElseStatement *exp){}
+    virtual void visitIfStatement(IfStatement *exp){}
+    virtual void visitLoopStatement(LoopStatement *exp){}
+    virtual void visitWhileStatement(WhileStatement *exp){}
+    virtual void visitForStatement(ForStatement *exp){}
+    virtual void visitSwitchStatement(SwitchStatement *exp){}
 };
 
 #endif

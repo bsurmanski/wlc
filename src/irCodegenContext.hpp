@@ -72,7 +72,7 @@ struct IRScope
     IRScope *parent;
 
     //switch
-    SwitchExpression *switchExp;
+    SwitchStatement *switchStmt;
     std::vector<IRSwitchCase*> cases;
 
     llvm::DIDescriptor getDebug() { return debug; }
@@ -91,7 +91,7 @@ struct IRScope
 
     void addCase(Expression *cs, ASTValue *ircs, llvm::BasicBlock *bl)
     {
-        if(switchExp)
+        if(switchStmt)
         {
             cases.push_back(new IRSwitchCase(cs, ircs, bl));
         } else if(parent)
@@ -202,10 +202,6 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenDeleteExpression(DeleteExpression *exp);
 
     ASTValue *codegenIdentifier(Identifier *id);
-    ASTValue *codegenIfExpression(IfExpression *exp);
-    ASTValue *codegenElseExpression(ElseExpression *exp);
-    ASTValue *codegenLoopExpression(LoopExpression *exp);
-    ASTValue *codegenSwitchExpression(SwitchExpression *exp);
     ASTValue *codegenCallExpression(CallExpression *exp);
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);
     ASTValue *codegenUnaryExpression(UnaryExpression *exp);
@@ -226,6 +222,11 @@ class IRCodegenContext : public CodegenContext
     // codegen statement
     void codegenReturnStatement(ReturnStatement *exp);
     void codegenStatement(Statement *stmt);
+
+    void codegenIfStatement(IfStatement *stmt);
+    void codegenElseStatement(ElseStatement *stmt);
+    void codegenLoopStatement(LoopStatement *stmt);
+    void codegenSwitchStatement(SwitchStatement *stmt);
 
     // codegen declaration
     void codegenDeclaration(Declaration *decl);

@@ -275,12 +275,12 @@ void BlockStatement::accept(ASTVisitor *v){
 }
 
 void ElseStatement::accept(ASTVisitor *v){
-    Statement::accept(v);
+    BlockStatement::accept(v);
     v->visitElseStatement(this);
 }
 
 void IfStatement::accept(ASTVisitor *v){
-    Statement::accept(v);
+    BlockStatement::accept(v);
     v->visitIfStatement(this);
     condition->accept(v);
     if(elsebr)
@@ -288,7 +288,7 @@ void IfStatement::accept(ASTVisitor *v){
 }
 
 void LoopStatement::accept(ASTVisitor *v){
-    Statement::accept(v);
+    BlockStatement::accept(v);
     v->visitLoopStatement(this);
     if(condition)
         condition->accept(v);
@@ -299,19 +299,19 @@ void LoopStatement::accept(ASTVisitor *v){
 }
 
 void WhileStatement::accept(ASTVisitor *v){
-    Statement::accept(v);
+    LoopStatement::accept(v);
     v->visitWhileStatement(this);
 }
 
 void ForStatement::accept(ASTVisitor *v){
-    Statement::accept(v);
+    LoopStatement::accept(v);
     v->visitForStatement(this);
     if(decl)
         decl->accept(v);
 }
 
 void SwitchStatement::accept(ASTVisitor *v){
-    Statement::accept(v);
+    BlockStatement::accept(v);
     v->visitSwitchStatement(this);
     if(condition)
         condition->accept(v);

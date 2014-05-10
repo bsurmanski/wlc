@@ -243,7 +243,7 @@ void ValidationVisitor::visitCompoundStatement(CompoundStatement *stmt){
     for(int i = 0; i < stmt->statements.size(); i++){
         if(!stmt->statements[i]){
             valid = false;
-            emit_message(msg::ERROR, "null statement in compound stmtression");
+            emit_message(msg::ERROR, "null statement in compound statement");
         }
     }
 #endif
@@ -251,9 +251,9 @@ void ValidationVisitor::visitCompoundStatement(CompoundStatement *stmt){
 
 void ValidationVisitor::visitBlockStatement(BlockStatement *stmt){
 #ifdef DEBUG
-    if(stmt->getScope() && stmt->body){
+    if(!stmt->getScope() && stmt->body){
         valid = false;
-        emit_message(msg::ERROR, "null scope in block stmtression");
+        emit_message(msg::ERROR, "null scope in block statement");
     }
 #endif
 

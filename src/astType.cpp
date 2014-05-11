@@ -257,45 +257,38 @@ Declaration *ClassTypeInfo::getMemberByName(std::string member){
 }
 
 //
-// PointerTypeInfo
+// PointerASTType
 //
-std::string PointerTypeInfo::getName(){
+std::string ASTPointerType::getName(){
     return ptrTo->getName() + "^";
-}
-
-//
-// ArrayTypeInfo
-//
-std::string ArrayTypeInfo::getName(){
-    return "array[" + arrayOf->getName() + "]";
 }
 
 //
 // StaticArrayTypeInfo
 //
-size_t StaticArrayTypeInfo::getAlign(){
+size_t ASTStaticArrayType::getAlign() const {
     return arrayOf->getAlign();
 }
 
-size_t StaticArrayTypeInfo::getSize() {
+size_t ASTStaticArrayType::getSize() const {
     return size * arrayOf->getSize();
 }
 
 //
 // DynamicArrayTypeInfo
 //
-size_t DynamicArrayTypeInfo::getAlign(){
+size_t ASTDynamicArrayType::getAlign() const {
     return ASTType::getCharTy()->getPointerTy()->getAlign();
 }
 
-size_t DynamicArrayTypeInfo::getSize() {
+size_t ASTDynamicArrayType::getSize() const {
     return ASTType::getCharTy()->getPointerTy()->getSize() + ASTType::getULongTy()->getSize();
 }
 
 //
-// TupleTypeInfo
+// ASTTupleType
 //
-size_t TupleTypeInfo::getSize()
+size_t ASTTupleType::getSize() const
 {
     size_t sz = 0;
     unsigned align;
@@ -309,7 +302,7 @@ size_t TupleTypeInfo::getSize()
     return sz;
 }
 
-size_t TupleTypeInfo::getAlign()
+size_t ASTTupleType::getAlign() const
 {
     size_t max = 0;
     for(int i = 0; i < types.size(); i++)
@@ -327,9 +320,7 @@ ASTType *ASTType::getPointerTy()
 {
     if(!pointerTy)
     {
-        ASTType *pty = new ASTType(TYPE_POINTER);
-        pty->setTypeInfo(new PointerTypeInfo(this));
-        pointerTy = pty;
+        pointerTy = new ASTPointerType(this);
     }
     return pointerTy;
 }
@@ -338,9 +329,7 @@ ASTType *ASTType::getArrayTy()
 {
     if(!dynamicArrayTy)
     {
-        ASTType *aty = new ASTType(TYPE_DYNAMIC_ARRAY);
-        aty->setTypeInfo(new DynamicArrayTypeInfo(this));
-        dynamicArrayTy = aty;
+        dynamicArrayTy = new ASTDynamicArrayType(this);
     }
     return dynamicArrayTy;
 }
@@ -350,9 +339,7 @@ ASTType *ASTType::getArrayTy(int sz)
     ASTType *aty = 0;
     if(!arrayTy.count(sz))
     {
-        aty = new ASTType(TYPE_ARRAY);
-        aty->setTypeInfo(new StaticArrayTypeInfo(this, sz));
-        arrayTy[sz] = aty;
+        aty = arrayTy[sz] = new ASTStaticArrayType(this, sz);
     } else aty = arrayTy[sz];
     return aty;
 }
@@ -400,9 +387,7 @@ ASTType *ASTType::DynamicTy = 0;
 ASTType *ASTType::getTupleTy(std::vector<ASTType *> t)
 {
     // TODO: type cache
-    ASTType *ty = new ASTType();
-    ty->setTypeInfo(new TupleTypeInfo(t), TYPE_TUPLE);
-    return ty;
+    return new ASTTupleType(t);
 }
 
 ASTType *ASTType::getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg)

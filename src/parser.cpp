@@ -560,6 +560,10 @@ Declaration *ParseContext::parseDeclaration()
             return NULL;
         }
 
+        HetrogenTypeInfo *sui = 0;
+        HetroDeclaration *sud = 0;
+        HetroDeclaration *sdecl = new HetroDeclaration(id, NULL, t_id.loc);
+
         SymbolTable *tbl = new SymbolTable(getScope(), SymbolTable::Scope_Struct);
         pushScope(tbl);
         vector<Declaration*> members;
@@ -570,6 +574,7 @@ Declaration *ParseContext::parseDeclaration()
             while(peek().isNot(tok::rbrace))
             {
                 Declaration *d = parseDeclaration();
+                //d->owner = sdecl;
                 if(d->functionDeclaration())
                     methods.push_back(d->functionDeclaration());
                 else
@@ -579,9 +584,6 @@ Declaration *ParseContext::parseDeclaration()
             ignore(); //eat rbrace
         } else ignore(); // eat semicolon
 
-        HetrogenTypeInfo *sui = 0;
-        StructUnionDeclaration *sud = 0;
-        StructUnionDeclaration *sdecl = new StructUnionDeclaration(id, NULL, t_id.loc);
 
         switch(kind)
         {
@@ -715,7 +717,7 @@ Declaration *ParseContext::parseDeclaration()
         emit_message(msg::ERROR, "dynamic type 'var' without initializer", t_id.loc);
     }
 
-    if(ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(type->info))
+    if(ASTArrayType *aty = dynamic_cast<ASTArrayType*>(type))
     {
         Declaration *adecl = new ArrayDeclaration(type, id, defaultValue, t_id.loc, external);
         id->setDeclaration(adecl, Identifier::ID_VARIABLE);

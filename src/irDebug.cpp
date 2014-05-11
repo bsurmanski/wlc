@@ -40,7 +40,7 @@ llvm::DIDescriptor IRDebug::createScope(llvm::DIDescriptor parent, SourceLocatio
 llvm::DICompositeType IRDebug::createDynamicArrayType(ASTType *ty)
 {
     llvm::DIDescriptor DIContext(currentFile());
-    ArrayTypeInfo *ati = (ArrayTypeInfo*) ty->info;
+    ASTArrayType *arrty = (ASTArrayType*) ty;
     vector<Value *> vec;
     vec.push_back(di.createMemberType(DIContext,
                 "ptr",
@@ -50,7 +50,7 @@ llvm::DICompositeType IRDebug::createDynamicArrayType(ASTType *ty)
                 64,
                 0,
                 0,
-                createType(ati->arrayOf)));
+                createType(arrty->arrayOf)));
 
     vec.push_back(di.createMemberType(DIContext,
                 "size",
@@ -78,10 +78,10 @@ llvm::DICompositeType IRDebug::createDynamicArrayType(ASTType *ty)
 llvm::DICompositeType IRDebug::createArrayType(ASTType *ty)
 {
     llvm::DIDescriptor DIContext(currentFile());
-    ArrayTypeInfo *ati = (ArrayTypeInfo*) ty->info;
-    assert(!ati->isDynamic());
-    return di.createArrayType(ati->length(), ati->arrayOf->getAlign(),
-            createType(ati->arrayOf),
+    ASTArrayType *arrty = (ASTArrayType*) ty;
+    assert(!arrty->isDynamic());
+    return di.createArrayType(arrty->length(), arrty->arrayOf->getAlign(),
+            createType(arrty->arrayOf),
             DIArray());
 }
 
@@ -90,13 +90,13 @@ llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
 
     assert(ty->kind == TYPE_TUPLE && "expected struct");
     llvm::DIDescriptor DIContext(currentFile());
-    TupleTypeInfo *tti = (TupleTypeInfo*) ty->info;
+    ASTTupleType *tupty = dynamic_cast<ASTTupleType*>(ty);
     vector<Value *> vec;
     int offset = 0;
-    for(int i = 0; i < tti->types.size(); i++)
+    for(int i = 0; i < tupty->types.size(); i++)
     {
-        unsigned size = tti->types[i]->getSize();
-        unsigned align = tti->types[i]->getAlign();
+        unsigned size = tupty->types[i]->getSize();
+        unsigned align = tupty->types[i]->getAlign();
         if(offset % align)
             offset += (align - (offset % align));
         stringstream ss;
@@ -110,8 +110,8 @@ llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
                     align * 8,
                     offset * 8,
                     0,
-                    createType(tti->types[i])));
-        offset += tti->types[i]->getSize();
+                    createType(tupty->types[i])));
+        offset += tupty->types[i]->getSize();
         //TODO: members
     }
 
@@ -129,7 +129,7 @@ llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
             );
 }
 
-llvm::DICompositeType IRDebug::createHetrogenType(ASTType *ty) //TODO: proper calculation
+llvm::DICompositeType IRDebug::createHetroType(ASTType *ty) //TODO: proper calculation
 {
     llvm::DIDescriptor DIContext(currentFile());
     HetrogenTypeInfo *hti = (HetrogenTypeInfo*) ty->info;

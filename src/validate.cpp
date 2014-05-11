@@ -79,6 +79,14 @@ void ValidationVisitor::visitLabelDeclaration(LabelDeclaration *decl){
 }
 
 void ValidationVisitor::visitVariableDeclaration(VariableDeclaration *decl){
+    if(decl->getType()->kind == TYPE_DYNAMIC){
+        if(!decl->value){
+            valid = false;
+            emit_message(msg::ERROR,
+                    "dynamically typed variables must have valid initializer", decl->loc);
+        }
+
+    }
 
 }
 
@@ -89,7 +97,7 @@ void ValidationVisitor::visitTypeDeclaration(TypeDeclaration *decl){
     }
 }
 
-void ValidationVisitor::visitStructUnionDeclaration(StructUnionDeclaration *decl){
+void ValidationVisitor::visitHetroDeclaration(HetroDeclaration *decl){
 
 }
 

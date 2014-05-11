@@ -85,7 +85,7 @@ llvm::Type *IRCodegenContext::codegenHetrogenType(ASTType *ty)
         sty->setBody(structVec);
     }
 
-    debug->createHetrogenType(ty);
+    debug->createHetroType(ty);
     return sty;
 }
 
@@ -151,8 +151,8 @@ llvm::Type *IRCodegenContext::codegenClassType(ASTType *ty) //TODO: actual codeg
 
 llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
 {
-    TupleTypeInfo *tti = dynamic_cast<TupleTypeInfo*>(ty->info);
-    if(ty->kind != TYPE_TUPLE || !tti)
+    ASTTupleType *tupty = dynamic_cast<ASTTupleType*>(ty);
+    if(ty->kind != TYPE_TUPLE || !tupty)
     {
         emit_message(msg::FAILURE, "invalid tuple type codegen");
         return NULL;
@@ -160,16 +160,16 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
 
     if(ty->cgType) return ty->cgType;
 
-    if(!tti->types.size())
+    if(!tupty->types.size())
     {
         emit_message(msg::ERROR, "invalid 0-tuple");
         return NULL;
     }
 
     std::vector<Type*> tupleVec;
-    for(int i = 0; i < tti->types.size(); i++)
+    for(int i = 0; i < tupty->types.size(); i++)
     {
-        tupleVec.push_back(codegenType(tti->types[i]));
+        tupleVec.push_back(codegenType(tupty->types[i]));
     }
 
     StructType *tty = StructType::create(context);
@@ -189,21 +189,21 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
  */
 llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
 {
-    ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(ty->info);
-    if(!ati) {
+    ASTArrayType *arrty = dynamic_cast<ASTArrayType*>(ty);
+    if(!arrty) {
         emit_message(msg::FAILURE, "attempt to codegen invalid array type");
     }
 
     if(ty->cgType) return ty->cgType;
 
-    if(ati->isDynamic())
+    if(arrty->isDynamic())
     {
         //Identifier *id = ast->getRuntimeUnit()->getScope()->lookup("DynamicArray");
         //ASTType *arrayty = id->getDeclaredType();
         //ty->cgType = codegenType(arrayty);
 
         vector<Type*> members;
-        members.push_back(codegenType(ati->arrayOf->getPointerTy()));
+        members.push_back(codegenType(arrty->arrayOf->getPointerTy()));
         members.push_back(codegenType(ASTType::getLongTy()));
         StructType *aty = StructType::create(context, ty->getName());
         aty->setBody(members);
@@ -212,7 +212,7 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
         debug->createDynamicArrayType(ty);
     } else
     {
-        llvm::ArrayType *aty = ArrayType::get(codegenType(ati->arrayOf), ati->length());
+        llvm::ArrayType *aty = ArrayType::get(codegenType(arrty->arrayOf), arrty->length());
         ty->cgType = aty;
 
         debug->createArrayType(ty);
@@ -406,15 +406,9 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
                 return unit->globals[id->getName()];
             } else
             {
-                Declaration *decl = id->getDeclaration();
-                GlobalValue::LinkageTypes linkage = decl->isExternal() ?
-                    GlobalValue::ExternalLinkage : GlobalValue::ExternalWeakLinkage;
-                GlobalVariable *GV = new GlobalVariable(*module,
-                        codegenType(id->getType()),
-                        false,
-                        linkage,
-                        NULL,
-                        id->getName());
+                GlobalVariable* GV =
+                (GlobalVariable*) module->getOrInsertGlobal(id->getName(), codegenType(id->getType()));
+                assert(GV);
                 IRValue irval = IRValue(new ASTValue(id->getType(), GV, true), GV);
                 unit->globals[id->getName()] = irval;
                 return irval;
@@ -425,10 +419,11 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
         return id->getValue(); // else declared in current TU, so we are good
     } else if(id->isFunction())
     {
-        Value *llvmfunc = unit->functions[id->getName()];
         FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
         if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
-        id->setValue(new ASTValue(fdecl->prototype, llvmfunc));
+        FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
+        Constant *func = module->getOrInsertFunction(fdecl->getName(), fty);
+        id->setValue(new ASTValue(fdecl->prototype, func));
     } else if(id->isStruct())
     {
         id->setValue(new ASTValue(id->getDeclaredType(), NULL));
@@ -550,9 +545,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
         if(!val->isLValue()) lvalue = false;
     }
 
-    TupleTypeInfo *tti = new TupleTypeInfo(types);
-    ASTType *tty = new ASTType();
-    tty->setTypeInfo(tti, TYPE_TUPLE);
+    ASTTupleType *tupty = new ASTTupleType(types);
 
     if(lvalue)
     {
@@ -567,7 +560,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
             llvals.push_back((Constant*) codegenValue(vals[i]));
         }
 
-        StructType *llty = (StructType*) codegenType(tty);
+        StructType *llty = (StructType*) codegenType(tupty);
 
         GlobalVariable *GV = new GlobalVariable(*module, llty, true,
                 GlobalValue::PrivateLinkage,
@@ -577,7 +570,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
         //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         //Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
-        return new ASTValue(tty, GV, true);
+        return new ASTValue(tupty, GV, true);
     }
 }
 
@@ -593,7 +586,11 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
     vector<Value*> llargs;
     llargs.push_back(ConstantInt::get(codegenType(ASTType::getULongTy()),
                 exp->type->getSize()));
-    Function *mallocFunc = module->getFunction("malloc");
+    vector<Type*> llargty;
+    llargty.push_back(codegenType(ASTType::getULongTy()));
+    FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()->getPointerTy()),
+            llargty, false);
+    Function *mallocFunc = (Function*) module->getOrInsertFunction("malloc", fty);
     Value *value;
     value = ir->CreateCall(mallocFunc, llargs);
     if(exp->type->isArray())
@@ -616,6 +613,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
 {
     vector<Value*> llargs;
+    vector<Type*> llargty;
     ASTValue *val = codegenExpression(exp->expression);
 
     if(val->type->isArray() && val->type->kind == TYPE_DYNAMIC_ARRAY)
@@ -630,7 +628,10 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
 
     val = promoteType(val, ASTType::getCharTy()->getPointerTy());
     llargs.push_back(codegenValue(val));
-    Function *freeFunc = module->getFunction("free");
+    llargty.push_back(codegenType(ASTType::getVoidTy()->getPointerTy()));
+
+    FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()), llargty, false);
+    Function *freeFunc = (Function*) module->getOrInsertFunction("free", fty);
 
     Value *value = ir->CreateCall(freeFunc, llargs);
     //TODO: call deallocator function
@@ -966,14 +967,14 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         {
             if(ConstantInt *llci = dynamic_cast<ConstantInt*>(codegenValue(ind)))
             {
-                TupleTypeInfo *tti = (TupleTypeInfo*) arr->getType()->info;
+                ASTTupleType *tupty = (ASTTupleType*) dynamic_cast<ASTTupleType*>(arr->getType());
                 unsigned long long index = llci->getZExtValue();
-                if(tti->types.size() <= index)
+                if(tupty->types.size() <= index)
                 {
                     emit_message(msg::ERROR, "invalid tuple index", exp->loc);
                     return NULL;
                 }
-                ASTType *type = tti->types[index];
+                ASTType *type = tupty->types[index];
                 Value *val = ir->CreateStructGEP(codegenLValue(arr), index);
                 return new ASTValue(type, val, true);
             } else
@@ -1108,12 +1109,12 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             }
             else if(lhs->getType()->kind == TYPE_DYNAMIC_ARRAY)
             {
-                ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(lhs->getType()->info);
-                if(!ati){
+                ASTArrayType *arrty = dynamic_cast<ASTArrayType*>(lhs->getType());
+                if(!arrty){
                     emit_message(msg::FATAL, "dot exp on array, not actually an array?", dexp->loc);
                     return NULL;
                 }
-                ASTType *ty = ati->getReferenceTy();
+                ASTType *ty = arrty->getReferencedTy();
 
                 if(dexp->rhs == "ptr")
                 {
@@ -1134,8 +1135,8 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 }
             } else if(lhs->getType()->kind == TYPE_ARRAY)
             {
-                ArrayTypeInfo *ati = dynamic_cast<ArrayTypeInfo*>(lhs->getType()->info);
-                ASTType *ty = ati->getReferenceTy();
+                ASTArrayType *arrty = dynamic_cast<ASTArrayType*>(lhs->getType());
+                ASTType *ty = arrty->getReferencedTy();
 
                 if(dexp->rhs == "ptr")
                 {
@@ -1146,7 +1147,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 if(dexp->rhs == "size")
                 {
                     return new ASTValue(ASTType::getULongTy(),
-                            ConstantInt::get(Type::getInt64Ty(context), ati->length()));
+                            ConstantInt::get(Type::getInt64Ty(context), arrty->length()));
                 }
             }
         emit_message(msg::ERROR, "unknown dot expression", exp->loc);
@@ -1228,7 +1229,7 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
 {
     if(toType->kind == TYPE_STRUCT)
     {
-        if(((TupleTypeInfo*) val->type->info)->types.size() ==
+        if(((ASTTupleType*) val->type)->types.size() ==
                 ((StructTypeInfo*) toType->info)->members.size()) //TODO proper test
         {
             Value *toPtr = ir->CreateBitCast(codegenLValue(val),
@@ -1241,8 +1242,8 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
         }
     } else if(toType->kind == TYPE_TUPLE)
     {
-        if(((TupleTypeInfo*) val->type->info)->types.size() ==
-                ((TupleTypeInfo*) toType->info)->types.size())
+        if(((ASTTupleType*) val->type)->types.size() ==
+                ((ASTTupleType*) toType)->types.size())
         {
             Value *toPtr;
             if(val->isLValue())
@@ -1285,8 +1286,8 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
         {
             toPtr = ir->CreateBitCast(codegenLValue(val),
                     codegenType(toType->getReferencedTy())->getPointerTo());
-            TupleTypeInfo *tti = (TupleTypeInfo*) val->type->info;
-            toSize = ConstantInt::get(codegenType(ASTType::getULongTy()), tti->length());
+            ASTTupleType *tupty = (ASTTupleType*) val->type;
+            toSize = ConstantInt::get(codegenType(ASTType::getULongTy()), tupty->length());
 
             arr = ir->CreateAlloca(codegenType(toType));
             ir->CreateStore(toPtr, ir->CreateStructGEP(arr, 0));
@@ -1306,8 +1307,8 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
     {
         if(toType->kind == TYPE_POINTER)
         {
-            ArrayTypeInfo *ati = (ArrayTypeInfo*) val->type->info;
-            if(ati->arrayOf != toType->getReferencedTy())
+            ASTArrayType *arrty = (ASTArrayType*) val->type;
+            if(arrty->arrayOf != toType->getReferencedTy())
             {
                 emit_message(msg::ERROR, "invalid convesion from array to invalid pointer type");
                 return NULL;
@@ -1760,10 +1761,15 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     {
         IRFunction backup = currentFunction;
         currentFunction = IRFunction(fdecl);
-        // create on declaration(?) No, then other references my be invalid
-        Function *func = module->getFunction(currentFunction.getName());
+
+        FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
+        Function *func;
+        func = (Function*) module->getOrInsertFunction(fdecl->getName(), fty);
+        unit->functions[fdecl->getName()] = func;
+
         if(fdecl->body)
         {
+            func->setLinkage(Function::ExternalLinkage);
             BasicBlock *BB = BasicBlock::Create(context, "entry", func);
             BasicBlock *exitBB = BasicBlock::Create(context, "exit", func);
             currentFunction.exit = exitBB;
@@ -1812,7 +1818,6 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
                 //TODO: register value to scope
             }
 
-
             codegenStatement(fdecl->body);
 
             if(!isTerminated())
@@ -1831,7 +1836,10 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             }
 
             popScope();
+        } else {
+            func->setLinkage(Function::ExternalWeakLinkage);
         }
+
         setTerminated(false);
         currentFunction = backup;
     } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl))
@@ -1936,46 +1944,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 //XXX should be 'import'?
 void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc)
 {
-    // alloc globals before codegen'ing functions
-    /*
-    for(int i = 0; i < inc->globals.size(); i++)
-    {
-        Identifier *id = inc->globals[i]->identifier;
-        if(id->isVariable() && !id->getValue())
-        {
-            ASTType *idTy = id->getType();
-            //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
-            GlobalValue::LinkageTypes linkage = inc->globals[i]->external ?
-                GlobalValue::ExternalLinkage : GlobalValue::ExternalWeakLinkage;
-            linkage = GlobalValue::WeakAnyLinkage;
-            GlobalVariable *llvmval = new GlobalVariable(*current->module,
-                    codegenType(idTy),
-                    false,
-                    linkage,
-                    NULL,
-                    id->getName()); //TODO: proper global insertion
 
-            ASTValue *gv = new ASTValue(idTy, llvmval, true);
-            id->setValue(gv); //TODO: is id declared across modules? should value only be set in local module?
-        } else if(id->isFunction())
-        {
-            //TODO: declare func
-        }
-    }*/
-
-    // declare functions prototypes
-    for(int i = 0; i < inc->functions.size(); i++)
-    {
-        FunctionDeclaration *fdecl = inc->functions[i];
-
-        if(current->functions.count(fdecl->getName())) continue;
-
-        FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
-        Function *func = Function::Create(fty, Function::ExternalWeakLinkage,
-                fdecl->getName(), current->module);
-
-        current->functions[fdecl->getName()] = func;
-    }
 }
 
 void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
@@ -1999,9 +1968,6 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
         if(id->isVariable())
         {
             ASTType *idTy = id->getType();
-            //llvm::Value *llvmval = module->getOrInsertGlobal(id->getName(), codegenType(idTy));
-            GlobalValue::LinkageTypes linkage = globals[i]->external ?
-                GlobalValue::ExternalLinkage : GlobalValue::ExternalLinkage;
 
             //TODO: correct type for global storage (esspecially pointers?)
             ASTValue *idValue = 0;
@@ -2032,12 +1998,13 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
                 gValue = (llvm::Constant*) llvm::Constant::getNullValue(codegenType(idTy));
             }
 
-            GlobalVariable *llvmval = new GlobalVariable(*module,
-                    codegenType(idTy),
-                    false,
-                    linkage,
-                    gValue,
-                    id->getName()); //TODO: proper global insertion
+            GlobalVariable *llvmval = (GlobalVariable*)
+                    module->getOrInsertGlobal(id->getName(), codegenType(idTy));
+
+            GlobalValue::LinkageTypes linkage = globals[i]->external ?
+                GlobalValue::ExternalLinkage : GlobalValue::ExternalLinkage;
+            llvmval->setLinkage(linkage);
+            llvmval->setInitializer(gValue);
 
             ASTValue *gv = new ASTValue(idTy, llvmval, true);
             id->setValue(gv);
@@ -2051,22 +2018,9 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
         }
     }
 
-    // declare functions prototypes
     std::vector<FunctionDeclaration*>& functions = unit->getFunctions();
-    for(int i = 0; i < functions.size(); i++)
-    {
-        FunctionDeclaration *fdecl = functions[i];
-        FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
-        Function *func;
 
-        if(unit->functions.count(fdecl->getName())) continue; // XXX duplicate?
-
-        //cout << "CG: " << fdecl->getName() << " : " << fdecl->identifier->getMangledName() << endl;
-        func = Function::Create(fty, Function::ExternalLinkage, fdecl->getName(), module);
-
-        unit->functions[fdecl->getName()] = func;
-    }
-        // codegen function bodys
+    // codegen function bodys
     for(int i = 0; i < functions.size(); i++)
         codegenDeclaration(functions[i]);
 

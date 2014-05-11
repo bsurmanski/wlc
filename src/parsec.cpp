@@ -95,8 +95,8 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
         clang_visitChildren(typeDecl, StructVisitor, &svarg);
 
         StructTypeInfo *sti = new StructTypeInfo(id, tbl, members, std::vector<FunctionDeclaration*>());
-        StructUnionDeclaration *sdecl =
-            new StructUnionDeclaration(id, NULL, SourceLocation());
+        HetroDeclaration *sdecl =
+            new HetroDeclaration(id, NULL, SourceLocation());
         id->getDeclaredType()->setTypeInfo(sti,
                 typeDecl.kind == CXCursor_StructDecl ? TYPE_STRUCT : TYPE_UNION);
         id->setDeclaration(sdecl,

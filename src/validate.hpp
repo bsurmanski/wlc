@@ -2,6 +2,7 @@
 #define _VALIDATE_HPP
 
 #include "ast.hpp"
+#include "astVisitor.hpp"
 
 enum Validity {
     UNCHECKED,
@@ -26,7 +27,7 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitLabelDeclaration(LabelDeclaration *decl);
     virtual void visitVariableDeclaration(VariableDeclaration *decl);
     virtual void visitTypeDeclaration(TypeDeclaration *decl);
-    virtual void visitStructUnionDeclaration(StructUnionDeclaration *decl);
+    virtual void visitHetroDeclaration(HetroDeclaration *decl);
 
     virtual void visitUnaryExpression(UnaryExpression *exp);
     virtual void visitBinaryExpression(BinaryExpression *exp);

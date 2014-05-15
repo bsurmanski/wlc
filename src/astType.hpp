@@ -28,9 +28,7 @@ enum ASTTypeEnum
     TYPE_ULONG,
     TYPE_FLOAT,
     TYPE_DOUBLE,
-    TYPE_STRUCT,
-    TYPE_UNION,
-    TYPE_CLASS,
+    TYPE_USER,
     TYPE_FUNCTION,
     TYPE_POINTER,
     TYPE_DYNAMIC,
@@ -40,155 +38,12 @@ enum ASTTypeEnum
     TYPE_VEC,
 };
 
-struct TypeInfo
-{
-    TypeInfo(){}
-    virtual ~TypeInfo(){}
-    virtual ASTType *getReferenceTy() { return NULL; }
-    virtual std::string getName() { return ""; }
-    virtual size_t getSize() { assert(false && "size of type is unknown"); }
-    virtual size_t getAlign() { assert(false && "alignment of type is unknown"); }
-    virtual size_t length() { return 1; }
-};
-
-
 struct VariableDeclaration;
-struct HetroDeclaration;
-
-struct CompositeTypeInfo : TypeInfo
-{
-    virtual ASTType *getContainedType(unsigned index) = 0;
-};
-
-struct FunctionTypeInfo : CompositeTypeInfo
-{
-    ASTType *ret;
-    std::vector<ASTType*> params;
-    bool vararg;
-
-    FunctionTypeInfo(ASTType *r, std::vector<ASTType *> p, bool va = false) :
-        ret(r), params(p), vararg(va) {}
-
-    bool isVararg() { return vararg; }
-
-    ASTType *getContainedType(unsigned index)
-    {
-        if(index == 0) return ret;
-        return params[index-1];
-    }
-
-};
-
-/*
-struct ArrayTypeInfo : public CompositeTypeInfo
-{
-    ASTType *arrayOf;
-    virtual ASTType *getReferenceTy() { return arrayOf; }
-    virtual ASTType *getContainedType(unsigned i) { return arrayOf; }
-    virtual size_t getSize() = 0;
-    virtual size_t getAlign() = 0;
-    virtual bool isDynamic() = 0;
-    virtual size_t length() = 0;
-    ArrayTypeInfo(ASTType *pto) : arrayOf(pto) {}
-    std::string getName();
-};
-
-struct StaticArrayTypeInfo : ArrayTypeInfo
-{
-    unsigned size;
-    virtual size_t getSize();
-    virtual size_t getAlign();
-    virtual bool isDynamic() { return false; }
-    virtual size_t length() { return size; }
-    StaticArrayTypeInfo(ASTType *pto, int sz) : ArrayTypeInfo(pto), size(sz) {}
-};
-
-struct DynamicArrayTypeInfo : ArrayTypeInfo
-{
-    virtual size_t getSize();
-    virtual size_t getAlign();
-    virtual bool isDynamic() { return true; }
-    virtual size_t length() { return 0; }
-    DynamicArrayTypeInfo(ASTType *pto) : ArrayTypeInfo(pto) {}
-};
-*/
-
-// hetrogeneous type info
-// some type that contains internal types which are not guarenteed to be of the same type
 struct FunctionDeclaration;
-struct HetrogenTypeInfo : public CompositeTypeInfo
-{
-    SymbolTable *scope;
-    Identifier *identifier;
-    std::vector<Declaration*> members; // <type, name>
-    std::vector<FunctionDeclaration*> methods;
-    HetrogenTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m,
-            std::vector<FunctionDeclaration*> mt) :
-        identifier(id), scope(sc), members(m), methods(mt){}
-    std::string getName() { return identifier->getName(); }
-    virtual size_t length() { return members.size(); }
-    virtual ASTType *getContainedType(unsigned i);
-    virtual size_t getMemberOffset(size_t i) = 0;
-    virtual size_t getMemberOffset(std::string member) = 0;
-    virtual long getMemberIndex(std::string member) = 0;
-    virtual Declaration *getMember(size_t index);
-    virtual Declaration *getMemberByName(std::string member);
-    virtual size_t getAlign();
-    HetroDeclaration *getDeclaration() {
-        return (HetroDeclaration*) identifier->getDeclaration();
-    }
-};
-
-struct StructTypeInfo : public HetrogenTypeInfo
-{
-    bool packed;
-    StructTypeInfo(Identifier *id, SymbolTable *sc,
-            std::vector<Declaration*> m, std::vector<FunctionDeclaration*> mt) :
-        HetrogenTypeInfo(id, sc, m, mt), packed(false) {}
-    virtual size_t getSize();
-    virtual size_t getMemberOffset(size_t i);
-    virtual size_t getMemberOffset(std::string member);
-    virtual long getMemberIndex(std::string member);
-};
-
-struct UnionTypeInfo : public HetrogenTypeInfo
-{
-    UnionTypeInfo(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m,
-            std::vector<FunctionDeclaration*> mt) :
-        HetrogenTypeInfo(id, sc, m, mt) {}
-    std::string getName() { return identifier->getName(); }
-    virtual size_t getSize();
-    virtual size_t getMemberOffset(size_t i) { return 0; }
-    virtual size_t getMemberOffset(std::string member) { return 0; }
-    virtual long getMemberIndex(std::string member) { return 0; }
-};
-
-struct ClassTypeInfo : public HetrogenTypeInfo
-{
-    Identifier *base; //XXX what about basic types?
-
-    ClassTypeInfo(Identifier *id, SymbolTable *sc, Identifier *b, std::vector<Declaration*> m,
-            std::vector<FunctionDeclaration*> mt) :
-        HetrogenTypeInfo(id, sc, m, mt), base(b) {}
-    HetrogenTypeInfo *baseHetrogenTypeInfo();
-    virtual Declaration *getMember(size_t index);
-    virtual size_t length();
-    virtual size_t getSize();
-    void sortMembers();
-    virtual size_t getMemberOffset(size_t i);
-    virtual size_t getMemberOffset(std::string member);
-    virtual long getMemberIndex(std::string member);
-    virtual Declaration *getMemberByName(std::string member);
-};
-
-struct NamedUnknownInfo : public TypeInfo
-{
-    SymbolTable *scope;
-    Identifier *identifier;
-    NamedUnknownInfo(Identifier *id, SymbolTable *sc) : identifier(id), scope(sc) {}
-    virtual std::string getName() { return identifier->getName(); }
-};
-
+struct UserTypeDeclaration;
+struct ASTUserType;
+struct ASTCompositeType;
+struct ASTFunctionType;
 #include <llvm/DebugInfo.h> //XXX
 struct ASTType
 {
@@ -198,26 +53,22 @@ struct ASTType
     llvm::Type *cgType; //TODO: should not have llvm in here!
     llvm::DIType diType; //TODO: whatever, prototype
 
-    Declaration *declaration;
     std::map<int, ASTType*> arrayTy;
 
-    TypeInfo *info;
-    void setTypeInfo(TypeInfo *i, ASTTypeEnum en = TYPE_UNKNOWN)
+    void setTypeInfo(ASTTypeEnum en = TYPE_UNKNOWN)
     {
-        info = i;
         if(en != TYPE_UNKNOWN) kind = en;
     }
-    TypeInfo *getTypeInfo() { return info; }
 
-    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), cgType(0), info(0)
+    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), cgType(0)
     {}
 
-    ASTType(enum ASTTypeEnum ty, TypeInfo *i) :
-        kind(ty), pointerTy(0), cgType(0), info(i)
+    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL)
     {}
-
-    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL), info(0){}
     virtual ~ASTType(){}
+
+    virtual bool isResolved(){ return true; }
+    virtual ASTType *getTypeResolution() { return this; }
 
     void accept(ASTVisitor *v);
     //ASTType(ASTTypeQual q) : qual(q), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
@@ -226,7 +77,8 @@ struct ASTType
     ASTType *getPointerTy();
     ASTType *getArrayTy(int sz);
     ASTType *getArrayTy();
-    virtual size_t getSize() const
+    virtual UserTypeDeclaration *getDeclaration() { return NULL; }
+    virtual size_t getSize()
     {
         switch(kind)
         {
@@ -244,21 +96,16 @@ struct ASTType
             case TYPE_DOUBLE: return 8;
             case TYPE_ARRAY:
             case TYPE_DYNAMIC_ARRAY:
-            case TYPE_STRUCT:
-            case TYPE_UNION:
-            case TYPE_CLASS:
-            default: return info->getSize();
+            default: assert(false && "unimplemented getsize");
         }
     }
 
     // conversion priority
-    unsigned getPriority() const
+    unsigned getPriority()
     {
         switch(kind)
         {
-            case TYPE_UNION:
-            case TYPE_STRUCT:
-            case TYPE_CLASS:
+            case TYPE_USER:
                 return 0;
             case TYPE_TUPLE:
                 return 1;
@@ -323,12 +170,12 @@ struct ASTType
         return true;  //TODO
     }
 
-    virtual size_t length() const
+    virtual size_t length()
     {
         return 1;
     }
 
-    virtual size_t getAlign() const
+    virtual size_t getAlign()
     {
 
         switch(kind)
@@ -345,7 +192,7 @@ struct ASTType
             case TYPE_POINTER: return 8;
             case TYPE_FLOAT: return 4;
             case TYPE_DOUBLE: return 8;
-            default: return info->getAlign();
+            default: assert(false && "unimplemented align");
         }
     };
 
@@ -365,15 +212,12 @@ struct ASTType
             case TYPE_FLOAT: return "float";
             case TYPE_DOUBLE: return "double";
             case TYPE_VOID: return "void";
-            default: return info->getName();
+            default: assert(false && "unimplemented getname");
         }
     }
 
     virtual ASTType *getReferencedTy() const { return NULL; }
-    bool isAggregate() { return kind == TYPE_STRUCT || kind == TYPE_UNION || kind == TYPE_CLASS; }
-    bool isClass() { return kind == TYPE_CLASS; }
-    bool isStruct() { return kind == TYPE_STRUCT; }
-    bool isUnion() { return kind == TYPE_UNION; }
+    bool isAggregate() { return kind == TYPE_USER; } //XXX kinda...
     bool isBool() { return kind == TYPE_BOOL; }
     bool isInteger() { return kind == TYPE_BOOL || kind == TYPE_CHAR || kind == TYPE_SHORT ||
         kind == TYPE_INT || kind == TYPE_LONG ||
@@ -385,7 +229,15 @@ struct ASTType
     bool isVector() { return kind == TYPE_VEC; }
     bool isArray() { return kind == TYPE_ARRAY || kind == TYPE_DYNAMIC_ARRAY; }
     bool isPointer() { return this && kind == TYPE_POINTER; } //TODO: shouldnt need to test for this
-    bool isComposite() { return dynamic_cast<CompositeTypeInfo*>(info); }
+    bool isComposite() { return compositeType(); }
+    virtual bool isUnknown() { return false; }
+    virtual bool isClass() { return false; }
+    virtual bool isStruct() { return false; }
+    virtual bool isUnion() { return false; }
+
+    virtual ASTUserType *userType() { return NULL; }
+    virtual ASTCompositeType *compositeType() { return NULL; }
+    virtual ASTFunctionType *functionType() { return NULL; }
 
     static std::vector<ASTType *> typeCache;
 #define DECLTY(NM) static ASTType *NM; static ASTType *get##NM();
@@ -412,14 +264,75 @@ struct ASTType
     static ASTType *getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg=false);
 };
 
-struct ASTTupleType : public ASTType {
+struct ASTBasicType : public ASTType {
+    ASTBasicType(ASTTypeEnum k) : ASTType(k) {}
+};
+
+struct ASTCompositeType : public ASTType {
+    ASTCompositeType(ASTTypeEnum k) : ASTType(k) {}
+    virtual ASTType *getMemberType(size_t i) = 0;
+    virtual ASTCompositeType *compositeType() { return this; }
+};
+
+struct ASTFunctionType : public ASTCompositeType {
+    ASTType *ret;
+    std::vector<ASTType*> params;
+    bool vararg;
+
+    ASTFunctionType(ASTType *r, std::vector<ASTType *> p, bool va = false) :
+        ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION) {}
+
+    bool isVararg() { return vararg; }
+
+    ASTType *getMemberType(size_t index)
+    {
+        if(index == 0) return ret;
+        return params[index-1];
+    }
+
+    virtual ASTFunctionType *functionType() { return this; }
+};
+
+struct UserTypeDeclaration;
+struct ASTUserType : public ASTCompositeType {
+    Identifier *identifier;
+    ASTUserType(Identifier *id, UserTypeDeclaration *d=NULL) : ASTCompositeType(TYPE_USER),
+    identifier(id){
+        //TODO: assert identifier is properly declared, declaration is present
+    }
+
+    virtual std::string getName() { return identifier->getName(); }
+    virtual ASTUserType *userType() { return this; }
+    virtual bool isUnknown() { return !identifier->getDeclaredType(); }
+    virtual bool isOpaque();
+    virtual size_t length();
+    virtual size_t getSize();
+    virtual size_t getAlign();
+    Declaration *getMember(size_t i);
+    ASTType *getMemberType(size_t i);
+    Declaration *getMemberByName(std::string nm);
+    long getMemberIndex(std::string member);
+    long getMemberOffset(size_t i);
+    virtual UserTypeDeclaration *getDeclaration() {
+        return (UserTypeDeclaration*) identifier->getDeclaration();
+    }
+
+    virtual bool isResolved() { return getDeclaration(); }
+    virtual ASTType *getTypeResolution();
+
+    virtual bool isClass();
+    virtual bool isStruct();
+    virtual bool isUnion();
+};
+
+struct ASTTupleType : public ASTCompositeType {
     std::vector<ASTType*> types;
-    virtual ASTType *getContainedType(unsigned i) { return types[i]; }
-    virtual size_t length() const { return types.size(); }
-    virtual size_t getSize() const;
-    virtual size_t getAlign() const;
+    virtual ASTType *getMemberType(size_t i) { return types[i]; }
+    virtual size_t length() { return types.size(); }
+    virtual size_t getSize();
+    virtual size_t getAlign();
     virtual std::string getName() { return ""; }
-    ASTTupleType(std::vector<ASTType*> t) : ASTType(TYPE_TUPLE), types(t) {}
+    ASTTupleType(std::vector<ASTType*> t) : ASTCompositeType(TYPE_TUPLE), types(t) {}
 };
 
 struct ASTPointerType : public ASTType {
@@ -429,32 +342,32 @@ struct ASTPointerType : public ASTType {
     virtual std::string getName();
 };
 
-struct ASTArrayType : public ASTType {
+struct ASTArrayType : public ASTCompositeType {
     ASTType *arrayOf;
     virtual ASTType *getReferencedTy() const { return arrayOf; }
-    virtual ASTType *getContainedType(unsigned i) { return arrayOf; }
-    virtual size_t getSize() const = 0;
-    virtual size_t getAlign() const = 0;
+    virtual ASTType *getMemberType(size_t i) { return arrayOf; }
+    virtual size_t getSize()= 0;
+    virtual size_t getAlign() = 0;
     virtual bool isDynamic() = 0;
-    virtual size_t length() const = 0;
-    ASTArrayType(ASTType *pto, ASTTypeEnum kind) : arrayOf(pto), ASTType(kind) {}
+    virtual size_t length() = 0;
+    ASTArrayType(ASTType *pto, ASTTypeEnum kind) : arrayOf(pto), ASTCompositeType(kind) {}
     std::string getName() { return "array[" + arrayOf->getName() + "]"; }
 };
 
 struct ASTStaticArrayType : public ASTArrayType {
     unsigned size;
-    virtual size_t getSize() const;
-    virtual size_t getAlign() const;
+    virtual size_t getSize();
+    virtual size_t getAlign();
     virtual bool isDynamic() { return false; }
-    virtual size_t length() const { return size; }
+    virtual size_t length() { return size; }
     ASTStaticArrayType(ASTType *pto, int sz) : ASTArrayType(pto, TYPE_ARRAY), size(sz){}
 };
 
 struct ASTDynamicArrayType : public ASTArrayType {
-    virtual size_t getSize() const;
-    virtual size_t getAlign() const;
+    virtual size_t getSize();
+    virtual size_t getAlign();
     virtual bool isDynamic() { return true; }
-    virtual size_t length() const { return 0; }
+    virtual size_t length() { return 0; }
     ASTDynamicArrayType(ASTType *pto) : ASTArrayType(pto, TYPE_DYNAMIC_ARRAY) {}
 };
 

@@ -16,7 +16,7 @@ void Identifier::setDeclaration(Declaration *decl, IDType ty)
         if(declaration)
         {
             emit_message(msg::FATAL, "redefinition of " + getName() +
-                    "originally defined at " + declaration->loc.toString(), decl->loc);
+                    " originally defined at " + declaration->loc.toString(), decl->loc);
         }
     declaration = decl;
     type = ty;
@@ -24,23 +24,19 @@ void Identifier::setDeclaration(Declaration *decl, IDType ty)
 
 ASTType *Identifier::getType()
 {
-    if(VariableDeclaration *vdcl = dynamic_cast<VariableDeclaration*>(declaration))
-    {
-        return vdcl->type;
-    }
+    return declaration->getType();
 }
 
 ASTType *Identifier::getDeclaredType()
 {
     //TODO: class
-    if(type != ID_STRUCT && type != ID_UNKNOWN && type != ID_UNION && type != ID_CLASS) {
+    if(type != ID_USER && type != ID_UNKNOWN) {
         //emit_message(msg::FAILURE, "this doesnt look like a type");
         return NULL;
     }
     if(!astType)
     {
-        astType = new ASTType();
-        astType->info = new NamedUnknownInfo(this, NULL);
+        astType = new ASTUserType(this);
     }
     return astType;
 }
@@ -72,3 +68,7 @@ std::string Identifier::getMangledName() {
     }
     return mangled;
 }
+
+bool Identifier::isStruct() { return dynamic_cast<StructDeclaration*>(declaration); }
+bool Identifier::isUnion() { return dynamic_cast<UnionDeclaration*>(declaration); }
+bool Identifier::isClass() { return dynamic_cast<ClassDeclaration*>(declaration); }

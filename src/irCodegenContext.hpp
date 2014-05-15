@@ -161,7 +161,7 @@ class IRCodegenContext : public CodegenContext
 
     // codegen type
     llvm::Type *codegenArrayType(ASTType *ty);
-    llvm::Type *codegenHetrogenType(ASTType *ty);
+    llvm::Type *codegenUserType(ASTType *ty);
     llvm::Type *codegenStructType(ASTType *ty);
     llvm::Type *codegenUnionType(ASTType *ty);
     llvm::Type *codegenClassType(ASTType *ty);

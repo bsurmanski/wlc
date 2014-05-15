@@ -16,9 +16,11 @@ struct SourceLocation
     SourceLocation(const char *fn, int l, int cha = 1) : filenm(fn), line(l), ch(cha) {}
     std::string toString()
     {
+        if(filenm){
         char buf[20];
         sprintf(buf, "%d", line);
         return std::string(filenm) + ":" + std::string(buf);
+        } return "?";
     }
 };
 

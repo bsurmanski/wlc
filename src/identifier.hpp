@@ -8,6 +8,9 @@ struct Expression;
 struct ASTType;
 struct ASTValue;
 struct SymbolTable;
+struct StructDeclaration;
+struct UnionDeclaration;
+struct ClassDeclaration;
 
 struct Identifier
 {
@@ -19,9 +22,7 @@ struct Identifier
         ID_FUNCTION,
         ID_PACKAGE,
         ID_MODULE,
-        ID_CLASS,
-        ID_STRUCT,
-        ID_UNION,
+        ID_USER, //user type
         ID_ALIAS,
         ID_EXPRESSION,
         ID_LABEL,
@@ -61,9 +62,9 @@ struct Identifier
     bool isUndeclared() { return type == ID_UNKNOWN; }
     bool isVariable() { return type == ID_VARIABLE; }
     bool isFunction() { return type == ID_FUNCTION; }
-    bool isStruct() { return type == ID_STRUCT; }
-    bool isUnion() { return type == ID_UNION; }
-    bool isClass() { return type == ID_CLASS; }
+    bool isStruct();
+    bool isUnion();
+    bool isClass();
     bool isPackage() { return type == ID_PACKAGE; }
     bool isModule() { return type = ID_MODULE; }
     bool isExpression() { return type == ID_EXPRESSION; }

@@ -72,9 +72,10 @@ void TypeDeclaration::accept(ASTVisitor *v){
     v->visitTypeDeclaration(this);
 }
 
-void HetroDeclaration::accept(ASTVisitor *v){
-    Declaration::accept(v);
-    v->visitHetroDeclaration(this);
+void UserTypeDeclaration::accept(ASTVisitor *v){
+    TypeDeclaration::accept(v);
+    v->visitUserTypeDeclaration(this);
+    v->visitType(type);
 }
 
 //

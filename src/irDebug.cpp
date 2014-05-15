@@ -129,27 +129,27 @@ llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
             );
 }
 
-llvm::DICompositeType IRDebug::createHetroType(ASTType *ty) //TODO: proper calculation
+llvm::DICompositeType IRDebug::createUserType(ASTType *ty) //TODO: proper calculation
 {
     llvm::DIDescriptor DIContext(currentFile());
-    HetrogenTypeInfo *hti = (HetrogenTypeInfo*) ty->info;
+    ASTUserType *userty = (ASTUserType*) ty;
     vector<Value *> vec;
     int offset = 0;
-    for(int i = 0; i < hti->members.size(); i++)
+    for(int i = 0; i < userty->length(); i++)
     {
-        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(hti->members[i]);
+        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(userty->getMember(i));
         assert(vdecl);
-        ASTType *vtype = hti->getContainedType(i);
+        ASTType *vtype = userty->getMember(i)->getType();
         unsigned size = vtype->getSize();
         unsigned align = vtype->getAlign();
         vec.push_back(di.createMemberType(
                     DIContext,
                     vdecl->getName(),
                     currentFile(),
-                    hti->members[0]->loc.line,
+                    userty->getMember(i)->loc.line,
                     size * 8,
                     align * 8,
-                    hti->getMemberOffset(i) * 8,
+                    userty->getMemberOffset(i) * 8,
                     0,
                     createType(vdecl->getType())));
     }
@@ -159,7 +159,7 @@ llvm::DICompositeType IRDebug::createHetroType(ASTType *ty) //TODO: proper calcu
     return di.createStructType(DIContext, //TODO: defined scope
             ty->getName(),
             currentFile(), //TODO: defined file
-            hti->getDeclaration()->loc.line, //line num
+            userty->getDeclaration()->loc.line, //line num
             ty->getSize() * 8,
             ty->getAlign() * 8,
             0, // flags
@@ -172,12 +172,12 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
 {
     assert(ty->isStruct() && "expected struct for debug info generation");
     llvm::DIDescriptor DIContext(currentFile());
-    StructTypeInfo *sti = (StructTypeInfo*) ty->info;
+    ASTUserType *userty = (ASTUserType*) ty;
     vector<Value *> vec;
     int offset = 0;
-    for(int i = 0; i < sti->members.size(); i++)
+    for(int i = 0; i < userty->length(); i++)
     {
-        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(sti->members[i]);
+        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(userty->getMember(i));
         assert(vdecl);
         unsigned size = vdecl->getType()->getSize();
         unsigned align = vdecl->getType()->getAlign();
@@ -187,7 +187,7 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
                     DIContext,
                     vdecl->getName(),
                     currentFile(),
-                    sti->members[0]->loc.line,
+                    userty->getMember(i)->loc.line,
                     size * 8,
                     align * 8,
                     offset * 8,
@@ -202,7 +202,7 @@ llvm::DICompositeType IRDebug::createStructType(ASTType *ty)
     return di.createStructType(DIContext, //TODO: defined scope
             ty->getName(),
             currentFile(), //TODO: defined file
-            sti->getDeclaration()->loc.line, //line num
+            userty->getDeclaration()->loc.line, //line num
             ty->getSize() * 8,
             ty->getAlign() * 8,
             0, // flags
@@ -215,11 +215,11 @@ llvm::DICompositeType IRDebug::createUnionType(ASTType *ty)
 {
     assert(ty->isUnion() && "expected union for debug info generation");
     llvm::DIDescriptor DIContext(currentFile());
-    UnionTypeInfo *sti = (UnionTypeInfo*) ty->info;
+    ASTUserType *userty = (ASTUserType*) ty;
     vector<Value *> vec;
-    for(int i = 0; i < sti->members.size(); i++)
+    for(int i = 0; i < userty->length(); i++)
     {
-        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(sti->members[i]);
+        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(userty->getMember(i));
         assert(vdecl);
         unsigned size = vdecl->getType()->getSize();
         unsigned align = vdecl->getType()->getAlign();
@@ -227,7 +227,7 @@ llvm::DICompositeType IRDebug::createUnionType(ASTType *ty)
                     DIContext,
                     vdecl->getName(),
                     currentFile(),
-                    sti->members[0]->loc.line,
+                    userty->getMember(i)->loc.line,
                     size * 8,
                     align * 8,
                     0, //offset
@@ -241,7 +241,7 @@ llvm::DICompositeType IRDebug::createUnionType(ASTType *ty)
     return di.createUnionType(DIContext, //TODO: defined scope
             ty->getName(),
             currentFile(), //TODO: defined file
-            sti->getDeclaration()->loc.line, //line num
+            userty->getDeclaration()->loc.line, //line num
             ty->getSize() * 8,
             ty->getAlign() * 8,
             0, // flags
@@ -253,21 +253,21 @@ llvm::DICompositeType IRDebug::createClassType(ASTType *ty)
 {
     assert(ty->isClass() && "expected struct for debug info generation");
     llvm::DIDescriptor DIContext(currentFile());
-    ClassTypeInfo *sti = (ClassTypeInfo*) ty->info;
+    ASTUserType *userty = (ASTUserType*) ty;
     vector<Value *> vec;
 
     vec.push_back(di.createMemberType(DIContext, "vtable", currentFile(),
-                sti->members[0]->loc.line, 8 * 8, 8 * 8, 0, 0,
+                userty->getDeclaration()->loc.line, 8 * 8, 8 * 8, 0, 0,
                 createType(ASTType::getVoidTy()->getPointerTy())));
 
     vec.push_back(di.createMemberType(DIContext, "refs", currentFile(),
-                sti->members[0]->loc.line, 8 * 8, 8 * 8, 8 * 8, 0,
+                userty->getDeclaration()->loc.line, 8 * 8, 8 * 8, 8 * 8, 0,
                 createType(ASTType::getLongTy())));
 
     int offset = 16;
-    for(int i = 0; i < sti->members.size(); i++)
+    for(int i = 0; i < userty->length(); i++)
     {
-        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(sti->members[i]);
+        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(userty->getMember(i));
         assert(vdecl);
         unsigned size = vdecl->getType()->getSize();
         unsigned align = vdecl->getType()->getAlign();
@@ -277,7 +277,7 @@ llvm::DICompositeType IRDebug::createClassType(ASTType *ty)
                     DIContext,
                     vdecl->getName(),
                     currentFile(),
-                    sti->members[0]->loc.line,
+                    userty->getDeclaration()->loc.line,
                     size * 8,
                     align * 8,
                     offset * 8,
@@ -292,7 +292,7 @@ llvm::DICompositeType IRDebug::createClassType(ASTType *ty)
     return di.createStructType(DIContext, //TODO: defined scope
             ty->getName(),
             currentFile(), //TODO: defined file
-            sti->getDeclaration()->loc.line, //line num
+            userty->getDeclaration()->loc.line, //line num
             ty->getSize() * 8,
             ty->getAlign() * 8,
             0, // flags
@@ -347,11 +347,17 @@ llvm::DIType IRDebug::createType(ASTType *ty)
             case TYPE_POINTER:
                 dity = di.createPointerType(createType(ty->getReferencedTy()), 64, 64);
                 break;
-            case TYPE_STRUCT:
-                dity = createStructType(ty);
-                break;
-            case TYPE_UNION:
-                dity = createUnionType(ty);
+            case TYPE_USER:
+                //XXX work around for cyclic codegen; probably wont even solve it...
+                //XXX BROKEN
+                if(true)
+                    dity = di.createBasicType("void", 8, 8, dwarf::DW_ATE_address);
+                else if(ty->isStruct())
+                    dity = createStructType(ty);
+                else if(ty->isUnion())
+                    dity = createUnionType(ty);
+                else if(ty->isClass())
+                    dity = createClassType(ty);
                 break;
             case TYPE_ARRAY:
                 return createArrayType(ty);
@@ -377,15 +383,15 @@ llvm::DIType IRDebug::createType(ASTType *ty)
 
 llvm::DICompositeType IRDebug::createPrototype(ASTType *p)
 {
-    FunctionTypeInfo *fti = dynamic_cast<FunctionTypeInfo*>(p->info);
-    assert(fti);
+    ASTFunctionType *astfty = p->functionType();
+    assert(astfty);
 
     vector<Value*> vec;
 
-    vec.push_back(createType(fti->ret));
-    for(int i = 0; i < fti->params.size(); i++)
+    vec.push_back(createType(astfty->ret));
+    for(int i = 0; i < astfty->params.size(); i++)
     {
-        vec.push_back(createType(fti->params[i]));
+        vec.push_back(createType(astfty->params[i]));
     }
 
     DIArray arr = di.getOrCreateArray(vec);

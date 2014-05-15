@@ -560,10 +560,6 @@ Declaration *ParseContext::parseDeclaration()
             return NULL;
         }
 
-        HetrogenTypeInfo *sui = 0;
-        HetroDeclaration *sud = 0;
-        HetroDeclaration *sdecl = new HetroDeclaration(id, NULL, t_id.loc);
-
         SymbolTable *tbl = new SymbolTable(getScope(), SymbolTable::Scope_Struct);
         pushScope(tbl);
         vector<Declaration*> members;
@@ -584,27 +580,18 @@ Declaration *ParseContext::parseDeclaration()
             ignore(); //eat rbrace
         } else ignore(); // eat semicolon
 
+        UserTypeDeclaration *sdecl;
 
         switch(kind)
         {
             case kw_union:
-                sui = new UnionTypeInfo(id, tbl, members, methods);
-                sdecl->setDeclaredType(new ASTType(TYPE_UNION, sui));
-                id->getDeclaredType()->setTypeInfo(sui, TYPE_UNION);
-                id->setDeclaration(sdecl, Identifier::ID_UNION);
+                sdecl = new UnionDeclaration(id, tbl, members, loc);
                 break;
             case kw_struct:
-                sui = new StructTypeInfo(id, tbl, members, methods);
-                sdecl->setDeclaredType(new ASTType(TYPE_STRUCT, sui));
-                id->getDeclaredType()->setTypeInfo(sui, TYPE_STRUCT);
-                id->setDeclaration(sdecl, Identifier::ID_STRUCT);
+                sdecl = new StructDeclaration(id, tbl, members, loc);
                 break;
             case kw_class:
-                sui = new ClassTypeInfo(id, tbl, baseId, members, methods); //TODO: use info
-                sdecl->setDeclaredType(new ASTType(TYPE_CLASS, sui));
-                ((ClassTypeInfo*)sui)->sortMembers();
-                id->getDeclaredType()->setTypeInfo(sui, TYPE_CLASS);
-                id->setDeclaration(sdecl, Identifier::ID_CLASS);
+                sdecl = new ClassDeclaration(id, tbl, baseId, members, loc);
                 break;
             default:
                 emit_message(msg::FAILURE, "unknown declaration kind", loc);
@@ -639,8 +626,7 @@ Declaration *ParseContext::parseDeclaration()
     if(peek().is(tok::lparen)) // function decl
     {
         std::vector<ASTType *> params;
-        std::vector<Identifier*> paramNames;
-        std::vector<Expression*> paramValues;
+        std::vector<VariableDeclaration*> parameters;
         ignore(); // lparen
 
         SymbolTable *funcScope = new SymbolTable(getScope());
@@ -667,18 +653,18 @@ Declaration *ParseContext::parseDeclaration()
             Token t_name = get();
             params.push_back(aty);
             Identifier *paramId = getScope()->getInScope(t_name.toString());
-            paramId->setDeclaration(NULL, Identifier::ID_VARIABLE);
-            paramNames.push_back(paramId);
+
+            Expression *defaultValue = NULL;
 
             if(peek().is(tok::equal))
             {
                 ignore(); // eat '='
-                Expression *defaultValue = parseExpression();
-                paramValues.push_back(defaultValue);
-            } else
-            {
-                paramValues.push_back(NULL);
+                defaultValue = parseExpression();
             }
+
+            VariableDeclaration *paramDecl = new VariableDeclaration(aty, paramId, defaultValue, loc);
+            paramId->setDeclaration(paramDecl, Identifier::ID_VARIABLE);
+            parameters.push_back(paramDecl);
 
             if(peek().is(tok::comma))
             {
@@ -701,7 +687,7 @@ Declaration *ParseContext::parseDeclaration()
         popScope();
 
         ASTType *proto = ASTType::getFunctionTy(type, params, vararg);
-        Declaration *decl = new FunctionDeclaration(id, proto, paramNames, paramValues,
+        Declaration *decl = new FunctionDeclaration(id, proto, parameters,
                 funcScope, stmt, t_id.loc);
         id->setDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;

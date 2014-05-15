@@ -10,11 +10,11 @@ class ASTVisitor {
     std::stack<FunctionDeclaration*> function;
 
     public:
-    SymbolTable *getCurrentScope() { return scope.top(); }
+    SymbolTable *getScope() { return scope.top(); }
     void pushScope(SymbolTable *sc) { scope.push(sc); }
     SymbolTable *popScope() { SymbolTable *sc = scope.top(); scope.pop(); return sc; }
 
-    FunctionDeclaration *getCurrentFunction() { return function.top(); }
+    FunctionDeclaration *getFunction() { return function.top(); }
     void pushFunction(FunctionDeclaration *fdecl) { function.push(fdecl); }
     FunctionDeclaration *popFunction() {
         FunctionDeclaration *fd = function.top();
@@ -34,7 +34,7 @@ class ASTVisitor {
     virtual void visitLabelDeclaration(LabelDeclaration *decl){}
     virtual void visitVariableDeclaration(VariableDeclaration *decl){}
     virtual void visitTypeDeclaration(TypeDeclaration *decl){}
-    virtual void visitHetroDeclaration(HetroDeclaration *decl){}
+    virtual void visitUserTypeDeclaration(UserTypeDeclaration *decl){}
 
     virtual void visitUnaryExpression(UnaryExpression *exp){}
     virtual void visitBinaryExpression(BinaryExpression *exp){}
@@ -72,6 +72,8 @@ class ASTVisitor {
     virtual void visitWhileStatement(WhileStatement *exp){}
     virtual void visitForStatement(ForStatement *exp){}
     virtual void visitSwitchStatement(SwitchStatement *exp){}
+
+    virtual void visitType(ASTType *type){}
 };
 
 #endif

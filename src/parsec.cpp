@@ -87,6 +87,7 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
 
     Identifier *id = unit->getScope()->lookup(name);
 
+    UserTypeDeclaration *utdecl = 0;
     if(!id)
     {
         id = unit->getScope()->get(name);
@@ -94,13 +95,15 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
         StructVisitorArg svarg = { unit, &members, tbl };
         clang_visitChildren(typeDecl, StructVisitor, &svarg);
 
-        StructTypeInfo *sti = new StructTypeInfo(id, tbl, members, std::vector<FunctionDeclaration*>());
-        HetroDeclaration *sdecl =
-            new HetroDeclaration(id, NULL, SourceLocation());
-        id->getDeclaredType()->setTypeInfo(sti,
-                typeDecl.kind == CXCursor_StructDecl ? TYPE_STRUCT : TYPE_UNION);
-        id->setDeclaration(sdecl,
-                typeDecl.kind == CXCursor_StructDecl ? Identifier::ID_STRUCT : Identifier::ID_UNION);
+        if(typeDecl.kind == CXCursor_StructDecl)
+        {
+            //TODO: correct source loc
+            utdecl = new StructDeclaration(id, tbl, members, SourceLocation());
+        } else {// is union
+            utdecl = new UnionDeclaration(id, tbl, members, SourceLocation());
+        }
+
+        return utdecl->getDeclaredType();
     }
 
     return id->getDeclaredType();
@@ -189,8 +192,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         int nargs = clang_getNumArgTypes(fType);
 
         vector<ASTType*> params;
-        vector<Identifier*> paramNames;
-        vector<Expression*> paramValues;
+        vector<VariableDeclaration*> parameters;
 
         for(int i = 0; i < nargs; i++)
         {
@@ -200,8 +202,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
             if(!astArgTy) goto ERR;
 
             params.push_back(astArgTy);
-            paramNames.push_back(NULL);
-            paramValues.push_back(NULL);
+            parameters.push_back(new VariableDeclaration(astArgTy, NULL, NULL, loc));
         }
 
         ASTType *rType = ASTTypeFromCType(unit, clang_getResultType(fType));
@@ -213,7 +214,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         ASTType *functionType = ASTType::getFunctionTy(rType, params,
                                         clang_isFunctionTypeVariadic(fType));
         FunctionDeclaration *fdecl = new FunctionDeclaration(id, functionType,
-                paramNames, paramValues, 0, 0, loc);
+               parameters, 0, 0, loc);
         id->setDeclaration(fdecl, Identifier::ID_FUNCTION);
 
         unit->functions.push_back(fdecl);

@@ -186,6 +186,8 @@ struct Declaration : public ASTNode
     bool isExternal() { return external; }
     virtual ASTType *getType() = 0;
 
+    Identifier *getIdentifier() { return identifier; }
+
     void setOwner(Declaration *decl) { owner = decl; }
 
     virtual FunctionDeclaration *functionDeclaration() { return NULL; }
@@ -198,15 +200,13 @@ struct FunctionDeclaration : public Declaration
 {
     llvm::DISubprogram diSubprogram;
     ASTType *prototype;
-    std::vector<Identifier*> paramNames;
-    std::vector<Expression*> paramValues;
+    std::vector<VariableDeclaration*> parameters;
     SymbolTable *scope;
     Statement *body;
     void *cgValue;
-    FunctionDeclaration(Identifier *id, ASTType *p, std::vector<Identifier*> pname,
-            std::vector<Expression*> pvals, SymbolTable *sc,
-            Statement *st, SourceLocation loc) :
-        Declaration(id, loc), prototype(p), paramNames(pname), paramValues(pvals), scope(sc),
+    FunctionDeclaration(Identifier *id, ASTType *p, std::vector<VariableDeclaration*> params,
+            SymbolTable *sc, Statement *st, SourceLocation loc) :
+        Declaration(id, loc), prototype(p), parameters(params), scope(sc),
         body(st), cgValue(NULL) {}
     virtual FunctionDeclaration *functionDeclaration() { return this; }
     virtual std::string getName(bool mangle=false)
@@ -217,7 +217,7 @@ struct FunctionDeclaration : public Declaration
         }
     }
     SymbolTable *getScope() { return scope; }
-    ASTType *getReturnType() { return dynamic_cast<FunctionTypeInfo*>(prototype->info)->ret; }
+    ASTType *getReturnType() { return prototype->functionType()->ret; }
 
     virtual ASTType *getType() { return prototype;  } //TODO: 'prototype' should be 'type'?
     virtual void accept(ASTVisitor *v);
@@ -256,10 +256,9 @@ struct TypeDeclaration : public Declaration
     virtual void accept(ASTVisitor *v);
     virtual ASTType *getType() { return NULL; } // XXX return a 'type' type?
     virtual ASTType *getDeclaredType() = 0;
-    virtual ASTType *setDeclaredType(ASTType *ty) = 0;
     //virtual std::string getName() { return "" };
-    virtual size_t getSize() { assert(false && "unknown size"); }
-    virtual size_t getAlign() { assert(false && "unknown align"); }
+    virtual size_t getSize() const { assert(false && "unknown size"); }
+    virtual size_t getAlign() const { assert(false && "unknown align"); }
 };
 
 struct CompositeTypeDeclaration : public TypeDeclaration
@@ -267,41 +266,51 @@ struct CompositeTypeDeclaration : public TypeDeclaration
     virtual ASTType *getContainedType(unsigned index) = 0;
 };
 
-//TODO: rename to 'Hetrogen'? Used in classes as well as struct, union
-struct HetroDeclaration : public TypeDeclaration
+struct UserTypeDeclaration : public TypeDeclaration
 {
     ASTType *type;
     SymbolTable *scope;
     std::vector<Declaration*> members;
-    std::vector<FunctionDeclaration*> methods;
 
-    HetroDeclaration(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m,
-            std::vector<FunctionDeclaration*> mt, SourceLocation loc) :
-            TypeDeclaration(id, loc), scope(sc), members(m), methods(mt), type(0) {
+    UserTypeDeclaration(Identifier *id, SymbolTable *sc,
+            std::vector<Declaration*> m, SourceLocation loc) :
+            TypeDeclaration(id, loc), scope(sc), members(m),
+                type(new ASTUserType(id, this)) {
+                identifier->setDeclaredType(type);
+                identifier->setDeclaration(this, Identifier::ID_USER);
             }
 
-    HetroDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) :
+    UserTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) :
         TypeDeclaration(id, loc), type(ty) {}
 
     virtual ASTType *getDeclaredType() { return type; }
-    virtual ASTType *setDeclaredType(ASTType *ty) {
-        identifier->setDeclaredType(ty);
-        type = ty;
-    }
+    virtual size_t length() const { return members.size(); }
+    virtual size_t getAlign() const;
+    virtual size_t getSize() const = 0;
     virtual void accept(ASTVisitor *v);
 };
 
-struct ClassDeclaration : public HetroDeclaration {
-    ClassDeclaration(Identifier *id, SymbolTable *sc, Identifier *base,
-            std::vector<Declaration*> m,
-            std::vector<FunctionDeclaration*> mt, SourceLocation loc) :
-        HetroDeclaration(id, sc, m, mt, loc)
-    {
-        ClassTypeInfo *cti = new ClassTypeInfo(id, sc, base, m, mt);
-        type = new ASTType(TYPE_CLASS,  cti);
-        type->declaration = this;
+struct ClassDeclaration : public UserTypeDeclaration {
+    Identifier *base;
+    ClassDeclaration(Identifier *id, SymbolTable *sc, Identifier *bs,
+            std::vector<Declaration*> m, SourceLocation loc) :
+        UserTypeDeclaration(id, sc, m, loc), base(bs) {
     }
+    virtual size_t getSize() const;
+};
 
+struct StructDeclaration : public UserTypeDeclaration {
+    bool packed;
+    StructDeclaration(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m, SourceLocation loc) :
+        UserTypeDeclaration(id, sc, m, loc), packed(false) {
+        }
+    virtual size_t getSize() const;
+};
+
+struct UnionDeclaration : public UserTypeDeclaration {
+    UnionDeclaration(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m, SourceLocation loc) :
+        UserTypeDeclaration(id, sc, m, loc) {}
+    virtual size_t getSize() const;
 };
 
 /***
@@ -837,8 +846,5 @@ struct IncludeExpression : public TopLevelExpression
 {
 
 };
-
-
-
 
 #endif

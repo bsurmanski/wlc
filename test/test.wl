@@ -109,7 +109,7 @@ int main(int argc, char^^ argv)
 
 
     var tuple = [1, 2, 3]
-    MyNewStruct st = [1, 2, 3]
+    //MyNewStruct st = [1, 2, 3]
 
     [int, int] intTuple = myTupleFunc()
 

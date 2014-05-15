@@ -4,6 +4,7 @@
 #include "ast.hpp"
 #include "astVisitor.hpp"
 
+// can be removed?
 enum Validity {
     UNCHECKED,
     VALID,
@@ -16,6 +17,8 @@ class ValidationVisitor : public ASTVisitor {
     public:
     bool isValid() { return valid; }
     ValidationVisitor();
+    Identifier *resolveIdentifier(Identifier *id);
+    ASTType *resolveType(ASTType *ty);
     virtual void visitPackage(Package *pak);
     virtual void visitTranslationUnit(TranslationUnit *tu);
 
@@ -27,7 +30,7 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitLabelDeclaration(LabelDeclaration *decl);
     virtual void visitVariableDeclaration(VariableDeclaration *decl);
     virtual void visitTypeDeclaration(TypeDeclaration *decl);
-    virtual void visitHetroDeclaration(HetroDeclaration *decl);
+    virtual void visitUserTypeDeclaration(UserTypeDeclaration *decl);
 
     virtual void visitUnaryExpression(UnaryExpression *exp);
     virtual void visitBinaryExpression(BinaryExpression *exp);
@@ -63,6 +66,8 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitWhileStatement(WhileStatement *exp);
     virtual void visitForStatement(ForStatement *exp);
     virtual void visitSwitchStatement(SwitchStatement *exp);
+
+    virtual void visitType(ASTType *ty);
 };
 
 #endif

@@ -37,7 +37,7 @@ class IRDebug
         llvm::DIDescriptor currentScope();
         llvm::DIDescriptor createScope(llvm::DIDescriptor parent, SourceLocation loc);
         llvm::DICompositeType createClassType(ASTType *ty);
-        llvm::DICompositeType createHetroType(ASTType *ty);
+        llvm::DICompositeType createUserType(ASTType *ty);
         llvm::DICompositeType createStructType(ASTType *ty);
         llvm::DICompositeType createUnionType(ASTType *ty);
         llvm::DICompositeType createDynamicArrayType(ASTType *ty);

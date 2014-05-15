@@ -1,259 +1,71 @@
 #include "ast.hpp"
+#include "message.hpp"
 
 //
-// StructTypeInfo
-//
-size_t StructTypeInfo::getSize()
-{
-    size_t sz = 0;
-    VariableDeclaration *vd;
-    unsigned align;
-    for(int i = 0; i < members.size(); i++)
-    {
-        vd = members[i]->variableDeclaration();
-        if(!vd) continue;
-
-        align = vd->getType()->getAlign();
-        if(!packed && sz % align)
-            sz += (align - (sz % align));
-        sz += vd->type->getSize();
-    }
-    return sz;
-}
-
-size_t StructTypeInfo::getMemberOffset(std::string member)
-{
-    size_t offset = 0;
-    unsigned align = 0;
-    VariableDeclaration *vd;
-    for(int i = 0; i < members.size(); i++)
-    {
-        if(members[i]->identifier->getName() == member)
-        {
-            return offset;
-        }
-        vd = members[i]->variableDeclaration();
-        if(!vd) continue;
-        align = vd->getType()->getAlign();
-        if(!packed && offset % align)
-            offset += (align - (offset % align));
-        offset += vd->getType()->getSize();
-    }
-}
-
-size_t StructTypeInfo::getMemberOffset(size_t index)
-{
-    size_t offset = 0;
-    unsigned align = 0;
-    VariableDeclaration *vd;
-    for(int i = 0; i < index; i++)
-    {
-        vd = members[i]->variableDeclaration();
-        if(!vd) continue;
-        align = vd->getType()->getAlign();
-        if(!packed && offset % align)
-            offset += (align - (offset % align));
-        offset += vd->getType()->getSize();
-    }
-    return offset;
-}
-
-long StructTypeInfo::getMemberIndex(std::string member)
-{
-    for(int i = 0; i < members.size(); i++)
-    {
-        if(members[i]->identifier->getName() == member)
-        {
-            return i; //TODO: mangling
-        }
-    }
-}
-
-//
-// HetrogenTypeInfo
-//
-Declaration *HetrogenTypeInfo::getMember(size_t i){
-    return members[i];
-}
-
-Declaration *HetrogenTypeInfo::getMemberByName(std::string member)
-{
-    for(int i = 0; i < members.size(); i++)
-        if(members[i]->identifier->getName() == member)
-            return members[i];
-}
-
-ASTType *HetrogenTypeInfo::getContainedType(unsigned i)
-{
-    return members[i]->getType();
-}
-
-size_t HetrogenTypeInfo::getAlign()
-{
-    size_t align = 0;
-    VariableDeclaration *vd;
-    for(int i = 0; i < members.size(); i++)
-    {
-        vd = members[i]->variableDeclaration();
-        assert(vd && "expected variable decl, found something else");
-        if(vd->getType()->getAlign() > align)
-            align = vd->getType()->getAlign();
-    }
-    if(align == 0) return 1; //TODO: empty struct, bad!
-    return align;
-    //TODO: handle packed
-}
-
-//
-// UnionTypeInfo
-//
-size_t UnionTypeInfo::getSize()
-{
-    size_t sz = 0;
-    VariableDeclaration *vd;
-    for(int i = 0; i < members.size(); i++)
-    {
-        vd = members[i]->variableDeclaration();
-        if(vd->getType()->getSize() > sz)
-            sz = vd->getType()->getSize();
-    }
-}
-
-//
-// ClassTypeInfo
+// UserType
 //
 
-// sort members in descending order for most efficient packing
-bool classSort(Declaration *decla, Declaration *declb){
-    return decla->getType()->getSize() > declb->getType()->getSize();
-}
-
-void ClassTypeInfo::sortMembers() {
-    std::stable_sort(members.begin(), members.end(), classSort);
-}
-
-HetrogenTypeInfo *ClassTypeInfo::baseHetrogenTypeInfo() {
-    if(base){
-        return dynamic_cast<HetrogenTypeInfo*>(base->getDeclaredType()->info);
-    }
-}
-
-size_t ClassTypeInfo::getSize() {
-    sortMembers();
-
-    size_t sz = base ? base->getDeclaredType()->getSize() : 0;
-    VariableDeclaration *vd;
-    unsigned align; //TODO: padding past base?
-    for(int i = 0; i < members.size(); i++)
-    {
-        vd = members[i]->variableDeclaration();
-        if(!vd) continue;
-
-        align = vd->getType()->getAlign();
-        if(sz % align)
-            sz += (align - (sz % align));
-        sz += vd->type->getSize();
-    }
-    return sz;
-}
-
-size_t ClassTypeInfo::length(){
-    size_t count = members.size();
-    if(HetrogenTypeInfo *hti = baseHetrogenTypeInfo())
-    {
-        count += hti->length();
-    }
-    return count;
-}
-
-Declaration *ClassTypeInfo::getMember(size_t index) {
-    size_t baselen = 0;
-    if(HetrogenTypeInfo *hti = baseHetrogenTypeInfo()){
-        baselen = hti->length();
-        if(index < baselen) return hti->getMember(index);
-    }
-    index -= baselen;
-    if(index > members.size()) return NULL;
-    return members[index];
-}
-
-size_t ClassTypeInfo::getMemberOffset(size_t index)
-{
-    size_t offset = 0;
-    unsigned align = 0;
-    VariableDeclaration *vd;
-    for(int i = 0; i < index; i++)
-    {
-        vd = members[i]->variableDeclaration();
-        if(!vd) continue;
-        align = vd->getType()->getAlign();
-        if(offset % align)
-            offset += (align - (offset % align));
-        offset += vd->getType()->getSize();
-    }
-    return offset;
-}
-
-size_t ClassTypeInfo::getMemberOffset(std::string member){
-    if(member == "vtable") return 0;
-    if(member == "refs") return 8;
-
-    sortMembers();
-
-    size_t offset = 16;
-    unsigned align = 0;
-
-    VariableDeclaration *vd;
-    for(int i = 0; i < members.size(); i++)
-    {
-        if(members[i]->identifier->getName() == member)
-        {
-            return offset;
-        }
-        vd = members[i]->variableDeclaration();
-        if(!vd) continue;
-        align = vd->getType()->getAlign();
-        if(offset % align)
-            offset += (align - (offset % align));
-        offset += vd->getType()->getSize();
-    }
-}
-
-long ClassTypeInfo::getMemberIndex(std::string member) {
-    //if(member == "vtable") return 0;
-    //if(member == "refs") return 1;
-
-    sortMembers();
-
-    long index;
-    if(base && (index = baseHetrogenTypeInfo()->getMemberIndex(member)) >= 0 ){
-        return index;
-    }
-
-    for(int i = 0; i < members.size(); i++)
-    {
-        if(members[i]->identifier->getName() == member)
-        {
-            return i + (base ? baseHetrogenTypeInfo()->length() : 0);
-        }
-    }
-
-    return -1;
-}
-
-Declaration *ClassTypeInfo::getMemberByName(std::string member){
-    Declaration *decl = NULL;
-    if(base && (decl = baseHetrogenTypeInfo()->getMemberByName(member))){
-        return decl;
-    }
-    for(int i = 0; i < members.size(); i++)
-    {
-        if(members[i]->identifier->getName() == member) {
-            return members[i];
-        }
-    }
-
+ASTType *ASTUserType::getTypeResolution() {
+    if(getDeclaration())
+        return getDeclaration()->getDeclaredType();
     return NULL;
+}
+
+bool ASTUserType::isOpaque() {
+    return !getDeclaration()->members.size();
+}
+
+Declaration *ASTUserType::getMember(size_t i) {
+    return getDeclaration()->members[i];
+}
+
+size_t ASTUserType::length() {
+    UserTypeDeclaration *utd = getDeclaration();
+    return utd->members.size();
+}
+
+size_t ASTUserType::getSize() {
+    UserTypeDeclaration *utd = getDeclaration();
+    return utd->getSize();
+}
+size_t ASTUserType::getAlign() {
+    UserTypeDeclaration *utd = getDeclaration();
+    return utd->getAlign();
+}
+
+ASTType *ASTUserType::getMemberType(size_t i) {
+    return getMember(i)->getType();
+}
+
+Declaration *ASTUserType::getMemberByName(std::string name) {
+    UserTypeDeclaration *utd = getDeclaration();
+    for(int i = 0; i < utd->members.size(); i++){
+        if(utd->members[i]->getName() == name)
+            return utd->members[i];
+    }
+    return NULL;
+}
+
+long ASTUserType::getMemberIndex(std::string member){
+    UserTypeDeclaration *utd = getDeclaration();
+
+    if(dynamic_cast<StructDeclaration*>(utd)) {
+        for(int i = 0; i < utd->members.size(); i++){
+            if(utd->members[i]->identifier->getName() == member){
+                return i;
+            }
+        }
+    } else if(dynamic_cast<UnionDeclaration*>(utd)) {
+        return 0;
+    } else if(dynamic_cast<ClassDeclaration*>(utd)) {
+        long index;
+        emit_message(msg::ERROR, "feature currently broke: class index");
+    }
+}
+
+
+long ASTUserType::getMemberOffset(size_t i) {
+    return 0; //TODO
 }
 
 //
@@ -264,31 +76,31 @@ std::string ASTPointerType::getName(){
 }
 
 //
-// StaticArrayTypeInfo
+// StaticArrayType
 //
-size_t ASTStaticArrayType::getAlign() const {
+size_t ASTStaticArrayType::getAlign() {
     return arrayOf->getAlign();
 }
 
-size_t ASTStaticArrayType::getSize() const {
+size_t ASTStaticArrayType::getSize() {
     return size * arrayOf->getSize();
 }
 
 //
-// DynamicArrayTypeInfo
+// DynamicArrayType
 //
-size_t ASTDynamicArrayType::getAlign() const {
+size_t ASTDynamicArrayType::getAlign() {
     return ASTType::getCharTy()->getPointerTy()->getAlign();
 }
 
-size_t ASTDynamicArrayType::getSize() const {
+size_t ASTDynamicArrayType::getSize() {
     return ASTType::getCharTy()->getPointerTy()->getSize() + ASTType::getULongTy()->getSize();
 }
 
 //
 // ASTTupleType
 //
-size_t ASTTupleType::getSize() const
+size_t ASTTupleType::getSize()
 {
     size_t sz = 0;
     unsigned align;
@@ -302,7 +114,7 @@ size_t ASTTupleType::getSize() const
     return sz;
 }
 
-size_t ASTTupleType::getAlign() const
+size_t ASTTupleType::getAlign()
 {
     size_t max = 0;
     for(int i = 0; i < types.size(); i++)
@@ -353,11 +165,11 @@ ASTType *ASTType::getArrayTy(int sz)
 
 std::vector<ASTType *> ASTType::typeCache;
 
-#define DECLTY(TY, NM) ASTType *ASTType::get##NM() { \
+#define DECLTY(TYENUM, NM) ASTType *ASTType::get##NM() { \
     static int id = -1; \
     ASTType *ty; \
     if(id < 0) { \
-        ty = new ASTType(TY); \
+        ty = new ASTBasicType(TYENUM); \
         id = typeCache.size(); \
         typeCache.push_back(ty); \
     } \
@@ -393,10 +205,14 @@ ASTType *ASTType::getTupleTy(std::vector<ASTType *> t)
 ASTType *ASTType::getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg)
 {
     //TODO: type cache?
-    return new ASTType(TYPE_FUNCTION, new FunctionTypeInfo(ret, param, vararg));
+    return new ASTFunctionType(ret, param, vararg);
 }
 
 void ASTType::accept(ASTVisitor *v) {
     //v->visitType(this);
     //TODO subtypes, etc
 }
+
+bool ASTUserType::isClass() { return dynamic_cast<ClassDeclaration*>(identifier->getDeclaration()); }
+bool ASTUserType::isStruct() { return dynamic_cast<StructDeclaration*>(identifier->getDeclaration()); }
+bool ASTUserType::isUnion() { return dynamic_cast<UnionDeclaration*>(identifier->getDeclaration()); }

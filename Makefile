@@ -28,10 +28,31 @@ CLANGLIBS=\
 /usr/lib/libclangStaticAnalyzerFrontend.a\
 
 SRC=$(foreach file, $(SRCFILES), src/$(file))
+OBJ=$(foreach file, $(SRCFILES), build/$(file:.cpp=.o))
+DEP=$(foreach file, $(SRCFILES), build/$(file:.cpp=.d))
 
-all:
+CXXFLAGS=`llvm-config --cxxflags` -ggdb -O0 -frtti -UNDEBUG -DDEBUG
+LDFLAGS=`llvm-config --ldflags --libs` -lLLVM-3.4
+
+.PHONY: clean all
+
+all: wlc
+
+clean:
+	rm -rf build
+
+wlc: build $(OBJ) $(SRC)
 	ctags -R -o .git/tags
-	g++ $(SRC) $(CLANGLIBS) `llvm-config --ldflags --cxxflags --libs` -lLLVM-3.4 -ggdb -O0 -frtti -UNDEBUG -DDEBUG -o wlc
+	g++ $(OBJ) $(CLANGLIBS) $(CXXFLAGS) $(LDFLAGS) -o wlc
+
+build/%.o: src/%.cpp build/%.d
+	g++ $< -c $(CXXFLAGS) -ggdb -O0 -frtti -UNDEBUG -DDEBUG -o $@
+
+build/%.d: src/%.cpp
+	g++ $(CXXFLAGS) -MM -MT '$(patsubst %.d,%.o,$@)' $< -MF $@
+
+build:
+	mkdir -p build
 
 install: wlc
 	sudo cp wlc /usr/local/bin/
@@ -40,3 +61,5 @@ install: wlc
 
 installsyntax:
 	cp wl.vim ~/.vim/syntax/
+
+-include $(DEP)

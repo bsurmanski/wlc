@@ -2,17 +2,17 @@
 #define _ASTVISITOR_HPP
 
 #include "ast.hpp"
-#include "symbolTable.hpp"
+#include "astScope.hpp"
 #include <stack>
 
 class ASTVisitor {
-    std::stack<SymbolTable*> scope;
+    std::stack<ASTScope*> scope;
     std::stack<FunctionDeclaration*> function;
 
     public:
-    SymbolTable *getScope() { return scope.top(); }
-    void pushScope(SymbolTable *sc) { scope.push(sc); }
-    SymbolTable *popScope() { SymbolTable *sc = scope.top(); scope.pop(); return sc; }
+    ASTScope *getScope() { return scope.top(); }
+    void pushScope(ASTScope *sc) { scope.push(sc); }
+    ASTScope *popScope() { ASTScope *sc = scope.top(); scope.pop(); return sc; }
 
     FunctionDeclaration *getFunction() { return function.top(); }
     void pushFunction(FunctionDeclaration *fdecl) { function.push(fdecl); }

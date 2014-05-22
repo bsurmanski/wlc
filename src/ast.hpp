@@ -11,7 +11,7 @@
 #include <limits.h>
 #include <unistd.h>
 
-#include "symbolTable.hpp"
+#include "astScope.hpp"
 #include "identifier.hpp"
 #include "sourceLocation.hpp"
 #include "token.hpp"
@@ -82,7 +82,7 @@ struct ASTNode {
 
 struct Package : public ASTNode
 {
-    SymbolTable *scope;
+    ASTScope *scope;
     Package *parent;
     Identifier *identifier;
     void *cgValue; // opaque pointer to specific codegen information
@@ -98,9 +98,9 @@ struct Package : public ASTNode
     virtual ~Package() { if(scope) delete scope; }
 
     Identifier *getIdentifier() { return identifier; }
-    SymbolTable *getScope() {
+    ASTScope *getScope() {
         if(!scope)
-            scope = new SymbolTable(NULL, SymbolTable::Scope_Global, this);
+            scope = new ASTScope(NULL, ASTScope::Scope_Global, this);
         return scope;
     } //TODO: subscope of parent ?
 
@@ -201,11 +201,11 @@ struct FunctionDeclaration : public Declaration
     llvm::DISubprogram diSubprogram;
     ASTType *prototype;
     std::vector<VariableDeclaration*> parameters;
-    SymbolTable *scope;
+    ASTScope *scope;
     Statement *body;
     void *cgValue;
     FunctionDeclaration(Identifier *id, ASTType *p, std::vector<VariableDeclaration*> params,
-            SymbolTable *sc, Statement *st, SourceLocation loc) :
+            ASTScope *sc, Statement *st, SourceLocation loc) :
         Declaration(id, loc), prototype(p), parameters(params), scope(sc),
         body(st), cgValue(NULL) {}
     virtual FunctionDeclaration *functionDeclaration() { return this; }
@@ -216,7 +216,7 @@ struct FunctionDeclaration : public Declaration
             return Declaration::getName();
         }
     }
-    SymbolTable *getScope() { return scope; }
+    ASTScope *getScope() { return scope; }
     ASTType *getReturnType() { return prototype->functionType()->ret; }
 
     virtual ASTType *getType() { return prototype;  } //TODO: 'prototype' should be 'type'?
@@ -269,16 +269,17 @@ struct CompositeTypeDeclaration : public TypeDeclaration
 struct UserTypeDeclaration : public TypeDeclaration
 {
     ASTType *type;
-    SymbolTable *scope;
+    ASTScope *scope;
     std::vector<Declaration*> members;
 
-    UserTypeDeclaration(Identifier *id, SymbolTable *sc,
-            std::vector<Declaration*> m, SourceLocation loc) :
+    UserTypeDeclaration(Identifier *id, ASTScope *sc,
+                std::vector<Declaration*> m, SourceLocation loc) :
             TypeDeclaration(id, loc), scope(sc), members(m),
-                type(new ASTUserType(id, this)) {
-                identifier->setDeclaredType(type);
-                identifier->setDeclaration(this, Identifier::ID_USER);
-            }
+            type(new ASTUserType(id, this))
+    {
+        identifier->setDeclaredType(type);
+        identifier->setDeclaration(this, Identifier::ID_USER);
+    }
 
     UserTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) :
         TypeDeclaration(id, loc), type(ty) {}
@@ -292,7 +293,7 @@ struct UserTypeDeclaration : public TypeDeclaration
 
 struct ClassDeclaration : public UserTypeDeclaration {
     Identifier *base;
-    ClassDeclaration(Identifier *id, SymbolTable *sc, Identifier *bs,
+    ClassDeclaration(Identifier *id, ASTScope *sc, Identifier *bs,
             std::vector<Declaration*> m, SourceLocation loc) :
         UserTypeDeclaration(id, sc, m, loc), base(bs) {
     }
@@ -301,14 +302,14 @@ struct ClassDeclaration : public UserTypeDeclaration {
 
 struct StructDeclaration : public UserTypeDeclaration {
     bool packed;
-    StructDeclaration(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m, SourceLocation loc) :
+    StructDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m, SourceLocation loc) :
         UserTypeDeclaration(id, sc, m, loc), packed(false) {
         }
     virtual size_t getSize() const;
 };
 
 struct UnionDeclaration : public UserTypeDeclaration {
-    UnionDeclaration(Identifier *id, SymbolTable *sc, std::vector<Declaration*> m, SourceLocation loc) :
+    UnionDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m, SourceLocation loc) :
         UserTypeDeclaration(id, sc, m, loc) {}
     virtual size_t getSize() const;
 };
@@ -401,10 +402,10 @@ struct ReturnStatement : public Statement
 struct CompoundStatement : public Statement
 {
     //TODO: sym table
-    SymbolTable *scope;
-    SymbolTable *getScope() { return scope; }
+    ASTScope *scope;
+    ASTScope *getScope() { return scope; }
     std::vector<Statement*> statements;
-    CompoundStatement(SymbolTable *sc, std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
+    CompoundStatement(ASTScope *sc, std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
         scope(sc), Statement(l), statements(s) {}
     virtual CompoundStatement *compoundStatement() { return this; }
     virtual void accept(ASTVisitor *v);
@@ -414,18 +415,18 @@ struct CompoundStatement : public Statement
 
 struct BlockStatement : public Statement
 {
-    SymbolTable *scope;
-    SymbolTable *getScope() { return scope; }
+    ASTScope *scope;
+    ASTScope *getScope() { return scope; }
     Statement *body;
     virtual BlockStatement *blockStatement() { return this; }
-    BlockStatement(SymbolTable *sc, Statement *b, SourceLocation l = SourceLocation()) :
+    BlockStatement(ASTScope *sc, Statement *b, SourceLocation l = SourceLocation()) :
         scope(sc), body(b), Statement(l) {}
     virtual void accept(ASTVisitor *v);
 };
 
 struct ElseStatement : public BlockStatement
 {
-    ElseStatement(SymbolTable *sc, Statement *b, SourceLocation l = SourceLocation()) :
+    ElseStatement(ASTScope *sc, Statement *b, SourceLocation l = SourceLocation()) :
         BlockStatement(sc, b, l) {}
     virtual ElseStatement *elseStatement() { return this; }
     virtual void accept(ASTVisitor *v);
@@ -437,7 +438,7 @@ struct IfStatement : public BlockStatement
     Expression *condition;
     ElseStatement *elsebr;
     virtual IfStatement *ifStatement() { return this; }
-    IfStatement(SymbolTable *sc, Expression *c, Statement *b, ElseStatement *e,
+    IfStatement(ASTScope *sc, Expression *c, Statement *b, ElseStatement *e,
             SourceLocation l = SourceLocation()) :
         BlockStatement(sc, b, l), condition(c), elsebr(e) {}
     virtual void accept(ASTVisitor *v);
@@ -449,7 +450,7 @@ struct LoopStatement : public BlockStatement
     Statement *update;
     ElseStatement *elsebr;
     LoopStatement *loopStatement() { return this; }
-    LoopStatement(SymbolTable *sc, Expression *c, Statement *u, Statement *b, ElseStatement *el,
+    LoopStatement(ASTScope *sc, Expression *c, Statement *u, Statement *b, ElseStatement *el,
             SourceLocation l = SourceLocation()) : BlockStatement(sc, b, l), condition(c),
                                                 update(u), elsebr(el) {}
     virtual void accept(ASTVisitor *v);
@@ -459,7 +460,7 @@ struct LoopStatement : public BlockStatement
 struct WhileStatement : public LoopStatement
 {
     virtual WhileStatement *whileStatement() { return this; }
-    WhileStatement(SymbolTable *sc, Expression *c, Statement *b, ElseStatement *e,
+    WhileStatement(ASTScope *sc, Expression *c, Statement *b, ElseStatement *e,
             SourceLocation l = SourceLocation()) :
         LoopStatement(sc, c, NULL, b, e, l) {}
     virtual void accept(ASTVisitor *v);
@@ -469,7 +470,7 @@ struct ForStatement : public LoopStatement
 {
     Statement *decl;
     virtual ForStatement *forStatement() { return this; }
-    ForStatement(SymbolTable *sc, Statement *d, Expression *c, Statement *u,
+    ForStatement(ASTScope *sc, Statement *d, Expression *c, Statement *u,
             Statement *b, ElseStatement *e,
             SourceLocation l = SourceLocation()) : LoopStatement(sc, c, u, b, e, l),
         decl(d) {}
@@ -480,7 +481,7 @@ struct SwitchStatement : public BlockStatement
 {
     Expression *condition;
     virtual SwitchStatement *switchStatement() { return this; }
-    SwitchStatement(SymbolTable *sc, Expression *cond, Statement *b,
+    SwitchStatement(ASTScope *sc, Expression *cond, Statement *b,
             SourceLocation l = SourceLocation())
         : BlockStatement(sc, b, l), condition(cond) {}
     virtual void accept(ASTVisitor *v);

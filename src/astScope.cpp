@@ -1,16 +1,16 @@
-#include "symbolTable.hpp"
+#include "astScope.hpp"
 #include "ast.hpp"
 
 #include <iostream>
 
-void SymbolTable::addBuiltin()
+void ASTScope::addBuiltin()
 {
     //XXX dont think this is needed
 //#define BTYPE(X,SZ,SIGN) Identifier *id_##X = get(#X); id_##X->setDeclaration(new TypeDeclaration(id_##X, new ASTBasicType(id_##X,SZ,SIGN)), Identifier::ID_TYPE);
 //#include "tokenkinds.def"
 }
 
-void SymbolTable::dump()
+void ASTScope::dump()
 {
     std::map<std::string, Identifier *>::iterator it = symbols.begin();
     for(; it != symbols.end(); it++)
@@ -19,17 +19,17 @@ void SymbolTable::dump()
     }
 }
 
-bool SymbolTable::contains(std::string str)
+bool ASTScope::contains(std::string str)
 {
     return symbols.count(str) || (parent && parent->contains(str));
 }
 
-void SymbolTable::addSibling(SymbolTable *t)
+void ASTScope::addSibling(ASTScope *t)
 {
     siblings.push_back(t);
 }
 
-Identifier *SymbolTable::getInScope(std::string str)
+Identifier *ASTScope::getInScope(std::string str)
 {
     if(symbols.count(str))
     {
@@ -42,7 +42,7 @@ Identifier *SymbolTable::getInScope(std::string str)
     }
 }
 
-Identifier *SymbolTable::get(std::string str)
+Identifier *ASTScope::get(std::string str)
 {
     Identifier *id = lookup(str);
 
@@ -55,7 +55,7 @@ Identifier *SymbolTable::get(std::string str)
     return id;
 }
 
-Identifier *SymbolTable::lookup(std::string str, bool imports)
+Identifier *ASTScope::lookup(std::string str, bool imports)
 {
     Identifier *ret = NULL;
     Identifier *id = NULL;
@@ -89,12 +89,12 @@ Identifier *SymbolTable::lookup(std::string str, bool imports)
     return ret;
 }
 
-TranslationUnit *SymbolTable::getUnit()
+TranslationUnit *ASTScope::getUnit()
 {
     return dynamic_cast<TranslationUnit*>(package);
 }
 
-std::string SymbolTable::getMangledName()
+std::string ASTScope::getMangledName()
 {
     return package->getMangledName();
 }

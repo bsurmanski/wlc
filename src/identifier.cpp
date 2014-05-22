@@ -3,7 +3,7 @@
 
 #include <assert.h>
 
-Identifier::Identifier(SymbolTable *ta, std::string s, IDType t) :
+Identifier::Identifier(ASTScope *ta, std::string s, IDType t) :
     table(ta), type(t), name(s), declaration(NULL), astValue(NULL), isMangled(false)
 {
     mangled = "";

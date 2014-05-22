@@ -7,7 +7,7 @@
 #include <llvm/IR/Module.h>
 #include "lexer.hpp"
 #include "ast.hpp"
-#include "symbolTable.hpp"
+#include "astScope.hpp"
 #include "sourceLocation.hpp"
 
 #include <deque>
@@ -45,7 +45,7 @@ class ParseContext
     Parser *parser;
     Package *package;
     TranslationUnit *unit;
-    std::stack<SymbolTable*> scope;
+    std::stack<ASTScope*> scope;
     //std::stack<Lexer*> lexers;
 
     public:
@@ -109,9 +109,9 @@ class ParseContext
     bool eof() { return tqueue.empty() && lexer->eof(); }
 
     Package *currentPackage() { return package; }
-    void pushScope(SymbolTable* tbl) { scope.push(tbl); }
-    SymbolTable *popScope() { SymbolTable *tbl = scope.top(); scope.pop(); return tbl;}
-    SymbolTable *getScope() { if(!scope.empty()) return scope.top(); return NULL; }
+    void pushScope(ASTScope* tbl) { scope.push(tbl); }
+    ASTScope *popScope() { ASTScope *tbl = scope.top(); scope.pop(); return tbl;}
+    ASTScope *getScope() { if(!scope.empty()) return scope.top(); return NULL; }
 
     //void pushLexer(Lexer *l) { lexers.push(l); }
     //Lexer *popLexer() { Lexer *lx = lexers.top(); lexers.pop(); return lx; }

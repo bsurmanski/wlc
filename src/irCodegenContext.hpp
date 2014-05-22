@@ -68,7 +68,7 @@ struct IRScope
     llvm::BasicBlock *breakLabel;
     llvm::BasicBlock *continueLabel;
     llvm::DIDescriptor debug;
-    SymbolTable *table;
+    ASTScope *table;
     IRScope *parent;
 
     //switch
@@ -110,7 +110,7 @@ struct IRScope
     Identifier *get(std::string s) { return table->get(s); }
     Identifier *lookup(std::string s, bool imports = true) { return table->lookup(s, imports); }
 
-    IRScope(SymbolTable *tbl, llvm::DIDescriptor dbg) : table(tbl), debug(dbg),
+    IRScope(ASTScope *tbl, llvm::DIDescriptor dbg) : table(tbl), debug(dbg),
         breakLabel(0), continueLabel(0), parent(0) {}
 };
 

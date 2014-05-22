@@ -25,7 +25,7 @@ struct StructVisitorArg
 {
     TranslationUnit *unit;
     std::vector<Declaration *> *members;
-    SymbolTable *scope;
+    ASTScope *scope;
 };
 
 ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype);
@@ -36,7 +36,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
 
     TranslationUnit *unit = m->unit;
     std::vector<Declaration *> *members = m->members;
-    SymbolTable *scope = m->scope;
+    ASTScope *scope = m->scope;
 
     CXSourceLocation cxloc = clang_getCursorLocation(cursor);
     SourceLocation loc = SourceLocationFromCLocation(cxloc);
@@ -71,7 +71,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
 ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
 {
     vector<Declaration*> members;
-    SymbolTable *tbl = new SymbolTable(unit->getScope());
+    ASTScope *tbl = new ASTScope(unit->getScope());
     CXString cxname = clang_getTypeSpelling(ctype);
     CXCursor typeDecl = clang_getTypeDeclaration(ctype);
     string name = clang_getCString(cxname);

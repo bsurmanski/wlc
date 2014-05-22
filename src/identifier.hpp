@@ -7,7 +7,7 @@ struct Declaration;
 struct Expression;
 struct ASTType;
 struct ASTValue;
-struct SymbolTable;
+struct ASTScope;
 struct StructDeclaration;
 struct UnionDeclaration;
 struct ClassDeclaration;
@@ -34,7 +34,7 @@ struct Identifier
     std::string mangled;
     Declaration *declaration;
     Expression *expression;
-    SymbolTable *table;
+    ASTScope *table;
     union
     {
         struct
@@ -45,7 +45,7 @@ struct Identifier
         ASTType *astType;
     };
 
-    Identifier(SymbolTable *ta, std::string s, IDType t = ID_UNKNOWN);
+    Identifier(ASTScope *ta, std::string s, IDType t = ID_UNKNOWN);
     void setDeclaration(Declaration *decl, IDType t = ID_UNKNOWN);
     Declaration *getDeclaration() { return declaration; }
     void setExpression(Expression *e) { expression = e; type = ID_EXPRESSION; }
@@ -57,7 +57,7 @@ struct Identifier
     void setDeclaredType(ASTType *ty);
     ASTValue *getReference();
     ASTValue *getValue();
-    SymbolTable *getScope() { return table; }
+    ASTScope *getScope() { return table; }
     void setValue(ASTValue *value);
     bool isUndeclared() { return type == ID_UNKNOWN; }
     bool isVariable() { return type == ID_VARIABLE; }

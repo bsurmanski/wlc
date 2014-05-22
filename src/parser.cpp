@@ -560,7 +560,7 @@ Declaration *ParseContext::parseDeclaration()
             return NULL;
         }
 
-        SymbolTable *tbl = new SymbolTable(getScope(), SymbolTable::Scope_Struct);
+        ASTScope *tbl = new ASTScope(getScope(), ASTScope::Scope_Struct);
         pushScope(tbl);
         vector<Declaration*> members;
         vector<FunctionDeclaration*> methods;
@@ -629,7 +629,7 @@ Declaration *ParseContext::parseDeclaration()
         std::vector<VariableDeclaration*> parameters;
         ignore(); // lparen
 
-        SymbolTable *funcScope = new SymbolTable(getScope());
+        ASTScope *funcScope = new ASTScope(getScope());
         pushScope(funcScope);
 
         bool vararg = false;
@@ -720,7 +720,7 @@ Declaration *ParseContext::parseDeclaration()
 Statement *ParseContext::parseCompoundStatement(){
     SourceLocation loc = peek().getLocation();
     ignore(); // eat lbrace
-    SymbolTable *tbl = new SymbolTable(getScope());
+    ASTScope *tbl = new ASTScope(getScope());
     pushScope(tbl);
     vector<Statement*> stmts;
     while(peek().isNot(tok::rbrace))
@@ -739,8 +739,8 @@ Statement *ParseContext::parseIfStatement()
     Expression *cond = NULL;
     Statement *body = NULL;
     ElseStatement *els = NULL;
-    SymbolTable *parentScope = getScope();
-    SymbolTable *scope = new SymbolTable(parentScope);
+    ASTScope *parentScope = getScope();
+    ASTScope *scope = new ASTScope(parentScope);
     pushScope(scope);
     assert_message(peek().is(tok::kw_if), msg::ERROR, "expected 'if' keyword", peek().loc);
     ignore(); // ignore if
@@ -768,7 +768,7 @@ Statement *ParseContext::parseIfStatement()
     {
         SourceLocation elseLoc = peek().loc;
         ignore(); // else kw
-        SymbolTable *elseScope = new SymbolTable(parentScope);
+        ASTScope *elseScope = new ASTScope(parentScope);
         pushScope(elseScope);
         els = new ElseStatement(elseScope, parseStatement(), elseLoc);
         popScope();
@@ -783,8 +783,8 @@ Statement *ParseContext::parseWhileStatement()
     Expression *cond = NULL;
     Statement *body = NULL;
     ElseStatement *els = NULL;
-    SymbolTable *parentScope = getScope();
-    SymbolTable *scope = new SymbolTable(parentScope);
+    ASTScope *parentScope = getScope();
+    ASTScope *scope = new ASTScope(parentScope);
     pushScope(scope);
     assert_message(peek().is(tok::kw_while), msg::ERROR, "expected 'while' keyword", peek().loc);
     ignore(); // eat 'while'
@@ -804,7 +804,7 @@ Statement *ParseContext::parseWhileStatement()
     {
         ignore(); // else kw
         SourceLocation eloc = peek().loc;
-        SymbolTable *elseScope = new SymbolTable(parentScope);
+        ASTScope *elseScope = new ASTScope(parentScope);
         pushScope(elseScope);
         els = new ElseStatement(elseScope, parseStatement(), eloc);
         popScope();
@@ -821,8 +821,8 @@ Statement *ParseContext::parseForStatement()
     Statement *upd = NULL;
     Statement *body = NULL;
     ElseStatement *els = NULL;
-    SymbolTable *parentScope = getScope();
-    SymbolTable *scope = new SymbolTable(parentScope);
+    ASTScope *parentScope = getScope();
+    ASTScope *scope = new ASTScope(parentScope);
     pushScope(scope);
 
     if(!peek().is(tok::kw_for)) {
@@ -866,7 +866,7 @@ Statement *ParseContext::parseForStatement()
     {
         SourceLocation eloc = peek().loc;
         ignore();
-        SymbolTable *elseScope = new SymbolTable(parentScope);
+        ASTScope *elseScope = new ASTScope(parentScope);
         pushScope(elseScope);
         els = new ElseStatement(elseScope, parseStatement(), eloc);
         popScope();
@@ -900,7 +900,7 @@ CaseStatement *ParseContext::parseCaseStatement()
 Statement *ParseContext::parseSwitchStatement()
 {
     SourceLocation loc = peek().loc;
-    SymbolTable *scope = new SymbolTable(getScope());
+    ASTScope *scope = new ASTScope(getScope());
     pushScope(scope);
 
     if(peek().isNot(tok::kw_switch)) {

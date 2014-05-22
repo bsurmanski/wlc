@@ -11,10 +11,23 @@ typedef std::map<std::string, Identifier*>::iterator SymbolIterator;
 struct Package;
 struct TranslationUnit;
 
-struct SymbolTable
+/*
+ * TODO: create specialized iterator, that can traverse dependent on variable type
+ * iterates different declaration kinds
+struct SymbolIterator {
+    enum Type {
+        ITER_PACKAGE,
+        ITER_TYPE,
+        ITER_VARIABLES,
+        ITER_FUNCTIONS,
+        ITER_UNKNOWN,
+    };
+}; */
+
+struct ASTScope
 {
-    SymbolTable *parent;
-    std::vector<SymbolTable*> siblings;
+    ASTScope *parent;
+    std::vector<ASTScope*> siblings;
     std::map<std::string, Identifier *> symbols;
     std::map<std::string, bool> extensions;
     Package *package;
@@ -40,7 +53,7 @@ struct SymbolTable
     }
 
     void dump();
-    SymbolTable(SymbolTable *par = NULL, ScopeType st = Scope_Local, Package *pkg=0) :
+    ASTScope(ASTScope *par = NULL, ScopeType st = Scope_Local, Package *pkg=0) :
         package(pkg), parent(par), type(st)
     {
         if(!par) addBuiltin();
@@ -55,7 +68,7 @@ struct SymbolTable
     ScopeType getScopeType() { return type; }
     SymbolIterator begin() { return symbols.begin(); }
     SymbolIterator end() { return symbols.end(); }
-    void addSibling(SymbolTable *t);
+    void addSibling(ASTScope *t);
     void addBuiltin();
     bool contains(std::string);
     Identifier *getInScope(std::string); // retrieves and creates if non-existant (only from current scope, not parents)

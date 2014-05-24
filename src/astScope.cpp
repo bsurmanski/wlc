@@ -3,6 +3,15 @@
 
 #include <iostream>
 
+ScopeIterator::ScopeIterator(ASTScope *sc, Type t, bool rec) :
+    scope(sc), type(t), recurse(rec) {
+    base = scope->symbols.begin();
+}
+
+ScopeIterator::ScopeIterator(ASTScope *sc, std::map<std::string, Identifier*>::iterator b,
+        Type t, bool rec) : scope(sc), base(b), type(t), recurse(rec) {
+            }
+
 void ASTScope::addBuiltin()
 {
     //XXX dont think this is needed
@@ -89,6 +98,10 @@ Identifier *ASTScope::lookup(std::string str, bool imports)
     return ret;
 }
 
+void ASTScope::remove(Identifier *id){
+    symbols.erase(id->getName());
+}
+
 TranslationUnit *ASTScope::getUnit()
 {
     return dynamic_cast<TranslationUnit*>(package);
@@ -97,4 +110,18 @@ TranslationUnit *ASTScope::getUnit()
 std::string ASTScope::getMangledName()
 {
     return package->getMangledName();
+}
+
+Identifier *ASTScope::realizeIdentifier(Identifier *id)
+{
+    if(!id->isUndeclared()){
+        return id;
+    }
+
+    Identifier *realize = lookup(id->getName());
+    if(id != realize){
+        remove(id);
+        id = realize;
+    }
+    return id;
 }

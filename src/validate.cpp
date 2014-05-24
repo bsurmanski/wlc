@@ -30,7 +30,7 @@ ValidationVisitor::ValidationVisitor() : ASTVisitor() {
 
 Identifier *ValidationVisitor::resolveIdentifier(Identifier *id) {
     if(id->isUndeclared()) {
-        id = getScope()->lookup(id->getName());
+        id = getScope()->realizeIdentifier(id);
     }
 
     if(id->isUndeclared()) {

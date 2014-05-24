@@ -231,20 +231,11 @@ void ParseContext::parseTopLevel(TranslationUnit *unit)
             break;
 
         default:
-            //stmt = parseDeclarationStatement();
             decl = parseDeclaration();
-            if(dynamic_cast<TypeDeclaration*>(decl))
+            if(!decl)
             {
-                unit->types.push_back((TypeDeclaration*) decl);
-            } else if(dynamic_cast<VariableDeclaration*>(decl))
-            {
-                unit->globals.push_back((VariableDeclaration*) decl);
-            } else if(dynamic_cast<FunctionDeclaration*>(decl))
-            {
-                unit->functions.push_back((FunctionDeclaration*) decl);
-            } else
-            {
-                emit_message(msg::FAILURE, "what sort of global statement did i just parse?");
+                emit_message(msg::FAILURE, "invalid global statement, expected global,\
+                        function declaration");
             }
     }
 }
@@ -318,14 +309,11 @@ ImportExpression *ParseContext::parseImport()
     {
         ignore(); // ignore (
         special = true;
-        Expression *specialImportType = parseExpression();
-        if(!dynamic_cast<IdentifierExpression*>(specialImportType))
-        {
-            emit_message(msg::ERROR, "invalid special import expression", loc);
-            dropLine();
-            return NULL;
+        if(peek().isNot(tok::identifier)){
+            emit_message(msg::ERROR, "expected identifier as special import specifier", loc);
         }
-        parserType = ((IdentifierExpression*)specialImportType)->getName();
+
+        parserType = get().toString();
 
         ignore(); // ignore )
     }

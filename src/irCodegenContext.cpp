@@ -15,6 +15,13 @@
 using namespace std;
 using namespace llvm;
 
+IRTranslationUnit::IRTranslationUnit(IRCodegenContext *c, TranslationUnit *u) :
+    context(c), unit(u) {
+    module = new Module("", context->context);
+    debug = new IRDebug(context, this);
+    scope = new IRScope(u->getScope(), debug->getCompileUnit());
+}
+
 SourceLocation currentLoc;
 
 std::string IRFunction::getName(bool mangle)
@@ -94,7 +101,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         sty->setBody(structVec);
     }
 
-    debug->createUserType(ty);
+    unit->debug->createUserType(ty);
     return sty;
 }
 
@@ -149,7 +156,7 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
     }
     else ty->cgType = Type::getInt8Ty(context); //allow fwd declared types, TODO: cleaner
 
-    debug->createUnionType(ty);
+    unit->debug->createUnionType(ty);
     return(llvm::Type*) ty->cgType;
 }
 
@@ -184,7 +191,7 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
     StructType *tty = StructType::create(context);
     tty->setBody(tupleVec);
     ty->cgType = tty;
-    debug->createType(ty); // TODO
+    unit->debug->createType(ty); // TODO
     return tty;
 }
 
@@ -218,13 +225,13 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
         aty->setBody(members);
         ty->cgType = aty;
 
-        debug->createDynamicArrayType(ty);
+        unit->debug->createDynamicArrayType(ty);
     } else
     {
         llvm::ArrayType *aty = ArrayType::get(codegenType(arrty->arrayOf), arrty->length());
         ty->cgType = aty;
 
-        debug->createArrayType(ty);
+        unit->debug->createArrayType(ty);
     }
 
     return (llvm::Type*) ty->cgType;
@@ -1742,7 +1749,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     } else if(BlockStatement *bstmt = stmt->blockStatement())
     {
         ASTValue *value = NULL;
-        pushScope(new IRScope(bstmt->scope, debug->createScope(getScope()->debug, bstmt->loc)));
+        pushScope(new IRScope(bstmt->scope, unit->debug->createScope(getScope()->debug, bstmt->loc)));
         if(IfStatement *istmt = stmt->ifStatement())
         {
             codegenIfStatement(istmt);
@@ -1790,7 +1797,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             ir->SetInsertPoint(BB);
 
             dwarfStopPoint(decl->loc);
-            debug->createFunction(fdecl);
+            unit->debug->createFunction(fdecl);
             pushScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
             dwarfStopPoint(decl->loc);
 
@@ -1817,7 +1824,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
                 //register debug params
                 //XXX hacky with Instruction, and setDebugLoc manually
-                Instruction *ainst = debug->createVariable(fdecl->parameters[idx]->getName(),
+                Instruction *ainst = unit->debug->createVariable(fdecl->parameters[idx]->getName(),
                                                           alloca, BB, decl->loc, idx+1);
                 ainst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
                 //TODO: register value to scope
@@ -1906,7 +1913,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
             defaultValue = promoteType(defaultValue, vty);
             storeValue(idValue, defaultValue);
 
-            Instruction *vinst = debug->createVariable(vdecl->getName(),
+            Instruction *vinst = unit->debug->createVariable(vdecl->getName(),
                     idValue, ir->GetInsertBlock(), vdecl->loc);
             vinst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
             //TODO: maybe create a LValue field in CGValue?
@@ -1930,9 +1937,8 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 {
     this->unit = u;
     this->module = this->unit->module;
-    this->debug = new IRDebug(this, u);
 
-    pushScope(new IRScope(unit->unit->getScope(), debug->getCompileUnit()));
+    pushScope(u->getScope());
 
     for(int i = 0; i < unit->unit->importUnits.size(); i++) //TODO: import symbols.
     {
@@ -1940,37 +1946,39 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
     }
 
     // alloc globals before codegen'ing functions
-    std::vector<VariableDeclaration*>& globals = unit->getGlobals();
-    for(int i = 0; i < globals.size(); i++)
+    // iterate over globals
+    ASTScope::iterator end = unit->getScope()->end();
+    for(ASTScope::iterator it = unit->getScope()->begin(); it != end; it++)
     {
-        Identifier *id = globals[i]->identifier;
+        Identifier *id = *it;
+        VariableDeclaration *vdecl = id->getDeclaration()->variableDeclaration();
         if(id->isVariable())
         {
             ASTType *idTy = id->getType();
 
             //TODO: correct type for global storage (esspecially pointers?)
             ASTValue *idValue = 0;
-            if(globals[i]->value)
-                idValue = codegenExpression(globals[i]->value);
+            if(vdecl->value)
+                idValue = codegenExpression(vdecl->value);
 
             if(idTy->kind == TYPE_DYNAMIC)
             {
                 if(!idValue)
                     emit_message(msg::FAILURE,
                             "attempt to codegen dynamically typed \
-                            variable without properly assigned value", globals[i]->loc);
+                            variable without properly assigned value", vdecl->loc);
                 idTy = idValue->getType();
-                globals[i]->type = idTy;
+                vdecl->type = idTy;
             }
 
             llvm::Constant* gValue;
-            if(globals[i]->external)
+            if(vdecl->external)
             {
                 gValue = NULL;
-            } else if(globals[i]->value)
+            } else if(vdecl->value)
             {
                 gValue = (llvm::Constant*) codegenValue(
-                            promoteType(codegenExpression(globals[i]->value), idTy)
+                            promoteType(codegenExpression(vdecl->value), idTy)
                             );
             } else
             {
@@ -1980,7 +1988,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
             GlobalVariable *llvmval = (GlobalVariable*)
                     module->getOrInsertGlobal(id->getName(), codegenType(idTy));
 
-            GlobalValue::LinkageTypes linkage = globals[i]->external ?
+            GlobalValue::LinkageTypes linkage = vdecl->external ?
                 GlobalValue::ExternalLinkage : GlobalValue::ExternalLinkage;
             llvmval->setLinkage(linkage);
             llvmval->setInitializer(gValue);
@@ -1988,8 +1996,8 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
             ASTValue *gv = new ASTValue(idTy, llvmval, true);
             id->setValue(gv);
 
-            dwarfStopPoint(globals[i]->loc);
-            debug->createGlobal(globals[i], gv);
+            dwarfStopPoint(vdecl->loc);
+            unit->debug->createGlobal(vdecl, gv);
 
         } else if(id->isFunction())
         {
@@ -1997,15 +2005,16 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
         }
     }
 
-    std::vector<FunctionDeclaration*>& functions = unit->getFunctions();
+    // iterate over unit, get functions
+    end = unit->getScope()->end();
+    for(ASTScope::iterator it = unit->getScope()->begin(); it != end; it++){
+        if(it->getDeclaration()->functionDeclaration()){
+            codegenDeclaration(it->getDeclaration());
+        }
+    }
 
-    // codegen function bodys
-    for(int i = 0; i < functions.size(); i++)
-        codegenDeclaration(functions[i]);
-
+    unit->debug->finalize();
     popScope();
-
-    delete debug;
 }
 
 void IRCodegenContext::codegenPackage(Package *p)
@@ -2013,18 +2022,16 @@ void IRCodegenContext::codegenPackage(Package *p)
     if(p->isTranslationUnit()) // leaf in package tree
     {
         std::string err;
-        Module *m = new Module("", context);
-        IRTranslationUnit *unit = new IRTranslationUnit((TranslationUnit*) p);
-        unit->module = m;
+        IRTranslationUnit *unit = new IRTranslationUnit(this, (TranslationUnit*) p);
         p->cgValue = 0;
         codegenTranslationUnit(unit);
 
         // XXX debug, output all modules
         std::string outputll = config.tempName + "/" + unit->unit->getName() + ".ll";
         raw_fd_ostream output(outputll.c_str(), err);
-        m->print(output, 0);
+        unit->module->print(output, 0);
 
-        linker.linkInModule(m, (unsigned) Linker::DestroySource, &err);
+        linker.linkInModule(unit->module, (unsigned) Linker::DestroySource, &err);
 
     } else // generate all leaves ...
     {

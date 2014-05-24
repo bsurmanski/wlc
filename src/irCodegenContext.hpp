@@ -4,6 +4,7 @@
 #include "codegenContext.hpp"
 #include "config.hpp"
 #include "message.hpp"
+#include "astScope.hpp"
 #include <llvm/IR/Module.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/IRBuilder.h>
@@ -71,6 +72,9 @@ struct IRScope
     ASTScope *table;
     IRScope *parent;
 
+    ASTScope::iterator begin() { return table->begin(); }
+    ASTScope::iterator end() { return table->end(); }
+
     //switch
     SwitchStatement *switchStmt;
     std::vector<IRSwitchCase*> cases;
@@ -114,10 +118,13 @@ struct IRScope
         breakLabel(0), continueLabel(0), parent(0) {}
 };
 
+class IRDebug;
 struct IRTranslationUnit
 {
     TranslationUnit *unit;
     IRScope *scope;
+    IRCodegenContext *context;
+    IRDebug *debug;
     llvm::Module *module;
 
 
@@ -125,13 +132,11 @@ struct IRTranslationUnit
     std::map<std::string, IRValue> globals;
     std::map<std::string, llvm::Function*> functions;
 
-    std::vector<VariableDeclaration*>& getGlobals() { return unit->globals; }
-    std::vector<FunctionDeclaration*>& getFunctions() { return unit->functions; }
+    IRScope* getScope() { return scope; }
 
-    IRTranslationUnit(TranslationUnit *u) : unit(u), scope(NULL) {}
+    IRTranslationUnit(IRCodegenContext *c, TranslationUnit *u);
 };
 
-class IRDebug;
 class IRCodegenContext : public CodegenContext
 {
     public:
@@ -141,7 +146,6 @@ class IRCodegenContext : public CodegenContext
     llvm::Linker linker;
     IRFunction currentFunction;
     IRTranslationUnit *unit;
-    IRDebug *debug;
     IRScope *scope;
     AST *ast;
     bool terminated;

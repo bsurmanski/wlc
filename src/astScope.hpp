@@ -7,22 +7,53 @@
 #include <iterator>
 #include "identifier.hpp"
 
-typedef std::map<std::string, Identifier*>::iterator SymbolIterator;
+//typedef std::map<std::string, Identifier*>::iterator SymbolIterator;
 struct Package;
 struct TranslationUnit;
 
-/*
- * TODO: create specialized iterator, that can traverse dependent on variable type
- * iterates different declaration kinds
-struct SymbolIterator {
+// TODO: create specialized iterator, that can traverse dependent on variable type
+// iterates different declaration kinds
+struct ScopeIterator {
     enum Type {
+        ITER_ALL,
         ITER_PACKAGE,
         ITER_TYPE,
         ITER_VARIABLES,
         ITER_FUNCTIONS,
         ITER_UNKNOWN,
     };
-}; */
+    ASTScope *scope;
+    Type type;
+    std::map<std::string, Identifier*>::iterator base;
+    bool recurse;
+
+    ScopeIterator(ASTScope *sc, Type t, bool rec=false);
+    ScopeIterator(ASTScope *sc, std::map<std::string, Identifier*>::iterator b,
+            Type t, bool rec=false);
+    ScopeIterator(const ScopeIterator& it){
+        scope = it.scope;
+        type = it.type;
+        base = it.base;
+        recurse = it.recurse;
+    }
+
+    Identifier *operator*(){ return base->second; }
+    Identifier *operator->(){ return base->second; }
+    ScopeIterator &operator++() {
+        base++;
+        return *this;
+    }
+
+    ScopeIterator operator++(int) {
+        ScopeIterator it = ScopeIterator(*this);
+        operator++();
+        return it;
+    }
+
+    bool operator==(const ScopeIterator &it){ return it.base == base; }
+    bool operator!=(const ScopeIterator &it){ return !(*this == it); }
+
+};
 
 struct ASTScope
 {
@@ -41,6 +72,11 @@ struct ASTScope
     };
 
     ScopeType type;
+
+    typedef ScopeIterator iterator;
+    ScopeIterator begin() { return ScopeIterator(this, ScopeIterator::ITER_ALL); }
+    ScopeIterator end() { return ScopeIterator(this, symbols.end(), ScopeIterator::ITER_ALL); }
+
 
     bool extensionEnabled(std::string s)
     {
@@ -66,14 +102,15 @@ struct ASTScope
     TranslationUnit *getUnit();
 
     ScopeType getScopeType() { return type; }
-    SymbolIterator begin() { return symbols.begin(); }
-    SymbolIterator end() { return symbols.end(); }
     void addSibling(ASTScope *t);
     void addBuiltin();
     bool contains(std::string);
     Identifier *getInScope(std::string); // retrieves and creates if non-existant (only from current scope, not parents)
     Identifier *get(std::string); // retrieves and creates if non-existant
     Identifier *lookup(std::string, bool imports=true); // same as 'get', but does not create on not-found
+    void remove(Identifier *id);
+    Identifier *realizeIdentifier(Identifier *id);
 };
+
 
 #endif

@@ -27,6 +27,11 @@ class IRDebug
 
         ~IRDebug()
         {
+            finalize();
+        }
+
+        void finalize()
+        {
             di.finalize();
         }
 

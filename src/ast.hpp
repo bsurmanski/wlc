@@ -138,10 +138,6 @@ struct TranslationUnit : public Package
 {
     std::vector<ImportExpression*> imports; //TODO: aliased imports?
     std::vector<TranslationUnit*> importUnits; //TODO: aliased imports?
-    std::vector<TypeDeclaration*> types;
-    std::vector<VariableDeclaration*> globals;
-    std::vector<FunctionDeclaration*> functions;
-
     std::map<std::string, bool> extensions;
 
     std::string filenm;

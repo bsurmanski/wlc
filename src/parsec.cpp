@@ -217,7 +217,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
                parameters, 0, 0, loc);
         id->setDeclaration(fdecl, Identifier::ID_FUNCTION);
 
-        unit->functions.push_back(fdecl);
+        //unit->functions.push_back(fdecl);
 
     } else if(cursor.kind == CXCursor_VarDecl)
     {

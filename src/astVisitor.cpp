@@ -25,17 +25,9 @@ void Package::accept(ASTVisitor *v) {
 void TranslationUnit::accept(ASTVisitor *v) {
     Package::accept(v);
     v->visitTranslationUnit(this);
-    for(int i = 0; i < types.size(); i++)
-        if(types[i])
-            types[i]->accept(v);
-
-    for(int i = 0; i < globals.size(); i++)
-        if(globals[i])
-            globals[i]->accept(v);
-
-    for(int i = 0; i < functions.size(); i++)
-        if(functions[i])
-            functions[i]->accept(v);
+    for(ASTScope::iterator it = getScope()->begin(); it != getScope()->end(); it++){
+        it->getDeclaration()->accept(v);
+    }
 }
 
 //

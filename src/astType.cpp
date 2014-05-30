@@ -5,14 +5,12 @@
 // UserType
 //
 
-ASTType *ASTUserType::getTypeResolution() {
-    if(getDeclaration())
-        return getDeclaration()->getDeclaredType();
-    return NULL;
+ASTScope *ASTUserType::getScope() {
+    return getDeclaration()->getScope();
 }
 
 bool ASTUserType::isOpaque() {
-    return !getDeclaration()->members.size();
+    return !getDeclaration()->length();
 }
 
 Declaration *ASTUserType::getMember(size_t i) {
@@ -20,47 +18,27 @@ Declaration *ASTUserType::getMember(size_t i) {
 }
 
 size_t ASTUserType::length() {
-    UserTypeDeclaration *utd = getDeclaration();
-    return utd->members.size();
+    return getDeclaration()->length();
 }
 
 size_t ASTUserType::getSize() {
-    UserTypeDeclaration *utd = getDeclaration();
-    return utd->getSize();
+    return getDeclaration()->getSize();
 }
 size_t ASTUserType::getAlign() {
-    UserTypeDeclaration *utd = getDeclaration();
-    return utd->getAlign();
+    return getDeclaration()->getAlign();
 }
 
 ASTType *ASTUserType::getMemberType(size_t i) {
     return getMember(i)->getType();
 }
 
-Declaration *ASTUserType::getMemberByName(std::string name) {
-    UserTypeDeclaration *utd = getDeclaration();
-    for(int i = 0; i < utd->members.size(); i++){
-        if(utd->members[i]->getName() == name)
-            return utd->members[i];
-    }
-    return NULL;
-}
-
 long ASTUserType::getMemberIndex(std::string member){
     UserTypeDeclaration *utd = getDeclaration();
+    return getDeclaration()->getMemberIndex(member);
+}
 
-    if(dynamic_cast<StructDeclaration*>(utd)) {
-        for(int i = 0; i < utd->members.size(); i++){
-            if(utd->members[i]->identifier->getName() == member){
-                return i;
-            }
-        }
-    } else if(dynamic_cast<UnionDeclaration*>(utd)) {
-        return 0;
-    } else if(dynamic_cast<ClassDeclaration*>(utd)) {
-        long index;
-        emit_message(msg::ERROR, "feature currently broke: class index");
-    }
+long ASTUserType::getVTableIndex(std::string method){
+
 }
 
 

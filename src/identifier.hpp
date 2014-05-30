@@ -26,8 +26,10 @@ struct Identifier
         ID_ALIAS,
         ID_EXPRESSION,
         ID_LABEL,
+        ID_ANY,
     };
 
+    bool noMangle;
     bool isMangled;
     IDType type;
     std::string name;
@@ -50,6 +52,7 @@ struct Identifier
     Declaration *getDeclaration() { return declaration; }
     void setExpression(Expression *e) { expression = e; type = ID_EXPRESSION; }
     Expression *getExpression() { return expression; }
+    void setMangle(bool val) { noMangle = !val; }
     std::string getName() { return name; }
     std::string getMangledName();
     ASTType *getType();
@@ -62,6 +65,7 @@ struct Identifier
     bool isUndeclared() { return type == ID_UNKNOWN; }
     bool isVariable() { return type == ID_VARIABLE; }
     bool isFunction() { return type == ID_FUNCTION; }
+    bool isUserType() { return type == ID_USER; }
     bool isStruct();
     bool isUnion();
     bool isClass();
@@ -69,6 +73,11 @@ struct Identifier
     bool isModule() { return type = ID_MODULE; }
     bool isExpression() { return type == ID_EXPRESSION; }
     bool isLabel() { return type == ID_LABEL; }
+
+    /*
+    bool isTypeMember() { return getScope()->isUserTypeScope() && isVariable(); }
+    bool isTypeMethod() { return getScope()->isUserTypeScope() && isFunction(); }
+    */
 
 };
 

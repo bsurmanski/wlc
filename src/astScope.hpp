@@ -10,6 +10,7 @@
 //typedef std::map<std::string, Identifier*>::iterator SymbolIterator;
 struct Package;
 struct TranslationUnit;
+struct ASTVisitor;
 
 // TODO: create specialized iterator, that can traverse dependent on variable type
 // iterates different declaration kinds
@@ -27,6 +28,7 @@ struct ScopeIterator {
     std::map<std::string, Identifier*>::iterator base;
     bool recurse;
 
+    ScopeIterator() : scope(0){}
     ScopeIterator(ASTScope *sc, Type t, bool rec=false);
     ScopeIterator(ASTScope *sc, std::map<std::string, Identifier*>::iterator b,
             Type t, bool rec=false);
@@ -55,9 +57,11 @@ struct ScopeIterator {
 
 };
 
+struct ASTNode;
 struct ASTScope
 {
     ASTScope *parent;
+    ASTNode *owner;
     std::vector<ASTScope*> siblings;
     std::map<std::string, Identifier *> symbols;
     std::map<std::string, bool> extensions;
@@ -65,6 +69,7 @@ struct ASTScope
 
     enum ScopeType
     {
+        Scope_Unowned,
         Scope_Global,
         Scope_FunctionParameter,
         Scope_Struct,
@@ -77,6 +82,12 @@ struct ASTScope
     ScopeIterator begin() { return ScopeIterator(this, ScopeIterator::ITER_ALL); }
     ScopeIterator end() { return ScopeIterator(this, symbols.end(), ScopeIterator::ITER_ALL); }
 
+    void setOwner(ASTNode *own) { owner = own; }
+    /*
+    Package *isPackageScope() { return dynamic_cast<Package*>(owner); }
+    FunctionDeclaration *isFunctionScope() { return dynamic_cast<FunctionDeclaration*>(owner); }
+    UserTypeDeclaration *isUserTypeScope() { return dynamic_cast<UserTypeDeclaration*>(owner); }
+    */
 
     bool extensionEnabled(std::string s)
     {
@@ -108,8 +119,11 @@ struct ASTScope
     Identifier *getInScope(std::string); // retrieves and creates if non-existant (only from current scope, not parents)
     Identifier *get(std::string); // retrieves and creates if non-existant
     Identifier *lookup(std::string, bool imports=true); // same as 'get', but does not create on not-found
+    Identifier *lookupInScope(std::string str);
     void remove(Identifier *id);
-    Identifier *realizeIdentifier(Identifier *id);
+    Identifier *resolveIdentifier(Identifier *id);
+
+    void accept(ASTVisitor *v);
 };
 
 

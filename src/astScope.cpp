@@ -1,4 +1,5 @@
 #include "astScope.hpp"
+#include "astVisitor.hpp"
 #include "ast.hpp"
 
 #include <iostream>
@@ -17,6 +18,10 @@ void ASTScope::addBuiltin()
     //XXX dont think this is needed
 //#define BTYPE(X,SZ,SIGN) Identifier *id_##X = get(#X); id_##X->setDeclaration(new TypeDeclaration(id_##X, new ASTBasicType(id_##X,SZ,SIGN)), Identifier::ID_TYPE);
 //#include "tokenkinds.def"
+}
+
+void ASTScope::accept(ASTVisitor *v){
+    v->visitScope(this);
 }
 
 void ASTScope::dump()
@@ -91,11 +96,19 @@ Identifier *ASTScope::lookup(std::string str, bool imports)
         for(int i = 0; i < siblings.size() && !ret; i++)
         {
             id = siblings[i]->lookup(str, false);
-            if(id && !id->isUndeclared()) ret = id;
+            if(id && !id->isUndeclared())
+                ret = id;
         }
     }
 
     return ret;
+}
+
+Identifier *ASTScope::lookupInScope(std::string str) {
+    if(symbols.count(str)){
+        return symbols[str];
+    }
+    return NULL;
 }
 
 void ASTScope::remove(Identifier *id){
@@ -109,19 +122,28 @@ TranslationUnit *ASTScope::getUnit()
 
 std::string ASTScope::getMangledName()
 {
-    return package->getMangledName();
+    if(owner){
+        if(parent){
+            return parent->getMangledName() + "$" + owner->getName();
+        }
+        return owner->getName();
+    }
+    return "";
 }
 
-Identifier *ASTScope::realizeIdentifier(Identifier *id)
+Identifier *ASTScope::resolveIdentifier(Identifier *id)
 {
     if(!id->isUndeclared()){
         return id;
     }
 
-    Identifier *realize = lookup(id->getName());
-    if(id != realize){
+    if(id->getName() == "SDL_Surface"){
+        printf("k");
+    }
+    Identifier *res = lookup(id->getName(), true);
+    if(id != res){
         remove(id);
-        id = realize;
+        id = res;
     }
     return id;
 }

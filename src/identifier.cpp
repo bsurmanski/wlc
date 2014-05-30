@@ -4,7 +4,7 @@
 #include <assert.h>
 
 Identifier::Identifier(ASTScope *ta, std::string s, IDType t) :
-    table(ta), type(t), name(s), declaration(NULL), astValue(NULL), isMangled(false)
+    table(ta), type(t), name(s), declaration(NULL), astValue(NULL), isMangled(false), expression(0)
 {
     mangled = "";
 }
@@ -24,6 +24,10 @@ void Identifier::setDeclaration(Declaration *decl, IDType ty)
 
 ASTType *Identifier::getType()
 {
+    if(type == ID_EXPRESSION){
+        return expression->getType();
+    }
+
     return declaration->getType();
 }
 
@@ -62,8 +66,10 @@ void Identifier::setValue(ASTValue *val)
 }
 
 std::string Identifier::getMangledName() {
+    if(noMangle) return getName();
+
     if(!isMangled) {
-        mangled = mangled = table->getMangledName() + getName();
+        mangled = table->getMangledName() + "$" + getName();
         isMangled = true;
     }
     return mangled;

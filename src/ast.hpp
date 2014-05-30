@@ -77,6 +77,8 @@ struct AST
 
 struct ASTNode {
     ASTNode() {}
+    virtual std::string getMangledName() { return ""; }
+    virtual std::string getName() { return ""; }
     virtual void accept(ASTVisitor *v) = 0;
 };
 
@@ -88,19 +90,16 @@ struct Package : public ASTNode
     void *cgValue; // opaque pointer to specific codegen information
     std::string name;
 
-    Package(Package *par=0, std::string nm="wl") : parent(par), scope(NULL), cgValue(NULL),
-        identifier(NULL)
-    {
-        name = nm;
-        if(parent)
-            identifier = parent->getScope()->getInScope(name);
-    }
+    Package(Package *par=0, std::string nm="wl");
+
     virtual ~Package() { if(scope) delete scope; }
 
     Identifier *getIdentifier() { return identifier; }
     ASTScope *getScope() {
-        if(!scope)
+        if(!scope){
             scope = new ASTScope(NULL, ASTScope::Scope_Global, this);
+            scope->setOwner(this);
+        }
         return scope;
     } //TODO: subscope of parent ?
 
@@ -116,12 +115,17 @@ struct Package : public ASTNode
         // XXX add identifier in scope ?
         //p->setParent(this);
         children.push_back(p);
+        //Identifier *id = scope->get(p->getName());
     }
 
-    std::string getMangledName()
+    virtual std::string getMangledName()
     {
         if(parent)
             return parent->getMangledName() + identifier->getName();
+        return identifier->getName();
+    }
+
+    virtual std::string getName() {
         return identifier->getName();
     }
 
@@ -154,7 +158,6 @@ struct TranslationUnit : public Package
         Package(parent, getFilebase(fn)), filenm(fn), expl(false) {}
     ~TranslationUnit() { }
     virtual bool isTranslationUnit() { return true; }
-    std::string getName() { return identifier->getName(); }
     virtual void accept(ASTVisitor *v);
 };
 
@@ -168,15 +171,20 @@ struct TranslationUnit : public Package
 struct Declaration : public ASTNode
 {
     Identifier *identifier;
-    Declaration *owner;
     SourceLocation loc;
     bool external;
     Declaration(Identifier *id, SourceLocation l, bool ext = false) :
-        identifier(id), loc(l), external(ext), owner(NULL) {}
+        identifier(id), loc(l), external(ext) {}
     virtual ~Declaration(){}
-    virtual std::string getName(bool mangle=false)
+    virtual std::string getName()
     {
         if(identifier) return identifier->getName();
+        return "";
+    }
+    virtual std::string getMangledName(){
+        if(identifier){
+            return identifier->getMangledName();
+        }
         return "";
     }
     bool isExternal() { return external; }
@@ -184,12 +192,17 @@ struct Declaration : public ASTNode
 
     Identifier *getIdentifier() { return identifier; }
 
-    void setOwner(Declaration *decl) { owner = decl; }
-
     virtual FunctionDeclaration *functionDeclaration() { return NULL; }
     virtual VariableDeclaration *variableDeclaration() { return NULL; }
 
     virtual void accept(ASTVisitor *v);
+};
+
+struct PackageDeclaration : public Declaration {
+    Package *package;
+    PackageDeclaration(Package *p, Identifier *id, SourceLocation l, bool ext=false) :
+        package(p), Declaration(id, l, ext) {}
+    ASTType *getType() { return NULL; }
 };
 
 struct FunctionDeclaration : public Declaration
@@ -203,15 +216,11 @@ struct FunctionDeclaration : public Declaration
     FunctionDeclaration(Identifier *id, ASTType *p, std::vector<VariableDeclaration*> params,
             ASTScope *sc, Statement *st, SourceLocation loc) :
         Declaration(id, loc), prototype(p), parameters(params), scope(sc),
-        body(st), cgValue(NULL) {}
-    virtual FunctionDeclaration *functionDeclaration() { return this; }
-    virtual std::string getName(bool mangle=false)
-    {
-        if(mangle){}
-        else {
-            return Declaration::getName();
+        body(st), cgValue(NULL) {
+            if(scope)
+                scope->setOwner(this);
         }
-    }
+    virtual FunctionDeclaration *functionDeclaration() { return this; }
     ASTScope *getScope() { return scope; }
     ASTType *getReturnType() { return prototype->functionType()->ret; }
 
@@ -231,18 +240,10 @@ struct VariableDeclaration : public Declaration
     //Identifier *type;
     ASTType *type;
     Expression *value; // initial value
-    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) : Declaration(nm, loc, ext), type(ty), value(val) {}
+    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) : Declaration(nm, loc, ext), type(ty), value(val){}
     virtual VariableDeclaration *variableDeclaration() { return this; }
     virtual ASTType *getType() { return type; }
     virtual void accept(ASTVisitor *v);
-};
-
-// XXX seems pretty useless, bounce down to VariableDeclaraation ?
-struct ArrayDeclaration : public VariableDeclaration
-{
-    ArrayDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) :
-        VariableDeclaration(ty, nm, val, loc, ext) {}
-    virtual ArrayDeclaration *arrayDeclaration() { return this; }
 };
 
 struct TypeDeclaration : public Declaration
@@ -273,6 +274,7 @@ struct UserTypeDeclaration : public TypeDeclaration
             TypeDeclaration(id, loc), scope(sc), members(m),
             type(new ASTUserType(id, this))
     {
+        if(scope) scope->setOwner(this);
         identifier->setDeclaredType(type);
         identifier->setDeclaration(this, Identifier::ID_USER);
     }
@@ -280,10 +282,13 @@ struct UserTypeDeclaration : public TypeDeclaration
     UserTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) :
         TypeDeclaration(id, loc), type(ty) {}
 
+    ASTScope *getScope() { return scope; }
     virtual ASTType *getDeclaredType() { return type; }
     virtual size_t length() const { return members.size(); }
     virtual size_t getAlign() const;
     virtual size_t getSize() const = 0;
+    virtual long getMemberIndex(std::string member) = 0;
+    virtual long getVTableIndex(std::string method) { return -1; }
     virtual void accept(ASTVisitor *v);
 };
 
@@ -294,6 +299,7 @@ struct ClassDeclaration : public UserTypeDeclaration {
         UserTypeDeclaration(id, sc, m, loc), base(bs) {
     }
     virtual size_t getSize() const;
+    long getMemberIndex(std::string member) { return 0; }
 };
 
 struct StructDeclaration : public UserTypeDeclaration {
@@ -302,12 +308,14 @@ struct StructDeclaration : public UserTypeDeclaration {
         UserTypeDeclaration(id, sc, m, loc), packed(false) {
         }
     virtual size_t getSize() const;
+    long getMemberIndex(std::string member);
 };
 
 struct UnionDeclaration : public UserTypeDeclaration {
     UnionDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m, SourceLocation loc) :
         UserTypeDeclaration(id, sc, m, loc) {}
     virtual size_t getSize() const;
+    long getMemberIndex(std::string member) { return 0; }
 };
 
 /***
@@ -402,7 +410,10 @@ struct CompoundStatement : public Statement
     ASTScope *getScope() { return scope; }
     std::vector<Statement*> statements;
     CompoundStatement(ASTScope *sc, std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
-        scope(sc), Statement(l), statements(s) {}
+        scope(sc), Statement(l), statements(s) {
+            if(scope)
+                scope->setOwner(this);
+        }
     virtual CompoundStatement *compoundStatement() { return this; }
     virtual void accept(ASTVisitor *v);
 };
@@ -416,7 +427,10 @@ struct BlockStatement : public Statement
     Statement *body;
     virtual BlockStatement *blockStatement() { return this; }
     BlockStatement(ASTScope *sc, Statement *b, SourceLocation l = SourceLocation()) :
-        scope(sc), body(b), Statement(l) {}
+        scope(sc), body(b), Statement(l) {
+            if(scope)
+                scope->setOwner(this);
+        }
     virtual void accept(ASTVisitor *v);
 };
 
@@ -529,6 +543,7 @@ struct Expression : public Statement
     virtual bool isLValue() { return false; }
     virtual bool isConstant() { return false; }
     virtual ASTType *getType() { return NULL; }
+    virtual ASTType *getDeclaredType() { return NULL; }
 
     Expression(SourceLocation l = SourceLocation()) : Statement(l) {}
     virtual UnaryExpression *unaryExpression() { return NULL; }
@@ -562,6 +577,7 @@ struct TypeExpression : public Expression
     ASTType *type;
     TypeExpression(ASTType *t, SourceLocation l = SourceLocation()) : Expression(l), type(t) {}
     virtual TypeExpression *typeExpression() { return this; }
+    virtual ASTType *getDeclaredType() { return type; }
     virtual void accept(ASTVisitor *v);
 };
 
@@ -747,6 +763,9 @@ struct PrimaryExpression : public Expression
 struct IdentifierExpression : public PrimaryExpression
 {
     Identifier *id;
+    bool isUserType() { return id->isUserType(); }
+    bool isVariable() { return id->isVariable(); }
+    bool isFunction() { return id->isFunction(); }
     virtual bool isLValue() { return id->isVariable(); }
     IdentifierExpression(Identifier *i, SourceLocation l = SourceLocation()) :
         PrimaryExpression(l), id(i) {}
@@ -755,6 +774,10 @@ struct IdentifierExpression : public PrimaryExpression
     virtual IdentifierExpression *identifierExpression() { return this; }
     virtual void accept(ASTVisitor *v);
     virtual ASTType *getType() { return id->getType(); }
+    virtual ASTType *getDeclaredType() {
+        if(id->isUserType()) return id->getDeclaredType();
+        return NULL;
+    }
 };
 
 //struct TypeExpression : public Expression

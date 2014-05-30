@@ -15,6 +15,7 @@ void AST::accept(ASTVisitor *v) {
 
 void Package::accept(ASTVisitor *v) {
     v->visitPackage(this);
+    v->visitScope(scope);
     v->pushScope(this->getScope());
     for(int i = 0; i < children.size(); i++)
         if(children[i])
@@ -40,6 +41,7 @@ void Declaration::accept(ASTVisitor *v) {
 
 void FunctionDeclaration::accept(ASTVisitor *v) {
     Declaration::accept(v);
+    v->visitScope(scope);
     v->visitFunctionDeclaration(this);
     v->pushScope(this->getScope());
     v->pushFunction(this);
@@ -66,6 +68,7 @@ void TypeDeclaration::accept(ASTVisitor *v){
 
 void UserTypeDeclaration::accept(ASTVisitor *v){
     TypeDeclaration::accept(v);
+    v->visitScope(scope);
     v->visitUserTypeDeclaration(this);
     v->visitType(type);
 }
@@ -261,6 +264,7 @@ void CompoundStatement::accept(ASTVisitor *v){
 
 void BlockStatement::accept(ASTVisitor *v){
     Statement::accept(v);
+    v->visitScope(scope);
     v->visitBlockStatement(this);
     v->pushScope(scope);
     if(body)

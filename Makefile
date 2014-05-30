@@ -31,7 +31,7 @@ SRC=$(foreach file, $(SRCFILES), src/$(file))
 OBJ=$(foreach file, $(SRCFILES), build/$(file:.cpp=.o))
 DEP=$(foreach file, $(SRCFILES), build/$(file:.cpp=.d))
 
-CXXFLAGS=`llvm-config --cxxflags` -ggdb -O0 -frtti -UNDEBUG -DDEBUG
+CXXFLAGS=`llvm-config --cxxflags` -ggdb -O0 -frtti -UNDEBUG -DDEBUG -I/usr/local/include
 LDFLAGS=`llvm-config --ldflags --libs` -lLLVM-3.4
 
 .PHONY: clean all

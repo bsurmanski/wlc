@@ -131,6 +131,7 @@ struct IRTranslationUnit
     std::map<std::string, IRType> types;
     std::map<std::string, IRValue> globals;
     std::map<std::string, llvm::Function*> functions;
+    std::map<std::string, Identifier*> symbols; //TODO
 
     IRScope* getScope() { return scope; }
 

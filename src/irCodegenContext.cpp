@@ -52,11 +52,13 @@ void IRCodegenContext::dwarfStopPoint(SourceLocation l)
 llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
 {
     ASTUserType *userty = ty->userType();
+    UserTypeDeclaration *utdecl = userty->getDeclaration();
     if(!userty) {
         emit_message(msg::FAILURE, "invalid user type");
     }
 
     if(userty->identifier->isUndeclared()){
+        emit_message(msg::WARNING, "type should be resolved by now");
         userty->identifier = lookup(ty->getName());
         if(userty->identifier->isUndeclared()){
             emit_message(msg::ERROR, "undeclared struct: " + userty->getName());
@@ -78,7 +80,19 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     sty->setName(ty->getName());
     unit->types[ty->getName()] = IRType(ty, sty);
 
+    //
+    //TODO: use iterator
+    //
+
     std::vector<Type*> structVec;
+    ASTScope::iterator end = userty->getScope()->end();
+    for(ASTScope::iterator it = userty->getScope()->begin(); it != end; ++it){
+        if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(it->getDeclaration())){
+            structVec.push_back(codegenType(vd->getType()));
+        }
+    }
+
+    /*
     for(int i = 0; i < userty->length(); i++)
     {
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(userty->getMember(i)))
@@ -87,7 +101,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         } else {
             emit_message(msg::UNIMPLEMENTED, "this cant be declared in a struct (yet?)");
         }
-    }
+    }*/
 
     /*
     for(int i = 0; i < userty->methods.size(); i++)
@@ -343,6 +357,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
     return (llvm::Type *) llvmty;
 }
 
+/*
 ASTValue *IRCodegenContext::indexValue(ASTValue *val, int i)
 {
     ASTCompositeType *compty = dynamic_cast<ASTCompositeType*>(val->getType());
@@ -352,14 +367,16 @@ ASTValue *IRCodegenContext::indexValue(ASTValue *val, int i)
         return NULL;
     }
 
+    ASTType *memberTy = compty->getMemberType(i);
     std::vector<Value*> gep;
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), i));
     Value *v = codegenLValue(val);
     Value *llval = ir->CreateInBoundsGEP(v, gep);
-    llval = ir->CreateBitCast(llval, codegenType(compty->getMemberType(i)->getPointerTy()));
-    return new ASTValue(compty->getMemberType(i), llval, true);
+    llval = ir->CreateBitCast(llval, codegenType(memberTy->getPointerTy()));
+    return new ASTValue(memberTy, llval, true);
 }
+*/
 
 llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 {
@@ -405,11 +422,13 @@ ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
     return loaded;
 }
 
+// does not create IR Value for codegen (unless global).
+// values should be created at declaration
 ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
 {
     if(id->isVariable())
     {
-        if(id->getScope()->getUnit() != unit->unit) // id not declared in current TU
+        if(id->getScope()->getUnit() != unit->unit) // id not declared in current TU because imported
         {
             if(unit->globals.count(id->getName()))
             {
@@ -417,7 +436,8 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
             } else
             {
                 GlobalVariable* GV =
-                (GlobalVariable*) module->getOrInsertGlobal(id->getName(), codegenType(id->getType()));
+                (GlobalVariable*) module->getOrInsertGlobal(id->getMangledName(),
+                        codegenType(id->getType()));
                 assert(GV);
                 IRValue irval = IRValue(new ASTValue(id->getType(), GV, true), GV);
                 unit->globals[id->getName()] = irval;
@@ -432,7 +452,10 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
         FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
         if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
         FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
-        Constant *func = module->getOrInsertFunction(fdecl->getName(), fty);
+        Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
+
+        emit_message(msg::WARNING, fdecl->getMangledName());
+
         id->setValue(new ASTValue(fdecl->prototype, func));
     } else if(id->isStruct())
     {
@@ -1042,83 +1065,68 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         }
     } else if(DotExpression *dexp = dynamic_cast<DotExpression*>(exp))
     {
-            ASTValue *lhs; // = codegenExpression(dexp->lhs);
-            if(TypeExpression *tyexp = dexp->lhs->typeExpression())
+            ASTValue *lhs;
+
+            // if left hand side represents a type
+            if(ASTType *declty = dexp->lhs->getDeclaredType())
             {
                 if(dexp->rhs == "sizeof")
                 {
                     return new ASTValue(ASTType::getULongTy(),
                             ConstantInt::get(Type::getInt64Ty(context),
-                                tyexp->type->getSize()));
+                                declty->getSize()));
                 } else if(dexp->rhs == "offsetof")
                 {
                     emit_message(msg::UNIMPLEMENTED,
                             "offsetof attribute not yet implemented", dexp->loc);
                 }
+                //TODO: static members
                 emit_message(msg::ERROR, "unknown attribute '" + dexp->rhs + "' of struct '" +
-                        tyexp->type->getName() + "'", dexp->loc);
+                        declty->getName() + "'", dexp->loc);
                 return NULL;
             }
 
             lhs = codegenExpression(dexp->lhs);
 
-            //TODO: duplicate of above. resolve 'MyStruct.sizeof' lhs to TypeExpression
-            if(!lhs->cgValue)
-            {
-                if(dexp->rhs == "sizeof")
-                {
-                    return new ASTValue(ASTType::getULongTy(),
-                            ConstantInt::get(Type::getInt64Ty(context),
-                                lhs->getType()->getSize()));
-                } else if(dexp->rhs == "offsetof")
-                {
-                    emit_message(msg::UNIMPLEMENTED,
-                            "offsetof attribute not yet implemented", dexp->loc);
-                }
-                emit_message(msg::ERROR, "unknown attribute '" + dexp->rhs + "' of struct '" +
-                        lhs->getType()->getName() + "'", dexp->loc);
-                return NULL;
-            }
-
-            if(lhs->getType()->isPointer()) lhs = new ASTValue(lhs->getType()->getReferencedTy(),
+            if(lhs->getType()->isPointer())
+                lhs = new ASTValue(lhs->getType()->getReferencedTy(),
                     codegenValue(lhs), true);
+
             if(!lhs->getType()->userType() && !lhs->getType()->isArray()) {
                 emit_message(msg::ERROR, "can only index struct or array type", dexp->loc);
                 return NULL;
             }
 
-            if(lhs->getType()->isStruct())
-            {
-                ASTUserType *userty = lhs->getType()->userType();
+            if(ASTUserType *userty = lhs->getType()->userType()){
+                Identifier *id = userty->getScope()->lookupInScope(dexp->rhs);
+                ASTValue *ret = NULL;
 
-                int i = userty->getMemberIndex(dexp->rhs);
-                if(i < 0)
-                {
-                    emit_message(msg::ERROR, "member not in struct: " + userty->getName() + "." +
-                            dexp->rhs,
-                            dexp->loc);
-                }
-                return indexValue(lhs, i);
-            } else if (lhs->getType()->isUnion() || lhs->getType()->isClass())
-            {
-                ASTUserType *userty = lhs->getType()->userType();
-                Declaration *mdecl = userty->getMemberByName(dexp->rhs);
-                if(!mdecl)
-                {
-                    emit_message(msg::ERROR, "member not in class/union: " + userty->getName() + "." +
-                            dexp->rhs,
-                            dexp->loc);
+                if(!id || id->isUndeclared()) {
+                    emit_message(msg::ERROR, "no member found in user type", dexp->loc);
                     return NULL;
                 }
-                ASTType *ty = mdecl->getType();
-                std::vector<Value*> gep;
-                gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
-                                            userty->getMemberIndex(dexp->rhs)));
-                Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                llval = ir->CreateBitCast(llval, codegenType(ty->getPointerTy()));
-                return new ASTValue(ty, llval, true);
+
+                if(id->isVariable()) {
+                    //TODO: below is a bit round-about
+                    Declaration *mdecl = id->getDeclaration();
+                    ASTType *mty = mdecl->getType();
+
+                    std::vector<Value*> gep;
+                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
+                                                userty->getMemberIndex(dexp->rhs)));
+                    Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
+                    llval = ir->CreateBitCast(llval, codegenType(mty->getPointerTy()));
+                    ret = new ASTValue(mty, llval, true);
+                } else if(id->isFunction()) {
+                    IRType type = unit->types[userty->getName()];
+                    //TODO
+                } else {
+                    emit_message(msg::ERROR, "invalid identifier type in user type", dexp->loc);
+                }
+                return ret;
             }
+
             else if(lhs->getType()->kind == TYPE_DYNAMIC_ARRAY)
             {
                 ASTArrayType *arrty = dynamic_cast<ASTArrayType*>(lhs->getType());
@@ -1708,7 +1716,6 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         if(!isTerminated())
             ir->CreateBr(BB);
         ir->SetInsertPoint(BB);
-        //lstmt->identifier->setValue(new ASTValue(NULL, BB)); //TODO: cg value?
     } else if(GotoStatement *gstmt = dynamic_cast<GotoStatement*>(stmt))
     {
         ASTValue *lbl = codegenIdentifier(gstmt->identifier);
@@ -1776,7 +1783,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
         FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
         Function *func;
-        func = (Function*) module->getOrInsertFunction(fdecl->getName(), fty);
+        func = (Function*) module->getOrInsertFunction(fdecl->getMangledName(), fty);
         unit->functions[fdecl->getName()] = func;
 
         if(fdecl->body)
@@ -1930,7 +1937,28 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 //XXX should be 'import'?
 void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc)
 {
-
+    /*
+    ASTScope::iterator end = inc->getScope()->end();
+    ASTScope::iterator it;
+    for(it = inc->getScope()->begin(); it != end; ++it){
+        Identifier *id = *it;
+        if(id->isVariable()){
+            GlobalVariable *GV = (GlobalVariable*) module->getOrInsertGlobal(id->getName(),
+                    codegenType(id->getType()));
+            assert(GV);
+            if(!current->globals.count(id->getName())){
+                emit_message(msg::WARNING, "overriding global value with include",
+                        id->getDeclaration()->loc);
+            }
+            current->globals[id->getName()] = IRValue(new ASTValue(id->getType(), GV, true), GV);
+        } else if(id->isFunction()){
+            FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
+            if(!fdecl) emit_message(msg::FAILURE, "invalud function identifier");
+            FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
+            Constant *func = module->getOrInsertFunction(fdecl->getName(), fty);
+        }
+    }
+    */
 }
 
 void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)

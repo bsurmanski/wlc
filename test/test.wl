@@ -6,7 +6,8 @@ void ^memcpy(void^ dest, void^ src, long n);
 
 int RAND_MAX = 2147483647
 
-import "sdl.wl"
+//import "sdl.wl"
+import(C) "/usr/include/SDL/SDL.h"
 import(C) "/usr/include/stdlib.h"
 import(C) "/usr/include/stdio.h"
 

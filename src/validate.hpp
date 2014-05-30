@@ -67,6 +67,7 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitForStatement(ForStatement *exp);
     virtual void visitSwitchStatement(SwitchStatement *exp);
 
+    virtual void visitScope(ASTScope *sc);
     virtual void visitType(ASTType *ty);
 };
 

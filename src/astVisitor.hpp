@@ -73,6 +73,7 @@ class ASTVisitor {
     virtual void visitForStatement(ForStatement *exp){}
     virtual void visitSwitchStatement(SwitchStatement *exp){}
 
+    virtual void visitScope(ASTScope *scope){}
     virtual void visitType(ASTType *type){}
 };
 

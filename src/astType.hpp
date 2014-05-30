@@ -68,7 +68,6 @@ struct ASTType
     virtual ~ASTType(){}
 
     virtual bool isResolved(){ return true; }
-    virtual ASTType *getTypeResolution() { return this; }
 
     void accept(ASTVisitor *v);
     //ASTType(ASTTypeQual q) : qual(q), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
@@ -228,8 +227,8 @@ struct ASTType
     bool isNumeric() { return isFloating() || isInteger(); }
     bool isVector() { return kind == TYPE_VEC; }
     bool isArray() { return kind == TYPE_ARRAY || kind == TYPE_DYNAMIC_ARRAY; }
-    bool isPointer() { return this && kind == TYPE_POINTER; } //TODO: shouldnt need to test for this
     bool isComposite() { return compositeType(); }
+    virtual bool isPointer() { return false; }
     virtual bool isUnknown() { return false; }
     virtual bool isClass() { return false; }
     virtual bool isStruct() { return false; }
@@ -310,15 +309,16 @@ struct ASTUserType : public ASTCompositeType {
     virtual size_t getAlign();
     Declaration *getMember(size_t i);
     ASTType *getMemberType(size_t i);
-    Declaration *getMemberByName(std::string nm);
     long getMemberIndex(std::string member);
+    long getVTableIndex(std::string method);
     long getMemberOffset(size_t i);
     virtual UserTypeDeclaration *getDeclaration() {
         return (UserTypeDeclaration*) identifier->getDeclaration();
     }
 
     virtual bool isResolved() { return getDeclaration(); }
-    virtual ASTType *getTypeResolution();
+
+    ASTScope *getScope();
 
     virtual bool isClass();
     virtual bool isStruct();
@@ -339,6 +339,7 @@ struct ASTPointerType : public ASTType {
     ASTType *ptrTo;
     virtual ASTType *getReferencedTy() const { return ptrTo; }
     ASTPointerType(ASTType *pto) : ASTType(TYPE_POINTER), ptrTo(pto) {}
+    virtual bool isPointer() { return true; }
     virtual std::string getName();
 };
 

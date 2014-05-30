@@ -1,5 +1,16 @@
 #include "ast.hpp"
 
+Package::Package(Package *par, std::string nm) : parent(par), scope(NULL), cgValue(NULL),
+    identifier(NULL)
+{
+    name = nm;
+    if(parent) {
+        identifier = parent->getScope()->getInScope(name);
+        identifier->setDeclaration(new PackageDeclaration(this, identifier,
+                    SourceLocation(nm.c_str(), 1)), Identifier::ID_PACKAGE);
+    }
+}
+
 size_t UserTypeDeclaration::getAlign() const {
     size_t align = 0;
     VariableDeclaration *vd;
@@ -11,6 +22,15 @@ size_t UserTypeDeclaration::getAlign() const {
     }
     if(align == 0) return 1; // TODO: empty struct, bad!
     return align; //TODO: handle packed
+}
+
+long StructDeclaration::getMemberIndex(std::string member){
+    for(int i = 0; i < members.size(); i++){
+        if(members[i]->identifier->getName() == member){
+            return i;
+        }
+    }
+    return -1;
 }
 
 size_t StructDeclaration::getSize() const {

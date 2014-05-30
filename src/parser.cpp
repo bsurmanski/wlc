@@ -693,7 +693,7 @@ Declaration *ParseContext::parseDeclaration()
 
     if(ASTArrayType *aty = dynamic_cast<ASTArrayType*>(type))
     {
-        Declaration *adecl = new ArrayDeclaration(type, id, defaultValue, t_id.loc, external);
+        Declaration *adecl = new VariableDeclaration(type, id, defaultValue, t_id.loc, external);
         id->setDeclaration(adecl, Identifier::ID_VARIABLE);
         return adecl;
     }

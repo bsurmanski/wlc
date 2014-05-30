@@ -30,7 +30,7 @@ ValidationVisitor::ValidationVisitor() : ASTVisitor() {
 
 Identifier *ValidationVisitor::resolveIdentifier(Identifier *id) {
     if(id->isUndeclared()) {
-        id = getScope()->realizeIdentifier(id);
+        id = getScope()->resolveIdentifier(id);
     }
 
     if(id->isUndeclared()) {
@@ -331,5 +331,18 @@ void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt) {
     }*/
 }
 
+void ValidationVisitor::visitScope(ASTScope *sc){
+    ASTScope::iterator end = sc->end();
+    for(ASTScope::iterator it = sc->begin(); it != end; ++it){
+        if(it->isUndeclared()){
+            Identifier *resolve = sc->resolveIdentifier(*it);
+            if(!resolve || resolve->isUndeclared()){
+                emit_message(msg::ERROR, "could not resolve symbol in scope: " + resolve->getName());
+            }
+        }
+    }
+}
+
 void ValidationVisitor::visitType(ASTType *ty) {
+
 }

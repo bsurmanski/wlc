@@ -1,6 +1,6 @@
-SRCFILES=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier.cpp astScope.cpp astType.cpp irDebug.cpp message.cpp parsec.cpp ast.cpp validate.cpp astVisitor.cpp
+SRCFILES:=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier.cpp astScope.cpp astType.cpp irDebug.cpp message.cpp parsec.cpp ast.cpp validate.cpp astVisitor.cpp
 
-CLANGLIBS=\
+CLANGLIBS:=\
 /usr/lib/libclang.a\
 /usr/lib/libclangIndex.a\
 /usr/lib/libclangFrontend.a\
@@ -27,32 +27,37 @@ CLANGLIBS=\
 /usr/lib/libclangStaticAnalyzerCore.a\
 /usr/lib/libclangStaticAnalyzerFrontend.a\
 
-SRC=$(foreach file, $(SRCFILES), src/$(file))
-OBJ=$(foreach file, $(SRCFILES), build/$(file:.cpp=.o))
-DEP=$(foreach file, $(SRCFILES), build/$(file:.cpp=.d))
+#SUFFIXES += .d
+NODEPS:=clean install installsyntax
+SRC:=$(foreach file, $(SRCFILES), src/$(file))
+OBJ:=$(foreach file, $(SRCFILES), build/$(file:.cpp=.o))
+DEP:=$(foreach file, $(SRCFILES), build/$(file:.cpp=.d))
 
-CXXFLAGS=`llvm-config --cxxflags` -ggdb -O0 -frtti -UNDEBUG -DDEBUG -I/usr/local/include
-LDFLAGS=`llvm-config --ldflags --libs` -lLLVM-3.4
+CXXFLAGS:=`llvm-config --cxxflags` -ggdb -O0 -frtti -UNDEBUG -DDEBUG -I/usr/local/include
+LDFLAGS:=`llvm-config --ldflags --libs` -lLLVM-3.4
 
-.PHONY: clean all
 
-all: wlc
+.PHONY: clean all install installsyntax
+
+all: build wlc
 
 clean:
 	rm -rf build
 
-wlc: build $(OBJ) $(SRC)
+build:
+	mkdir -p build
+
+wlc: $(OBJ)
 	ctags -R -o .git/tags
 	g++ $(OBJ) $(CLANGLIBS) $(CXXFLAGS) $(LDFLAGS) -o wlc
 
 build/%.o: src/%.cpp build/%.d
+	echo $@, $?
 	g++ $< -c $(CXXFLAGS) -ggdb -O0 -frtti -UNDEBUG -DDEBUG -o $@
 
 build/%.d: src/%.cpp
+	echo $@, $?
 	g++ $(CXXFLAGS) -MM -MT '$(patsubst %.d,%.o,$@)' $< -MF $@
-
-build:
-	mkdir -p build
 
 install: wlc
 	sudo cp wlc /usr/local/bin/
@@ -63,4 +68,8 @@ install: wlc
 installsyntax:
 	cp wl.vim ~/.vim/syntax/
 
+ifeq (0, $(words $(findstring $(MAKECMDGOALS), $(NODEPS))))
+#Chances are, these files don't exist.  GMake will create them and
+#clean up automatically afterwards
 -include $(DEP)
+endif

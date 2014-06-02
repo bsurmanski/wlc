@@ -86,8 +86,10 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
 
     std::vector<Type*> structVec;
     ASTScope::iterator end = userty->getScope()->end();
-    for(ASTScope::iterator it = userty->getScope()->begin(); it != end; ++it){
-        if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(it->getDeclaration())){
+    for(ASTScope::iterator it = userty->getScope()->begin();
+            it != end; ++it){
+        if(VariableDeclaration *vd =
+                dynamic_cast<VariableDeclaration*>(it->getDeclaration())){
             structVec.push_back(codegenType(vd->getType()));
         }
     }

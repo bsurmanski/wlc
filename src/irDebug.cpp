@@ -10,7 +10,8 @@ using namespace llvm;
 IRDebug::IRDebug(IRCodegenContext *c, IRTranslationUnit *u) : context(c), unit(u),
      di(*unit->module)
 {
-    diUnit = di.createCompileUnit(0, u->unit->filenm, PROJDIR, CGSTR, false, "", 0);
+    diUnit = di.createCompileUnit(dwarf::DW_LANG_hi_user,
+            u->unit->filenm, PROJDIR, CGSTR, false, "", 0);
     diFile = di.createFile(u->unit->filenm, PROJDIR);
 }
 

@@ -608,6 +608,7 @@ Declaration *ParseContext::parseDeclaration()
     }
 
     Identifier *id = getScope()->getInScope(t_id.toString());
+    if(id->getName() == "main") id->setMangle(false); // dont mangle main
 
     //TODO parse decl specs
 

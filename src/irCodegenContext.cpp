@@ -85,14 +85,15 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     //
 
     std::vector<Type*> structVec;
+    /*
     ASTScope::iterator end = userty->getScope()->end();
     for(ASTScope::iterator it = userty->getScope()->begin(); it != end; ++it){
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(it->getDeclaration())){
             structVec.push_back(codegenType(vd->getType()));
         }
     }
+    */
 
-    /*
     for(int i = 0; i < userty->length(); i++)
     {
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(userty->getMember(i)))
@@ -101,7 +102,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         } else {
             emit_message(msg::UNIMPLEMENTED, "this cant be declared in a struct (yet?)");
         }
-    }*/
+    }
 
     /*
     for(int i = 0; i < userty->methods.size(); i++)
@@ -657,7 +658,7 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
-        val = new ASTValue(val->type->getReferencedTy(), llval, true);
+        val = new ASTValue(val->type->getReferencedTy()->getPointerTy(), llval, true);
     }
 
     val = promoteType(val, ASTType::getCharTy()->getPointerTy());
@@ -1194,7 +1195,7 @@ ASTValue *IRCodegenContext::promoteInt(ASTValue *val, ASTType *toType)
     }
     if(toType->isPointer())
     {
-        return new ASTValue(toType, ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
+        return new ASTValue(toType, ir->CreateIntToPtr(codegenValue(val), codegenType(toType)));
     }
 
     if(toType->isFloating())

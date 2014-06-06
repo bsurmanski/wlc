@@ -2,7 +2,7 @@
 
 use "importc"
 
-void ^memcpy(void^ dest, void^ src, long n);
+//nomangle void ^memcpy(void^ dest, void^ src, long n);
 
 int RAND_MAX = 2147483647
 

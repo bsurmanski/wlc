@@ -1,6 +1,6 @@
-SRCFILES=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier.cpp astScope.cpp astType.cpp irDebug.cpp message.cpp parsec.cpp ast.cpp validate.cpp astVisitor.cpp
+SRCFILES:=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier.cpp astScope.cpp astType.cpp irDebug.cpp message.cpp parsec.cpp ast.cpp validate.cpp astVisitor.cpp
 
-CLANGLIBS=\
+CLANGLIBS:=\
 /usr/lib/libclang.a\
 /usr/lib/libclangIndex.a\
 /usr/lib/libclangFrontend.a\
@@ -19,29 +19,21 @@ CLANGLIBS=\
 /usr/lib/libclangBasic.a\
 /usr/lib/libclangFormat.a
 
-#/usr/lib/libclangASTMatchers.a\
-/usr/lib/libclangCodeGen.a\
-/usr/lib/libclangDynamicASTMatchers.a\
-/usr/lib/libclangFrontendTool.a\
-/usr/lib/libclangStaticAnalyzerCheckers.a\
-/usr/lib/libclangStaticAnalyzerCore.a\
-/usr/lib/libclangStaticAnalyzerFrontend.a\
-
-SRC=$(foreach file, $(SRCFILES), src/$(file))
-OBJ=$(foreach file, $(SRCFILES), build/$(file:.cpp=.o))
-DEP=$(foreach file, $(SRCFILES), build/$(file:.cpp=.d))
+NODEPS:=clean install installsyntax
+SRC:=$(foreach file, $(SRCFILES), src/$(file))
+OBJ:=$(foreach file, $(SRCFILES), build/$(file:.cpp=.o))
+DEP:=$(foreach file, $(SRCFILES), build/$(file:.cpp=.d))
 
 CXXFLAGS=`llvm-config --cxxflags` -ggdb -O0 -frtti -UNDEBUG -DDEBUG -I/usr/local/include
 LDFLAGS=`llvm-config --ldflags --libs` -lLLVM-3.4
+.PHONY: clean all install installsyntax
 
-.PHONY: clean all
-
-all: wlc
+all: build wlc
 
 clean:
 	rm -rf build
 
-wlc: build $(OBJ) $(SRC)
+wlc: $(OBJ)
 	ctags -R -o .git/tags
 	g++ $(OBJ) $(CLANGLIBS) $(CXXFLAGS) $(LDFLAGS) -o wlc
 
@@ -57,6 +49,7 @@ build:
 install: wlc
 	sudo cp wlc /usr/local/bin/
 	cp wl.vim ~/.vim/syntax/
+	sudo mkdir -p /usr/local/include/wl
 	sudo cp -R lib/* /usr/local/include/wl
 
 installsyntax:

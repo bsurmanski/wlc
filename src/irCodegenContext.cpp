@@ -84,16 +84,9 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     //TODO: use iterator
     //
 
-    std::vector<Type*> structVec;
-    /*
-    ASTScope::iterator end = userty->getScope()->end();
-    for(ASTScope::iterator it = userty->getScope()->begin(); it != end; ++it){
-        if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(it->getDeclaration())){
-            structVec.push_back(codegenType(vd->getType()));
-        }
-    }
-    */
 
+    //TODO: this is the length of the 'members' array
+    std::vector<Type*> structVec;
     for(int i = 0; i < userty->length(); i++)
     {
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(userty->getMember(i)))
@@ -105,11 +98,16 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     }
 
     /*
-    for(int i = 0; i < userty->methods.size(); i++)
-    {
-        FunctionDeclaration *fdecl = hti->methods[i];
+    // codegen function members
+    // TODO: needs to be done EVERY single module which includes this type
+    // TODO: add a "this" member to contained functions
+    ASTScope::iterator end = userty->getScope()->end();
+    for(ASTScope::iterator it = userty->getScope()->begin(); it != end; ++it){
+        if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(it->getDeclaration())){
             codegenDeclaration(fdecl);
-    }*/ //TODO
+        }
+    }
+    */
 
     if(!userty->isOpaque())
     {
@@ -810,7 +808,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *func = codegenExpression(exp->function);
     if(!func) {
-        emit_message(msg::ERROR, "unknown expression", exp->loc);
+        emit_message(msg::ERROR, "unknown expression used as function", exp->loc);
         return NULL;
     }
 
@@ -839,9 +837,17 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
             emit_message(msg::ERROR, "invalid identifier used in function context", exp->loc);
             return NULL;
         }
-        rtype = astfty->ret;
+        rtype = astfty->getReturnType();
 
-    } else emit_message(msg::FAILURE, "invalid expression used in function call context", exp->loc);
+    } else { //dot expression or something. above chunk is pretty messy. should unify
+        ASTValue *funcval = codegenExpression(exp->function);
+        astfty = dynamic_cast<ASTFunctionType*>(funcval->getType());
+        if(!astfty) {
+            emit_message(msg::ERROR, "invalid identifier used in function context", exp->loc);
+            return NULL;
+        }
+        rtype = astfty->getReturnType();
+    }
 
     vector<ASTValue*> cargs;
     vector<Value*> llargs;
@@ -851,7 +857,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 
         if(i < exp->args.size())
             val = codegenExpression(exp->args[i]);
-        else if(fdecl->parameters[i]->value)
+        else if(fdecl && fdecl->parameters[i]->value)
         {
             val = codegenExpression(fdecl->parameters[i]->value);
         } else
@@ -1120,8 +1126,9 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     llval = ir->CreateBitCast(llval, codegenType(mty->getPointerTy()));
                     ret = new ASTValue(mty, llval, true);
                 } else if(id->isFunction()) {
-                    IRType type = unit->types[userty->getName()];
-                    //TODO
+                    Identifier *id = userty->getScope()->lookupInScope(dexp->rhs);
+                    ret = codegenIdentifier(id);
+                    //TODO: codegenidentifier might not work here. it does not declare
                 } else {
                     emit_message(msg::ERROR, "invalid identifier type in user type", dexp->loc);
                 }
@@ -1785,7 +1792,6 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
         Function *func;
         func = (Function*) module->getOrInsertFunction(fdecl->getMangledName(), fty);
-        unit->functions[fdecl->getName()] = func;
 
         if(fdecl->body)
         {
@@ -1930,7 +1936,15 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
     } else if(TypeDeclaration *tdecl = dynamic_cast<TypeDeclaration*>(decl))
     {
-        //codegenType(tdecl->getType()); // make sure types are present in Module
+        //define type interface. define functions in type
+        if(UserTypeDeclaration *utdecl = dynamic_cast<UserTypeDeclaration*>(tdecl)){
+            ASTScope::iterator end = utdecl->getScope()->end();
+            for(ASTScope::iterator it = utdecl->getScope()->begin(); it != end; it++){
+                if(it->getDeclaration()->functionDeclaration()){
+                    codegenDeclaration(it->getDeclaration());
+                }
+            }
+        }
     }
     ///NOTE type declarations are not Codegen'd like values, accesible across Modules
 }
@@ -2034,10 +2048,11 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
         }
     }
 
-    // iterate over unit, get functions
+    // iterate over unit, get functions and type interface (functions)
     end = unit->getScope()->end();
     for(ASTScope::iterator it = unit->getScope()->begin(); it != end; it++){
-        if(it->getDeclaration()->functionDeclaration()){
+        if(it->getDeclaration()->functionDeclaration() ||
+                it->getDeclaration()->typeDeclaration()){
             codegenDeclaration(it->getDeclaration());
         }
     }

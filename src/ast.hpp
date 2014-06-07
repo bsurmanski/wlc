@@ -194,6 +194,7 @@ struct Declaration : public ASTNode
 
     virtual FunctionDeclaration *functionDeclaration() { return NULL; }
     virtual VariableDeclaration *variableDeclaration() { return NULL; }
+    virtual TypeDeclaration *typeDeclaration() { return NULL; }
 
     virtual void accept(ASTVisitor *v);
 };
@@ -256,6 +257,7 @@ struct TypeDeclaration : public Declaration
     //virtual std::string getName() { return "" };
     virtual size_t getSize() const { assert(false && "unknown size"); }
     virtual size_t getAlign() const { assert(false && "unknown align"); }
+    virtual TypeDeclaration *typeDeclaration() { return this; }
 };
 
 struct CompositeTypeDeclaration : public TypeDeclaration

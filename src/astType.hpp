@@ -289,6 +289,8 @@ struct ASTFunctionType : public ASTCompositeType {
         return params[index-1];
     }
 
+    ASTType *getReturnType() { return ret; }
+
     virtual ASTFunctionType *functionType() { return this; }
 };
 

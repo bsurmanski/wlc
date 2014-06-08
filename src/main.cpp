@@ -42,9 +42,6 @@ void link(WLConfig params, std::string outputo)
             libstr += " -i" + params.inc[i];
         }
 
-        //std::string linkcmd = "ld " + outputo +
-        //    " /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/crtn.o -lc -lm -dynamic-linker " +
-        //    dynamiclinker + libdirstr + incdirstr + libstr + incstr + " -o " + params.output;
         std::string linkcmd = "clang " + outputo + " -lc -lm " + libdirstr + incdirstr + libstr + incstr + " -o " + params.output;
         int err = system(linkcmd.c_str());
         if(err)
@@ -90,7 +87,8 @@ void compile(WLConfig params)
         IRCodegenContext cg;
         std::string outputo = cg.codegenAST(ast, params);
 
-        if(params.link)
+        // TODO: check if codegen succeeded before attempting to link
+        if(params.link && currentErrorLevel() < msg::ERROR)
             link(params, outputo);
     } else
     {

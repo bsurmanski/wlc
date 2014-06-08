@@ -416,11 +416,106 @@ ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
     return stored;
 }
 
+ASTValue *IRCodegenContext::getFloatValue(ASTType *t, float i){
+    //TODO: constant cache 0-255
+    return new ASTValue(t, ConstantFP::get(codegenType(t), i));
+}
+
+ASTValue *IRCodegenContext::getIntValue(ASTType *t, int i){
+    //TODO: constant cache 0-255
+    return new ASTValue(t, ConstantInt::get(codegenType(t), i));
+}
+
 ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
 {
-    assert_message(lval->isLValue(), msg::FAILURE, "attempted to load RValue (must be LValue");
+    assert_message(lval->isLValue(), msg::FAILURE, "attempted to load RValue (must be LValue)");
     ASTValue *loaded = new ASTValue(lval->type, codegenValue(lval));
     return loaded;
+}
+
+// UNOP ^
+ASTValue *IRCodegenContext::getValueOf(ASTValue *ptr){
+    assert_message(ptr->getType()->isPointer(), msg::FAILURE, "attempt to dereference non pointer type");
+    return new ASTValue(ptr->getType()->getReferencedTy(), codegenValue(ptr), true);
+}
+
+// UNOP &
+ASTValue *IRCodegenContext::getAddressOf(ASTValue *lval){
+    assert_message(lval->isLValue(), msg::FAILURE, "attempt to get address of non-LValue value");
+    return new ASTValue(lval->getType()->getPointerTy(), codegenLValue(lval), false);
+}
+
+// BINOP +
+ASTValue *IRCodegenContext::opAddValues(ASTValue *a, ASTValue *b){
+    assert_message(a->getType() == b->getType(), msg::FAILURE, "values must be same type for addition");
+    if(a->getType()->isFloating()){
+        return new ASTValue(a->getType(), ir->CreateFAdd(codegenValue(a), codegenValue(b)));
+    }
+    return new ASTValue(a->getType(), ir->CreateAdd(codegenValue(a), codegenValue(b)));
+}
+
+// BINOP -
+ASTValue *IRCodegenContext::opSubValues(ASTValue *a, ASTValue *b){
+    assert_message(a->getType() == b->getType(), msg::FAILURE, "values must be same type for subtraction");
+    if(a->getType()->isFloating()){
+        return new ASTValue(a->getType(), ir->CreateFSub(codegenValue(a), codegenValue(b)));
+    }
+    return new ASTValue(a->getType(), ir->CreateSub(codegenValue(a), codegenValue(b)));
+}
+
+// BINOP *
+ASTValue *IRCodegenContext::opMulValues(ASTValue *a, ASTValue *b){ // *
+    assert_message(a->getType() == b->getType(), msg::FAILURE, "values must be same type for multiplication");
+    if(a->getType()->isFloating()){
+        return new ASTValue(a->getType(), ir->CreateFMul(codegenValue(a), codegenValue(b)));
+    }
+    //TODO: sign?
+    return new ASTValue(a->getType(), ir->CreateMul(codegenValue(a), codegenValue(b)));
+}
+
+// BINOP /
+ASTValue *IRCodegenContext::opDivValues(ASTValue *a, ASTValue *b){ // /
+    assert_message(a->getType() == b->getType(), msg::FAILURE, "values must be same type for division");
+    if(a->getType()->isFloating()){
+        return new ASTValue(a->getType(), ir->CreateFDiv(codegenValue(a), codegenValue(b)));
+    }
+
+    if(a->getType()->isSigned()){
+        return new ASTValue(a->getType(), ir->CreateSDiv(codegenValue(a), codegenValue(b)));
+    }
+
+    // unsigned int div
+    return new ASTValue(a->getType(), ir->CreateUDiv(codegenValue(a), codegenValue(b)));
+}
+
+// BINOP %
+ASTValue *IRCodegenContext::opModValue(ASTValue *a, ASTValue *b){ // %
+    assert_message(a->getType() == b->getType(), msg::FAILURE, "values must be same type for modulus");
+    if(a->getType()->isFloating()){
+        return new ASTValue(a->getType(), ir->CreateFRem(codegenValue(a), codegenValue(b)));
+    }
+
+    if(a->getType()->isSigned()){
+        return new ASTValue(a->getType(), ir->CreateSRem(codegenValue(a), codegenValue(b)));
+    }
+
+    // unsigned remainder
+    return new ASTValue(a->getType(), ir->CreateURem(codegenValue(a), codegenValue(b)));
+}
+
+// BINOP <<
+ASTValue *IRCodegenContext::opShlValue(ASTValue *a, ASTValue *b){ // <<
+    return new ASTValue(a->getType(), ir->CreateShl(codegenValue(a), codegenValue(b)));
+}
+
+// BINOP >>
+ASTValue *IRCodegenContext::opShrValue(ASTValue *a, ASTValue *b){ // >>
+    return new ASTValue(a->getType(), ir->CreateLShr(codegenValue(a), codegenValue(b)));
+}
+
+// BINOP **
+ASTValue *IRCodegenContext::opPowValue(ASTValue *a, ASTValue *b){ // **
+    emit_message(msg::UNIMPLEMENTED, "unimplemented power operator");
 }
 
 // does not create IR Value for codegen (unless global).
@@ -905,15 +1000,12 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
 
             if(lhs->getType()->isFloating())
             {
-                llval = ConstantFP::get(codegenType(lhs->getType()), 1.0f);
-                llval = ir->CreateFAdd(codegenValue(lhs), llval);
+                val = opAddValues(lhs, getFloatValue(lhs->getType(), 1.0f));
             } else
             {
-                llval = ConstantInt::get(codegenType(lhs->getType()), 1);
-                llval = ir->CreateAdd(codegenValue(lhs), llval);
+                val = opAddValues(lhs, getIntValue(lhs->getType(), 1));
             }
 
-            val = new ASTValue(lhs->getType(), llval);
             storeValue(lhs, val);
             return val;
         case tok::minusminus:
@@ -924,15 +1016,12 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
 
             if(lhs->getType()->isFloating())
             {
-                llval = ConstantFP::get(codegenType(lhs->getType()), 1.0f);
-                llval = ir->CreateFSub(codegenValue(lhs), llval);
+                val = opSubValues(lhs, getFloatValue(lhs->getType(), 1.0f));
             } else
             {
-                llval = ConstantInt::get(codegenType(lhs->getType()), 1);
-                llval = ir->CreateSub(codegenValue(lhs), llval);
+                val = opSubValues(lhs, getIntValue(lhs->getType(), 1));
             }
 
-            val = new ASTValue(lhs->getType(), llval);
             storeValue(lhs, val);
             return val;
         case tok::plus:
@@ -958,13 +1047,13 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
                 emit_message(msg::ERROR, "attempt to dereference non-pointer type", exp->loc);
                 return NULL;
             }
-            return new ASTValue(lhs->getType()->getReferencedTy(), codegenValue(lhs), true);
+            return getValueOf(lhs);
         case tok::amp:
             if(!lhs->isLValue()){
                 emit_message(msg::ERROR, "attempt to take reference of non-LValue", exp->loc);
                 return NULL;
             }
-            return new ASTValue(lhs->getType()->getPointerTy(), codegenLValue(lhs), false);
+            return getAddressOf(lhs);
         default:
             emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen", exp->loc);
     }
@@ -1036,31 +1125,24 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             old = loadValue(lhs);
             if(lhs->getType()->isFloating())
             {
-                llval = ConstantFP::get(codegenType(lhs->getType()), 1.0f);
-                llval = ir->CreateFAdd(codegenValue(lhs), llval);
+                val = opAddValues(lhs, getFloatValue(lhs->getType(), 1.0f));
             } else
             {
-                llval = ConstantInt::get(codegenType(lhs->getType()), 1);
-                llval = ir->CreateAdd(codegenValue(lhs), llval);
+                val = opAddValues(lhs, getIntValue(lhs->getType(), 1));
             }
 
-            val = new ASTValue(lhs->getType(), llval);
-
+            old = loadValue(lhs);
             storeValue(lhs, val);
             return old;
             case tok::minusminus:
             if(lhs->getType()->isFloating())
             {
-                llval = ConstantFP::get(codegenType(lhs->getType()), 1.0f);
-                llval = ir->CreateFSub(codegenValue(lhs), llval);
+                val = opSubValues(lhs, getFloatValue(lhs->getType(), 1.0f));
             } else
             {
-                llval = ConstantInt::get(codegenType(lhs->getType()), 1);
-                llval = ir->CreateSub(codegenValue(lhs), llval);
+                val = opSubValues(lhs, getIntValue(lhs->getType(), 1));
             }
             old = loadValue(lhs);
-            val = new ASTValue(lhs->getType(), llval);
-
             storeValue(lhs, val);
             return old;
         }
@@ -1090,8 +1172,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             lhs = codegenExpression(dexp->lhs);
 
             if(lhs->getType()->isPointer())
-                lhs = new ASTValue(lhs->getType()->getReferencedTy(),
-                    codegenValue(lhs), true);
+                lhs = getValueOf(lhs);
 
             if(!lhs->getType()->userType() && !lhs->getType()->isArray()) {
                 emit_message(msg::ERROR, "can only index struct or array type", dexp->loc);
@@ -1579,62 +1660,39 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         // ARITHMETIC OPS
         case tok::plus:
         case tok::plusequal:
-            if(TYPE->isFloating())
-                val = ir->CreateFAdd(lhs_val, rhs_val);
-            else
-                val = ir->CreateAdd(lhs_val, rhs_val);
-            retValue = new ASTValue(TYPE, val); //TODO: proper typing (for all below too)
+            retValue = opAddValues(lhs, rhs);
             break;
 
         case tok::minus:
         case tok::minusequal:
-            if(TYPE->isFloating())
-                val = ir->CreateFSub(lhs_val, rhs_val);
-            else
-                val = ir->CreateSub(lhs_val, rhs_val);
-            retValue = new ASTValue(TYPE, val);
+            retValue = opSubValues(lhs, rhs);
             break;
 
         case tok::star:
         case tok::starequal:
-            if(TYPE->isFloating())
-                val = ir->CreateFMul(lhs_val, rhs_val);
-            else //TODO: signed?
-                val = ir->CreateMul(lhs_val, rhs_val);
-            retValue = new ASTValue(TYPE, val);
+            retValue = opMulValues(lhs, rhs);
             break;
 
         case tok::slash:
         case tok::slashequal:
-            if(TYPE->isFloating())
-                val = ir->CreateFDiv(lhs_val, rhs_val);
-            else if(TYPE->isSigned())
-                val = ir->CreateSDiv(lhs_val, rhs_val);
-            else
-                val = ir->CreateUDiv(lhs_val, rhs_val);
-            retValue = new ASTValue(TYPE, val);
+            retValue = opDivValues(lhs, rhs);
             break;
 
         case tok::percent:
         case tok::percentequal:
-            if(TYPE->isFloating())
-                val = ir->CreateFRem(lhs_val, rhs_val);
-            else if(TYPE->isSigned())
-                val = ir->CreateSRem(lhs_val, rhs_val);
-            else
-                val = ir->CreateURem(lhs_val, rhs_val);
-            retValue = new ASTValue(TYPE, val);
+            retValue = opModValue(lhs, rhs);
             break;
 
         case tok::lessless:
-            val = ir->CreateShl(lhs_val, rhs_val);
-            return new ASTValue(TYPE, val);
+            retValue = opShlValue(lhs, rhs);
+            break;
 
         case tok::greatergreater:
-            val = ir->CreateLShr(lhs_val, rhs_val);
-            return new ASTValue(TYPE, val);
+            retValue = opShrValue(lhs, rhs);
+            break;
 
         case tok::starstar:
+            retValue = opPowValue(lhs, rhs);
         default:
             emit_message(msg::UNIMPLEMENTED, "unimplemented operator", exp->loc);
             return NULL; //XXX: null val

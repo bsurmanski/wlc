@@ -115,7 +115,7 @@ int main(int argc, char^^ argv)
     [int, int] intTuple = myTupleFunc()
 
     float myfloat = 0x1234
-    printf("myFloat: %f, my tuple: %d\n", myfloat, intTuple[0])
+    printf("myFloat: %f, my tuple: %d, %d\n", myfloat, intTuple[0], intTuple[1])
     ++myfloat
     printf("myFloat2: %f\n", myfloat)
     myfloat = 0b1010
@@ -124,8 +124,8 @@ int main(int argc, char^^ argv)
     printf("myFloato: %f\n", myfloat)
 
     int add = addFunc(5, 7)
-    printf("addFunc: %d\n", addFunc())
-    printf("addFunc: %d\n", addFunc(5))
+    printf("addFunc: %d\n", addFunc(1,2))
+    printf("addFunc: %d\n", addFunc(5,2))
     printf("addFunc: %d\n", addFunc(5, 7))
 
     uint mySize = SDL_Surface.sizeof

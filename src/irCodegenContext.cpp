@@ -257,6 +257,8 @@ llvm::Type *IRCodegenContext::codegenFunctionType(ASTType *ty) {
         return NULL;
     }
 
+    //TODO: push back owner type
+
     vector<Type*> params;
     for(int i = 0; i < astfty->params.size(); i++)
     {
@@ -415,12 +417,12 @@ ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 }
 
 ASTValue *IRCodegenContext::getFloatValue(ASTType *t, float i){
-    //TODO: constant cache 0-255
+    //TODO: constant cache -256-255
     return new ASTValue(t, ConstantFP::get(codegenType(t), i));
 }
 
 ASTValue *IRCodegenContext::getIntValue(ASTType *t, int i){
-    //TODO: constant cache 0-255
+    //TODO: constant cache -256-255
     return new ASTValue(t, ConstantInt::get(codegenType(t), i));
 }
 
@@ -907,45 +909,39 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         return NULL;
     }
 
-    //assert(!func.llvmTy()->isFunctionTy() && "not callable!");
-    //FunctionType *fty = (FunctionType*) func.llvmTy();
-    //TODO: once proper type passing is done, check if callable above
-
+    ASTValue *functionValue = NULL;
     ASTFunctionType *astfty = NULL;
     FunctionDeclaration *fdecl = NULL;
     ASTType *rtype = NULL;
-    //TODO: very messy, should be able to get return value of function type
-    if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->function))
-    {
-        // XXX messy, not always true
-        if(fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->declaration))
-        {
-            astfty = fdecl->prototype->functionType();
-        } else if(VariableDeclaration *vdecl =
-                dynamic_cast<VariableDeclaration*>(iexp->id->declaration))
-        {
-            ASTType *pty = vdecl->getType();
-            astfty = pty->getReferencedTy()->functionType();
-        }
 
-        if(!astfty) {
-            emit_message(msg::ERROR, "invalid identifier used in function context", exp->loc);
-            return NULL;
+    functionValue = codegenExpression(exp->function);
+    if(functionValue->getType()->isPointer()){ // dereference function pointer
+        functionValue = getValueOf(functionValue);
+    }
+    astfty = dynamic_cast<ASTFunctionType*>(functionValue->getType());
+    if(!astfty) {
+        emit_message(msg::ERROR, "invalid value used in function call context", exp->loc);
+        if(functionValue->getType()){
+            emit_message(msg::ERROR, "value is of type \"" +
+                    functionValue->getType()->getName() + "\"", exp->loc);
         }
-        rtype = astfty->getReturnType();
+        return NULL;
+    }
+    rtype = astfty->getReturnType();
 
-    } else { //dot expression or something. above chunk is pretty messy. should unify
-        ASTValue *funcval = codegenExpression(exp->function);
-        astfty = dynamic_cast<ASTFunctionType*>(funcval->getType());
-        if(!astfty) {
-            emit_message(msg::ERROR, "invalid identifier used in function context", exp->loc);
-            return NULL;
-        }
-        rtype = astfty->getReturnType();
+    // allow default values if declaration is known
+    if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->function)){
+        fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->getDeclaration());
     }
 
     vector<ASTValue*> cargs;
     vector<Value*> llargs;
+
+    if(astfty->isMethod()){
+        cargs.push_back(functionValue->getOwner());
+        llargs.push_back(codegenValue(functionValue->getOwner()));
+    }
+
     for(int i = 0; i < exp->args.size() || i < astfty->params.size(); i++)
     {
         ASTValue *val = NULL;
@@ -983,7 +979,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         }
 
         cargs.push_back(val);
-        llargs.push_back(codegenValue(cargs[i]));
+        llargs.push_back(codegenValue(val));
     }
 
     llvm::Value *value = ir->CreateCall(codegenValue(func), llargs);
@@ -1180,6 +1176,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             if(lhs->getType()->isPointer())
                 lhs = getValueOf(lhs);
 
+            //TODO: allow indexing types other than userType and array?
             if(!lhs->getType()->userType() && !lhs->getType()->isArray()) {
                 emit_message(msg::ERROR, "can only index struct or array type", dexp->loc);
                 return NULL;
@@ -1205,10 +1202,12 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                                                 userty->getMemberIndex(dexp->rhs)));
                     Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
                     llval = ir->CreateBitCast(llval, codegenType(mty->getPointerTy()));
-                    ret = new ASTValue(mty, llval, true);
+                    ret = new ASTValue(lhs, mty, llval, true);
                 } else if(id->isFunction()) {
                     Identifier *id = userty->getScope()->lookupInScope(dexp->rhs);
                     ret = codegenIdentifier(id);
+                    ret->setOwner(lhs);
+                    //TODO: currently codegenIdentifier caches, might break with 'owner'
                     //TODO: codegenidentifier might not work here. it does not declare
                 } else {
                     emit_message(msg::ERROR, "invalid identifier type in user type", dexp->loc);

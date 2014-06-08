@@ -124,8 +124,8 @@ int main(int argc, char^^ argv)
     printf("myFloato: %f\n", myfloat)
 
     int add = addFunc(5, 7)
-    printf("addFunc: %d\n", addFunc(1,2))
-    printf("addFunc: %d\n", addFunc(5,2))
+    printf("addFunc: %d\n", addFunc())
+    printf("addFunc: %d\n", addFunc(5))
     printf("addFunc: %d\n", addFunc(5, 7))
 
     uint mySize = SDL_Surface.sizeof

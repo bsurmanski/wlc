@@ -212,6 +212,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *opShlValue(ASTValue *a, ASTValue *b); // <<
     ASTValue *opShrValue(ASTValue *a, ASTValue *b); // >>
     ASTValue *opPowValue(ASTValue *a, ASTValue *b); // **
+    //TODO: add compare ops
 
     // expression
     ASTValue *codegenExpression(Expression *exp);

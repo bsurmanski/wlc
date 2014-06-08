@@ -274,6 +274,7 @@ struct ASTCompositeType : public ASTType {
 };
 
 struct ASTFunctionType : public ASTCompositeType {
+    ASTUserType *owner; // aka 'this'
     ASTType *ret;
     std::vector<ASTType*> params;
     bool vararg;
@@ -281,7 +282,11 @@ struct ASTFunctionType : public ASTCompositeType {
     ASTFunctionType(ASTType *r, std::vector<ASTType *> p, bool va = false) :
         ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION) {}
 
+    ASTFunctionType(ASTUserType *owner, ASTType *r, std::vector<ASTType *> p, bool va = false) :
+        ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION) {}
+
     bool isVararg() { return vararg; }
+    bool isMethod() { return owner; }
 
     ASTType *getMemberType(size_t index)
     {

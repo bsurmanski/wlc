@@ -198,6 +198,21 @@ class IRCodegenContext : public CodegenContext
     ASTValue *loadValue(ASTValue *val);
     ASTValue *storeValue(ASTValue *dest, ASTValue *val);
 
+    ASTValue *getFloatValue(ASTType *t, float i);
+    ASTValue *getIntValue(ASTType *t, int i);
+
+    // ops
+    ASTValue *getValueOf(ASTValue *ptr);    // ^
+    ASTValue *getAddressOf(ASTValue *lval); // &
+    ASTValue *opAddValues(ASTValue *a, ASTValue *b); // +
+    ASTValue *opSubValues(ASTValue *a, ASTValue *b); // -
+    ASTValue *opMulValues(ASTValue *a, ASTValue *b); // *
+    ASTValue *opDivValues(ASTValue *a, ASTValue *b); // /
+    ASTValue *opModValue(ASTValue *a, ASTValue *b); // %
+    ASTValue *opShlValue(ASTValue *a, ASTValue *b); // <<
+    ASTValue *opShrValue(ASTValue *a, ASTValue *b); // >>
+    ASTValue *opPowValue(ASTValue *a, ASTValue *b); // **
+
     // expression
     ASTValue *codegenExpression(Expression *exp);
     ASTValue *codegenTupleExpression(TupleExpression *exp, ASTType *ty = 0);

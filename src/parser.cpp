@@ -397,6 +397,7 @@ Statement *ParseContext::parseStatement()
             } else goto PARSEEXP; //IF NOT UNDECLARED OR STRUCT, THIS IS PROBABLY AN EXPRESSION
 
         case tok::kw_extern:
+        case tok::kw_nomangle:
         case tok::kw_union:
         case tok::kw_class:
         case tok::kw_struct:
@@ -492,8 +493,10 @@ Declaration *ParseContext::parseDeclaration()
 {
     SourceLocation loc = peek().loc;
     bool external = false;
+    bool mangle = true;
 
     if(peek().is(tok::kw_extern)) { external = true; ignore(); }
+    if(peek().is(tok::kw_nomangle)) { mangle = false; ignore(); }
 
     //TODO: parse function decl specs
     if(peek().is(tok::kw_struct) || peek().is(tok::kw_union) || peek().is(tok::kw_class)) //parse struct
@@ -609,6 +612,7 @@ Declaration *ParseContext::parseDeclaration()
 
     Identifier *id = getScope()->getInScope(t_id.toString());
     if(id->getName() == "main") id->setMangle(false); // dont mangle main
+    if(!mangle) id->setMangle(false);
 
     //TODO parse decl specs
 

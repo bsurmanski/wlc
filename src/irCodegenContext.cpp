@@ -1920,7 +1920,9 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
             popScope();
         } else {
-            func->setLinkage(Function::ExternalWeakLinkage);
+            if(fdecl->isExternal())
+                func->setLinkage(Function::ExternalWeakLinkage);
+            func->setLinkage(Function::ExternalLinkage);
         }
 
         setTerminated(false);

@@ -23,7 +23,7 @@ syn keyword wConstant null
 syn keyword wTypedef alias
 syn keyword wLabel case default label
 syn keyword wStatement return
-syn keyword wStorageClass extern
+syn keyword wStorageClass extern nomangle
 syn keyword wOperator and or not
 syn keyword wMemOperator new delete renew
 syn keyword wDeclaration var

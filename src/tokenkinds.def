@@ -107,6 +107,7 @@ KEYWORD(var) /* statically checked automatic type variable var myvar = new MyStr
 KEYWORD(new)
 KEYWORD(renew)
 KEYWORD(delete)
+KEYWORD(nomangle)
 
 // reserved words. hopefully will get around to implementing these
 RESERVE(defer) /* for deferring code until function exit. defer <STATEMENT>*/

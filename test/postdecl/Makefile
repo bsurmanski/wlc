@@ -1,0 +1,2 @@
+all:
+	wlc postdecl.wl

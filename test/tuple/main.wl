@@ -1,3 +1,7 @@
+use "importc"
+
+import(C) "/usr/include/stdio.h"
+
 int printf(char^ fmt, ...);
 
 int main(int argc, char^^ argv)

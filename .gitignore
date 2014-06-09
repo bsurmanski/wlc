@@ -12,6 +12,7 @@ llvmir
 obj
 *.s
 *.log
+*.sum
 tags
 cscope.out
 build/

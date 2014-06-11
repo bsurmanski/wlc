@@ -323,6 +323,9 @@ struct ASTUserType : public ASTCompositeType {
         return (UserTypeDeclaration*) identifier->getDeclaration();
     }
 
+    // only valid after AST is validated
+    ASTType *getBaseType();
+
     virtual bool isResolved() { return getDeclaration(); }
 
     ASTScope *getScope();

@@ -195,6 +195,8 @@ struct Declaration : public ASTNode
     virtual FunctionDeclaration *functionDeclaration() { return NULL; }
     virtual VariableDeclaration *variableDeclaration() { return NULL; }
     virtual TypeDeclaration *typeDeclaration() { return NULL; }
+    virtual UserTypeDeclaration *userTypeDeclaration() { return NULL; }
+    virtual ClassDeclaration *classDeclaration() { return NULL; }
 
     virtual void accept(ASTVisitor *v);
 };
@@ -285,6 +287,10 @@ struct UserTypeDeclaration : public TypeDeclaration
         TypeDeclaration(id, loc), type(ty) {}
 
     ASTScope *getScope() { return scope; }
+    virtual Identifier *lookup(std::string member)
+    {
+        return getScope()->lookupInScope(member);
+    }
     virtual ASTType *getDeclaredType() { return type; }
     virtual size_t length() const { return members.size(); }
     virtual size_t getAlign() const;
@@ -292,6 +298,7 @@ struct UserTypeDeclaration : public TypeDeclaration
     virtual long getMemberIndex(std::string member) = 0;
     virtual long getVTableIndex(std::string method) { return -1; }
     virtual void accept(ASTVisitor *v);
+    virtual UserTypeDeclaration *userTypeDeclaration() { return this; }
 };
 
 struct ClassDeclaration : public UserTypeDeclaration {
@@ -300,8 +307,15 @@ struct ClassDeclaration : public UserTypeDeclaration {
             std::vector<Declaration*> m, SourceLocation loc) :
         UserTypeDeclaration(id, sc, m, loc), base(bs) {
     }
+    virtual Identifier *lookup(std::string member){
+        Identifier *id = getScope()->lookupInScope(member);
+        UserTypeDeclaration *bdecl = base->getDeclaration()->userTypeDeclaration();
+        if(!id && bdecl) id = bdecl->lookup(member);
+        return id;
+    }
     virtual size_t getSize() const;
-    long getMemberIndex(std::string member) { return 0; }
+    long getMemberIndex(std::string member);
+    virtual ClassDeclaration *classDeclaration() { return this; }
 };
 
 struct StructDeclaration : public UserTypeDeclaration {

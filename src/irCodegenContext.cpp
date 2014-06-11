@@ -84,9 +84,11 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     //TODO: use iterator
     //
 
-
-    //TODO: this is the length of the 'members' array
     std::vector<Type*> structVec;
+    if(ASTType *base = userty->getBaseType()){
+        structVec.push_back(codegenType(base));
+    }
+
     for(int i = 0; i < userty->length(); i++)
     {
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(userty->getMember(i)))
@@ -96,18 +98,6 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
             emit_message(msg::UNIMPLEMENTED, "this cant be declared in a struct (yet?)");
         }
     }
-
-    /*
-    // codegen function members
-    // TODO: needs to be done EVERY single module which includes this type
-    // TODO: add a "this" member to contained functions
-    ASTScope::iterator end = userty->getScope()->end();
-    for(ASTScope::iterator it = userty->getScope()->begin(); it != end; ++it){
-        if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(it->getDeclaration())){
-            codegenDeclaration(fdecl);
-        }
-    }
-    */
 
     if(!userty->isOpaque())
     {
@@ -358,27 +348,6 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
     return (llvm::Type *) llvmty;
 }
 
-/*
-ASTValue *IRCodegenContext::indexValue(ASTValue *val, int i)
-{
-    ASTCompositeType *compty = dynamic_cast<ASTCompositeType*>(val->getType());
-    if(!compty)
-    {
-        emit_message(msg::FAILURE, "cannot index non-composite type");
-        return NULL;
-    }
-
-    ASTType *memberTy = compty->getMemberType(i);
-    std::vector<Value*> gep;
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), i));
-    Value *v = codegenLValue(val);
-    Value *llval = ir->CreateInBoundsGEP(v, gep);
-    llval = ir->CreateBitCast(llval, codegenType(memberTy->getPointerTy()));
-    return new ASTValue(memberTy, llval, true);
-}
-*/
-
 llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 {
     if(!value->cgValue){
@@ -431,6 +400,34 @@ ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
     assert_message(lval->isLValue(), msg::FAILURE, "attempted to load RValue (must be LValue)");
     ASTValue *loaded = new ASTValue(lval->type, codegenValue(lval));
     return loaded;
+}
+
+// BINOP .
+ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
+    ASTUserType *userty = val->getType()->userType();
+    Identifier *id = userty->getScope()->lookupInScope(member);
+
+    // identifier is either in base or does not exist, recurse to base
+    if(!id){
+        // zeroeth member is base class
+        std::vector<Value*> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+        ASTValue base(userty->getBaseType(), llval, true);
+        return getMember(&base, member);
+    }
+
+    int index = userty->getMemberIndex(member);
+    if(userty->getBaseType()) index++; // skip over base class index
+    ASTType *mtype = id->getType();
+    std::vector<Value*> gep;
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
+                                index));
+    Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+    llval = ir->CreateBitCast(llval, codegenType(mtype->getPointerTy()));
+    return new ASTValue(mtype, llval, true);
 }
 
 // UNOP ^
@@ -719,7 +716,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
     vector<Type*> llargty;
     llargty.push_back(codegenType(ASTType::getULongTy()));
     FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()->getPointerTy()),
-            llargty, false);
+                llargty, false);
     Function *mallocFunc = (Function*) module->getOrInsertFunction("malloc", fty);
     Value *value;
     value = ir->CreateCall(mallocFunc, llargs);
@@ -814,15 +811,15 @@ void IRCodegenContext::codegenIfStatement(IfStatement *stmt)
 void IRCodegenContext::codegenLoopStatement(LoopStatement *stmt)
 {
     llvm::BasicBlock *loopBB = BasicBlock::Create(context, "loop_condition",
-            ir->GetInsertBlock()->getParent());
+        ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *ontrue = BasicBlock::Create(context, "loop_true",
-            ir->GetInsertBlock()->getParent());
+        ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *onfalse = BasicBlock::Create(context, "loop_false",
-            ir->GetInsertBlock()->getParent());
+        ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *loopupdate = BasicBlock::Create(context, "loop_update",
-            ir->GetInsertBlock()->getParent());
+        ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *loopend = BasicBlock::Create(context, "loop_end",
-            ir->GetInsertBlock()->getParent());
+        ir->GetInsertBlock()->getParent());
 
     if(ForStatement *fstmt = stmt->forStatement())
     {
@@ -1183,7 +1180,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             }
 
             if(ASTUserType *userty = lhs->getType()->userType()){
-                Identifier *id = userty->getScope()->lookupInScope(dexp->rhs);
+                Identifier *id = userty->getDeclaration()->lookup(dexp->rhs);
                 ASTValue *ret = NULL;
 
                 if(!id || id->isUndeclared()) {
@@ -1192,19 +1189,8 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 }
 
                 if(id->isVariable()) {
-                    //TODO: below is a bit round-about
-                    Declaration *mdecl = id->getDeclaration();
-                    ASTType *mty = mdecl->getType();
-
-                    std::vector<Value*> gep;
-                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
-                                                userty->getMemberIndex(dexp->rhs)));
-                    Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                    llval = ir->CreateBitCast(llval, codegenType(mty->getPointerTy()));
-                    ret = new ASTValue(lhs, mty, llval, true);
+                    return getMember(lhs, dexp->rhs);
                 } else if(id->isFunction()) {
-                    Identifier *id = userty->getScope()->lookupInScope(dexp->rhs);
                     ret = codegenIdentifier(id);
                     ret->setOwner(lhs);
                     //TODO: currently codegenIdentifier caches, might break with 'owner'

@@ -24,6 +24,15 @@ size_t UserTypeDeclaration::getAlign() const {
     return align; //TODO: handle packed
 }
 
+long ClassDeclaration::getMemberIndex(std::string member){
+    for(int i = 0; i < members.size(); i++){
+        if(members[i]->identifier->getName() == member){
+            return i;
+        }
+    }
+    return -1;
+}
+
 long StructDeclaration::getMemberIndex(std::string member){
     for(int i = 0; i < members.size(); i++){
         if(members[i]->identifier->getName() == member){

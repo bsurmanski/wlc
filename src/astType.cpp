@@ -5,6 +5,16 @@
 // UserType
 //
 
+ASTType *ASTUserType::getBaseType(){
+    ClassDeclaration *cdecl = getDeclaration()->classDeclaration();
+    if(cdecl) {
+        if(Identifier *base = cdecl->base){
+            return base->getDeclaredType();
+        }
+    }
+    return NULL;
+}
+
 ASTScope *ASTUserType::getScope() {
     return getDeclaration()->getScope();
 }

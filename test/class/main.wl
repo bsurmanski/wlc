@@ -15,7 +15,7 @@ class MySpecialClass : MyClass
     char svar
 
     int myFunction(int c, int b) {
-        return c + b + svar
+        return c + b
     }
 }
 

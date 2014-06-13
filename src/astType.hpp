@@ -45,6 +45,7 @@ struct ASTUserType;
 struct ASTCompositeType;
 struct ASTFunctionType;
 #include <llvm/DebugInfo.h> //XXX
+
 struct ASTType
 {
     ASTTypeEnum kind;
@@ -300,6 +301,18 @@ struct ASTFunctionType : public ASTCompositeType {
 };
 
 struct UserTypeDeclaration;
+/**
+ * Represents a user type. Since the declaration of a type may
+ * appear after it's usage, the ASTUserType class is mostly
+ * a shell used to proxy the Identifier, and subsequently the
+ * UserTypeDeclaration class.
+ *
+ * The UserTypeDeclaration class should hold all of the true information
+ * about a type.
+ *
+ * Also because of this, most of the methods of this class should not
+ * be called until type resolution.
+ */
 struct ASTUserType : public ASTCompositeType {
     Identifier *identifier;
     ASTUserType(Identifier *id, UserTypeDeclaration *d=NULL) : ASTCompositeType(TYPE_USER),

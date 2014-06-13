@@ -309,8 +309,10 @@ struct ClassDeclaration : public UserTypeDeclaration {
     }
     virtual Identifier *lookup(std::string member){
         Identifier *id = getScope()->lookupInScope(member);
-        UserTypeDeclaration *bdecl = base->getDeclaration()->userTypeDeclaration();
-        if(!id && bdecl) id = bdecl->lookup(member);
+        if(base){
+            UserTypeDeclaration *bdecl = base->getDeclaration()->userTypeDeclaration();
+            if(!id && bdecl) id = bdecl->lookup(member);
+        }
         return id;
     }
     virtual size_t getSize() const;

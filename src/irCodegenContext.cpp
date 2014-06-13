@@ -927,6 +927,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     rtype = astfty->getReturnType();
 
     // allow default values if declaration is known
+    // TODO: allow this if expression is dot expression
     if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->function)){
         fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->getDeclaration());
     }
@@ -934,7 +935,10 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     vector<ASTValue*> cargs;
     vector<Value*> llargs;
 
-    if(astfty->isMethod()){
+    /*if(astfty->isMethod()){*/
+    // allow for uniform function call syntax
+    int nargs = 0;
+    if(functionValue->getOwner()){
         cargs.push_back(functionValue->getOwner());
         llargs.push_back(codegenValue(functionValue->getOwner()));
     }
@@ -950,8 +954,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
             val = codegenExpression(fdecl->parameters[i]->value);
         } else
         {
-            emit_message(msg::ERROR,
-                    "invalid number of arguments provided for function call", exp->loc);
+            break;
         }
 
         if(astfty->params.size() > i && astfty->params[i]){
@@ -977,6 +980,15 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 
         cargs.push_back(val);
         llargs.push_back(codegenValue(val));
+    }
+
+    if(llargs.size() != exp->args.size()){
+        /*
+        emit_message(msg::ERROR,
+                "invalid number of arguments provided for function call", exp->loc);
+                */
+        //TODO: add 'this' member as expected argument to methods
+        //return NULL;
     }
 
     llvm::Value *value = ir->CreateCall(codegenValue(func), llargs);
@@ -1184,8 +1196,13 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 ASTValue *ret = NULL;
 
                 if(!id || id->isUndeclared()) {
-                    emit_message(msg::ERROR, "no member found in user type", dexp->loc);
-                    return NULL;
+                    // if not in user type, search current scope
+                    // this allows for uniform function syntax
+                    id = getScope()->lookup(dexp->rhs);
+                    if(!id || id->isUndeclared()){
+                        emit_message(msg::ERROR, "no member found in user type", dexp->loc);
+                        return NULL;
+                    }
                 }
 
                 if(id->isVariable()) {
@@ -1542,6 +1559,12 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
     ASTValue *lhs = codegenExpression(exp->lhs);
     ASTValue *rhs = codegenExpression(exp->rhs);
+
+    if(!lhs || !rhs){
+        emit_message(msg::FAILURE, "could not codegen expression in binary op", exp->loc);
+        return NULL;
+    }
+
     if(!isAssignOp((tok::TokenKind) exp->op)) //XXX messy
         codegenResolveBinaryTypes(&lhs, &rhs, exp->op);
     else if(lhs->type->kind == TYPE_ARRAY)

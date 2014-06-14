@@ -61,7 +61,7 @@ struct ASTNode;
 struct ASTScope
 {
     ASTScope *parent;
-    ASTNode *owner;
+    Identifier *owner;
     std::vector<ASTScope*> siblings;
     std::map<std::string, Identifier *> symbols;
     std::map<std::string, bool> extensions;
@@ -82,7 +82,8 @@ struct ASTScope
     ScopeIterator begin() { return ScopeIterator(this, ScopeIterator::ITER_ALL); }
     ScopeIterator end() { return ScopeIterator(this, symbols.end(), ScopeIterator::ITER_ALL); }
 
-    void setOwner(ASTNode *own) { owner = own; }
+    void setOwner(Identifier *own) { owner = own; }
+    Identifier *getOwner() { return owner; }
     /*
     Package *isPackageScope() { return dynamic_cast<Package*>(owner); }
     FunctionDeclaration *isFunctionScope() { return dynamic_cast<FunctionDeclaration*>(owner); }
@@ -101,7 +102,7 @@ struct ASTScope
 
     void dump();
     ASTScope(ASTScope *par = NULL, ScopeType st = Scope_Local, Package *pkg=0) :
-        package(pkg), parent(par), type(st)
+        package(pkg), parent(par), type(st), owner(0)
     {
         if(!par) addBuiltin();
         if(par) package = par->package;

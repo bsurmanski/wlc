@@ -495,6 +495,7 @@ Declaration *ParseContext::parseDeclaration()
     bool external = false;
     bool mangle = true;
 
+    //TODO: invarient order
     if(peek().is(tok::kw_extern)) { external = true; ignore(); }
     if(peek().is(tok::kw_nomangle)) { mangle = false; ignore(); }
 
@@ -552,6 +553,7 @@ Declaration *ParseContext::parseDeclaration()
         }
 
         ASTScope *tbl = new ASTScope(getScope(), ASTScope::Scope_Struct);
+        tbl->setOwner(id);
         pushScope(tbl);
         vector<Declaration*> members;
         vector<FunctionDeclaration*> methods;
@@ -618,12 +620,28 @@ Declaration *ParseContext::parseDeclaration()
 
     if(peek().is(tok::lparen)) // function decl
     {
+        Identifier *owner = NULL;
         std::vector<ASTType *> params;
         std::vector<VariableDeclaration*> parameters;
         ignore(); // lparen
 
+        if(getScope()->owner &&
+                getScope()->owner->getDeclaredType()){
+            owner = getScope()->owner;
+        }
+
         ASTScope *funcScope = new ASTScope(getScope());
         pushScope(funcScope);
+
+        // is a method
+        if(owner){
+            ASTType *thisTy = owner->getDeclaredType()->getPointerTy();
+            Identifier *this_id = getScope()->getInScope("this");
+            VariableDeclaration *this_decl = new VariableDeclaration(thisTy, this_id, NULL, loc);
+            this_id->setDeclaration(this_decl, Identifier::ID_VARIABLE);
+            params.push_back(thisTy);
+            parameters.push_back(this_decl);
+        }
 
         bool vararg = false;
         while(!peek().is(tok::rparen))

@@ -1,3 +1,5 @@
+extern nomangle int printf(char ^fmt, ...);
+
 int main(int argc, char^^ argv)
 {
     MyClass cl
@@ -6,7 +8,7 @@ int main(int argc, char^^ argv)
     scl.svar = 10
     scl.a = 2
     scl.b = 11
-    (&scl).myFunction(1,2)
+    printf("out %d\n", scl.myFunction(1,2));
     cl.weirdFunc()
     return 0    
 }
@@ -19,7 +21,7 @@ class MySpecialClass : MyClass
     char svar
 
     int myFunction(int c, int b) {
-        return c + b
+        return c + b + this.svar
     }
 }
 

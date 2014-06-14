@@ -21,8 +21,10 @@ struct ASTValue
     ASTValue(ASTType *ty, void *cgv = NULL, bool lv = false) : type(ty),
         cgValue((llvm::Value*) cgv), lValue(lv), owner(0) {}
 
+    /*
     ASTValue(ASTValue *own, ASTType *ty, void *cgv = NULL, bool lv = false) : type(ty),
         cgValue((llvm::Value*) cgv), lValue(lv), owner(own) {}
+        */
 
     void setOwner(ASTValue *v) { owner = v; }
     ASTValue *getOwner() { return owner; }

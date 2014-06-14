@@ -427,7 +427,9 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
                                 index));
     Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
     llval = ir->CreateBitCast(llval, codegenType(mtype->getPointerTy()));
-    return new ASTValue(mtype, llval, true);
+    ASTValue *ret = new ASTValue(mtype, llval, true);
+    ret->setOwner(val);
+    return ret;
 }
 
 // UNOP ^
@@ -932,15 +934,21 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->getDeclaration());
     }
 
-    vector<ASTValue*> cargs;
+    //vector<ASTValue*> cargs;
     vector<Value*> llargs;
 
     /*if(astfty->isMethod()){*/
     // allow for uniform function call syntax
     int nargs = 0;
     if(functionValue->getOwner()){
-        cargs.push_back(functionValue->getOwner());
-        llargs.push_back(codegenValue(functionValue->getOwner()));
+        Value *ownerVal = NULL;
+        if(functionValue->getOwner()->getType()->isPointer()){
+            ownerVal = codegenValue(functionValue->getOwner());
+        } else {
+            ownerVal = codegenLValue(functionValue->getOwner());
+        }
+        llargs.push_back(ownerVal);
+        nargs++;
     }
 
     for(int i = 0; i < exp->args.size() || i < astfty->params.size(); i++)
@@ -957,8 +965,9 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
             break;
         }
 
-        if(astfty->params.size() > i && astfty->params[i]){
-            val = promoteType(val, astfty->params[i]);
+        //TODO: nargs is messy. used to move param forward if implicit 'this'
+        if(astfty->params.size() > i && astfty->params[i+nargs]){
+            val = promoteType(val, astfty->params[i+nargs]);
         }
 
         else if(astfty->vararg)
@@ -978,7 +987,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
             emit_message(msg::ERROR, "invalid arguement provided for function", exp->loc);
         }
 
-        cargs.push_back(val);
+        //cargs.push_back(val);
         llargs.push_back(codegenValue(val));
     }
 

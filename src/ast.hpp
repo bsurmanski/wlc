@@ -80,6 +80,13 @@ struct ASTNode {
     virtual std::string getMangledName() { return ""; }
     virtual std::string getName() { return ""; }
     virtual void accept(ASTVisitor *v) = 0;
+
+    virtual Declaration *declaration() { return NULL; }
+    virtual FunctionDeclaration *functionDeclaration() { return NULL; }
+    virtual VariableDeclaration *variableDeclaration() { return NULL; }
+    virtual TypeDeclaration *typeDeclaration() { return NULL; }
+    virtual UserTypeDeclaration *userTypeDeclaration() { return NULL; }
+    virtual ClassDeclaration *classDeclaration() { return NULL; }
 };
 
 struct Package : public ASTNode
@@ -98,7 +105,7 @@ struct Package : public ASTNode
     ASTScope *getScope() {
         if(!scope){
             scope = new ASTScope(NULL, ASTScope::Scope_Global, this);
-            scope->setOwner(this);
+            scope->setOwner(identifier);
         }
         return scope;
     } //TODO: subscope of parent ?
@@ -192,11 +199,7 @@ struct Declaration : public ASTNode
 
     Identifier *getIdentifier() { return identifier; }
 
-    virtual FunctionDeclaration *functionDeclaration() { return NULL; }
-    virtual VariableDeclaration *variableDeclaration() { return NULL; }
-    virtual TypeDeclaration *typeDeclaration() { return NULL; }
-    virtual UserTypeDeclaration *userTypeDeclaration() { return NULL; }
-    virtual ClassDeclaration *classDeclaration() { return NULL; }
+    virtual Declaration *declaration() { return this; }
 
     virtual void accept(ASTVisitor *v);
 };
@@ -220,8 +223,8 @@ struct FunctionDeclaration : public Declaration
             ASTScope *sc, Statement *st, SourceLocation loc) :
         Declaration(id, loc), prototype(p), parameters(params), scope(sc),
         body(st), cgValue(NULL) {
-            if(scope)
-                scope->setOwner(this);
+            //if(scope)
+            //    scope->setOwner(this);
         }
     virtual FunctionDeclaration *functionDeclaration() { return this; }
     ASTScope *getScope() { return scope; }
@@ -278,7 +281,7 @@ struct UserTypeDeclaration : public TypeDeclaration
             TypeDeclaration(id, loc), scope(sc), members(m),
             type(new ASTUserType(id, this))
     {
-        if(scope) scope->setOwner(this);
+        if(scope) scope->setOwner(id);
         identifier->setDeclaredType(type);
         identifier->setDeclaration(this, Identifier::ID_USER);
     }
@@ -429,8 +432,8 @@ struct CompoundStatement : public Statement
     std::vector<Statement*> statements;
     CompoundStatement(ASTScope *sc, std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
         scope(sc), Statement(l), statements(s) {
-            if(scope)
-                scope->setOwner(this);
+            //if(scope)
+            //    scope->setOwner(this);
         }
     virtual CompoundStatement *compoundStatement() { return this; }
     virtual void accept(ASTVisitor *v);
@@ -446,8 +449,8 @@ struct BlockStatement : public Statement
     virtual BlockStatement *blockStatement() { return this; }
     BlockStatement(ASTScope *sc, Statement *b, SourceLocation l = SourceLocation()) :
         scope(sc), body(b), Statement(l) {
-            if(scope)
-                scope->setOwner(this);
+            //if(scope)
+            //    scope->setOwner(this);
         }
     virtual void accept(ASTVisitor *v);
 };

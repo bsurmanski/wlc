@@ -26,7 +26,7 @@ syn keyword wStatement return
 syn keyword wStorageClass extern nomangle
 syn keyword wOperator and or not
 syn keyword wMemOperator new delete renew
-syn keyword wDeclaration var
+syn keyword wDeclaration var this
 syn keyword wUse use
 hi def link wExternal Include 
 hi def link wScopeDecl StorageClass

@@ -90,6 +90,13 @@ struct ASTScope
     UserTypeDeclaration *isUserTypeScope() { return dynamic_cast<UserTypeDeclaration*>(owner); }
     */
 
+    ASTType* isUserTypeScope() {
+        if(type == Scope_Struct && owner) {
+            return owner->getDeclaredType();
+        }
+        return NULL;
+    }
+
     bool extensionEnabled(std::string s)
     {
         return extensions[s] || (parent && parent->extensionEnabled(s));

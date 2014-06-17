@@ -78,3 +78,6 @@ std::string Identifier::getMangledName() {
 bool Identifier::isStruct() { return dynamic_cast<StructDeclaration*>(declaration); }
 bool Identifier::isUnion() { return dynamic_cast<UnionDeclaration*>(declaration); }
 bool Identifier::isClass() { return dynamic_cast<ClassDeclaration*>(declaration); }
+
+bool Identifier::isTypeMember() { return getScope()->isUserTypeScope(); }
+ASTType *Identifier::getMemberOwner(){ return getScope()->isUserTypeScope(); }

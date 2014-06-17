@@ -21,7 +21,7 @@ class MySpecialClass : MyClass
     char svar
 
     int myFunction(int c, int b) {
-        return c + b + this.svar
+        return c + b + svar
     }
 }
 

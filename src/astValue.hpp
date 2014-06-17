@@ -41,4 +41,12 @@ struct TupleValue : public ASTValue
     {}
 };
 
+/*
+struct FunctionValue : public ASTValue {
+    FunctionDeclaration *declaration;
+    FunctionValue(ASTType *ty, void *cgv = NULL, bool lv = false, FunctionDeclaration *fdecl=NULL) : ASTValue(ty, cgv, lv) {
+
+    }
+};*/
+
 #endif

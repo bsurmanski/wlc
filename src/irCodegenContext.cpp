@@ -24,16 +24,6 @@ IRTranslationUnit::IRTranslationUnit(IRCodegenContext *c, TranslationUnit *u) :
 
 SourceLocation currentLoc;
 
-std::string IRFunction::getName(bool mangle)
-{
-    if(mangle){
-        return declaration->identifier->getMangledName();
-    } else
-    {
-        return declaration->getName();
-    }
-}
-
 void IRCodegenContext::dwarfStopPoint(int ln)
 {
     llvm::DebugLoc loc = llvm::DebugLoc::get(ln, 1, diScope());
@@ -402,9 +392,22 @@ ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
     return loaded;
 }
 
+ASTValue *IRCodegenContext::getThisMember(std::string member) {
+    Identifier *thisId = getScope()->lookupInScope("this");
+    return getMember(codegenIdentifier(thisId), member);
+
+}
+
 // BINOP .
 ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
+    if(val->getType()->isPointer())
+        val = getValueOf(val);
     ASTUserType *userty = val->getType()->userType();
+
+    if(!userty){
+        emit_message(msg::FAILURE, "cannot get member in non-usertype");
+    }
+
     Identifier *id = userty->getScope()->lookupInScope(member);
 
     // identifier is either in base or does not exist, recurse to base
@@ -539,6 +542,14 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
                 return irval;
             }
             emit_message(msg::FAILURE, "failed to codegen identifier");
+        }
+
+        // is a member of 'this'
+        if(id->isTypeMember()){
+            // get 'this' from current function
+            // OR static look up, if static member
+            emit_message(msg::WARNING, "codegening type member");
+            return getThisMember(id->getName());
         }
 
         return id->getValue(); // else declared in current TU, so we are good
@@ -929,7 +940,6 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     rtype = astfty->getReturnType();
 
     // allow default values if declaration is known
-    // TODO: allow this if expression is dot expression
     if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->function)){
         fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->getDeclaration());
     }
@@ -1862,7 +1872,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(decl))
     {
         IRFunction backup = currentFunction;
-        currentFunction = IRFunction(fdecl);
+        currentFunction = IRFunction();
 
         FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
         Function *func;

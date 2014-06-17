@@ -21,15 +21,11 @@ void IRCodegen(AST *ast, WLConfig cfg);
 
 struct IRFunction
 {
-    FunctionDeclaration *declaration;
     ASTValue *retVal;
     llvm::BasicBlock *exit;
     bool terminated;
 
-    std::string getName(bool mangle=false);
-
-    IRFunction(): declaration(NULL), retVal(NULL), terminated(false) {}
-    IRFunction(FunctionDeclaration *decl) : declaration(decl), terminated(false) {}
+    IRFunction(): retVal(NULL), exit(NULL), terminated(false) {}
 };
 
 struct IRSwitchCase
@@ -41,10 +37,11 @@ struct IRSwitchCase
         astCase(e), irCase(i), irBlock(ir) {}
 };
 
+struct IRValue;
 struct IRType
 {
     ASTType *type;
-    llvm::Value *vtable; // vtable if class type
+    IRValue *vtable; // vtable if class type
     llvm::Type *llvmType;
     IRType() : type(0), llvmType(0) {}
     IRType(ASTType *ty, llvm::Type *llty) : type(ty), llvmType(llty), vtable(0) {}
@@ -113,6 +110,7 @@ struct IRScope
     Identifier *getInScope(std::string s) { return table->getInScope(s); }
     Identifier *get(std::string s) { return table->get(s); }
     Identifier *lookup(std::string s, bool imports = true) { return table->lookup(s, imports); }
+    Identifier *lookupInScope(std::string s) { return table->lookupInScope(s); }
 
     IRScope(ASTScope *tbl, llvm::DIDescriptor dbg) : table(tbl), debug(dbg),
         breakLabel(0), continueLabel(0), parent(0) {}
@@ -202,6 +200,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *getIntValue(ASTType *t, int i);
 
     // ops
+    ASTValue *getThisMember(std::string member); // UNOP .
     ASTValue *getMember(ASTValue *val, std::string member); // .
     ASTValue *getValueOf(ASTValue *ptr);    // ^
     ASTValue *getAddressOf(ASTValue *lval); // &

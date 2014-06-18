@@ -1,3 +1,5 @@
+//use "implicit_this"
+
 extern nomangle int printf(char ^fmt, ...);
 
 int main(int argc, char^^ argv)
@@ -21,7 +23,7 @@ class MySpecialClass : MyClass
     char svar
 
     int myFunction(int c, int b) {
-        return c + b + svar
+        return c + b + .svar
     }
 }
 

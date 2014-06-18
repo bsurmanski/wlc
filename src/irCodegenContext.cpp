@@ -546,10 +546,14 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
 
         // is a member of 'this'
         if(id->isTypeMember()){
-            // get 'this' from current function
-            // OR static look up, if static member
-            emit_message(msg::WARNING, "codegening type member");
-            return getThisMember(id->getName());
+            //TODO: do not handle extensions in codegen
+            if(getScope()->table->extensionEnabled("implicit_this")){
+                // get 'this' from current function
+                // OR static look up, if static member
+                return getThisMember(id->getName());
+            } else if(!id->getValue()){
+                emit_message(msg::ERROR, "identifier not found in scope. did you mean '." + id->getName() + "'?");
+            }
         }
 
         return id->getValue(); // else declared in current TU, so we are good
@@ -559,9 +563,6 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
         if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
         FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
         Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
-
-        emit_message(msg::WARNING, fdecl->getMangledName());
-
         id->setValue(new ASTValue(fdecl->prototype, func));
     } else if(id->isStruct())
     {
@@ -1016,6 +1017,12 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 
 ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
 {
+    //TODO: messy
+    // use operator lowering
+    if(exp->op == tok::dot){
+        return getThisMember(exp->lhs->identifierExpression()->id->getName());
+    }
+
     ASTValue *lhs = codegenExpression(exp->lhs); // expression after unary op: eg in !a, lhs=a
 
     ASTValue *val;

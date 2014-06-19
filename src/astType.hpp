@@ -281,10 +281,10 @@ struct ASTFunctionType : public ASTCompositeType {
     bool vararg;
 
     ASTFunctionType(ASTType *r, std::vector<ASTType *> p, bool va = false) :
-        ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION) {}
+        ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION), owner(0) {}
 
-    ASTFunctionType(ASTUserType *owner, ASTType *r, std::vector<ASTType *> p, bool va = false) :
-        ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION) {}
+    ASTFunctionType(ASTUserType *own, ASTType *r, std::vector<ASTType *> p, bool va = false) :
+        ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION), owner(own) {}
 
     bool isVararg() { return vararg; }
     bool isMethod() { return owner; }

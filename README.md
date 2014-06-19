@@ -186,18 +186,58 @@ what I would ever be able to do within reasonable contraints.
 WL's syntax is different enough that modifying clang would be a significant effort.
 Also, I am not familier enough with clang's architecture to do so.
 
-## Future
+### Why is a dot required to reference a class member?
+In most object oriented languages, you may simply name the member and
+it will be within scope. In WL, instead you *must* reference members
+by indexing the this identifier. As a shortcut, a unary dot is equivilent.
+
+for example:
+    class MyClass {
+        int member
+
+        int myFunc(){
+            return member // Bad!
+        }
+
+        int myFunc2(){
+            return this.member // Good
+        }
+
+        int myFunc3(){
+            return .member // Equivilent to this.member, preferable for suscinctness
+        }
+
+    }
+
+The reason this is done is to make things more readible.
+It is sometimes difficult to tell where a variable is defined
+when reading someone else's code, or your own code from long in the past. 
+This helps the reader of the code know that the member is contained in the class.
+Its a minor syntax addition that should help readibility. Of course, some 
+people would rather WL to act like other languages they've used. For this,
+there is a 'use' extension
+
+    use "implicit_this"
+
+With "implicit\_this" enabled, no 'this', nor unary dot is required to
+reference class members.
+
+## Features
 
 ### 'Use' statement
-use statements will enable specific compiler extensions, or modify language syntax. Use
-statements will have a syntax of
+use statements enable specific compiler extensions, or modify language syntax. 
+When complete, use statements will likely have a syntax of
 
     use extensionName
+
+Currently, they are enabled by
+
+    use "extensionName"
 
 extensions can have various effects ranging from syntactical preference (substituting
 symbols), to declaring new keywords, types, and behaviour. 
 
-extensions will only affect the module they are declared in. 'use' extensions should not
+extensions only affect the module they are declared in. 'use' extensions should not
 destructively modify the behaviour of the compiler, and Modules with 'use' extensions
 should be able to interface with those without.
 
@@ -207,6 +247,116 @@ see 'Ideas' for some examples of possible 'use' extensions.
 
 There may be a set of extensions that are required for a 'conforming' compiler, and a 'embedded' 
 standard can be created that does not have the extensions.
+
+#### Current Use Extensions
+
+##### importc
+Used to enable the 'import(C)' construct, which allow importing symbols from a
+C header
+
+##### implicit\_this
+Allows class members to be referenced without indexing 'this' or using a
+unary dot operator
+
+with implicit this:
+
+    use "implicit_this"
+
+    class MyClass {
+        int member
+
+        int myFunc(){
+            return member
+        }
+    }
+
+without:
+
+    use "implicit_this"
+
+    class MyClass {
+        int member
+
+        int myFunc(){
+            return .member
+        }
+    }
+
+
+### Tuples
+Due to limitations of static typing, tuples will be more like unnamed structs than
+true tuples. This means that indexing can only be done with static integers. This 
+is because in a statement like
+
+    [int, char^] myTuple 
+    ...
+    var myvar = myTuple[i]
+
+it is imposible to determine the type required of 'v', either int or char^.
+It may be possible if all types in the tuple are of a uniform type:
+
+    [int, int, int] myIntTuple
+    ...
+    int myvar = myIntTuple[i]
+
+or if all members of the tuple are convertible to the destination type:
+
+    [char, int, float] myNumberTuple
+    ...
+    float mydest myNumberTuple[i]
+
+This last case may be exceedingly difficult, to calculate the correct
+tuple memory location of the member, and convert to the correct destination
+type at runtime.
+
+#### Tuple Syntax
+
+tuple declarations will be denoted by surrounding [ ]
+
+    [int,int,float] myTuple
+    myTuple = [5, 1, 2.3]
+
+Tuples can be implicitly converted to a struct with an identical signature. 
+
+    struct MyStruct
+    { 
+        int i
+        float j
+    }
+
+    ...
+
+    [int, float] myTuple = [1, 2.2]
+    MyStrct st = myTuple
+
+this would allow compound struct declarations to use the same syntax as tuples.
+
+    MyStruct s = [1, 2, 3]
+    [int,int,int] i = [1, 2, 3]
+
+#### Tuple return
+multiple values can be returned in a tuple.
+
+    [int,int] tupleReturner()
+    {
+        return [1,2]; 
+    }
+
+    ...
+
+    [int,int] pair = tuplerReturner()
+
+#### Tuple unpack
+Tuples can be unpacked onto multiple variables
+
+    [int, int] pair = [1,2]
+    int a
+    int b
+    [a,b] = pair
+
+All members of the left hand tuple must be LValues.
+
+## Future
 
 ### Tail call optimization
 self explanitory, avoids stack overflows, makes deep recursive function faster
@@ -290,62 +440,6 @@ This example would allow an embedded C statement within a WL scope. This would
 also extend to inlined ASM, using embed(ASM). It would need to be considered 
 if variables would leak across 'embed' scopes
 
-### Tuples
-Due to limitations of static typing, tuples will be more like unnamed structs than
-true tuples. This means that indexing can only be done with static integers. This 
-is because in a statement like
-
-    [int, char^] myTuple 
-    ...
-    var myvar = myTuple[i]
-
-it is imposible to determine the type required of 'v', either int or char^.
-It may be possible if all types in the tuple are of a uniform type:
-
-    [int, int, int] myIntTuple
-    ...
-    int myvar = myIntTuple[i]
-
-or if all members of the tuple are convertible to the destination type:
-
-    [char, int, float] myNumberTuple
-    ...
-    float mydest myNumberTuple[i]
-
-This last case may be exceedingly difficult, to calculate the correct
-tuple memory location of the member, and convert to the correct destination
-type at runtime.
-
-#### Tuple Syntax
-
-A comma can denote a tuple type, and a tuple value
-
-    int,int,float myTuple
-    myTuple = 5, 1, 2.3
-
-alternativly, tuple declarations can be surrounded by [ ]
-
-    [int,int,float] myTuple
-    myTuple = [5, 1, 2.3]
-
-Tuples can be implicitly converted to a struct with an identical signature. 
-
-    struct MyStruct
-    { 
-        int i
-        float j
-    }
-
-    ...
-
-    [int, float] myTuple = [1, 2.2]
-    MyStrct st = myTuple
-
-this would allow compound struct declarations to use the same syntax as tuples.
-
-    MyStruct s = [1, 2, 3]
-    [int,int,int] i = [1, 2, 3]
-
 #### Tuple auto unwrap
 if a tuple is passed as a function argument, it will automatically be unwrapped to
 its components.
@@ -369,28 +463,6 @@ to be called with individual values of the underlying tuple member types.
     ...
 
     myTupleFunction(1, 2)
-
-#### Tuple return
-multiple values can be returned in a tuple.
-
-    [int,int] tupleReturner()
-    {
-        return [1,2]; 
-    }
-
-    ...
-
-    [int,int] pair = tuplerReturner()
-
-#### Tuple unpack
-Tuples can be unpacked onto multiple variables
-
-    [int, int] pair = [1,2]
-    int a
-    int b
-    a,b = pair
-
-syntax needs to be considered for the assignment...
 
 ### Generic operator
 Generics can be denoted using the '!' operator.

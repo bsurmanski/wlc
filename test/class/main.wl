@@ -10,7 +10,8 @@ int main(int argc, char^^ argv)
     scl.svar = 10
     scl.a = 2
     scl.b = 11
-    printf("out %d\n", scl.myFunction(1,2));
+    scl.myFunction(1,2);
+    //printf("out %d\n", scl.myFunction(1,2));
     cl.weirdFunc()
     return 0    
 }

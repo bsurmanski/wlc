@@ -70,15 +70,17 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     sty->setName(ty->getName());
     unit->types[ty->getName()] = IRType(ty, sty);
 
-    //
-    //TODO: use iterator
-    //
 
     std::vector<Type*> structVec;
+
+    // add base type to member set
     if(ASTType *base = userty->getBaseType()){
         structVec.push_back(codegenType(base));
     }
 
+    //
+    //TODO: use iterator
+    //
     for(int i = 0; i < userty->length(); i++)
     {
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(userty->getMember(i)))
@@ -392,10 +394,34 @@ ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
     return loaded;
 }
 
-ASTValue *IRCodegenContext::getThisMember(std::string member) {
+ASTValue *IRCodegenContext::getThis() {
     Identifier *thisId = getScope()->lookupInScope("this");
-    return getMember(codegenIdentifier(thisId), member);
+    return codegenIdentifier(thisId);
+}
 
+ASTValue *IRCodegenContext::getVTable(ASTValue *instance) {
+    return getValueOf(getMember(instance, "vtable"));
+}
+
+ASTValue *IRCodegenContext::vtableLookup(ASTValue *instance, std::string func) {
+    ASTUserType *userty = instance->getType()->userType();
+    if(!userty) emit_message(msg::ERROR, "virtual function lookup only valid for class");
+
+    ASTValue *vtable = getVTable(instance);
+
+    //TODO: function index
+
+    std::vector<Value *> gep;
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 1)); //fuctions array
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), userty->getVTableIndex(func))); // specific function
+    Value *llval = ir->CreateGEP(codegenLValue(vtable), gep);
+
+    Identifier *id = userty->getScope()->lookup(func);
+    FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
+    ASTType *fty = fdecl->prototype;
+
+    return new ASTValue(fty, ir->CreatePointerCast(llval, codegenType(fty->getPointerTy())));
 }
 
 // BINOP .
@@ -421,18 +447,29 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         return getMember(&base, member);
     }
 
-    int index = userty->getMemberIndex(member);
-    if(userty->getBaseType()) index++; // skip over base class index
-    ASTType *mtype = id->getType();
-    std::vector<Value*> gep;
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
-                                index));
-    Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
-    llval = ir->CreateBitCast(llval, codegenType(mtype->getPointerTy()));
-    ASTValue *ret = new ASTValue(mtype, llval, true);
-    ret->setOwner(val);
-    return ret;
+    if(id->isFunction()){
+        //TODO: static vs nonvirtual vs virtual function calls
+        ASTValue *ret = vtableLookup(val, member);
+        ret->setOwner(val);
+        return ret;
+    } else if(id->isVariable()){
+        // member lookup
+        int index = userty->getMemberIndex(member);
+        if(userty->getBaseType()) index++; // skip over base class index
+        ASTType *mtype = id->getType();
+        std::vector<Value*> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
+                                    index));
+        Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+        llval = ir->CreateBitCast(llval, codegenType(mtype->getPointerTy()));
+        ASTValue *ret = new ASTValue(mtype, llval, true);
+        ret->setOwner(val);
+        return ret;
+    } else {
+        emit_message(msg::ERROR, "unknown member in user type");
+        return NULL;
+    }
 }
 
 // UNOP ^
@@ -550,7 +587,7 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
             if(getScope()->table->extensionEnabled("implicit_this")){
                 // get 'this' from current function
                 // OR static look up, if static member
-                return getThisMember(id->getName());
+                return getMember(getThis(), id->getName());
             } else if(!id->getValue()){
                 emit_message(msg::ERROR, "identifier not found in scope. did you mean '." + id->getName() + "'?");
             }
@@ -1020,7 +1057,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
     //TODO: messy
     // use operator lowering
     if(exp->op == tok::dot){
-        return getThisMember(exp->lhs->identifierExpression()->id->getName());
+        return getMember(getThis(), exp->lhs->identifierExpression()->id->getName());
     }
 
     ASTValue *lhs = codegenExpression(exp->lhs); // expression after unary op: eg in !a, lhs=a
@@ -1234,10 +1271,14 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 if(id->isVariable()) {
                     return getMember(lhs, dexp->rhs);
                 } else if(id->isFunction()) {
-                    ret = codegenIdentifier(id);
-                    ret->setOwner(lhs);
                     //TODO: currently codegenIdentifier caches, might break with 'owner'
                     //TODO: codegenidentifier might not work here. it does not declare
+                    ASTValue *ret;
+                    if(id->isTypeMember())
+                        ret = getMember(lhs, dexp->rhs);
+                    else ret = codegenIdentifier(id);
+                    ret->setOwner(lhs);
+                    return ret;
                 } else {
                     emit_message(msg::ERROR, "invalid identifier type in user type", dexp->loc);
                 }

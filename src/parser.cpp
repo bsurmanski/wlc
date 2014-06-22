@@ -578,13 +578,13 @@ Declaration *ParseContext::parseDeclaration()
         switch(kind)
         {
             case kw_union:
-                sdecl = new UnionDeclaration(id, tbl, members, loc);
+                sdecl = new UnionDeclaration(id, tbl, members, methods, loc);
                 break;
             case kw_struct:
-                sdecl = new StructDeclaration(id, tbl, members, loc);
+                sdecl = new StructDeclaration(id, tbl, members, methods, loc);
                 break;
             case kw_class:
-                sdecl = new ClassDeclaration(id, tbl, baseId, members, loc);
+                sdecl = new ClassDeclaration(id, tbl, baseId, members, methods, loc);
                 break;
             default:
                 emit_message(msg::FAILURE, "unknown declaration kind", loc);

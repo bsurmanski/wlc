@@ -48,7 +48,7 @@ long ASTUserType::getMemberIndex(std::string member){
 }
 
 long ASTUserType::getVTableIndex(std::string method){
-
+    return 0; //TODO
 }
 
 

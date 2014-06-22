@@ -274,10 +274,11 @@ struct UserTypeDeclaration : public TypeDeclaration
 {
     ASTType *type;
     ASTScope *scope;
+    std::vector<FunctionDeclaration*> methods;
     std::vector<Declaration*> members;
 
     UserTypeDeclaration(Identifier *id, ASTScope *sc,
-                std::vector<Declaration*> m, SourceLocation loc) :
+                std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc) :
             TypeDeclaration(id, loc), scope(sc), members(m),
             type(new ASTUserType(id, this))
     {
@@ -307,8 +308,8 @@ struct UserTypeDeclaration : public TypeDeclaration
 struct ClassDeclaration : public UserTypeDeclaration {
     Identifier *base;
     ClassDeclaration(Identifier *id, ASTScope *sc, Identifier *bs,
-            std::vector<Declaration*> m, SourceLocation loc) :
-        UserTypeDeclaration(id, sc, m, loc), base(bs) {
+            std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc) :
+        UserTypeDeclaration(id, sc, m, met, loc), base(bs) {
     }
     virtual Identifier *lookup(std::string member){
         Identifier *id = getScope()->lookupInScope(member);
@@ -325,16 +326,18 @@ struct ClassDeclaration : public UserTypeDeclaration {
 
 struct StructDeclaration : public UserTypeDeclaration {
     bool packed;
-    StructDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m, SourceLocation loc) :
-        UserTypeDeclaration(id, sc, m, loc), packed(false) {
+    StructDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m,
+            std::vector<FunctionDeclaration*> met, SourceLocation loc) :
+        UserTypeDeclaration(id, sc, m, met, loc), packed(false) {
         }
     virtual size_t getSize() const;
     long getMemberIndex(std::string member);
 };
 
 struct UnionDeclaration : public UserTypeDeclaration {
-    UnionDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m, SourceLocation loc) :
-        UserTypeDeclaration(id, sc, m, loc) {}
+    UnionDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m,
+            std::vector<FunctionDeclaration*> met, SourceLocation loc) :
+        UserTypeDeclaration(id, sc, m, met, loc) {}
     virtual size_t getSize() const;
     long getMemberIndex(std::string member) { return 0; }
 };

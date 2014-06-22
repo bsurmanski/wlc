@@ -1,3 +1,4 @@
+// XXX merge TypeInfo and VTable?
 struct TypeInfo
 {
     char[] name

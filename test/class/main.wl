@@ -23,6 +23,10 @@ class MySpecialClass : MyClass
 {
     char svar
 
+    void printCall() {
+        printf("stuff\n");
+    }
+
     int myFunction(int c, int b) {
         return c + b + .svar
     }

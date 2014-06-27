@@ -1,14 +1,7 @@
-// XXX merge TypeInfo and VTable?
 struct TypeInfo
 {
-    char[] name
-}
-
-struct VTable
-{
-    void^ typeinfo
-    void^[1] functions
-    // ... functions extend
+    //char[] name
+    void function()[1] functions
 }
 
 struct DynamicArray
@@ -19,6 +12,13 @@ struct DynamicArray
 
 class Object
 {
-    VTable^ vtable
+    TypeInfo^ typeInfo
     long refcount
+}
+
+use "nomangle"
+extern nomangle int printf(char ^fmt, ...);
+
+void dyncall_test(){
+    printf("dynamic call!\n");
 }

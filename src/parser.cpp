@@ -163,37 +163,39 @@ ASTType *ParseContext::parseType()
             continue;
         }
 
-        break; // if no post-modifiers are found, exit loop
-    }
-
-    if(peek().is(tok::kw_function))
-    {
-        ASTType *ret = type;
-        ignore(); // eat 'function'
-        if(peek().isNot(tok::lparen)) {
-            emit_message(msg::ERROR, "expected '(' in function pointer type specification");
-            return NULL;
-        }
-        ignore(); // eat '('
-
-        std::vector<ASTType*> params;
-        while(peek().isNot(tok::rparen)){
-            ASTType *param = parseType();
-            params.push_back(param);
-
-            if(peek().is(tok::comma)) {
-                ignore();
-            } else if(peek().is(tok::rparen)) {
-                break;
-            } else {
-                emit_message(msg::ERROR, "expected ',' or ')' in function type specification");
+        if(peek().is(tok::kw_function))
+        {
+            ASTType *ret = type;
+            ignore(); // eat 'function'
+            if(peek().isNot(tok::lparen)) {
+                emit_message(msg::ERROR, "expected '(' in function pointer type specification");
                 return NULL;
-            } // TODO: vararg
+            }
+            ignore(); // eat '('
+
+            std::vector<ASTType*> params;
+            while(peek().isNot(tok::rparen)){
+                ASTType *param = parseType();
+                params.push_back(param);
+
+                if(peek().is(tok::comma)) {
+                    ignore();
+                } else if(peek().is(tok::rparen)) {
+                    break;
+                } else {
+                    emit_message(msg::ERROR, "expected ',' or ')' in function type specification");
+                    return NULL;
+                } // TODO: vararg
+            }
+
+            ignore(); //eat ')' of function type
+
+            type = ASTType::getFunctionTy(ret, params)->getPointerTy(); // 'function' is a pointer
+
+            continue;
         }
 
-        ignore(); //eat ')' of function type
-
-        type = ASTType::getFunctionTy(ret, params)->getPointerTy(); // 'function' is a pointer
+        break; // if no post-modifiers are found, exit loop
     }
 
     return type;

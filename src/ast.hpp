@@ -307,9 +307,10 @@ struct UserTypeDeclaration : public TypeDeclaration
 
 struct ClassDeclaration : public UserTypeDeclaration {
     Identifier *base;
+    ASTValue *typeinfo; //XXX this might be a bad place for this
     ClassDeclaration(Identifier *id, ASTScope *sc, Identifier *bs,
             std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc) :
-        UserTypeDeclaration(id, sc, m, met, loc), base(bs) {
+        UserTypeDeclaration(id, sc, m, met, loc), base(bs), typeinfo(0) {
     }
     virtual Identifier *lookup(std::string member){
         Identifier *id = getScope()->lookupInScope(member);

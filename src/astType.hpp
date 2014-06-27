@@ -315,8 +315,9 @@ struct UserTypeDeclaration;
  */
 struct ASTUserType : public ASTCompositeType {
     Identifier *identifier;
+
     ASTUserType(Identifier *id, UserTypeDeclaration *d=NULL) : ASTCompositeType(TYPE_USER),
-    identifier(id){
+    identifier(id) {
         //TODO: assert identifier is properly declared, declaration is present
     }
 

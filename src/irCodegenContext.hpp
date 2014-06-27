@@ -196,13 +196,17 @@ class IRCodegenContext : public CodegenContext
     ASTValue *loadValue(ASTValue *val);
     ASTValue *storeValue(ASTValue *dest, ASTValue *val);
 
+    ASTValue *getStringValue(std::string str);
     ASTValue *getFloatValue(ASTType *t, float i);
     ASTValue *getIntValue(ASTType *t, int i);
 
-    // ops
+    // vtable
     ASTValue *getThis();
     ASTValue *getVTable(ASTValue *instance);
     ASTValue *vtableLookup(ASTValue *instance, std::string func);
+    ASTValue *createTypeInfo(ASTType *ty);
+
+    // ops
     ASTValue *getMember(ASTValue *val, std::string member); // .
     ASTValue *getValueOf(ASTValue *ptr);    // ^
     ASTValue *getAddressOf(ASTValue *lval); // &

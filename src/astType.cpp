@@ -48,6 +48,12 @@ long ASTUserType::getMemberIndex(std::string member){
 }
 
 long ASTUserType::getVTableIndex(std::string method){
+    ClassDeclaration *cdecl = getDeclaration()->classDeclaration();
+    for(int i = 0; i < cdecl->methods.size(); i++) {
+        if(cdecl->methods[i]->getName() == method) {
+            return i;
+        }
+    }
     return 0; //TODO
 }
 
@@ -194,6 +200,10 @@ ASTType *ASTType::getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool
 {
     //TODO: type cache?
     return new ASTFunctionType(ret, param, vararg);
+}
+
+ASTType *ASTType::getVoidFunctionTy() {
+    return getFunctionTy(getVoidTy(), std::vector<ASTType*>());
 }
 
 void ASTType::accept(ASTVisitor *v) {

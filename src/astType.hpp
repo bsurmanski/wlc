@@ -262,6 +262,7 @@ struct ASTType
     static ASTType *getTupleTy(std::vector<ASTType *> t);
 
     static ASTType *getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg=false);
+    static ASTType *getVoidFunctionTy();
 };
 
 struct ASTBasicType : public ASTType {

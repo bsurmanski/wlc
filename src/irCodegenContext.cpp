@@ -417,7 +417,7 @@ ASTValue *IRCodegenContext::getThis() {
 }
 
 ASTValue *IRCodegenContext::getVTable(ASTValue *instance) {
-    return getValueOf(getMember(instance, "typeInfo"));
+    return getMember(instance, "vtable");
 }
 
 ASTValue *IRCodegenContext::vtableLookup(ASTValue *instance, std::string func) {
@@ -428,10 +428,9 @@ ASTValue *IRCodegenContext::vtableLookup(ASTValue *instance, std::string func) {
     ASTValue *vtable = getVTable(instance);
 
     std::vector<Value *> gep;
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0)); // offset of 'functions' array
+    //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), userty->getVTableIndex(func))); // specific function
-    Value *llval = ir->CreateLoad(ir->CreateGEP(codegenLValue(vtable), gep));
+    Value *llval = ir->CreateLoad(ir->CreateGEP(codegenValue(vtable), gep));
 
     Identifier *id = userty->getScope()->lookup(func);
     FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
@@ -445,23 +444,32 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
         emit_message(msg::ERROR, "can only get type info for class");
     }
 
-    Identifier *tiid = ast->getRuntimeUnit()->lookup("TypeInfo");
-    Identifier *dcid = ast->getRuntimeUnit()->lookup("dyncall_test");
-    ASTType *typeInfoTy = tiid->getDeclaredType();
-    std::vector<Constant *> members;
+    std::vector<Constant *> members; // type info constant members
     std::vector<Constant *> arrayList;
-    arrayList.push_back((Function*) codegenValue(codegenIdentifier(dcid)));
-    members.push_back(
-            ConstantArray::get(
-                ArrayType::get(codegenType(dcid->getType()->getPointerTy()), 1),
-                arrayList
-                )
-            );
-    //members.push_back(
+    ASTType *vfty = ASTType::getVoidFunctionTy()->getPointerTy();
+    UserTypeDeclaration *utdecl = ty->getDeclaration()->userTypeDeclaration();
+    for(int i = 0; i < utdecl->methods.size(); i++){
+        Identifier *dcid = ast->getRuntimeUnit()->lookup("dyncall_test");
 
-    Constant *llconst = ConstantStruct::get((StructType*)codegenType(typeInfoTy), members);
-    GlobalVariable *gv = new GlobalVariable(*module, codegenType(typeInfoTy), true, GlobalValue::PrivateLinkage, llconst);
-    return new ASTValue(typeInfoTy, gv, true);
+        FunctionDeclaration *fdecl = utdecl->methods[i];
+        if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
+        FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
+        Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
+
+        arrayList.push_back((Function*)
+                ir->CreatePointerCast(func, codegenType(vfty)));
+    }
+
+    ArrayType *vtableTy = ArrayType::get(codegenType(vfty), utdecl->methods.size());
+    Constant *vtable = ConstantArray::get(
+                vtableTy,
+                arrayList
+                );
+
+    members.push_back(vtable);
+
+    GlobalVariable *gv = new GlobalVariable(*module, vtableTy, true, GlobalValue::PrivateLinkage, vtable);
+    return new ASTValue(vfty, gv, true);
 }
 
 // BINOP .
@@ -502,7 +510,7 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
                                     index));
         Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
-        llval = ir->CreateBitCast(llval, codegenType(mtype->getPointerTy()));
+        llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
         ASTValue *ret = new ASTValue(mtype, llval, true);
         ret->setOwner(val);
         return ret;
@@ -2094,8 +2102,8 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
         if(vty->isClass()){
 
-        //ASTValue *vtable = getVTable(idValue);
-        ASTValue *vtable = getMember(idValue, "typeInfo");
+        ASTValue *vtable = getVTable(idValue);
+        //ASTValue *vtable = getMember(idValue, "vtable");
 
         codegenType(userty); // XXX to create typeinfo. hacky
 
@@ -2105,7 +2113,14 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
         //the pass through identifier is an ugly hack to get typeinfo in case of duplicate ASTType types, eww
         Value *tival = codegenLValue(userty->getDeclaration()->classDeclaration()->typeinfo);
-        ir->CreateStore(tival, codegenLValue(vtable));
+
+        vector<Value *> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        tival = ir->CreateGEP(tival, gep);
+
+        ir->CreateStore(tival,
+                    codegenLValue(vtable));
         //TODO: store all functions (methods)
 
         }
@@ -2126,6 +2141,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
     } else if(TypeDeclaration *tdecl = dynamic_cast<TypeDeclaration*>(decl))
     {
+        //TODO: should this be near codegen type?
         //define type interface. define functions in type
         if(UserTypeDeclaration *utdecl = dynamic_cast<UserTypeDeclaration*>(tdecl)){
             ASTScope::iterator end = utdecl->getScope()->end();

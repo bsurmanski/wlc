@@ -1,23 +1,24 @@
 struct TypeInfo
 {
-    //char[] name
-    void function()[1] functions
+    char[] name
+    void^ vtable;
 }
 
 struct DynamicArray
 {
-    void ^ptr
+    void^ ptr
     long size
 }
 
 class Object
 {
-    TypeInfo^ typeInfo
+    //TypeInfo^ typeInfo
+    void function()^ vtable;
     long refcount
 }
 
 use "nomangle"
-extern nomangle int printf(char ^fmt, ...);
+extern nomangle int printf(char^ fmt, ...);
 
 void dyncall_test(){
     printf("dynamic call!\n");

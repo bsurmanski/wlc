@@ -279,7 +279,7 @@ struct UserTypeDeclaration : public TypeDeclaration
 
     UserTypeDeclaration(Identifier *id, ASTScope *sc,
                 std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc) :
-            TypeDeclaration(id, loc), scope(sc), members(m),
+            TypeDeclaration(id, loc), scope(sc), members(m), methods(met),
             type(new ASTUserType(id, this))
     {
         if(scope) scope->setOwner(id);

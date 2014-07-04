@@ -17,6 +17,8 @@ int main(int argc, char^^ argv)
     printf("out %d\n", i);
     printf("out %d\n", j);
     cl.weirdFunc()
+    someStruct s
+    s.myfunc()
     return 0
 }
 
@@ -45,4 +47,9 @@ class MyClass
     int myFunction(int a, int b) {
         return a + b
     }
+}
+
+struct someStruct {
+    int i;
+    int myfunc() return .i
 }

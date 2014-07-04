@@ -504,7 +504,7 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         if(val->getType()->isClass()) {
             ret = vtableLookup(val, member);
         } else {
-            assert(false); //XXX allow non virtual calls
+            ret = codegenIdentifier(id);
         }
         ret->setOwner(val);
         return ret;

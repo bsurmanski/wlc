@@ -447,20 +447,23 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
     std::vector<Constant *> members; // type info constant members
     std::vector<Constant *> arrayList;
     ASTType *vfty = ASTType::getVoidFunctionTy()->getPointerTy();
+
     UserTypeDeclaration *utdecl = ty->getDeclaration()->userTypeDeclaration();
-    for(int i = 0; i < utdecl->methods.size(); i++){
-        Identifier *dcid = ast->getRuntimeUnit()->lookup("dyncall_test");
+    if(ClassDeclaration *cdecl = utdecl->classDeclaration()) {
+        for(int i = 0; i < cdecl->vtable.size(); i++){
+            FunctionDeclaration *fdecl = cdecl->vtable[i];
+            if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
+            FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
+            Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
 
-        FunctionDeclaration *fdecl = utdecl->methods[i];
-        if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
-        FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
-        Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
+            arrayList.push_back((Function*)
+                    ir->CreatePointerCast(func, codegenType(vfty)));
+        }
 
-        arrayList.push_back((Function*)
-                ir->CreatePointerCast(func, codegenType(vfty)));
     }
 
-    ArrayType *vtableTy = ArrayType::get(codegenType(vfty), utdecl->methods.size());
+    int sz = utdecl->classDeclaration() ? utdecl->classDeclaration()->vtable.size() : 0;
+    ArrayType *vtableTy = ArrayType::get(codegenType(vfty), sz);
     Constant *vtable = ConstantArray::get(
                 vtableTy,
                 arrayList
@@ -497,7 +500,12 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
 
     if(id->isFunction()){
         //TODO: static vs nonvirtual vs virtual function calls
-        ASTValue *ret = vtableLookup(val, member);
+        ASTValue *ret = 0;
+        if(val->getType()->isClass()) {
+            ret = vtableLookup(val, member);
+        } else {
+            assert(false); //XXX allow non virtual calls
+        }
         ret->setOwner(val);
         return ret;
     } else if(id->isVariable()){
@@ -2106,10 +2114,6 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         //ASTValue *vtable = getMember(idValue, "vtable");
 
         codegenType(userty); // XXX to create typeinfo. hacky
-
-        //std::vector<Value *> gep;
-        //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        //Value *llval = ir->CreateGEP(codegenLValue(vtable), gep);
 
         //the pass through identifier is an ugly hack to get typeinfo in case of duplicate ASTType types, eww
         Value *tival = codegenLValue(userty->getDeclaration()->classDeclaration()->typeinfo);

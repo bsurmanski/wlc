@@ -49,8 +49,8 @@ long ASTUserType::getMemberIndex(std::string member){
 
 long ASTUserType::getVTableIndex(std::string method){
     ClassDeclaration *cdecl = getDeclaration()->classDeclaration();
-    for(int i = 0; i < cdecl->methods.size(); i++) {
-        if(cdecl->methods[i]->getName() == method) {
+    for(int i = 0; i < cdecl->vtable.size(); i++) {
+        if(cdecl->vtable[i]->getName() == method) {
             return i;
         }
     }

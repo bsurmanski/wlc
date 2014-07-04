@@ -313,6 +313,10 @@ struct UserTypeDeclaration;
  *
  * Also because of this, most of the methods of this class should not
  * be called until type resolution.
+ *
+ * Additionally, due to the requirement to have ASTType available before it's definition
+ * (for example for a variable type, parameter type, cast), and potentially in different
+ * packages, ASTUserType does not necessarily represent a unique type.
  */
 struct ASTUserType : public ASTCompositeType {
     Identifier *identifier;

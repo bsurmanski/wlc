@@ -274,7 +274,7 @@ struct UserTypeDeclaration : public TypeDeclaration
 {
     ASTType *type;
     ASTScope *scope;
-    std::vector<FunctionDeclaration*> methods;
+    std::vector<FunctionDeclaration*> methods; //locally declared methods; does not include methods defined in parent
     std::vector<Declaration*> members;
 
     UserTypeDeclaration(Identifier *id, ASTScope *sc,
@@ -308,6 +308,7 @@ struct UserTypeDeclaration : public TypeDeclaration
 struct ClassDeclaration : public UserTypeDeclaration {
     Identifier *base;
     ASTValue *typeinfo; //XXX this might be a bad place for this
+    std::vector<FunctionDeclaration*> vtable; // populated during validation
     ClassDeclaration(Identifier *id, ASTScope *sc, Identifier *bs,
             std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc) :
         UserTypeDeclaration(id, sc, m, met, loc), base(bs), typeinfo(0) {
@@ -320,6 +321,8 @@ struct ClassDeclaration : public UserTypeDeclaration {
         }
         return id;
     }
+
+    void populateVTable();
     virtual size_t getSize() const;
     long getMemberIndex(std::string member);
     virtual ClassDeclaration *classDeclaration() { return this; }

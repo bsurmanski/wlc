@@ -146,6 +146,14 @@ void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
         emit_message(msg::ERROR, "unresolved user type declaration", decl->loc);
     }
 
+    if(ClassDeclaration *cdecl = decl->classDeclaration()) {
+        if(cdecl->base)
+            cdecl->base = resolveIdentifier(cdecl->base);
+
+        cdecl->populateVTable();
+    }
+
+
     decl->scope->accept(this);
 }
 
@@ -190,6 +198,10 @@ void ValidationVisitor::visitIndexExpression(IndexExpression *exp) {
 void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp) {
     // resolve identifier
     exp->id = resolveIdentifier(exp->id);
+
+    if(exp->id->isUndeclared()){
+        emit_message(msg::ERROR, "identifier is expected to be resolved at this point");
+    }
 
     // resolve type of identifier if needed
     resolveType(exp->id->getType());

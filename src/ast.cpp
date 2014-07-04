@@ -83,3 +83,31 @@ size_t ClassDeclaration::getSize() const {
     }
     return sz;
 }
+
+void ClassDeclaration::populateVTable() {
+    if(vtable.size() > 0) return; //already populated
+
+    if(base && base->getDeclaration() && base->getDeclaration()->classDeclaration()) {
+        ClassDeclaration *bclass = base->getDeclaration()->classDeclaration();
+        bclass->populateVTable();
+
+        // copy in base members
+        for(int i = 0; i < bclass->vtable.size(); i++) {
+            vtable.push_back(bclass->vtable[i]);
+        }
+
+        for(int i = 0; i < methods.size(); i++) {
+            for(int j = 0; j < vtable.size(); j++) {
+                // if overridden method
+                if(methods[i]->getName() == vtable[j]->getName()) {
+                    vtable[j] = methods[i];
+                    goto CONTINUE;
+                }
+            }
+
+            //not overridden, put at vtable end
+            vtable.push_back(methods[i]);
+CONTINUE:;
+        }
+    }
+}

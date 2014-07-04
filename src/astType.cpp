@@ -5,6 +5,16 @@
 // UserType
 //
 
+ASTType *ASTUserType::getBaseType(){
+    ClassDeclaration *cdecl = getDeclaration()->classDeclaration();
+    if(cdecl) {
+        if(Identifier *base = cdecl->base){
+            return base->getDeclaredType();
+        }
+    }
+    return NULL;
+}
+
 ASTScope *ASTUserType::getScope() {
     return getDeclaration()->getScope();
 }
@@ -38,7 +48,13 @@ long ASTUserType::getMemberIndex(std::string member){
 }
 
 long ASTUserType::getVTableIndex(std::string method){
-
+    ClassDeclaration *cdecl = getDeclaration()->classDeclaration();
+    for(int i = 0; i < cdecl->vtable.size(); i++) {
+        if(cdecl->vtable[i]->getName() == method) {
+            return i;
+        }
+    }
+    return 0; //TODO
 }
 
 
@@ -184,6 +200,10 @@ ASTType *ASTType::getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool
 {
     //TODO: type cache?
     return new ASTFunctionType(ret, param, vararg);
+}
+
+ASTType *ASTType::getVoidFunctionTy() {
+    return getFunctionTy(getVoidTy(), std::vector<ASTType*>());
 }
 
 void ASTType::accept(ASTVisitor *v) {

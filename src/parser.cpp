@@ -163,37 +163,39 @@ ASTType *ParseContext::parseType()
             continue;
         }
 
-        break; // if no post-modifiers are found, exit loop
-    }
-
-    if(peek().is(tok::kw_function))
-    {
-        ASTType *ret = type;
-        ignore(); // eat 'function'
-        if(peek().isNot(tok::lparen)) {
-            emit_message(msg::ERROR, "expected '(' in function pointer type specification");
-            return NULL;
-        }
-        ignore(); // eat '('
-
-        std::vector<ASTType*> params;
-        while(peek().isNot(tok::rparen)){
-            ASTType *param = parseType();
-            params.push_back(param);
-
-            if(peek().is(tok::comma)) {
-                ignore();
-            } else if(peek().is(tok::rparen)) {
-                break;
-            } else {
-                emit_message(msg::ERROR, "expected ',' or ')' in function type specification");
+        if(peek().is(tok::kw_function))
+        {
+            ASTType *ret = type;
+            ignore(); // eat 'function'
+            if(peek().isNot(tok::lparen)) {
+                emit_message(msg::ERROR, "expected '(' in function pointer type specification");
                 return NULL;
-            } // TODO: vararg
+            }
+            ignore(); // eat '('
+
+            std::vector<ASTType*> params;
+            while(peek().isNot(tok::rparen)){
+                ASTType *param = parseType();
+                params.push_back(param);
+
+                if(peek().is(tok::comma)) {
+                    ignore();
+                } else if(peek().is(tok::rparen)) {
+                    break;
+                } else {
+                    emit_message(msg::ERROR, "expected ',' or ')' in function type specification");
+                    return NULL;
+                } // TODO: vararg
+            }
+
+            ignore(); //eat ')' of function type
+
+            type = ASTType::getFunctionTy(ret, params)->getPointerTy(); // 'function' is a pointer
+
+            continue;
         }
 
-        ignore(); //eat ')' of function type
-
-        type = ASTType::getFunctionTy(ret, params)->getPointerTy(); // 'function' is a pointer
+        break; // if no post-modifiers are found, exit loop
     }
 
     return type;
@@ -397,6 +399,7 @@ Statement *ParseContext::parseStatement()
             } else goto PARSEEXP; //IF NOT UNDECLARED OR STRUCT, THIS IS PROBABLY AN EXPRESSION
 
         case tok::kw_extern:
+        case tok::kw_nomangle:
         case tok::kw_union:
         case tok::kw_class:
         case tok::kw_struct:
@@ -492,8 +495,11 @@ Declaration *ParseContext::parseDeclaration()
 {
     SourceLocation loc = peek().loc;
     bool external = false;
+    bool mangle = true;
 
+    //TODO: invarient order
     if(peek().is(tok::kw_extern)) { external = true; ignore(); }
+    if(peek().is(tok::kw_nomangle)) { mangle = false; ignore(); }
 
     //TODO: parse function decl specs
     if(peek().is(tok::kw_struct) || peek().is(tok::kw_union) || peek().is(tok::kw_class)) //parse struct
@@ -549,6 +555,7 @@ Declaration *ParseContext::parseDeclaration()
         }
 
         ASTScope *tbl = new ASTScope(getScope(), ASTScope::Scope_Struct);
+        tbl->setOwner(id);
         pushScope(tbl);
         vector<Declaration*> members;
         vector<FunctionDeclaration*> methods;
@@ -573,13 +580,13 @@ Declaration *ParseContext::parseDeclaration()
         switch(kind)
         {
             case kw_union:
-                sdecl = new UnionDeclaration(id, tbl, members, loc);
+                sdecl = new UnionDeclaration(id, tbl, members, methods, loc);
                 break;
             case kw_struct:
-                sdecl = new StructDeclaration(id, tbl, members, loc);
+                sdecl = new StructDeclaration(id, tbl, members, methods, loc);
                 break;
             case kw_class:
-                sdecl = new ClassDeclaration(id, tbl, baseId, members, loc);
+                sdecl = new ClassDeclaration(id, tbl, baseId, members, methods, loc);
                 break;
             default:
                 emit_message(msg::FAILURE, "unknown declaration kind", loc);
@@ -609,17 +616,34 @@ Declaration *ParseContext::parseDeclaration()
 
     Identifier *id = getScope()->getInScope(t_id.toString());
     if(id->getName() == "main") id->setMangle(false); // dont mangle main
+    if(!mangle) id->setMangle(false);
 
     //TODO parse decl specs
 
     if(peek().is(tok::lparen)) // function decl
     {
+        Identifier *owner = NULL;
         std::vector<ASTType *> params;
         std::vector<VariableDeclaration*> parameters;
         ignore(); // lparen
 
+        if(getScope()->owner &&
+                getScope()->owner->getDeclaredType()){
+            owner = getScope()->owner;
+        }
+
         ASTScope *funcScope = new ASTScope(getScope());
         pushScope(funcScope);
+
+        // is a method
+        if(owner){
+            ASTType *thisTy = owner->getDeclaredType()->getPointerTy();
+            Identifier *this_id = getScope()->getInScope("this");
+            VariableDeclaration *this_decl = new VariableDeclaration(thisTy, this_id, NULL, loc);
+            this_id->setDeclaration(this_decl, Identifier::ID_VARIABLE);
+            params.push_back(thisTy);
+            parameters.push_back(this_decl);
+        }
 
         bool vararg = false;
         while(!peek().is(tok::rparen))

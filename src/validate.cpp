@@ -30,7 +30,7 @@ ValidationVisitor::ValidationVisitor() : ASTVisitor() {
 
 Identifier *ValidationVisitor::resolveIdentifier(Identifier *id) {
     if(id->isUndeclared()) {
-        id = getScope()->resolveIdentifier(id);
+        id = id->getScope()->resolveIdentifier(id);
     }
 
     if(id->isUndeclared()) {
@@ -46,7 +46,24 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
     if(!ty->isResolved()) {
         if(ASTUserType *userty = ty->userType()) {
             userty->identifier = resolveIdentifier(userty->identifier);
+            userty->getScope()->accept(this);
         }
+    }
+
+    if(ASTFunctionType *fty = ty->functionType()){
+        for(int i = 0; i < fty->params.size(); i++){
+            fty->params[i] = resolveType(fty->params[i]);
+        }
+
+        if(fty->owner){
+            resolveType(fty->owner);
+        }
+
+        resolveType(fty->ret);
+    }
+
+    if(ty->isPointer()){
+        resolveType(ty->getReferencedTy());
     }
 
     return ty;
@@ -128,6 +145,16 @@ void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
         valid = false;
         emit_message(msg::ERROR, "unresolved user type declaration", decl->loc);
     }
+
+    if(ClassDeclaration *cdecl = decl->classDeclaration()) {
+        if(cdecl->base)
+            cdecl->base = resolveIdentifier(cdecl->base);
+
+        cdecl->populateVTable();
+    }
+
+
+    decl->scope->accept(this);
 }
 
 void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp) {
@@ -135,6 +162,11 @@ void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp) {
     if(!exp->lhs) {
         valid = false;
         emit_message(msg::ERROR, "unary operator is missing expression");
+    }
+
+    if(exp->op == tok::dot && !exp->lhs->identifierExpression()){
+        valid = false;
+        emit_message(msg::ERROR, "unary dot operator expects identifier following dot");
     }
 }
 
@@ -166,6 +198,10 @@ void ValidationVisitor::visitIndexExpression(IndexExpression *exp) {
 void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp) {
     // resolve identifier
     exp->id = resolveIdentifier(exp->id);
+
+    if(exp->id->isUndeclared()){
+        emit_message(msg::ERROR, "identifier is expected to be resolved at this point");
+    }
 
     // resolve type of identifier if needed
     resolveType(exp->id->getType());
@@ -334,11 +370,18 @@ void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt) {
 void ValidationVisitor::visitScope(ASTScope *sc){
     ASTScope::iterator end = sc->end();
     for(ASTScope::iterator it = sc->begin(); it != end; ++it){
-        if(it->isUndeclared()){
-            Identifier *resolve = sc->resolveIdentifier(*it);
-            if(!resolve || resolve->isUndeclared()){
-                emit_message(msg::ERROR, "could not resolve symbol in scope: " + resolve->getName());
+        Identifier *id = *it;
+        if(it->isUndeclared()) {
+            id = sc->resolveIdentifier(id);
+            if(!id || id->isUndeclared()) {
+                emit_message(msg::ERROR, "could not resolve symbol in scope: " + id->getName());
             }
+
+        }
+
+        //TODO: condition shouldnt be needed
+        if(id->getType()) {
+            resolveType(id->getType());
         }
     }
 }

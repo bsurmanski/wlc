@@ -137,9 +137,6 @@ Identifier *ASTScope::resolveIdentifier(Identifier *id)
         return id;
     }
 
-    if(id->getName() == "SDL_Surface"){
-        printf("k");
-    }
     Identifier *res = lookup(id->getName(), true);
     if(id != res){
         remove(id);

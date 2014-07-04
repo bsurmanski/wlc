@@ -59,6 +59,8 @@ void LabelDeclaration::accept(ASTVisitor *v){
 void VariableDeclaration::accept(ASTVisitor *v){
     Declaration::accept(v);
     v->visitVariableDeclaration(this);
+    if(value)
+        value->accept(v);
 }
 
 void TypeDeclaration::accept(ASTVisitor *v){

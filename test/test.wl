@@ -131,6 +131,8 @@ int main(int argc, char^^ argv)
     uint mySize = SDL_Surface.sizeof
 
     MyNewStruct newstruct
+    printf("class functions? %d\n", newstruct.getNum());
+
     SomeUnion myUnion
     myUnion.myLong = 4294967298 >> 10
     printf("union: %d %d %lld\n", myUnion.myChar, myUnion.myInt, myUnion.myLong);
@@ -171,10 +173,12 @@ int main(int argc, char^^ argv)
     return 0
 }
 
-struct MyNewStruct
+class MyNewStruct
 {
     int a
     int b
     int c
     MyNewStruct ^st
+
+    int getNum() return 5
 }

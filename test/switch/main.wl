@@ -1,4 +1,6 @@
-int printf(char ^fmt, ...);
+use "importc"
+
+import(C) "/usr/include/stdio.h"
 
 int main(int argc, char^^ argv)
 {

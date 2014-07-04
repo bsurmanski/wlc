@@ -45,6 +45,7 @@ struct ASTUserType;
 struct ASTCompositeType;
 struct ASTFunctionType;
 #include <llvm/DebugInfo.h> //XXX
+
 struct ASTType
 {
     ASTTypeEnum kind;
@@ -261,6 +262,7 @@ struct ASTType
     static ASTType *getTupleTy(std::vector<ASTType *> t);
 
     static ASTType *getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg=false);
+    static ASTType *getVoidFunctionTy();
 };
 
 struct ASTBasicType : public ASTType {
@@ -274,14 +276,19 @@ struct ASTCompositeType : public ASTType {
 };
 
 struct ASTFunctionType : public ASTCompositeType {
+    ASTUserType *owner; // aka 'this'
     ASTType *ret;
     std::vector<ASTType*> params;
     bool vararg;
 
     ASTFunctionType(ASTType *r, std::vector<ASTType *> p, bool va = false) :
-        ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION) {}
+        ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION), owner(0) {}
+
+    ASTFunctionType(ASTUserType *own, ASTType *r, std::vector<ASTType *> p, bool va = false) :
+        ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION), owner(own) {}
 
     bool isVararg() { return vararg; }
+    bool isMethod() { return owner; }
 
     ASTType *getMemberType(size_t index)
     {
@@ -289,14 +296,33 @@ struct ASTFunctionType : public ASTCompositeType {
         return params[index-1];
     }
 
+    ASTType *getReturnType() { return ret; }
+
     virtual ASTFunctionType *functionType() { return this; }
 };
 
 struct UserTypeDeclaration;
+/**
+ * Represents a user type. Since the declaration of a type may
+ * appear after it's usage, the ASTUserType class is mostly
+ * a shell used to proxy the Identifier, and subsequently the
+ * UserTypeDeclaration class.
+ *
+ * The UserTypeDeclaration class should hold all of the true information
+ * about a type.
+ *
+ * Also because of this, most of the methods of this class should not
+ * be called until type resolution.
+ *
+ * Additionally, due to the requirement to have ASTType available before it's definition
+ * (for example for a variable type, parameter type, cast), and potentially in different
+ * packages, ASTUserType does not necessarily represent a unique type.
+ */
 struct ASTUserType : public ASTCompositeType {
     Identifier *identifier;
+
     ASTUserType(Identifier *id, UserTypeDeclaration *d=NULL) : ASTCompositeType(TYPE_USER),
-    identifier(id){
+    identifier(id) {
         //TODO: assert identifier is properly declared, declaration is present
     }
 
@@ -315,6 +341,9 @@ struct ASTUserType : public ASTCompositeType {
     virtual UserTypeDeclaration *getDeclaration() {
         return (UserTypeDeclaration*) identifier->getDeclaration();
     }
+
+    // only valid after AST is validated
+    ASTType *getBaseType();
 
     virtual bool isResolved() { return getDeclaration(); }
 

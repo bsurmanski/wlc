@@ -11,12 +11,23 @@ struct ASTValueInfo
 struct ASTValue
 {
     bool lValue;
+    // value in which this value is indexing or owned by.
+    // eg: if current value represents 'mc.func()', owner will be 'mc'
+    ASTValue *owner;
     ASTType *type;
     llvm::Value *cgValue; //XXX
     llvm::DIVariable debug; //XXX
     ASTType *getType() { return type; }
     ASTValue(ASTType *ty, void *cgv = NULL, bool lv = false) : type(ty),
-        cgValue((llvm::Value*) cgv), lValue(lv) {}
+        cgValue((llvm::Value*) cgv), lValue(lv), owner(0) {}
+
+    /*
+    ASTValue(ASTValue *own, ASTType *ty, void *cgv = NULL, bool lv = false) : type(ty),
+        cgValue((llvm::Value*) cgv), lValue(lv), owner(own) {}
+        */
+
+    void setOwner(ASTValue *v) { owner = v; }
+    ASTValue *getOwner() { return owner; }
     bool isLValue() { return lValue; }
 };
 
@@ -29,5 +40,13 @@ struct TupleValue : public ASTValue
     tuple(texp)
     {}
 };
+
+/*
+struct FunctionValue : public ASTValue {
+    FunctionDeclaration *declaration;
+    FunctionValue(ASTType *ty, void *cgv = NULL, bool lv = false, FunctionDeclaration *fdecl=NULL) : ASTValue(ty, cgv, lv) {
+
+    }
+};*/
 
 #endif

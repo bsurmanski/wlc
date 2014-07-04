@@ -1,3 +1,6 @@
+use "importc"
+import(C) "/usr/include/stdlib.h"
+
 struct MyStruct
 {
     int i
@@ -9,8 +12,6 @@ void initMyStruct(MyStruct^ s, int i, int j)
     s.i = i
     s.j = j
 }
-
-void^ malloc(int sz);
 
 MyStruct^ retStruct()
 {

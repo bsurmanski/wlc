@@ -80,6 +80,13 @@ struct ASTNode {
     virtual std::string getMangledName() { return ""; }
     virtual std::string getName() { return ""; }
     virtual void accept(ASTVisitor *v) = 0;
+
+    virtual Declaration *declaration() { return NULL; }
+    virtual FunctionDeclaration *functionDeclaration() { return NULL; }
+    virtual VariableDeclaration *variableDeclaration() { return NULL; }
+    virtual TypeDeclaration *typeDeclaration() { return NULL; }
+    virtual UserTypeDeclaration *userTypeDeclaration() { return NULL; }
+    virtual ClassDeclaration *classDeclaration() { return NULL; }
 };
 
 struct Package : public ASTNode
@@ -98,7 +105,7 @@ struct Package : public ASTNode
     ASTScope *getScope() {
         if(!scope){
             scope = new ASTScope(NULL, ASTScope::Scope_Global, this);
-            scope->setOwner(this);
+            scope->setOwner(identifier);
         }
         return scope;
     } //TODO: subscope of parent ?
@@ -192,8 +199,7 @@ struct Declaration : public ASTNode
 
     Identifier *getIdentifier() { return identifier; }
 
-    virtual FunctionDeclaration *functionDeclaration() { return NULL; }
-    virtual VariableDeclaration *variableDeclaration() { return NULL; }
+    virtual Declaration *declaration() { return this; }
 
     virtual void accept(ASTVisitor *v);
 };
@@ -217,8 +223,8 @@ struct FunctionDeclaration : public Declaration
             ASTScope *sc, Statement *st, SourceLocation loc) :
         Declaration(id, loc), prototype(p), parameters(params), scope(sc),
         body(st), cgValue(NULL) {
-            if(scope)
-                scope->setOwner(this);
+            //if(scope)
+            //    scope->setOwner(this);
         }
     virtual FunctionDeclaration *functionDeclaration() { return this; }
     ASTScope *getScope() { return scope; }
@@ -256,6 +262,7 @@ struct TypeDeclaration : public Declaration
     //virtual std::string getName() { return "" };
     virtual size_t getSize() const { assert(false && "unknown size"); }
     virtual size_t getAlign() const { assert(false && "unknown align"); }
+    virtual TypeDeclaration *typeDeclaration() { return this; }
 };
 
 struct CompositeTypeDeclaration : public TypeDeclaration
@@ -267,14 +274,15 @@ struct UserTypeDeclaration : public TypeDeclaration
 {
     ASTType *type;
     ASTScope *scope;
+    std::vector<FunctionDeclaration*> methods; //locally declared methods; does not include methods defined in parent
     std::vector<Declaration*> members;
 
     UserTypeDeclaration(Identifier *id, ASTScope *sc,
-                std::vector<Declaration*> m, SourceLocation loc) :
-            TypeDeclaration(id, loc), scope(sc), members(m),
+                std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc) :
+            TypeDeclaration(id, loc), scope(sc), members(m), methods(met),
             type(new ASTUserType(id, this))
     {
-        if(scope) scope->setOwner(this);
+        if(scope) scope->setOwner(id);
         identifier->setDeclaredType(type);
         identifier->setDeclaration(this, Identifier::ID_USER);
     }
@@ -283,6 +291,10 @@ struct UserTypeDeclaration : public TypeDeclaration
         TypeDeclaration(id, loc), type(ty) {}
 
     ASTScope *getScope() { return scope; }
+    virtual Identifier *lookup(std::string member)
+    {
+        return getScope()->lookupInScope(member);
+    }
     virtual ASTType *getDeclaredType() { return type; }
     virtual size_t length() const { return members.size(); }
     virtual size_t getAlign() const;
@@ -290,30 +302,46 @@ struct UserTypeDeclaration : public TypeDeclaration
     virtual long getMemberIndex(std::string member) = 0;
     virtual long getVTableIndex(std::string method) { return -1; }
     virtual void accept(ASTVisitor *v);
+    virtual UserTypeDeclaration *userTypeDeclaration() { return this; }
 };
 
 struct ClassDeclaration : public UserTypeDeclaration {
     Identifier *base;
+    ASTValue *typeinfo; //XXX this might be a bad place for this
+    std::vector<FunctionDeclaration*> vtable; // populated during validation
     ClassDeclaration(Identifier *id, ASTScope *sc, Identifier *bs,
-            std::vector<Declaration*> m, SourceLocation loc) :
-        UserTypeDeclaration(id, sc, m, loc), base(bs) {
+            std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc) :
+        UserTypeDeclaration(id, sc, m, met, loc), base(bs), typeinfo(0) {
     }
+    virtual Identifier *lookup(std::string member){
+        Identifier *id = getScope()->lookupInScope(member);
+        if(base){
+            UserTypeDeclaration *bdecl = base->getDeclaration()->userTypeDeclaration();
+            if(!id && bdecl) id = bdecl->lookup(member);
+        }
+        return id;
+    }
+
+    void populateVTable();
     virtual size_t getSize() const;
-    long getMemberIndex(std::string member) { return 0; }
+    long getMemberIndex(std::string member);
+    virtual ClassDeclaration *classDeclaration() { return this; }
 };
 
 struct StructDeclaration : public UserTypeDeclaration {
     bool packed;
-    StructDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m, SourceLocation loc) :
-        UserTypeDeclaration(id, sc, m, loc), packed(false) {
+    StructDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m,
+            std::vector<FunctionDeclaration*> met, SourceLocation loc) :
+        UserTypeDeclaration(id, sc, m, met, loc), packed(false) {
         }
     virtual size_t getSize() const;
     long getMemberIndex(std::string member);
 };
 
 struct UnionDeclaration : public UserTypeDeclaration {
-    UnionDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m, SourceLocation loc) :
-        UserTypeDeclaration(id, sc, m, loc) {}
+    UnionDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m,
+            std::vector<FunctionDeclaration*> met, SourceLocation loc) :
+        UserTypeDeclaration(id, sc, m, met, loc) {}
     virtual size_t getSize() const;
     long getMemberIndex(std::string member) { return 0; }
 };
@@ -411,8 +439,8 @@ struct CompoundStatement : public Statement
     std::vector<Statement*> statements;
     CompoundStatement(ASTScope *sc, std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
         scope(sc), Statement(l), statements(s) {
-            if(scope)
-                scope->setOwner(this);
+            //if(scope)
+            //    scope->setOwner(this);
         }
     virtual CompoundStatement *compoundStatement() { return this; }
     virtual void accept(ASTVisitor *v);
@@ -428,8 +456,8 @@ struct BlockStatement : public Statement
     virtual BlockStatement *blockStatement() { return this; }
     BlockStatement(ASTScope *sc, Statement *b, SourceLocation l = SourceLocation()) :
         scope(sc), body(b), Statement(l) {
-            if(scope)
-                scope->setOwner(this);
+            //if(scope)
+            //    scope->setOwner(this);
         }
     virtual void accept(ASTVisitor *v);
 };

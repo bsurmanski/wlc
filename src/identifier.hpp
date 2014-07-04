@@ -74,6 +74,9 @@ struct Identifier
     bool isExpression() { return type == ID_EXPRESSION; }
     bool isLabel() { return type == ID_LABEL; }
 
+    bool isTypeMember();
+    ASTType *getMemberOwner();
+
     /*
     bool isTypeMember() { return getScope()->isUserTypeScope() && isVariable(); }
     bool isTypeMethod() { return getScope()->isUserTypeScope() && isFunction(); }

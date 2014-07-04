@@ -104,6 +104,7 @@ int getUnaryPrecidence(tok::TokenKind tkind)
         case tok::tilde:
         case tok::caret:
         case tok::amp:
+        case tok::dot:
             return 12;
         default:
             return 0;

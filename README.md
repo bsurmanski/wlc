@@ -35,169 +35,34 @@ be no garbage collector, no virtual machine, etc.
 * importing C headers, using clang (experimental. currently able to interface with
   functions, variables, basic types (including pointers), structs. unfortunately not
   preprocessor tokens, const and other things)
+* switch statements
+* unions
 
 ## Planned Functionality
 roughly in order of planned implementation
 
-* switch statements
-* unions
+* classes (WIP, maybe in an extension language called 'OWL'; similar to the idea of C++ from C)
 * enums
 * vector types
-* classes (in an extension language called 'OWL'; similar to the idea of C++ from C)
 * generic
 
-## FAQ
 
-### Why no semicolons?
-Semicolons are optional. Although I am fine with writing code with semicolons, they are
-really a artifact of early compiler development. Furthermore, they are one of the most
-common syntax error problems, line based development is more intuitive from a learning
-standpoint.
-
-### Why is a semicolon required after an external function declarations?
-In WL, functions still need to be declared before use (somewhere, not strictly above. can be
-declared at the bottom of the file). Usually in WL semicolons are not required, but in
-this context, a semicolon represents an empty function body. This means the function
-is declared somewhere else. If no semicolon was present, then WL will expect a statement
-to follow as the function body. example:
-    
-    // printf will be linked in with libc, but must be declared to be used
-    int printf(char^ fmt, ...);
-
-### Why not use C style casting?
-C casting requires many parenthises. Parentheses are annoying. I tried to reduce the number of
-brackets required while coding. In this sense, there are fewer moments in which you must go
-back and add that missing left parenthesis. Also, WL does not require a forward reference for types;
-If there is none, it would be ambiguous if the cast statement is a cast, or a bracketed statement
-(or alternatively, would require a further lookahead to see if an operator or identifier follows).
-Also, I believe it will be easier and more intuitive to learn the idea of casting with the new syntax.
-example:
-
-    float a, b, c
-    // some declaration of a,b,c here
-    int i = int: a + int: b + int: c
-
-alternatively, if a variable is being assigned to an expression, and the whole expression needs
-to be casted, the ':=' operator can be used to cast to the type of the left hand side
-
-    int^ myIntPointer = getSomeIntPointer()
-    char^ myCharPointer := myIntPointer
-    char^ equivilentCharPointer = char^: myIntPointer
-
-the cast assign operator effectively casts a value without the required noise of casting.
-
-Another addition added to help reduce casting noise is the 'infix' cast. This style of casting
-is used for long 'dot expression' chains. In a long chain of member references, 
-it is often necessary to cast one of the members to another type. Due to the nature of 
-cast expressions, the cast type will end up at the beginning of the expression, far away
-from the relevent variable. And often this requires exuberant brackets to disambiguate the
-member which requires casting. This often creates confusing expressions which requires the
-excessive eye-pingponging to understand what is being applied where. WL attempts to reduce
-ambiguity in long dereferencing chains by adding an infix cast to keep the casted member 
-close to the casted type. Heres an example:
-
-    MyClass bar = getABar();
-    int foo1 = (Biz: bar.baz.buzz).value
-    int foo2 = bar.baz. Biz: buzz .value
-
-compare the two equivilent casts in the assignment of foo1, and foo2. the second of which
-can be read left to right without the need to look back to the beginning of the expression. 
-
-### Why are braces optional for a function body?
-this allows quick oneliner functions to be easy to write and read. This also 
-falls into the expectation presented by the conditional and loop statments (if,while,etc).
-This makes the language more intuitive. example:
-
-    int addFive(int n) return n + 5
-
-
-### Why use a caret '^' for pointers?
-This was mostly chosen so that a 'power' operator can be added as \*\*. Furthermore, this
-also has the benifit of quicker recognition of the operator's usage, due to less mental
-confliction with the multiplication operator. It is true that the XOR operator will have
-this problem, but it is used much less often.
-
-
-### Why attach the pointer to the type instead of the identifier?
-In WL, a pointer type is declared as 'void^ name' instead of C-style 'void \*name'. It can
-be seen that C attaches the pointer declarator to the identifier ('name') instead of the type.
-This is because in C, it is functionally attached to the identifier such that a line like:
-    int *a, b, c;
-declares one int\* a, and two ints b and c. WL's way is much more intuitive, so multiple
-declarations like:
-    int^ a, b, c
-declares 3 int pointers as expected.
-
-### Why no '->' operator?
-the '->' operator is *ugly*. WL uses a '.' instead. example:
-
-    mystruct^ st = new_mystruct()
-    st.member = 5
-
-### Why no headers?
-Headers are nice in that they declare the interface to a module. But unfortnately, when
-generics are added, it starts to get more complicated. Anyone who has used generic's in
-C++ can see that quickly it gets very messy, with most code ending up in a header. No
-longer is a header a declaration of interface, it *is* the source file. Additionally, 
-these day many people just end up using some sort of IDE, which in itself provides an view
-of module interfaces.  It is possible that WL will eventually add generated headers, but
-that would be somewhere in the future.
-
-Although WL currently does not have generics, it is a planned feature (sometime in the
-future).
-
-### How are arrays represented, and why not just use C-style arrays?
-In WL, Arrays are represented as a structure containing a pointer and size. The following
-C structure is equivilent to an int array in WL:
-
-    struct Array
-    {
-        int *ptr;
-        long size;
-    };
-
-When an array is initialized with a size in WL, (like: int[5] myarray), the 'ptr' member 
-is set to a stack allocated buffer of the appropriate size, and the 'size' member is set
-to the appropriate size. This can be done statically. Once an array is created, the 'ptr'
-and 'size' member can be accessed identically as if the arrays was a struct (with the dot
-operator).
-
-In C, arrays are represented as pointers. Often when using an array, a size is required.
-As such, in C, a size variable must be passed around seperately. If a simple C style array
-is required, you can just use a pointer. (this leads to a problem in structs, I would like
-to change this eventually)
-
-### How do I import C files?
-use the 'import(C) expression'
-
-    import(C) "stdio.h"
-
-an exact path to the the file may be required. 
-this feature is experimental and could change in syntax and semantics.
-currently, const or volatile declarations fail to convert correctly and are ignored.
-
-### Why LLVM?
-Using LLVM allows me to focus on the syntax and functionality of the language, and eschew
-all optimization and backend logic. This allows me to develop the language much faster and
-easier. Furthermore, LLVM's optimization and platform support is likely much better than 
-what I would ever be able to do within reasonable contraints.
-
-### Why not modify clang?
-WL's syntax is different enough that modifying clang would be a significant effort.
-Also, I am not familier enough with clang's architecture to do so.
-
-## Future
+## Features
 
 ### 'Use' statement
-use statements will enable specific compiler extensions, or modify language syntax. Use
-statements will have a syntax of
+use statements enable specific compiler extensions, or modify language syntax. 
+When complete, use statements will likely have a syntax of
 
     use extensionName
+
+Currently, they are enabled by
+
+    use "extensionName"
 
 extensions can have various effects ranging from syntactical preference (substituting
 symbols), to declaring new keywords, types, and behaviour. 
 
-extensions will only affect the module they are declared in. 'use' extensions should not
+extensions only affect the module they are declared in. 'use' extensions should not
 destructively modify the behaviour of the compiler, and Modules with 'use' extensions
 should be able to interface with those without.
 
@@ -207,6 +72,116 @@ see 'Ideas' for some examples of possible 'use' extensions.
 
 There may be a set of extensions that are required for a 'conforming' compiler, and a 'embedded' 
 standard can be created that does not have the extensions.
+
+#### Current Use Extensions
+
+##### importc
+Used to enable the 'import(C)' construct, which allow importing symbols from a
+C header
+
+##### implicit\_this
+Allows class members to be referenced without indexing 'this' or using a
+unary dot operator
+
+with implicit this:
+
+    use "implicit_this"
+
+    class MyClass {
+        int member
+
+        int myFunc(){
+            return member
+        }
+    }
+
+without:
+
+    use "implicit_this"
+
+    class MyClass {
+        int member
+
+        int myFunc(){
+            return .member
+        }
+    }
+
+
+### Tuples
+Due to limitations of static typing, tuples will be more like unnamed structs than
+true tuples. This means that indexing can only be done with static integers. This 
+is because in a statement like
+
+    [int, char^] myTuple 
+    ...
+    var myvar = myTuple[i]
+
+it is imposible to determine the type required of 'v', either int or char^.
+It may be possible if all types in the tuple are of a uniform type:
+
+    [int, int, int] myIntTuple
+    ...
+    int myvar = myIntTuple[i]
+
+or if all members of the tuple are convertible to the destination type:
+
+    [char, int, float] myNumberTuple
+    ...
+    float mydest myNumberTuple[i]
+
+This last case may be exceedingly difficult, to calculate the correct
+tuple memory location of the member, and convert to the correct destination
+type at runtime.
+
+#### Tuple Syntax
+
+tuple declarations will be denoted by surrounding [ ]
+
+    [int,int,float] myTuple
+    myTuple = [5, 1, 2.3]
+
+Tuples can be implicitly converted to a struct with an identical signature. 
+
+    struct MyStruct
+    { 
+        int i
+        float j
+    }
+
+    ...
+
+    [int, float] myTuple = [1, 2.2]
+    MyStrct st = myTuple
+
+this would allow compound struct declarations to use the same syntax as tuples.
+
+    MyStruct s = [1, 2, 3]
+    [int,int,int] i = [1, 2, 3]
+
+#### Tuple return
+multiple values can be returned in a tuple.
+
+    [int,int] tupleReturner()
+    {
+        return [1,2]; 
+    }
+
+    ...
+
+    [int,int] pair = tuplerReturner()
+
+#### Tuple unpack
+Tuples can be unpacked onto multiple variables
+
+    [int, int] pair = [1,2]
+    int a
+    int b
+    [a,b] = pair
+
+All members of the left hand tuple must be LValues.
+
+## Future
 
 ### Tail call optimization
 self explanitory, avoids stack overflows, makes deep recursive function faster
@@ -290,62 +265,6 @@ This example would allow an embedded C statement within a WL scope. This would
 also extend to inlined ASM, using embed(ASM). It would need to be considered 
 if variables would leak across 'embed' scopes
 
-### Tuples
-Due to limitations of static typing, tuples will be more like unnamed structs than
-true tuples. This means that indexing can only be done with static integers. This 
-is because in a statement like
-
-    [int, char^] myTuple 
-    ...
-    var myvar = myTuple[i]
-
-it is imposible to determine the type required of 'v', either int or char^.
-It may be possible if all types in the tuple are of a uniform type:
-
-    [int, int, int] myIntTuple
-    ...
-    int myvar = myIntTuple[i]
-
-or if all members of the tuple are convertible to the destination type:
-
-    [char, int, float] myNumberTuple
-    ...
-    float mydest myNumberTuple[i]
-
-This last case may be exceedingly difficult, to calculate the correct
-tuple memory location of the member, and convert to the correct destination
-type at runtime.
-
-#### Tuple Syntax
-
-A comma can denote a tuple type, and a tuple value
-
-    int,int,float myTuple
-    myTuple = 5, 1, 2.3
-
-alternativly, tuple declarations can be surrounded by [ ]
-
-    [int,int,float] myTuple
-    myTuple = [5, 1, 2.3]
-
-Tuples can be implicitly converted to a struct with an identical signature. 
-
-    struct MyStruct
-    { 
-        int i
-        float j
-    }
-
-    ...
-
-    [int, float] myTuple = [1, 2.2]
-    MyStrct st = myTuple
-
-this would allow compound struct declarations to use the same syntax as tuples.
-
-    MyStruct s = [1, 2, 3]
-    [int,int,int] i = [1, 2, 3]
-
 #### Tuple auto unwrap
 if a tuple is passed as a function argument, it will automatically be unwrapped to
 its components.
@@ -369,28 +288,6 @@ to be called with individual values of the underlying tuple member types.
     ...
 
     myTupleFunction(1, 2)
-
-#### Tuple return
-multiple values can be returned in a tuple.
-
-    [int,int] tupleReturner()
-    {
-        return [1,2]; 
-    }
-
-    ...
-
-    [int,int] pair = tuplerReturner()
-
-#### Tuple unpack
-Tuples can be unpacked onto multiple variables
-
-    [int, int] pair = [1,2]
-    int a
-    int b
-    a,b = pair
-
-syntax needs to be considered for the assignment...
 
 ### Generic operator
 Generics can be denoted using the '!' operator.

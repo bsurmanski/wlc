@@ -24,16 +24,6 @@ IRTranslationUnit::IRTranslationUnit(IRCodegenContext *c, TranslationUnit *u) :
 
 SourceLocation currentLoc;
 
-std::string IRFunction::getName(bool mangle)
-{
-    if(mangle){
-        return declaration->identifier->getMangledName();
-    } else
-    {
-        return declaration->getName();
-    }
-}
-
 void IRCodegenContext::dwarfStopPoint(int ln)
 {
     llvm::DebugLoc loc = llvm::DebugLoc::get(ln, 1, diScope());
@@ -80,20 +70,17 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     sty->setName(ty->getName());
     unit->types[ty->getName()] = IRType(ty, sty);
 
+
+    std::vector<Type*> structVec;
+
+    // add base type to member set
+    if(ASTType *base = userty->getBaseType()){
+        structVec.push_back(codegenType(base));
+    }
+
     //
     //TODO: use iterator
     //
-
-    std::vector<Type*> structVec;
-    /*
-    ASTScope::iterator end = userty->getScope()->end();
-    for(ASTScope::iterator it = userty->getScope()->begin(); it != end; ++it){
-        if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(it->getDeclaration())){
-            structVec.push_back(codegenType(vd->getType()));
-        }
-    }
-    */
-
     for(int i = 0; i < userty->length(); i++)
     {
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(userty->getMember(i)))
@@ -104,17 +91,13 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         }
     }
 
-    /*
-    for(int i = 0; i < userty->methods.size(); i++)
-    {
-        FunctionDeclaration *fdecl = hti->methods[i];
-            codegenDeclaration(fdecl);
-    }*/ //TODO
-
     if(!userty->isOpaque())
     {
         sty->setBody(structVec);
     }
+
+    if(ty->isClass())
+        userty->getDeclaration()->classDeclaration()->typeinfo = createTypeInfo(ty);
 
     unit->debug->createUserType(ty);
     return sty;
@@ -259,6 +242,8 @@ llvm::Type *IRCodegenContext::codegenFunctionType(ASTType *ty) {
         return NULL;
     }
 
+    //TODO: push back owner type
+
     vector<Type*> params;
     for(int i = 0; i < astfty->params.size(); i++)
     {
@@ -358,27 +343,6 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
     return (llvm::Type *) llvmty;
 }
 
-/*
-ASTValue *IRCodegenContext::indexValue(ASTValue *val, int i)
-{
-    ASTCompositeType *compty = dynamic_cast<ASTCompositeType*>(val->getType());
-    if(!compty)
-    {
-        emit_message(msg::FAILURE, "cannot index non-composite type");
-        return NULL;
-    }
-
-    ASTType *memberTy = compty->getMemberType(i);
-    std::vector<Value*> gep;
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), i));
-    Value *v = codegenLValue(val);
-    Value *llval = ir->CreateInBoundsGEP(v, gep);
-    llval = ir->CreateBitCast(llval, codegenType(memberTy->getPointerTy()));
-    return new ASTValue(memberTy, llval, true);
-}
-*/
-
 llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 {
     if(!value->cgValue){
@@ -416,13 +380,27 @@ ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
     return stored;
 }
 
+ASTValue *IRCodegenContext::getStringValue(std::string str) {
+    Constant *strConstant = ConstantDataArray::getString(context, str);
+    GlobalVariable *GV = new GlobalVariable(*module, strConstant->getType(), true,
+            GlobalValue::PrivateLinkage, strConstant);
+    vector<Value *> gep;
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+    Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
+
+    //TODO: make this an ARRAY (when arrays are added), so that it has an associated length
+
+    return new ASTValue(ASTType::getCharTy()->getPointerTy(), val);
+}
+
 ASTValue *IRCodegenContext::getFloatValue(ASTType *t, float i){
-    //TODO: constant cache 0-255
+    //TODO: constant cache -256-255
     return new ASTValue(t, ConstantFP::get(codegenType(t), i));
 }
 
 ASTValue *IRCodegenContext::getIntValue(ASTType *t, int i){
-    //TODO: constant cache 0-255
+    //TODO: constant cache -256-255
     return new ASTValue(t, ConstantInt::get(codegenType(t), i));
 }
 
@@ -431,6 +409,123 @@ ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
     assert_message(lval->isLValue(), msg::FAILURE, "attempted to load RValue (must be LValue)");
     ASTValue *loaded = new ASTValue(lval->type, codegenValue(lval));
     return loaded;
+}
+
+ASTValue *IRCodegenContext::getThis() {
+    Identifier *thisId = getScope()->lookupInScope("this");
+    return codegenIdentifier(thisId);
+}
+
+ASTValue *IRCodegenContext::getVTable(ASTValue *instance) {
+    return getMember(instance, "vtable");
+}
+
+ASTValue *IRCodegenContext::vtableLookup(ASTValue *instance, std::string func) {
+    ASTUserType *userty = instance->getType()->userType();
+    if(!userty) emit_message(msg::ERROR, "virtual function lookup only valid for class");
+
+    //TODO: function index
+    ASTValue *vtable = getVTable(instance);
+
+    std::vector<Value *> gep;
+    //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), userty->getVTableIndex(func))); // specific function
+    Value *llval = ir->CreateLoad(ir->CreateGEP(codegenValue(vtable), gep));
+
+    Identifier *id = userty->getScope()->lookup(func);
+    FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
+    ASTType *fty = fdecl->prototype;
+
+    return new ASTValue(fty, ir->CreatePointerCast(llval, codegenType(fty->getPointerTy())));
+}
+
+ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
+    if(!ty->isClass()){
+        emit_message(msg::ERROR, "can only get type info for class");
+    }
+
+    std::vector<Constant *> members; // type info constant members
+    std::vector<Constant *> arrayList;
+    ASTType *vfty = ASTType::getVoidFunctionTy()->getPointerTy();
+
+    UserTypeDeclaration *utdecl = ty->getDeclaration()->userTypeDeclaration();
+    if(ClassDeclaration *cdecl = utdecl->classDeclaration()) {
+        for(int i = 0; i < cdecl->vtable.size(); i++){
+            FunctionDeclaration *fdecl = cdecl->vtable[i];
+            if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
+            FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
+            Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
+
+            arrayList.push_back((Function*)
+                    ir->CreatePointerCast(func, codegenType(vfty)));
+        }
+
+    }
+
+    int sz = utdecl->classDeclaration() ? utdecl->classDeclaration()->vtable.size() : 0;
+    ArrayType *vtableTy = ArrayType::get(codegenType(vfty), sz);
+    Constant *vtable = ConstantArray::get(
+                vtableTy,
+                arrayList
+                );
+
+    members.push_back(vtable);
+
+    GlobalVariable *gv = new GlobalVariable(*module, vtableTy, true, GlobalValue::PrivateLinkage, vtable);
+    return new ASTValue(vfty, gv, true);
+}
+
+// BINOP .
+ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
+    if(val->getType()->isPointer())
+        val = getValueOf(val);
+    ASTUserType *userty = val->getType()->userType();
+
+    if(!userty){
+        emit_message(msg::FAILURE, "cannot get member in non-usertype");
+    }
+
+    Identifier *id = userty->getScope()->lookupInScope(member);
+
+    // identifier is either in base or does not exist, recurse to base
+    if(!id){
+        // zeroeth member is base class
+        std::vector<Value*> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+        ASTValue base(userty->getBaseType(), llval, true);
+        return getMember(&base, member);
+    }
+
+    if(id->isFunction()){
+        //TODO: static vs nonvirtual vs virtual function calls
+        ASTValue *ret = 0;
+        if(val->getType()->isClass()) {
+            ret = vtableLookup(val, member);
+        } else {
+            ret = codegenIdentifier(id);
+        }
+        ret->setOwner(val);
+        return ret;
+    } else if(id->isVariable()){
+        // member lookup
+        int index = userty->getMemberIndex(member);
+        if(userty->getBaseType()) index++; // skip over base class index
+        ASTType *mtype = id->getType();
+        std::vector<Value*> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
+                                    index));
+        Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+        llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
+        ASTValue *ret = new ASTValue(mtype, llval, true);
+        ret->setOwner(val);
+        return ret;
+    } else {
+        emit_message(msg::ERROR, "unknown member in user type");
+        return NULL;
+    }
 }
 
 // UNOP ^
@@ -542,6 +637,18 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
             emit_message(msg::FAILURE, "failed to codegen identifier");
         }
 
+        // is a member of 'this'
+        if(id->isTypeMember()){
+            //TODO: do not handle extensions in codegen
+            if(getScope()->table->extensionEnabled("implicit_this")){
+                // get 'this' from current function
+                // OR static look up, if static member
+                return getMember(getThis(), id->getName());
+            } else if(!id->getValue()){
+                emit_message(msg::ERROR, "identifier not found in scope. did you mean '." + id->getName() + "'?");
+            }
+        }
+
         return id->getValue(); // else declared in current TU, so we are good
     } else if(id->isFunction())
     {
@@ -549,9 +656,6 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
         if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
         FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
         Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
-
-        emit_message(msg::WARNING, fdecl->getMangledName());
-
         id->setValue(new ASTValue(fdecl->prototype, func));
     } else if(id->isStruct())
     {
@@ -598,17 +702,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     }
     else if(StringExpression *sexp = exp->stringExpression())
     {
-        Constant *strConstant = ConstantDataArray::getString(context, sexp->string);
-        GlobalVariable *GV = new GlobalVariable(*module, strConstant->getType(), true,
-                GlobalValue::PrivateLinkage, strConstant);
-        vector<Value *> gep;
-        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
-
-        //TODO: make this an ARRAY (when arrays are added), so that it has an associated length
-
-        return new ASTValue(ASTType::getCharTy()->getPointerTy(), val);
+        return getStringValue(sexp->string);
     }
     else if(PostfixExpression *pexp = exp->postfixExpression())
     {
@@ -719,7 +813,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
     vector<Type*> llargty;
     llargty.push_back(codegenType(ASTType::getULongTy()));
     FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()->getPointerTy()),
-            llargty, false);
+                llargty, false);
     Function *mallocFunc = (Function*) module->getOrInsertFunction("malloc", fty);
     Value *value;
     value = ir->CreateCall(mallocFunc, llargs);
@@ -814,15 +908,15 @@ void IRCodegenContext::codegenIfStatement(IfStatement *stmt)
 void IRCodegenContext::codegenLoopStatement(LoopStatement *stmt)
 {
     llvm::BasicBlock *loopBB = BasicBlock::Create(context, "loop_condition",
-            ir->GetInsertBlock()->getParent());
+        ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *ontrue = BasicBlock::Create(context, "loop_true",
-            ir->GetInsertBlock()->getParent());
+        ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *onfalse = BasicBlock::Create(context, "loop_false",
-            ir->GetInsertBlock()->getParent());
+        ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *loopupdate = BasicBlock::Create(context, "loop_update",
-            ir->GetInsertBlock()->getParent());
+        ir->GetInsertBlock()->getParent());
     llvm::BasicBlock *loopend = BasicBlock::Create(context, "loop_end",
-            ir->GetInsertBlock()->getParent());
+        ir->GetInsertBlock()->getParent());
 
     if(ForStatement *fstmt = stmt->forStatement())
     {
@@ -905,58 +999,69 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *func = codegenExpression(exp->function);
     if(!func) {
-        emit_message(msg::ERROR, "unknown expression", exp->loc);
+        emit_message(msg::ERROR, "unknown expression used as function", exp->loc);
         return NULL;
     }
 
-    //assert(!func.llvmTy()->isFunctionTy() && "not callable!");
-    //FunctionType *fty = (FunctionType*) func.llvmTy();
-    //TODO: once proper type passing is done, check if callable above
-
+    ASTValue *functionValue = NULL;
     ASTFunctionType *astfty = NULL;
     FunctionDeclaration *fdecl = NULL;
     ASTType *rtype = NULL;
-    //TODO: very messy, should be able to get return value of function type
-    if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->function))
-    {
-        // XXX messy, not always true
-        if(fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->declaration))
-        {
-            astfty = fdecl->prototype->functionType();
-        } else if(VariableDeclaration *vdecl =
-                dynamic_cast<VariableDeclaration*>(iexp->id->declaration))
-        {
-            ASTType *pty = vdecl->getType();
-            astfty = pty->getReferencedTy()->functionType();
+
+    functionValue = codegenExpression(exp->function);
+    if(functionValue->getType()->isPointer()){ // dereference function pointer
+        functionValue = getValueOf(functionValue);
+    }
+    astfty = dynamic_cast<ASTFunctionType*>(functionValue->getType());
+    if(!astfty) {
+        emit_message(msg::ERROR, "invalid value used in function call context", exp->loc);
+        if(functionValue->getType()){
+            emit_message(msg::ERROR, "value is of type \"" +
+                    functionValue->getType()->getName() + "\"", exp->loc);
         }
+        return NULL;
+    }
+    rtype = astfty->getReturnType();
 
-        if(!astfty) {
-            emit_message(msg::ERROR, "invalid identifier used in function context", exp->loc);
-            return NULL;
-        }
-        rtype = astfty->ret;
+    // allow default values if declaration is known
+    if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->function)){
+        fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->getDeclaration());
+    }
 
-    } else emit_message(msg::FAILURE, "invalid expression used in function call context", exp->loc);
-
-    vector<ASTValue*> cargs;
+    //vector<ASTValue*> cargs;
     vector<Value*> llargs;
+
+    /*if(astfty->isMethod()){*/
+    // allow for uniform function call syntax
+    int nargs = 0;
+    if(functionValue->getOwner()){
+        Value *ownerVal = NULL;
+        if(functionValue->getOwner()->getType()->isPointer()){
+            ownerVal = codegenValue(functionValue->getOwner());
+        } else {
+            ownerVal = codegenLValue(functionValue->getOwner());
+        }
+        llargs.push_back(ownerVal);
+        nargs++;
+    }
+
     for(int i = 0; i < exp->args.size() || i < astfty->params.size(); i++)
     {
         ASTValue *val = NULL;
 
         if(i < exp->args.size())
             val = codegenExpression(exp->args[i]);
-        else if(fdecl->parameters[i]->value)
+        else if(fdecl && fdecl->parameters[i]->value)
         {
             val = codegenExpression(fdecl->parameters[i]->value);
         } else
         {
-            emit_message(msg::ERROR,
-                    "invalid number of arguments provided for function call", exp->loc);
+            break;
         }
 
-        if(astfty->params.size() > i && astfty->params[i]){
-            val = promoteType(val, astfty->params[i]);
+        //TODO: nargs is messy. used to move param forward if implicit 'this'
+        if(astfty->params.size() > i && astfty->params[i+nargs]){
+            val = promoteType(val, astfty->params[i+nargs]);
         }
 
         else if(astfty->vararg)
@@ -976,8 +1081,17 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
             emit_message(msg::ERROR, "invalid arguement provided for function", exp->loc);
         }
 
-        cargs.push_back(val);
-        llargs.push_back(codegenValue(cargs[i]));
+        //cargs.push_back(val);
+        llargs.push_back(codegenValue(val));
+    }
+
+    if(llargs.size() != exp->args.size()){
+        /*
+        emit_message(msg::ERROR,
+                "invalid number of arguments provided for function call", exp->loc);
+                */
+        //TODO: add 'this' member as expected argument to methods
+        //return NULL;
     }
 
     llvm::Value *value = ir->CreateCall(codegenValue(func), llargs);
@@ -986,6 +1100,12 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 
 ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
 {
+    //TODO: messy
+    // use operator lowering
+    if(exp->op == tok::dot){
+        return getMember(getThis(), exp->lhs->identifierExpression()->id->getName());
+    }
+
     ASTValue *lhs = codegenExpression(exp->lhs); // expression after unary op: eg in !a, lhs=a
 
     ASTValue *val;
@@ -1174,35 +1294,37 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             if(lhs->getType()->isPointer())
                 lhs = getValueOf(lhs);
 
+            //TODO: allow indexing types other than userType and array?
             if(!lhs->getType()->userType() && !lhs->getType()->isArray()) {
                 emit_message(msg::ERROR, "can only index struct or array type", dexp->loc);
                 return NULL;
             }
 
             if(ASTUserType *userty = lhs->getType()->userType()){
-                Identifier *id = userty->getScope()->lookupInScope(dexp->rhs);
+                Identifier *id = userty->getDeclaration()->lookup(dexp->rhs);
                 ASTValue *ret = NULL;
 
                 if(!id || id->isUndeclared()) {
-                    emit_message(msg::ERROR, "no member found in user type", dexp->loc);
-                    return NULL;
+                    // if not in user type, search current scope
+                    // this allows for uniform function syntax
+                    id = getScope()->lookup(dexp->rhs);
+                    if(!id || id->isUndeclared()){
+                        emit_message(msg::ERROR, "no member found in user type", dexp->loc);
+                        return NULL;
+                    }
                 }
 
                 if(id->isVariable()) {
-                    //TODO: below is a bit round-about
-                    Declaration *mdecl = id->getDeclaration();
-                    ASTType *mty = mdecl->getType();
-
-                    std::vector<Value*> gep;
-                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
-                                                userty->getMemberIndex(dexp->rhs)));
-                    Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                    llval = ir->CreateBitCast(llval, codegenType(mty->getPointerTy()));
-                    ret = new ASTValue(mty, llval, true);
+                    return getMember(lhs, dexp->rhs);
                 } else if(id->isFunction()) {
-                    IRType type = unit->types[userty->getName()];
-                    //TODO
+                    //TODO: currently codegenIdentifier caches, might break with 'owner'
+                    //TODO: codegenidentifier might not work here. it does not declare
+                    ASTValue *ret;
+                    if(id->isTypeMember())
+                        ret = getMember(lhs, dexp->rhs);
+                    else ret = codegenIdentifier(id);
+                    ret->setOwner(lhs);
+                    return ret;
                 } else {
                     emit_message(msg::ERROR, "invalid identifier type in user type", dexp->loc);
                 }
@@ -1550,6 +1672,12 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
     ASTValue *lhs = codegenExpression(exp->lhs);
     ASTValue *rhs = codegenExpression(exp->rhs);
+
+    if(!lhs || !rhs){
+        emit_message(msg::FAILURE, "could not codegen expression in binary op", exp->loc);
+        return NULL;
+    }
+
     if(!isAssignOp((tok::TokenKind) exp->op)) //XXX messy
         codegenResolveBinaryTypes(&lhs, &rhs, exp->op);
     else if(lhs->type->kind == TYPE_ARRAY)
@@ -1838,12 +1966,11 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(decl))
     {
         IRFunction backup = currentFunction;
-        currentFunction = IRFunction(fdecl);
+        currentFunction = IRFunction();
 
         FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
         Function *func;
         func = (Function*) module->getOrInsertFunction(fdecl->getMangledName(), fty);
-        unit->functions[fdecl->getName()] = func;
 
         if(fdecl->body)
         {
@@ -1915,7 +2042,9 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
             popScope();
         } else {
-            func->setLinkage(Function::ExternalWeakLinkage);
+            if(fdecl->isExternal())
+                func->setLinkage(Function::ExternalWeakLinkage);
+            func->setLinkage(Function::ExternalLinkage);
         }
 
         setTerminated(false);
@@ -1924,6 +2053,8 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     {
         dwarfStopPoint(vdecl->loc);
         ASTType *vty = vdecl->type;
+
+        //XXX merge with 'new expression'?
 
         ASTValue *defaultValue = 0;
         //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
@@ -1971,8 +2102,34 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         }
 
         AllocaInst *llvmDecl = ir->CreateAlloca(codegenType(vty), 0, vdecl->getName());
+
         llvmDecl->setAlignment(8);
         ASTValue *idValue = new ASTValue(vty, llvmDecl, true);
+
+        //XXX temp below. set vtable of new class
+
+        if(vty->isClass()){
+
+        ASTValue *vtable = getVTable(idValue);
+        //ASTValue *vtable = getMember(idValue, "vtable");
+
+        codegenType(userty); // XXX to create typeinfo. hacky
+
+        //the pass through identifier is an ugly hack to get typeinfo in case of duplicate ASTType types, eww
+        Value *tival = codegenLValue(userty->getDeclaration()->classDeclaration()->typeinfo);
+
+        vector<Value *> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        tival = ir->CreateGEP(tival, gep);
+
+        ir->CreateStore(tival,
+                    codegenLValue(vtable));
+        //TODO: store all functions (methods)
+
+        }
+
+        //
 
         if(defaultValue)
         {
@@ -1988,7 +2145,16 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
 
     } else if(TypeDeclaration *tdecl = dynamic_cast<TypeDeclaration*>(decl))
     {
-        //codegenType(tdecl->getType()); // make sure types are present in Module
+        //TODO: should this be near codegen type?
+        //define type interface. define functions in type
+        if(UserTypeDeclaration *utdecl = dynamic_cast<UserTypeDeclaration*>(tdecl)){
+            ASTScope::iterator end = utdecl->getScope()->end();
+            for(ASTScope::iterator it = utdecl->getScope()->begin(); it != end; it++){
+                if(it->getDeclaration()->functionDeclaration()){
+                    codegenDeclaration(it->getDeclaration());
+                }
+            }
+        }
     }
     ///NOTE type declarations are not Codegen'd like values, accesible across Modules
 }
@@ -2092,10 +2258,11 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
         }
     }
 
-    // iterate over unit, get functions
+    // iterate over unit, get functions and type interface (functions)
     end = unit->getScope()->end();
     for(ASTScope::iterator it = unit->getScope()->begin(); it != end; it++){
-        if(it->getDeclaration()->functionDeclaration()){
+        if(it->getDeclaration()->functionDeclaration() ||
+                it->getDeclaration()->typeDeclaration()){
             codegenDeclaration(it->getDeclaration());
         }
     }

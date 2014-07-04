@@ -1,4 +1,4 @@
-int printf(char^ fmt, ...);
+extern nomangle int printf(char^ fmt, ...);
 
 int main(int argc, char^^ argv)
 {

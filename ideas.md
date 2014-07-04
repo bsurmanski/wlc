@@ -115,3 +115,11 @@ due to similarity of syntax to call. potentially disambiguatable, but messy. may
     MyStruct st = MyStruct where(this.i == 2): getMyStruct()
     type MyType = int where(this == 5)
     
+
+
+
+###
+keyword direct/indirect to replace 'final'/'virtual'.
+keyword decorated/undecorated to replace 'mangle'
+decorated(C), decorated(CPP)
+intern keyword for internal linkage. replace 'static' on functions

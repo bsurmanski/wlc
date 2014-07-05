@@ -4,7 +4,159 @@ This document is meant to contain insight into design choices. Like a FAQ for
 those interested in language design.
 
 
-## Why is the typeinfo member in the vtable? why not instead create a TypeInfo
+# Why was OWL created? Why is there no other language that fits OWL's niche?
+OWL was created out of frustration for the current selection of system level Object Orient
+programming languages. The list of languages have been growing over the years, yet
+nothing seemed to fit exactly what I wanted. I was looking for a language with the following criteria:
+
+* I wanted something compiled
+    this is for speed. This means that all the scripting and interpreted
+    languages are unacceptable.
+
+* I wanted something without a garbage collector
+    This is partly for speed, partly determinism and partly for flexibility.
+
+* I wanted something with a familiar syntax
+    This one is harder to quantify, but mainly means vaugly C-like.
+
+* I wanted something cross platform
+    This means something that isn't proprietary or highly dependent on single platform libraries.
+
+* I wanted something object-oriented
+    This 
+
+So here is an (incomplete) list of all of the languages I considered and why they didn't fit:
+
+(scripted, slow)
+* Python
+* Lua
+* Ruby
+
+(Garbage collected)
+* Ada
+* Go
+* D
+
+(vendor locked)
+* Java
+* C#
+* Objective-C
+* Swift
+* Vala
+
+(unfamiliarity)
+* Lisp
+
+This leaves the following
+* C
+* C++
+* Fortran
+
+Below I will go into greater detail of why certain languages don't fit my criteria.
+
+## C
+C is a great language. In fact, I feel that it is one of the best designed languages in existence.
+But for larger applications, it feels awkward. Sometimes C is a bit too explicit for my purposes.
+For example, when using a vector math library, the lack of operator overloading
+adds a cognitive overhead to all operations. Additionally, while the lack of
+Objects isn't a big problem, I find it reduces abstraction and forces cohesion.
+
+## C++
+This is the closest candidate. In scope and feature set, it fits my criteria.
+The problem with C++ is mainly my aversion to using it. Whenever I use C++, I
+run across features and syntax that I find unbearable. Many of the features,
+viewed from a historical context, make perfect sense.  But viewed from a modern
+perspective feel clunky or downright ugly. Although newer releases of C++, such
+as C++11, make efforts to make working with C++ easier, they also add their own
+syntactic warts and leave my underlying issue unacknowledged. In fact, I do not
+think that my problems with C++ will ever be acknowledged. The problems I see
+are too crucial to the language's design to ever change. Essentially what I
+wanted out of OWL was a redesigned C++.
+
+## Fortran
+I do not have much experience with Fortran. Admittedly I don't want to use
+Fortran due to it's syntax and due to it's reputation. Perhaps I am a bit
+stubborn.
+
+## Vala
+Vala is a really nice language. It fixes a lot of my gripes with C and C++.
+Despite this, I am reluctant to use Vala due to it's crucial dependence on GTK.
+Although GTK is a fairly well designed library (even more so viewed within
+Vala), and it is cross platform; basing a language around it feels constricting.
+
+## Java
+The dependence on the JVM makes Java unacceptable and on top of that, it uses a
+garbage collector.  I am aware that Java is no longer 'slow'. Additionally, the
+"Everything is an Object, and Everything is In an Object" design of Java is
+constricting.
+
+## Swift
+Swift seems like a promising new language. When development on OWL first began
+(November 2013), Swift did not exist (it was announced in June 2014). The
+feature set and syntax of Swift seem well thought out and desirable. Admittedly,
+I was a little disappointed when Swift was announced since it fairly closely fit
+the niche that OWL was being designed for. The only real problem I see with
+Swift is it's heavy platform dependence. Theoretically, Swift can be used cross
+platform, but it was clearly designed with iOS/OSX development in mind. As such,
+it uses the existing Objective-C libraries. Swift may in the future gain
+cross-platform usability, but for now, Swift is only useful for Apple related
+development, and is disqualified from my language list.
+
+## D
+Before I began development on OWL, D was the closest language to what I wanted.
+It's original tag line was 'C++ redesigned'. That is even where it's
+name comes from  D does a good effort to clean up system level object-oriented
+programming. Although D is a good language, there is still a few underlying
+issues that keeps me from using it.
+
+Firstly, the required garbage collector is undesirable to me. I am aware that
+garbage collection algorithms have come a long way since their inception, and
+generally have a low overhead these days. But despite that, the potential of
+hiccups caused by the current "halt the world" style garbage collection in use
+right now doesn't suit my needs.
+
+Secondly, compiler performance is currently less than I would like.
+Out of the three major compilers for D (dmd, ldc, gdc), dmd is the only
+reasonable compiler to use. For one application I wrote in D, the compile time
+was without contest. The application is about 5000 lines, and for all compilers
+I am compiling without optimization, with debug symbols enabled. GDC Takes about
+40 seconds, LDC takes about 15 seconds, and dmd takes about 9 seconds.
+
+<!--
+This is a comment. when compiled through markdown this will not be here.
+If you see this, pretend it doesn't exist. This section is incomplete.
+
+TODO: talk about issues with bugs, interoperability with C, etc
+
+Lastly there is still a few hiccups when developing in D.
+
+TODO: talk about upgrading with pacman breaking the compiler libraries
+TODO: talk about lua_push stuff. inability to use templates defined in external
+modules
+
+-->
+
+D is a promising language, and will likely improve greatly in the future.
+Perhaps it is a silly idea to write my own language because the current
+contender is not polished enough. Even my complaint about Garbage Collector is
+likely to be solved. I believe that Walter Bright has mentioned that he intends
+to make D more friendly for development without a Garbage Collector [citation
+needed], but I don't believe there is a schedule for that feature.
+
+<!--
+## Go
+TODO: talk about Go
+-->
+
+## Conclusion
+The point here is not that any of these languages are particularly bad, simply
+that none seemed to fit my criteria. Along with my curiosity for compiler
+design, OWL needed to be created.
+
+
+# Design Decisions
+
+## Why is the typeinfo member in the vtable? Why not instead create a TypeInfo
 ## structure that has a flexible array as it's last member?
 
 Because (using LLVM) you cannot store in a flexible array statically. It would

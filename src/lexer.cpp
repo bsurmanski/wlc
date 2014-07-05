@@ -6,26 +6,6 @@
 
 using namespace std;
 
-/*
-std::string Token::toString()
-{
-    if(isIdentifier())
-    {
-        return *((string*) data);
-    } else if(isLiteral())
-    {
-        return *((string*) data);
-    } else if(isKeyword())
-    {
-        return keywords[kind - KW_BEGIN];
-    } else if(isOp())
-    {
-        return operators[kind - OP_BEGIN];
-    }
-
-    return "";
-}*/
-
 Token Lexer::lexWord()
 {
     char curChar;
@@ -40,6 +20,7 @@ Token Lexer::lexWord()
     if(tokstr == "not") return Token(tok::bang);
 
 #define KEYWORD(X) if(#X == tokstr) return Token(tok::kw_##X);
+#define RESERVED(X) if(#X == tokstr) emit_message(msg::ERROR, "keyword '" + tokstr + "' is reserved");
 #include "tokenkinds.def"
 
     // is identifier

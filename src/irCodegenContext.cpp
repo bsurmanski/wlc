@@ -47,7 +47,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         emit_message(msg::FAILURE, "invalid user type");
     }
 
-    if(userty->identifier->isUndeclared()){
+    if(userty->identifier->isUndeclared()){ //NOTE superfluous test
         emit_message(msg::WARNING, "type should be resolved by now");
         userty->identifier = lookup(ty->getName());
         if(userty->identifier->isUndeclared()){
@@ -108,6 +108,7 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
     return codegenUserType(ty);
 }
 
+//TODO: fix union types. codegen is incorrect (calls 'codegen usertype')
 llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
 {
     //return codegenUserType(ty);
@@ -1961,159 +1962,76 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     } else emit_message(msg::FAILURE, "i dont know what kind of statmeent this isssss", stmt->loc);
 }
 
-void IRCodegenContext::codegenDeclaration(Declaration *decl)
-{
-    if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(decl))
+void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
+    dwarfStopPoint(vdecl->loc);
+    ASTType *vty = vdecl->type;
+
+    //XXX merge with 'new expression'?
+
+    ASTValue *defaultValue = 0;
+    //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
+    if(vdecl->value)
     {
-        IRFunction backup = currentFunction;
-        currentFunction = IRFunction();
-
-        FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
-        Function *func;
-        func = (Function*) module->getOrInsertFunction(fdecl->getMangledName(), fty);
-
-        if(fdecl->body)
+        TupleExpression *texp = dynamic_cast<TupleExpression*>(vdecl->value);
+        if(vty && vty->isComposite() && texp)
         {
-            func->setLinkage(Function::ExternalLinkage);
-            BasicBlock *BB = BasicBlock::Create(context, "entry", func);
-            BasicBlock *exitBB = BasicBlock::Create(context, "exit", func);
-            currentFunction.exit = exitBB;
-
-            currentFunction.retVal = NULL;
-            if(func->getReturnType() != Type::getVoidTy(context))
-            {
-                currentFunction.retVal = new ASTValue(fdecl->getReturnType(),
-                        new AllocaInst(codegenType(fdecl->getReturnType()),
-                            0, "ret", BB), true);
-            }
-
-            ir->SetInsertPoint(BB);
-
-            dwarfStopPoint(decl->loc);
-            unit->debug->createFunction(fdecl);
-            pushScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
-            dwarfStopPoint(decl->loc);
-
-            ASTFunctionType *astfty = fdecl->prototype->functionType();
-            int idx = 0;
-            for(Function::arg_iterator AI = func->arg_begin(); AI != func->arg_end(); AI++, idx++)
-            {
-                if(astfty->params.size() < idx){
-                        emit_message(msg::FAILURE,
-                                "argument counts dont seem to match up...", decl->loc);
-                        return;
-                }
-                //pair<ASTType*, std::string> param_i = fdecl->prototype->parameters[idx];
-                AI->setName(fdecl->parameters[idx]->getName());
-                AllocaInst *alloc = new AllocaInst(codegenType(astfty->params[idx]),
-                                                   0, fdecl->parameters[idx]->getName(), BB);
-                    //ir->CreateAlloca(codegenType(param_i.first), 0, param_i.second);
-                alloc->setAlignment(8);
-                ASTValue *alloca = new ASTValue(astfty->params[idx], alloc, true);
-                new StoreInst(AI, codegenLValue(alloca), BB);
-                //ir->CreateStore(AI, codegenLValue(alloca));
-
-                fdecl->parameters[idx]->getIdentifier()->setValue(alloca);
-
-                //register debug params
-                //XXX hacky with Instruction, and setDebugLoc manually
-                Instruction *ainst = unit->debug->createVariable(fdecl->parameters[idx]->getName(),
-                                                          alloca, BB, decl->loc, idx+1);
-                ainst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
-                //TODO: register value to scope
-            }
-
-            codegenStatement(fdecl->body);
-
-            if(!isTerminated())
-                ir->CreateBr(currentFunction.exit);
-
-            if(!currentFunction.retVal) // returns void
-            {
-                ir->SetInsertPoint(currentFunction.exit);
-                ir->CreateRetVoid();
-            } else
-            {
-                //ir->CreateBr(currentFunction.exit);
-                ir->SetInsertPoint(currentFunction.exit);
-                ASTValue *astRet = loadValue(currentFunction.retVal);
-                ir->CreateRet(codegenValue(astRet));
-            }
-
-            popScope();
-        } else {
-            if(fdecl->isExternal())
-                func->setLinkage(Function::ExternalWeakLinkage);
-            func->setLinkage(Function::ExternalLinkage);
+            defaultValue = codegenTupleExpression(texp, vty);
+        } else { // not composite vty
+            defaultValue = codegenExpression(vdecl->value);
         }
+    }
 
-        setTerminated(false);
-        currentFunction = backup;
-    } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl))
+    if(vty->kind == TYPE_DYNAMIC)
     {
-        dwarfStopPoint(vdecl->loc);
-        ASTType *vty = vdecl->type;
-
-        //XXX merge with 'new expression'?
-
-        ASTValue *defaultValue = 0;
-        //XXX note that we are storing the alloca(pointer) to the variable in the CGValue
-        if(vdecl->value)
+        if(!defaultValue)
         {
-            TupleExpression *texp = dynamic_cast<TupleExpression*>(vdecl->value);
-            if(vty && vty->isComposite() && texp)
-            {
-                defaultValue = codegenTupleExpression(texp, vty);
-            } else { // not composite vty
-                defaultValue = codegenExpression(vdecl->value);
-            }
+            emit_message(msg::FAILURE,
+                    "failure to codegen dynamic 'var' type default expression", vdecl->loc);
         }
 
-        if(vty->kind == TYPE_DYNAMIC)
+        vty = defaultValue->getType();
+        vdecl->type = vty;
+    } else if(defaultValue)
+    {
+        //TODO: promote type is borkd
+        defaultValue = promoteType(defaultValue, vty);
+    }
+
+    //XXX work around for undeclared struct
+    Identifier *id = NULL;
+    ASTUserType *userty = vty->userType();
+    if(userty && vty->isUnknown())
+    {
+        if(userty->identifier->isUndeclared())
         {
-            if(!defaultValue)
-            {
-                emit_message(msg::FAILURE,
-                        "failure to codegen dynamic 'var' type default expression", vdecl->loc);
+            id = lookup(userty->identifier->getName());
+            if(id->isUndeclared()){
+                emit_message(msg::ERROR, "undeclared struct: " + id->getName(), vdecl->loc);
+                return;
             }
-
-            vty = defaultValue->getType();
-            vdecl->type = vty;
-        } else if(defaultValue)
-        {
-            //TODO: promote type is borkd
-            defaultValue = promoteType(defaultValue, vty);
+            vty = id->getDeclaredType();
         }
+    }
 
-        //XXX work around for undeclared struct
-        Identifier *id = NULL;
-        ASTUserType *userty = vty->userType();
-        if(userty && vty->isUnknown())
-        {
-            if(userty->identifier->isUndeclared())
-            {
-                id = lookup(userty->identifier->getName());
-                if(id->isUndeclared()){
-                    emit_message(msg::ERROR, "undeclared struct: " + id->getName(), vdecl->loc);
-                    return;
-                }
-                vty = id->getDeclaredType();
-            }
-        }
+    AllocaInst *llvmDecl = ir->CreateAlloca(codegenType(vty), 0, vdecl->getName());
 
-        AllocaInst *llvmDecl = ir->CreateAlloca(codegenType(vty), 0, vdecl->getName());
+    llvmDecl->setAlignment(8);
+    ASTValue *idValue = new ASTValue(vty, llvmDecl, true);
 
-        llvmDecl->setAlignment(8);
-        ASTValue *idValue = new ASTValue(vty, llvmDecl, true);
+    if(defaultValue) {
+        defaultValue = promoteType(defaultValue, vty);
+        storeValue(idValue, defaultValue);
 
+        Instruction *vinst = unit->debug->createVariable(vdecl->getName(),
+                idValue, ir->GetInsertBlock(), vdecl->loc);
+        vinst->setDebugLoc(llvm::DebugLoc::get(vdecl->loc.line, vdecl->loc.ch, diScope()));
+        //TODO: maybe create a LValue field in CGValue?
+    } else if(vty->isClass()) { // no default value, and allocated class. set VTable, in case
         //XXX temp below. set vtable of new class
-
-        if(vty->isClass()){
-
+        // TODO: also do if type is pointer to class (called through 'new')
         ASTValue *vtable = getVTable(idValue);
-        //ASTValue *vtable = getMember(idValue, "vtable");
 
-        codegenType(userty); // XXX to create typeinfo. hacky
+        codegenType(userty); // XXX to create typeinfo. So we are able to load it below... hacky
 
         //the pass through identifier is an ugly hack to get typeinfo in case of duplicate ASTType types, eww
         Value *tival = codegenLValue(userty->getDeclaration()->classDeclaration()->typeinfo);
@@ -2121,69 +2039,126 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
         vector<Value *> gep;
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        tival = ir->CreateGEP(tival, gep);
+        tival = ir->CreateGEP(tival, gep); // GEP to class's vtable, so we can store to it
 
-        ir->CreateStore(tival,
-                    codegenLValue(vtable));
-        //TODO: store all functions (methods)
-
-        }
-
-        //
-
-        if(defaultValue)
-        {
-            defaultValue = promoteType(defaultValue, vty);
-            storeValue(idValue, defaultValue);
-
-            Instruction *vinst = unit->debug->createVariable(vdecl->getName(),
-                    idValue, ir->GetInsertBlock(), vdecl->loc);
-            vinst->setDebugLoc(llvm::DebugLoc::get(decl->loc.line, decl->loc.ch, diScope()));
-            //TODO: maybe create a LValue field in CGValue?
-        }
-        vdecl->identifier->setValue(idValue);
-
-    } else if(TypeDeclaration *tdecl = dynamic_cast<TypeDeclaration*>(decl))
-    {
-        //TODO: should this be near codegen type?
-        //define type interface. define functions in type
-        if(UserTypeDeclaration *utdecl = dynamic_cast<UserTypeDeclaration*>(tdecl)){
-            ASTScope::iterator end = utdecl->getScope()->end();
-            for(ASTScope::iterator it = utdecl->getScope()->begin(); it != end; it++){
-                if(it->getDeclaration()->functionDeclaration()){
-                    codegenDeclaration(it->getDeclaration());
-                }
-            }
-        }
+        ir->CreateStore(tival, codegenLValue(vtable));
     }
-    ///NOTE type declarations are not Codegen'd like values, accesible across Modules
+
+    vdecl->identifier->setValue(idValue);
 }
 
-//XXX should be 'import'?
-void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc)
-{
-    /*
-    ASTScope::iterator end = inc->getScope()->end();
-    ASTScope::iterator it;
-    for(it = inc->getScope()->begin(); it != end; ++it){
-        Identifier *id = *it;
-        if(id->isVariable()){
-            GlobalVariable *GV = (GlobalVariable*) module->getOrInsertGlobal(id->getName(),
-                    codegenType(id->getType()));
-            assert(GV);
-            if(!current->globals.count(id->getName())){
-                emit_message(msg::WARNING, "overriding global value with include",
-                        id->getDeclaration()->loc);
+void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
+    IRFunction backup = currentFunction;
+    currentFunction = IRFunction();
+
+    FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
+    Function *func;
+    func = (Function*) module->getOrInsertFunction(fdecl->getMangledName(), fty);
+
+    if(fdecl->body)
+    {
+        func->setLinkage(Function::ExternalLinkage);
+        BasicBlock *BB = BasicBlock::Create(context, "entry", func);
+        BasicBlock *exitBB = BasicBlock::Create(context, "exit", func);
+        currentFunction.exit = exitBB;
+
+        currentFunction.retVal = NULL;
+        if(func->getReturnType() != Type::getVoidTy(context))
+        {
+            currentFunction.retVal = new ASTValue(fdecl->getReturnType(),
+                    new AllocaInst(codegenType(fdecl->getReturnType()),
+                        0, "ret", BB), true);
+        }
+
+        ir->SetInsertPoint(BB);
+
+        dwarfStopPoint(fdecl->loc);
+        unit->debug->createFunction(fdecl);
+        pushScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
+        dwarfStopPoint(fdecl->loc);
+
+        ASTFunctionType *astfty = fdecl->prototype->functionType();
+        int idx = 0;
+        for(Function::arg_iterator AI = func->arg_begin(); AI != func->arg_end(); AI++, idx++)
+        {
+            if(astfty->params.size() < idx){
+                    emit_message(msg::FAILURE,
+                            "argument counts dont seem to match up...", fdecl->loc);
+                    return;
             }
-            current->globals[id->getName()] = IRValue(new ASTValue(id->getType(), GV, true), GV);
-        } else if(id->isFunction()){
-            FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
-            if(!fdecl) emit_message(msg::FAILURE, "invalud function identifier");
-            FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
-            Constant *func = module->getOrInsertFunction(fdecl->getName(), fty);
+
+            AI->setName(fdecl->parameters[idx]->getName());
+            AllocaInst *alloc = new AllocaInst(codegenType(astfty->params[idx]),
+                                               0, fdecl->parameters[idx]->getName(), BB);
+            alloc->setAlignment(8);
+            ASTValue *alloca = new ASTValue(astfty->params[idx], alloc, true);
+            new StoreInst(AI, codegenLValue(alloca), BB);
+            // i think we arent using IRBuilder here so we can insert at top of BB
+
+            fdecl->parameters[idx]->getIdentifier()->setValue(alloca);
+
+            //register debug params
+            //XXX hacky with Instruction, and setDebugLoc manually
+            Instruction *ainst = unit->debug->createVariable(fdecl->parameters[idx]->getName(),
+                                                      alloca, BB, fdecl->loc, idx+1);
+            ainst->setDebugLoc(llvm::DebugLoc::get(fdecl->loc.line, fdecl->loc.ch, diScope()));
+            //TODO: register value to scope
+        }
+
+        codegenStatement(fdecl->body);
+
+        if(!isTerminated())
+            ir->CreateBr(currentFunction.exit);
+
+        if(!currentFunction.retVal) // returns void
+        {
+            ir->SetInsertPoint(currentFunction.exit);
+            ir->CreateRetVoid();
+        } else
+        {
+            ir->SetInsertPoint(currentFunction.exit);
+            ASTValue *astRet = loadValue(currentFunction.retVal);
+            ir->CreateRet(codegenValue(astRet));
+        }
+
+        popScope();
+    } else { // function has no body; external linkage (weak external if actually declared 'extern')
+        if(fdecl->isExternal())
+            func->setLinkage(Function::ExternalWeakLinkage);
+        func->setLinkage(Function::ExternalLinkage);
+    }
+
+    setTerminated(false);
+    currentFunction = backup;
+}
+
+void IRCodegenContext::codegenUserTypeDeclaration(UserTypeDeclaration *utdecl) {
+    //TODO: should this be near codegen type?
+    //define type interface. define functions in type
+    ASTScope::iterator end = utdecl->getScope()->end();
+    for(ASTScope::iterator it = utdecl->getScope()->begin(); it != end; it++){
+        if(it->getDeclaration()->functionDeclaration()){
+            codegenDeclaration(it->getDeclaration());
         }
     }
-    */
+}
+
+
+void IRCodegenContext::codegenDeclaration(Declaration *decl)
+{
+    if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(decl)) {
+        codegenFunctionDeclaration(fdecl);
+    } else if(VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(decl)) {
+        codegenVariableDeclaration(vdecl);
+    } else if(UserTypeDeclaration *utdecl = dynamic_cast<UserTypeDeclaration*>(decl)) {
+        codegenUserTypeDeclaration(utdecl);
+    }
+    ///NOTE (for the most part) type declarations are not Codegen'd like values, accesible across Modules
+}
+
+void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc)
+{
+    //XXX should be 'import'?
 }
 
 void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)

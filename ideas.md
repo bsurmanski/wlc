@@ -123,3 +123,13 @@ keyword direct/indirect to replace 'final'/'virtual'.
 keyword decorated/undecorated to replace 'mangle'
 decorated(C), decorated(CPP)
 intern keyword for internal linkage. replace 'static' on functions
+
+###
+constructors in classes (and maybe in other usertypes).
+    use 'this' to specify constructor methods. constructors *must* be explicitly called with
+    a call, eg.
+    MyClass c = MyClass()
+    will run the no arguments constructor
+default constructors for classes only. may use some special syntax in declaration, declared
+    like constructor except use 'default' instead of 'this'. The reason for the distinction is
+    so that no argument constructors can be used in structs/etc.

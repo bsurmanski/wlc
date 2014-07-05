@@ -16,6 +16,7 @@
 #include "sourceLocation.hpp"
 #include "token.hpp"
 #include "astType.hpp"
+#include "message.hpp"
 
 struct ASTVisitor;
 

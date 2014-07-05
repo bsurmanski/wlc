@@ -257,6 +257,9 @@ class IRCodegenContext : public CodegenContext
 
     // codegen declaration
     void codegenDeclaration(Declaration *decl);
+    void codegenVariableDeclaration(VariableDeclaration *vdecl);
+    void codegenFunctionDeclaration(FunctionDeclaration *fdecl);
+    void codegenUserTypeDeclaration(UserTypeDeclaration *utdecl);
 
     // codegen etc
     void codegenTranslationUnit(IRTranslationUnit *unit);

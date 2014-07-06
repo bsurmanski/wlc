@@ -103,11 +103,13 @@ KEYWORD(use) /* use extensions */
 
 // OWL
 KEYWORD(class)
+KEYWORD(interface)
 KEYWORD(var) /* statically checked automatic type variable var myvar = new MyStruct() */
 KEYWORD(new)
 KEYWORD(renew)
 KEYWORD(delete)
-KEYWORD(nomangle)
+KEYWORD(nomangle) /* change to undecorated */
+KEYWORD(implicit) /* for implicit conversions, default constructors, apply to function */
 
 // reserved words. hopefully will get around to implementing these
 RESERVE(defer) /* for deferring code until function exit. defer <STATEMENT>*/
@@ -116,7 +118,6 @@ RESERVE(asm) /* inline asm */
 RESERVE(once) /* declare that statement only happens once, ever. when first encountered  */
 RESERVE(number) /* for variable precission numbers */
 RESERVE(let) /* like D alias, and for constants (let a = 7) */
-RESERVE(implicit) /* for implicit conversions, apply to function */
 RESERVE(this)
 RESERVE(super)
 RESERVE(go)

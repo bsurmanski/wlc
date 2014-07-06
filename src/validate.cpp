@@ -147,10 +147,26 @@ void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
     }
 
     if(ClassDeclaration *cdecl = decl->classDeclaration()) {
-        if(cdecl->base)
+        if(cdecl->base) {
             cdecl->base = resolveIdentifier(cdecl->base);
+            if(!cdecl->base->isClass()) {
+                emit_message(msg::ERROR, "expected class type in base specifier", cdecl->loc);
+                if(cdecl->base->isInterface()) {
+                    emit_message(msg::ERROR, "interfaces are specified implicitly", cdecl->loc);
+                }
+            }
+        }
 
         cdecl->populateVTable();
+    }
+
+    if(InterfaceDeclaration *idecl = dynamic_cast<InterfaceDeclaration*>(decl)){
+        for(int i = 0; i < idecl->methods.size(); i++){
+            if(idecl->methods[i]->body){
+                emit_message(msg::ERROR, "interface methods should not declare method body (did you forget ';'?)",
+                        idecl->methods[i]->loc);
+            }
+        }
     }
 
 
@@ -204,7 +220,8 @@ void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp) {
     }
 
     // resolve type of identifier if needed
-    resolveType(exp->id->getType());
+    if(exp->id->getType()) //XXX temp?
+        resolveType(exp->id->getType());
 }
 
 void ValidationVisitor::visitNumericExpression(NumericExpression *exp) {

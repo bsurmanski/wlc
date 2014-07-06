@@ -23,7 +23,7 @@ syn keyword wConstant null
 syn keyword wTypedef alias
 syn keyword wLabel case default label
 syn keyword wStatement return
-syn keyword wStorageClass extern nomangle
+syn keyword wStorageClass extern nomangle implicit
 syn keyword wOperator and or not
 syn keyword wMemOperator new delete renew
 syn keyword wDeclaration var this
@@ -46,7 +46,7 @@ hi def link wDeclaration Keyword
 hi def link wUse Keyword
 
 " Types
-syn keyword Structure class struct union function
+syn keyword Structure struct union function interface class
 syn keyword Enum enum
 syn keyword Type char uchar byte ubyte short ushort int uint long ulong
 syn keyword Type int8 uint8 int16 uint16 int32 uint32 int64 uint64

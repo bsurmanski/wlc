@@ -134,6 +134,7 @@ class ParseContext
     Statement *parseWhileStatement();
     Statement *parseForStatement();
     Statement *parseCompoundStatement();
+    DeclarationQualifier parseDeclarationQualifier();
     Declaration *parseDeclaration();
     TopLevelExpression *parseTopLevelExpression();
     UseExpression *parseUseExpression();

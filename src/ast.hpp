@@ -176,13 +176,26 @@ struct TranslationUnit : public Package
  *
  ***/
 
+struct DeclarationQualifier
+{
+    bool external;
+    bool decorated;
+    bool implicit;
+
+    DeclarationQualifier() {
+        external = false;
+        decorated = true;
+        implicit = false;
+    }
+};
+
 struct Declaration : public ASTNode
 {
     Identifier *identifier;
     SourceLocation loc;
-    bool external;
-    Declaration(Identifier *id, SourceLocation l, bool ext = false) :
-        identifier(id), loc(l), external(ext) {}
+    DeclarationQualifier qualifier;
+    Declaration(Identifier *id, SourceLocation l, DeclarationQualifier dqual) :
+        identifier(id), loc(l), qualifier(dqual) {}
     virtual ~Declaration(){}
     virtual std::string getName()
     {
@@ -195,7 +208,7 @@ struct Declaration : public ASTNode
         }
         return "";
     }
-    bool isExternal() { return external; }
+    bool isExternal() { return qualifier.external; }
     virtual ASTType *getType() = 0;
 
     Identifier *getIdentifier() { return identifier; }
@@ -207,8 +220,8 @@ struct Declaration : public ASTNode
 
 struct PackageDeclaration : public Declaration {
     Package *package;
-    PackageDeclaration(Package *p, Identifier *id, SourceLocation l, bool ext=false) :
-        package(p), Declaration(id, l, ext) {}
+    PackageDeclaration(Package *p, Identifier *id, SourceLocation l, DeclarationQualifier dqual) :
+        package(p), Declaration(id, l, dqual) {}
     ASTType *getType() { return NULL; }
 };
 
@@ -221,8 +234,8 @@ struct FunctionDeclaration : public Declaration
     Statement *body;
     void *cgValue;
     FunctionDeclaration(Identifier *id, ASTType *p, std::vector<VariableDeclaration*> params,
-            ASTScope *sc, Statement *st, SourceLocation loc) :
-        Declaration(id, loc), prototype(p), parameters(params), scope(sc),
+            ASTScope *sc, Statement *st, SourceLocation loc, DeclarationQualifier dqual) :
+        Declaration(id, loc, dqual), prototype(p), parameters(params), scope(sc),
         body(st), cgValue(NULL) {
             //if(scope)
             //    scope->setOwner(this);
@@ -237,7 +250,8 @@ struct FunctionDeclaration : public Declaration
 
 struct LabelDeclaration : public Declaration
 {
-    LabelDeclaration(Identifier *id, SourceLocation loc) : Declaration(id, loc) {}
+    // declaration qualifiers on labels are meaningless
+    LabelDeclaration(Identifier *id, SourceLocation loc) : Declaration(id, loc, DeclarationQualifier()) {}
     virtual ASTType *getType() { return 0; }
     virtual void accept(ASTVisitor *v);
 };
@@ -247,7 +261,8 @@ struct VariableDeclaration : public Declaration
     //Identifier *type;
     ASTType *type;
     Expression *value; // initial value
-    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, bool ext = false) : Declaration(nm, loc, ext), type(ty), value(val){}
+    VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, DeclarationQualifier dqual)
+        : Declaration(nm, loc, dqual), type(ty), value(val){}
     virtual VariableDeclaration *variableDeclaration() { return this; }
     virtual ASTType *getType() { return type; }
     virtual void accept(ASTVisitor *v);
@@ -255,7 +270,7 @@ struct VariableDeclaration : public Declaration
 
 struct TypeDeclaration : public Declaration
 {
-    TypeDeclaration(Identifier *id, SourceLocation loc) : Declaration(id, loc) {}
+    TypeDeclaration(Identifier *id, SourceLocation loc, DeclarationQualifier dqual) : Declaration(id, loc, dqual) {}
 
     virtual void accept(ASTVisitor *v);
     virtual ASTType *getType() { return NULL; } // XXX return a 'type' type?
@@ -275,12 +290,13 @@ struct UserTypeDeclaration : public TypeDeclaration
 {
     ASTType *type;
     ASTScope *scope;
+    FunctionDeclaration *defaultConstructor;
     std::vector<FunctionDeclaration*> methods; //locally declared methods; does not include methods defined in parent
     std::vector<Declaration*> members;
 
     UserTypeDeclaration(Identifier *id, ASTScope *sc,
-                std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc) :
-            TypeDeclaration(id, loc), scope(sc), members(m), methods(met),
+                std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc, DeclarationQualifier dqual) :
+            TypeDeclaration(id, loc, dqual), scope(sc), members(m), methods(met), defaultConstructor(0),
             type(new ASTUserType(id, this))
     {
         if(scope) scope->setOwner(id);
@@ -288,8 +304,8 @@ struct UserTypeDeclaration : public TypeDeclaration
         identifier->setDeclaration(this, Identifier::ID_USER);
     }
 
-    UserTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc) :
-        TypeDeclaration(id, loc), type(ty) {}
+    UserTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc, DeclarationQualifier dqual) :
+        TypeDeclaration(id, loc, dqual), type(ty) {}
 
     ASTScope *getScope() { return scope; }
     virtual Identifier *lookup(std::string member)
@@ -304,6 +320,7 @@ struct UserTypeDeclaration : public TypeDeclaration
     virtual long getVTableIndex(std::string method) { return -1; }
     virtual void accept(ASTVisitor *v);
     virtual UserTypeDeclaration *userTypeDeclaration() { return this; }
+    virtual FunctionDeclaration *getDefaultConstructor() { return 0; }
 };
 
 struct ClassDeclaration : public UserTypeDeclaration {
@@ -311,8 +328,8 @@ struct ClassDeclaration : public UserTypeDeclaration {
     ASTValue *typeinfo; //XXX this might be a bad place for this
     std::vector<FunctionDeclaration*> vtable; // populated during validation
     ClassDeclaration(Identifier *id, ASTScope *sc, Identifier *bs,
-            std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc) :
-        UserTypeDeclaration(id, sc, m, met, loc), base(bs), typeinfo(0) {
+            std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc, DeclarationQualifier dqual) :
+        UserTypeDeclaration(id, sc, m, met, loc, dqual), base(bs), typeinfo(0) {
     }
     virtual Identifier *lookup(std::string member){
         Identifier *id = getScope()->lookupInScope(member);
@@ -329,11 +346,22 @@ struct ClassDeclaration : public UserTypeDeclaration {
     virtual ClassDeclaration *classDeclaration() { return this; }
 };
 
+struct InterfaceDeclaration : public UserTypeDeclaration {
+    InterfaceDeclaration(Identifier *id, ASTScope *sc,
+            std::vector<FunctionDeclaration*> met, SourceLocation loc, DeclarationQualifier dqual) :
+        UserTypeDeclaration(id, sc, std::vector<Declaration*>(), met, loc, dqual) {}
+    virtual size_t getSize() const { return 0; } //TODO?
+    virtual long getMemberIndex(std::string member) {
+        emit_message(msg::FAILURE, "member index is meaningless for interface");
+        return 0;
+    }
+};
+
 struct StructDeclaration : public UserTypeDeclaration {
     bool packed;
     StructDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m,
-            std::vector<FunctionDeclaration*> met, SourceLocation loc) :
-        UserTypeDeclaration(id, sc, m, met, loc), packed(false) {
+            std::vector<FunctionDeclaration*> met, SourceLocation loc, DeclarationQualifier dqual) :
+        UserTypeDeclaration(id, sc, m, met, loc, dqual), packed(false) {
         }
     virtual size_t getSize() const;
     long getMemberIndex(std::string member);
@@ -341,8 +369,8 @@ struct StructDeclaration : public UserTypeDeclaration {
 
 struct UnionDeclaration : public UserTypeDeclaration {
     UnionDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m,
-            std::vector<FunctionDeclaration*> met, SourceLocation loc) :
-        UserTypeDeclaration(id, sc, m, met, loc) {}
+            std::vector<FunctionDeclaration*> met, SourceLocation loc, DeclarationQualifier dqual) :
+        UserTypeDeclaration(id, sc, m, met, loc, dqual) {}
     virtual size_t getSize() const;
     long getMemberIndex(std::string member) { return 0; }
 };
@@ -680,6 +708,7 @@ struct IndexExpression : public PostfixExpression
     Expression *index;
     IndexExpression(Expression *l, Expression *i, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), index(i) {}
+    virtual ASTType *getType() { return 0; } //TODO
     virtual void accept(ASTVisitor *v);
 };
 

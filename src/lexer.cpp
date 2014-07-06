@@ -60,8 +60,10 @@ Token Lexer::lexPunct()
             {
                 ignoreChar();
                 while(true) {
-                    while(peekChar() != '*' && !eofChar())
+                    while(peekChar() != '*' && !eofChar()){
+                        if(peekChar() == '\n') line++;
                         ignoreChar();
+                    }
 
                     assert(peekChar() == '*');
                     ignoreChar();

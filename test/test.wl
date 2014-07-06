@@ -142,6 +142,7 @@ int main(int argc, char^^ argv)
     printf("sizeof array's: %d %d\n", int[5].sizeof, int[].sizeof);
     printf("seek cur is: %f\n", SEEK_CUR);
 
+    //TODO: something is wrong here
     printf("myArray: elem: sz: %d, %d %d %d %d %d\n",
     darr.size,
     darr[0],

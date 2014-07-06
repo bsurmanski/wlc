@@ -399,10 +399,12 @@ Statement *ParseContext::parseStatement()
             } else goto PARSEEXP; //IF NOT UNDECLARED OR STRUCT, THIS IS PROBABLY AN EXPRESSION
 
         case tok::kw_extern:
+        case tok::kw_implicit: //implicit constructor/conversion
         case tok::kw_nomangle:
         case tok::kw_union:
         case tok::kw_class:
         case tok::kw_struct:
+        case tok::kw_interface:
         case tok::kw_var:
 #define BTYPE(X,SZ,SN) case tok::kw_##X:
 #define FTYPE(X,SZ) case tok::kw_##X:
@@ -491,18 +493,46 @@ PARSEEXP:
     }
 }
 
+DeclarationQualifier ParseContext::parseDeclarationQualifier()
+{
+    DeclarationQualifier dq;
+    dq.external = false;
+    dq.decorated = true;
+    dq.implicit = false;
+
+    while(true) {
+        if(peek().is(tok::kw_extern)){
+            dq.external = true;
+            ignore();
+            continue;
+        }
+        if(peek().is(tok::kw_nomangle)){
+            dq.decorated = false;
+            ignore();
+            continue;
+        }
+        if(peek().is(tok::kw_implicit)){
+            dq.implicit = true;
+            ignore();
+            continue;
+        }
+
+        break; //if no more qualifiers, exit loop
+    }
+
+    return dq;
+}
+
 Declaration *ParseContext::parseDeclaration()
 {
     SourceLocation loc = peek().loc;
-    bool external = false;
-    bool mangle = true;
 
-    //TODO: invarient order
-    if(peek().is(tok::kw_extern)) { external = true; ignore(); }
-    if(peek().is(tok::kw_nomangle)) { mangle = false; ignore(); }
+    //TODO: check for decl quals on labels. they are meaningless; should be syntax error
+    DeclarationQualifier dqual = parseDeclarationQualifier();
 
     //TODO: parse function decl specs
-    if(peek().is(tok::kw_struct) || peek().is(tok::kw_union) || peek().is(tok::kw_class)) //parse struct
+    if(peek().is(tok::kw_struct) || peek().is(tok::kw_union) ||
+            peek().is(tok::kw_class) || peek().is(tok::kw_interface)) //parse struct
     {
         TokenKind kind = peek().kind;
         ignore(); // eat "struct" etc
@@ -530,13 +560,11 @@ Declaration *ParseContext::parseDeclaration()
         if(peek().is(tok::colon))
         {
             ignore(); // eat ':'
-            if(kind != kw_class)
-            {
+            if(kind != kw_class) {
                 emit_message(msg::ERROR, "only classes can inherit from a base", peek().loc);
             }
 
             baseId = getScope()->get(get().toString());
-            //emit_message(msg::UNIMPLEMENTED, "inheritance not implemented", peek().loc);
         } else if(kind == kw_class && id->getName() != "Object") { //TODO: inherits void
             static Identifier *objectId = NULL;
             if(!objectId) objectId = getAST()->getRuntimeUnit()->lookup("Object");
@@ -565,11 +593,21 @@ Declaration *ParseContext::parseDeclaration()
             while(peek().isNot(tok::rbrace))
             {
                 Declaration *d = parseDeclaration();
-                //d->owner = sdecl;
-                if(d->functionDeclaration())
+
+                if(d->functionDeclaration()) {
+                    if(kind == kw_interface && d->functionDeclaration()->body) {
+                        emit_message(msg::ERROR, "interface methods should not have associated bodies", loc);
+                    }
+
                     methods.push_back(d->functionDeclaration());
-                else
-                    members.push_back(d);
+                }
+                else { // is variable declaration (probably... *TODO)
+                    if(kind == kw_interface) {
+                        emit_message(msg::ERROR, "interfaces cannot contain variable members, methods only", loc);
+                    } else {
+                        members.push_back(d);
+                    }
+                }
                 while(peek().is(tok::semicolon)) ignore();
             }
             ignore(); //eat rbrace
@@ -580,13 +618,16 @@ Declaration *ParseContext::parseDeclaration()
         switch(kind)
         {
             case kw_union:
-                sdecl = new UnionDeclaration(id, tbl, members, methods, loc);
+                sdecl = new UnionDeclaration(id, tbl, members, methods, loc, dqual);
                 break;
             case kw_struct:
-                sdecl = new StructDeclaration(id, tbl, members, methods, loc);
+                sdecl = new StructDeclaration(id, tbl, members, methods, loc, dqual);
                 break;
             case kw_class:
-                sdecl = new ClassDeclaration(id, tbl, baseId, members, methods, loc);
+                sdecl = new ClassDeclaration(id, tbl, baseId, members, methods, loc, dqual);
+                break;
+            case kw_interface:
+                sdecl = new InterfaceDeclaration(id, tbl, methods, loc, dqual);
                 break;
             default:
                 emit_message(msg::FAILURE, "unknown declaration kind", loc);
@@ -616,7 +657,7 @@ Declaration *ParseContext::parseDeclaration()
 
     Identifier *id = getScope()->getInScope(t_id.toString());
     if(id->getName() == "main") id->setMangle(false); // dont mangle main
-    if(!mangle) id->setMangle(false);
+    if(!dqual.decorated) id->setMangle(false);
 
     //TODO parse decl specs
 
@@ -639,7 +680,7 @@ Declaration *ParseContext::parseDeclaration()
         if(owner){
             ASTType *thisTy = owner->getDeclaredType()->getPointerTy();
             Identifier *this_id = getScope()->getInScope("this");
-            VariableDeclaration *this_decl = new VariableDeclaration(thisTy, this_id, NULL, loc);
+            VariableDeclaration *this_decl = new VariableDeclaration(thisTy, this_id, NULL, loc, DeclarationQualifier());
             this_id->setDeclaration(this_decl, Identifier::ID_VARIABLE);
             params.push_back(thisTy);
             parameters.push_back(this_decl);
@@ -675,7 +716,7 @@ Declaration *ParseContext::parseDeclaration()
                 defaultValue = parseExpression();
             }
 
-            VariableDeclaration *paramDecl = new VariableDeclaration(aty, paramId, defaultValue, loc);
+            VariableDeclaration *paramDecl = new VariableDeclaration(aty, paramId, defaultValue, loc, DeclarationQualifier());
             paramId->setDeclaration(paramDecl, Identifier::ID_VARIABLE);
             parameters.push_back(paramDecl);
 
@@ -701,7 +742,7 @@ Declaration *ParseContext::parseDeclaration()
 
         ASTType *proto = ASTType::getFunctionTy(type, params, vararg);
         Declaration *decl = new FunctionDeclaration(id, proto, parameters,
-                funcScope, stmt, t_id.loc);
+                funcScope, stmt, t_id.loc, dqual);
         id->setDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;
     }
@@ -718,12 +759,12 @@ Declaration *ParseContext::parseDeclaration()
 
     if(ASTArrayType *aty = dynamic_cast<ASTArrayType*>(type))
     {
-        Declaration *adecl = new VariableDeclaration(type, id, defaultValue, t_id.loc, external);
+        Declaration *adecl = new VariableDeclaration(type, id, defaultValue, t_id.loc, dqual);
         id->setDeclaration(adecl, Identifier::ID_VARIABLE);
         return adecl;
     }
 
-    Declaration *decl = new VariableDeclaration(type, id, defaultValue, t_id.loc, external);
+    Declaration *decl = new VariableDeclaration(type, id, defaultValue, t_id.loc, dqual);
     id->setDeclaration(decl, Identifier::ID_VARIABLE);
 
     //TODO: comma, multiple decl

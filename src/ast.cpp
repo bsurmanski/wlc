@@ -7,7 +7,7 @@ Package::Package(Package *par, std::string nm) : parent(par), scope(NULL), cgVal
     if(parent) {
         identifier = parent->getScope()->getInScope(name);
         identifier->setDeclaration(new PackageDeclaration(this, identifier,
-                    SourceLocation(nm.c_str(), 1)), Identifier::ID_PACKAGE);
+                    SourceLocation(nm.c_str(), 1), DeclarationQualifier()), Identifier::ID_PACKAGE);
     }
 }
 

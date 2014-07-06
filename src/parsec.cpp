@@ -41,6 +41,9 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
     CXSourceLocation cxloc = clang_getCursorLocation(cursor);
     SourceLocation loc = SourceLocationFromCLocation(cxloc);
 
+    DeclarationQualifier dqual;
+    dqual.decorated = false;
+
     if(cursor.kind == CXCursor_FieldDecl)
     {
         CXString cxname = clang_getCursorSpelling(cursor);
@@ -50,7 +53,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
         id->setMangle(false);
         ASTType *ty = ASTTypeFromCType(unit, clang_getCursorType(cursor));
         if(!ty) return CXChildVisit_Break;
-        VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc);
+        VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
         id->setDeclaration(vdecl, Identifier::ID_VARIABLE);
         members->push_back(vdecl);
     } else if(cursor.kind == CXCursor_UnionDecl || cursor.kind == CXCursor_StructDecl)
@@ -59,7 +62,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
         if(!ty) return CXChildVisit_Break;
         Identifier *id = scope->get("___" + ty->getName()); // TODO: proper scope name
         id->setMangle(false);
-        VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc);
+        VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
         id->setDeclaration(vdecl, Identifier::ID_VARIABLE);
         //members->push_back(vdecl);
     } else
@@ -101,9 +104,9 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
         if(typeDecl.kind == CXCursor_StructDecl)
         {
             //TODO: correct source loc
-            utdecl = new StructDeclaration(id, tbl, members, std::vector<FunctionDeclaration*>(), SourceLocation());
+            utdecl = new StructDeclaration(id, tbl, members, std::vector<FunctionDeclaration*>(), SourceLocation(), DeclarationQualifier());
         } else {// is union
-            utdecl = new UnionDeclaration(id, tbl, members, std::vector<FunctionDeclaration*>(), SourceLocation());
+            utdecl = new UnionDeclaration(id, tbl, members, std::vector<FunctionDeclaration*>(), SourceLocation(), DeclarationQualifier());
         }
 
         return utdecl->getDeclaredType();
@@ -205,7 +208,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
             if(!astArgTy) goto ERR;
 
             params.push_back(astArgTy);
-            parameters.push_back(new VariableDeclaration(astArgTy, NULL, NULL, loc));
+            parameters.push_back(new VariableDeclaration(astArgTy, NULL, NULL, loc, DeclarationQualifier()));
         }
 
         ASTType *rType = ASTTypeFromCType(unit, clang_getResultType(fType));
@@ -215,10 +218,13 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         Identifier *id = unit->getScope()->get(name);
         id->setMangle(false);
 
+        DeclarationQualifier dqual;
+        dqual.decorated = false;
+
         ASTType *functionType = ASTType::getFunctionTy(rType, params,
                                         clang_isFunctionTypeVariadic(fType));
         FunctionDeclaration *fdecl = new FunctionDeclaration(id, functionType,
-               parameters, 0, 0, loc);
+               parameters, 0, 0, loc, dqual);
         id->setDeclaration(fdecl, Identifier::ID_FUNCTION);
 
         //unit->functions.push_back(fdecl);
@@ -235,8 +241,10 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         Identifier *id = unit->getScope()->get(name);
         id->setMangle(false);
         CXLinkageKind linkage = clang_getCursorLinkage(cursor);
-        VariableDeclaration *vdecl = new VariableDeclaration(wlType, id, 0, loc,
-                linkage == CXLinkage_External || linkage == CXLinkage_UniqueExternal);
+        DeclarationQualifier dqual;
+        dqual.external = linkage == CXLinkage_External || linkage == CXLinkage_UniqueExternal;
+        dqual.decorated = false;
+        VariableDeclaration *vdecl = new VariableDeclaration(wlType, id, 0, loc, dqual);
         id->setDeclaration(vdecl, Identifier::ID_VARIABLE);
         //unit->globals.push_back(vdecl);
 

@@ -69,6 +69,7 @@ struct Identifier
     bool isStruct();
     bool isUnion();
     bool isClass();
+    bool isInterface();
     bool isPackage() { return type == ID_PACKAGE; }
     bool isModule() { return type = ID_MODULE; }
     bool isExpression() { return type == ID_EXPRESSION; }

@@ -66,6 +66,13 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         return llty;
     }
 
+    // if interface create an interface struct
+    // will still need to populate the interface members though
+    // XXX seems a bit messy
+    if(ty->isInterface())
+        return codegenType(ast->getRuntimeUnit()->lookup("Interface")->getDeclaredType());
+
+
     StructType *sty = StructType::create(context);
     sty->setName(ty->getName());
     unit->types[ty->getName()] = IRType(ty, sty);
@@ -98,6 +105,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
 
     if(ty->isClass())
         userty->getDeclaration()->classDeclaration()->typeinfo = createTypeInfo(ty);
+
 
     unit->debug->createUserType(ty);
     return sty;
@@ -1029,10 +1037,8 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->getDeclaration());
     }
 
-    //vector<ASTValue*> cargs;
     vector<Value*> llargs;
 
-    /*if(astfty->isMethod()){*/
     // allow for uniform function call syntax
     int nargs = 0;
     if(functionValue->getOwner()){
@@ -2027,6 +2033,7 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         vinst->setDebugLoc(llvm::DebugLoc::get(vdecl->loc.line, vdecl->loc.ch, diScope()));
         //TODO: maybe create a LValue field in CGValue?
     } else if(vty->isClass()) { // no default value, and allocated class. set VTable, in case
+        //TODO call default constructor
         //XXX temp below. set vtable of new class
         // TODO: also do if type is pointer to class (called through 'new')
         ASTValue *vtable = getVTable(idValue);
@@ -2200,7 +2207,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
             }
 
             llvm::Constant* gValue;
-            if(vdecl->external)
+            if(vdecl->qualifier.external)
             {
                 gValue = NULL;
             } else if(vdecl->value)
@@ -2216,7 +2223,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
             GlobalVariable *llvmval = (GlobalVariable*)
                     module->getOrInsertGlobal(id->getName(), codegenType(idTy));
 
-            GlobalValue::LinkageTypes linkage = vdecl->external ?
+            GlobalValue::LinkageTypes linkage = vdecl->qualifier.external ?
                 GlobalValue::ExternalLinkage : GlobalValue::ExternalLinkage;
             llvmval->setLinkage(linkage);
             llvmval->setInitializer(gValue);

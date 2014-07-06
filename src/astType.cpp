@@ -212,5 +212,6 @@ void ASTType::accept(ASTVisitor *v) {
 }
 
 bool ASTUserType::isClass() { return dynamic_cast<ClassDeclaration*>(identifier->getDeclaration()); }
+bool ASTUserType::isInterface() { return dynamic_cast<InterfaceDeclaration*>(identifier->getDeclaration()); }
 bool ASTUserType::isStruct() { return dynamic_cast<StructDeclaration*>(identifier->getDeclaration()); }
 bool ASTUserType::isUnion() { return dynamic_cast<UnionDeclaration*>(identifier->getDeclaration()); }

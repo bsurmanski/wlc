@@ -130,6 +130,12 @@ constructors in classes (and maybe in other usertypes).
     a call, eg.
     MyClass c = MyClass()
     will run the no arguments constructor
-default constructors for classes only. may use some special syntax in declaration, declared
-    like constructor except use 'default' instead of 'this'. The reason for the distinction is
-    so that no argument constructors can be used in structs/etc.
+default constructors. uses syntax of "implicit this() {}". If an 'implicit this' is found
+in the type, it will be called when creating the type on the stack, and implicitly in all other
+constructors (maybe).
+The reason for the distinction and distinct syntax 
+is so that no argument constructors can be used in structs/etc.
+
+###
+codegen type expressions
+create a 'type' runtime type

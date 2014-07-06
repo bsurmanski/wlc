@@ -1,9 +1,14 @@
+/*
 use "importc"
 
 import(C) "/usr/include/SDL/SDL.h"
 import(C) "/usr/include/stdlib.h"
 import(C) "/usr/include/stdio.h"
 import(C) "/usr/include/math.h"
+*/
+
+extern nomangle int printf(char^ fmt, ...);
+extern nomangle float sinf(float f);
 
 int main(int argc, char^^ argv)
 {
@@ -16,5 +21,5 @@ int main(int argc, char^^ argv)
     printf("%d\n", i[0]);
     printf("%d\n", i[1]);
     printf("%f\n", x);
-    return 0    
+    return 0
 }

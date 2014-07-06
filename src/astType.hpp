@@ -232,6 +232,7 @@ struct ASTType
     virtual bool isPointer() { return false; }
     virtual bool isUnknown() { return false; }
     virtual bool isClass() { return false; }
+    virtual bool isInterface() { return false; }
     virtual bool isStruct() { return false; }
     virtual bool isUnion() { return false; }
 
@@ -349,7 +350,9 @@ struct ASTUserType : public ASTCompositeType {
 
     ASTScope *getScope();
 
+    virtual FunctionDeclaration *getDefaultConstructor() { return 0; }
     virtual bool isClass();
+    virtual bool isInterface();
     virtual bool isStruct();
     virtual bool isUnion();
 };

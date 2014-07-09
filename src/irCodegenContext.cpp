@@ -1004,6 +1004,28 @@ void IRCodegenContext::codegenSwitchStatement(SwitchStatement *stmt)
     return;
 }
 
+ASTValue *IRCodegenContext::codegenCall(ASTValue *func, std::vector<ASTValue *> args) {
+    vector<Value*> llargs;
+
+    ASTFunctionType *astfty = dynamic_cast<ASTFunctionType*>(func->getType());
+    if(!astfty) {
+        emit_message(msg::ERROR, "invalid value used in function call context");
+        if(func->getType()){
+            emit_message(msg::ERROR, "value is of type \"" +
+                    func->getType()->getName() + "\"");
+        }
+        return NULL;
+    }
+    ASTType *rtype = astfty->getReturnType();
+
+    for(int i = 0; i < args.size(); i++){
+        llargs.push_back(codegenValue(args[i]));
+    }
+
+    llvm::Value *value = ir->CreateCall(codegenValue(func), llargs);
+    return new ASTValue(rtype, value);
+}
+
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *func = codegenExpression(exp->function);
@@ -1012,21 +1034,19 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         return NULL;
     }
 
-    ASTValue *functionValue = NULL;
     ASTFunctionType *astfty = NULL;
     FunctionDeclaration *fdecl = NULL;
     ASTType *rtype = NULL;
 
-    functionValue = codegenExpression(exp->function);
-    if(functionValue->getType()->isPointer()){ // dereference function pointer
-        functionValue = getValueOf(functionValue);
+    if(func->getType()->isPointer()){ // dereference function pointer
+        func = getValueOf(func);
     }
-    astfty = dynamic_cast<ASTFunctionType*>(functionValue->getType());
+    astfty = dynamic_cast<ASTFunctionType*>(func->getType());
     if(!astfty) {
         emit_message(msg::ERROR, "invalid value used in function call context", exp->loc);
-        if(functionValue->getType()){
+        if(func->getType()){
             emit_message(msg::ERROR, "value is of type \"" +
-                    functionValue->getType()->getName() + "\"", exp->loc);
+                    func->getType()->getName() + "\"", exp->loc);
         }
         return NULL;
     }
@@ -1037,18 +1057,21 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->getDeclaration());
     }
 
-    vector<Value*> llargs;
 
+    std::vector<ASTValue *> args;
     // allow for uniform function call syntax
     int nargs = 0;
-    if(functionValue->getOwner()){
-        Value *ownerVal = NULL;
-        if(functionValue->getOwner()->getType()->isPointer()){
-            ownerVal = codegenValue(functionValue->getOwner());
+    if(func->getOwner()){
+        ASTValue *ownerVal = NULL;
+        //TODO: figure out correct type for owner
+        if(func->getOwner()->getType()->isPointer()){
+            ownerVal = getAddressOf(func->getOwner());
         } else {
-            ownerVal = codegenLValue(functionValue->getOwner());
+            ownerVal = getAddressOf(func->getOwner());
+            //ownerVal = functionValue->getOwner();
         }
-        llargs.push_back(ownerVal);
+        //TODO: cast to correct type if needed
+        args.push_back(ownerVal);
         nargs++;
     }
 
@@ -1089,10 +1112,10 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         }
 
         //cargs.push_back(val);
-        llargs.push_back(codegenValue(val));
+        args.push_back(val);
     }
 
-    if(llargs.size() != exp->args.size()){
+    if(args.size() != exp->args.size()){
         /*
         emit_message(msg::ERROR,
                 "invalid number of arguments provided for function call", exp->loc);
@@ -1101,8 +1124,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         //return NULL;
     }
 
-    llvm::Value *value = ir->CreateCall(codegenValue(func), llargs);
-    return new ASTValue(rtype, value);
+    return codegenCall(func, args);
 }
 
 ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
@@ -1604,6 +1626,7 @@ void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, u
 //TODO: should take astvalue's?
 ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs, bool convert)
 {
+    /*
     if(!lhs->isLValue())
     {
         // XXX work around. if lhs is unknown, isLValue will fail on expression
@@ -1613,7 +1636,7 @@ ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs, bool
             emit_message(msg::ERROR, "assignment requires lvalue", lhs->loc);
             return NULL;
         }
-    }
+    }*/
 
     // codegen tuple assignment
     if(TupleExpression *tlhs = lhs->tupleExpression())
@@ -2033,6 +2056,12 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         vinst->setDebugLoc(llvm::DebugLoc::get(vdecl->loc.line, vdecl->loc.ch, diScope()));
         //TODO: maybe create a LValue field in CGValue?
     } else if(vty->isClass()) { // no default value, and allocated class. set VTable, in case
+        ASTUserType *uty = vty->userType();
+        if(FunctionDeclaration *fdecl = uty->getDefaultConstructor()){
+            std::vector<ASTValue*> args;
+            args.push_back(getAddressOf(idValue));
+            codegenCall(codegenIdentifier(fdecl->identifier), args);
+        }
         //TODO call default constructor
         //XXX temp below. set vtable of new class
         // TODO: also do if type is pointer to class (called through 'new')

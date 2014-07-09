@@ -7,6 +7,9 @@ int main(int argc, char^^ argv)
 {
     MyClass cl
     MySpecialClass scl
+    MySpecialClass^ sclpt = &scl
+
+    sclpt.printCall()
     cl.a = 5
     scl.svar = 11
     scl.a = 2
@@ -36,6 +39,10 @@ class MySpecialClass : MyClass
 
     int myFunction(int v1, int v2) {
         return v1 + v2 + .svar
+    }
+
+    implicit void this() {
+        .svar = 0
     }
 }
 

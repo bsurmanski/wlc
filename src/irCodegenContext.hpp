@@ -229,6 +229,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenDeleteExpression(DeleteExpression *exp);
 
     ASTValue *codegenIdentifier(Identifier *id);
+    ASTValue *codegenCall(ASTValue *func, std::vector<ASTValue *> args);
     ASTValue *codegenCallExpression(CallExpression *exp);
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);
     ASTValue *codegenUnaryExpression(UnaryExpression *exp);

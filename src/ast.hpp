@@ -305,7 +305,7 @@ struct UserTypeDeclaration : public TypeDeclaration
     }
 
     UserTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc, DeclarationQualifier dqual) :
-        TypeDeclaration(id, loc, dqual), type(ty) {}
+        TypeDeclaration(id, loc, dqual), type(ty), defaultConstructor(0) {}
 
     ASTScope *getScope() { return scope; }
     virtual Identifier *lookup(std::string member)
@@ -320,7 +320,8 @@ struct UserTypeDeclaration : public TypeDeclaration
     virtual long getVTableIndex(std::string method) { return -1; }
     virtual void accept(ASTVisitor *v);
     virtual UserTypeDeclaration *userTypeDeclaration() { return this; }
-    virtual FunctionDeclaration *getDefaultConstructor() { return 0; }
+    virtual FunctionDeclaration *getDefaultConstructor() { return defaultConstructor; }
+    virtual void setDefaultConstructor(FunctionDeclaration *f) { defaultConstructor = f; }
 };
 
 struct ClassDeclaration : public UserTypeDeclaration {

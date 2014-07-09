@@ -350,7 +350,7 @@ struct ASTUserType : public ASTCompositeType {
 
     ASTScope *getScope();
 
-    virtual FunctionDeclaration *getDefaultConstructor() { return 0; }
+    virtual FunctionDeclaration *getDefaultConstructor();
     virtual bool isClass();
     virtual bool isInterface();
     virtual bool isStruct();

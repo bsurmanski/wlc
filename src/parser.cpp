@@ -587,6 +587,7 @@ Declaration *ParseContext::parseDeclaration()
         pushScope(tbl);
         vector<Declaration*> members;
         vector<FunctionDeclaration*> methods;
+        FunctionDeclaration *defaultConstructor = 0;
         if(peek().is(tok::lbrace))
         {
             ignore(); // eat lbrace
@@ -594,9 +595,14 @@ Declaration *ParseContext::parseDeclaration()
             {
                 Declaration *d = parseDeclaration();
 
-                if(d->functionDeclaration()) {
+                if(FunctionDeclaration *fdecl = d->functionDeclaration()) {
                     if(kind == kw_interface && d->functionDeclaration()->body) {
                         emit_message(msg::ERROR, "interface methods should not have associated bodies", loc);
+                    }
+
+                    if(d->getName() == "this" && d->qualifier.implicit){
+                        defaultConstructor = fdecl;
+                        continue;
                     }
 
                     methods.push_back(d->functionDeclaration());
@@ -632,6 +638,7 @@ Declaration *ParseContext::parseDeclaration()
             default:
                 emit_message(msg::FAILURE, "unknown declaration kind", loc);
         }
+        sdecl->setDefaultConstructor(defaultConstructor);
 
         popScope();
 

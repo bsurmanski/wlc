@@ -104,7 +104,7 @@ void ValidationVisitor::visitStatement(Statement *stmt) {
 
 void ValidationVisitor::visitFunctionDeclaration(FunctionDeclaration *decl) {
     //TODO: validate prototype
-    if(!decl->prototype) {
+    if(!decl->getType()) {
         valid = false;
         emit_message(msg::ERROR, "function declaration missing prototype");
     }
@@ -114,7 +114,7 @@ void ValidationVisitor::visitFunctionDeclaration(FunctionDeclaration *decl) {
         emit_message(msg::ERROR, "function has body without scope");
     }
 
-    resolveType(decl->prototype);
+    resolveType(decl->getType());
 }
 
 void ValidationVisitor::visitLabelDeclaration(LabelDeclaration *decl) {
@@ -149,7 +149,7 @@ void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
     if(ClassDeclaration *cdecl = decl->classDeclaration()) {
         if(cdecl->base) {
             cdecl->base = resolveIdentifier(cdecl->base);
-            if(!cdecl->base->isClass()) {
+            if(!cdecl->base->isClass() && !cdecl->base->isStruct()) {
                 emit_message(msg::ERROR, "expected class type in base specifier", cdecl->loc);
                 if(cdecl->base->isInterface()) {
                     emit_message(msg::ERROR, "interfaces are specified implicitly", cdecl->loc);

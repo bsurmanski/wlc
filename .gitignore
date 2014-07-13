@@ -13,6 +13,7 @@ obj
 *.s
 *.log
 *.sum
+core.*
 tags
 cscope.out
 build/

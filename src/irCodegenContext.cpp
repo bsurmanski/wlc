@@ -56,8 +56,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         }
     }
 
-    if(StructType *sty = module->getTypeByName(ty->getName()))
-    {
+    if(StructType *sty = module->getTypeByName(ty->getName())) {
         return sty;
     }
 
@@ -82,7 +81,9 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
 
     // add base type to member set
     if(ASTType *base = userty->getBaseType()){
-        structVec.push_back(codegenType(base));
+        Type *basety = codegenType(base);
+        if(base->isReference()) basety = basety->getPointerElementType();
+        structVec.push_back(basety);
     }
 
     //
@@ -103,11 +104,12 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         sty->setBody(structVec);
     }
 
-    if(ty->isClass())
-        userty->getDeclaration()->classDeclaration()->typeinfo = createTypeInfo(ty);
-
-
     unit->debug->createUserType(ty);
+
+    if(ty->isClass()) {
+        userty->getDeclaration()->classDeclaration()->typeinfo = createTypeInfo(ty);
+    }
+
     return sty;
 }
 
@@ -256,7 +258,8 @@ llvm::Type *IRCodegenContext::codegenFunctionType(ASTType *ty) {
     vector<Type*> params;
     for(int i = 0; i < astfty->params.size(); i++)
     {
-        params.push_back(codegenType(astfty->params[i]));
+        Type *llty = codegenType(astfty->params[i]);
+        params.push_back(llty);
     }
 
     FunctionType *llfty = FunctionType::get(codegenType(astfty->ret), params, astfty->vararg);
@@ -330,6 +333,8 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
             break;
         case TYPE_USER:
             llvmty = codegenUserType(ty);
+            if(ty->isReference())
+                llvmty = llvmty->getPointerTo();
             break;
         case TYPE_TUPLE:
             llvmty = codegenTupleType(ty);
@@ -354,13 +359,12 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 
 llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 {
-    if(!value->cgValue){
+    if(!value->cgValue) {
         //TODO
         emit_message(msg::FAILURE, "AST Value failed to generate");
     }
 
-    if(value->isLValue())
-    {
+    if(value->isLValue()) {
         return ir->CreateAlignedLoad(codegenLValue(value), 4);
     }
 
@@ -369,7 +373,7 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 
 llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
 {
-    if(!value->isLValue())
+    if(!value->isLValue() && !value->isReference())
     {
         emit_message(msg::FATAL, "rvalue used in lvalue context!");
         return NULL;
@@ -379,14 +383,36 @@ llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
         emit_message(msg::FAILURE, "AST Value failed to generate");
     }
 
+    if(value->isLValue() && value->isReference()) {
+        return ir->CreateAlignedLoad(value->cgValue, 4);
+    }
+
+    return (llvm::Value*) value->cgValue;
+}
+
+llvm::Value *IRCodegenContext::codegenRefValue(ASTValue *value) {
+    if(!value->cgValue) {
+        //TODO
+        emit_message(msg::FAILURE, "AST Value failed to generate");
+    }
+
+    if(!value->isReference()) {
+        emit_message(msg::FAILURE, "Attempting to get reference value of non reference");
+    }
+
     return (llvm::Value*) value->cgValue;
 }
 
 ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 {
-    ASTValue *stored = new ASTValue(dest->type,
-            ir->CreateStore(codegenValue(val), codegenLValue(dest)));
-    return stored;
+    Value *llval = 0;
+    if(dest->isReference()) {
+        llval = ir->CreateStore(codegenValue(val), codegenRefValue(dest));
+    } else {
+        llval = ir->CreateStore(codegenValue(val), codegenLValue(dest));
+    }
+
+    return new ASTValue(dest->type, llval);
 }
 
 ASTValue *IRCodegenContext::getStringValue(std::string str) {
@@ -443,9 +469,9 @@ ASTValue *IRCodegenContext::vtableLookup(ASTValue *instance, std::string func) {
 
     Identifier *id = userty->getScope()->lookup(func);
     FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
-    ASTType *fty = fdecl->prototype;
+    ASTType *fty = fdecl->getType();
 
-    return new ASTValue(fty, ir->CreatePointerCast(llval, codegenType(fty->getPointerTy())));
+    return new ASTValue(fty, ir->CreatePointerCast(llval, codegenType(fty)->getPointerTo()));
 }
 
 ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
@@ -462,7 +488,7 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
         for(int i = 0; i < cdecl->vtable.size(); i++){
             FunctionDeclaration *fdecl = cdecl->vtable[i];
             if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
-            FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
+            FunctionType *fty = (FunctionType*) codegenType(fdecl->getType());
             Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
 
             arrayList.push_back((Function*)
@@ -502,8 +528,9 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         std::vector<Value*> gep;
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
-        ASTValue base(userty->getBaseType(), llval, true);
+        Value *llval = codegenLValue(val);
+        llval = ir->CreateInBoundsGEP(llval, gep);
+        ASTValue base(userty->getBaseType(), llval, true, false);
         return getMember(&base, member);
     }
 
@@ -526,7 +553,8 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
                                     index));
-        Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+        Value *llval;
+        llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
         llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
         ASTValue *ret = new ASTValue(mtype, llval, true);
         ret->setOwner(val);
@@ -663,9 +691,9 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
     {
         FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
         if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
-        FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
+        FunctionType *fty = (FunctionType*) codegenType(fdecl->getType());
         Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
-        id->setValue(new ASTValue(fdecl->prototype, func));
+        id->setValue(new ASTValue(fdecl->getType(), func));
     } else if(id->isStruct())
     {
         id->setValue(new ASTValue(id->getDeclaredType(), NULL));
@@ -826,6 +854,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
     Function *mallocFunc = (Function*) module->getOrInsertFunction("malloc", fty);
     Value *value;
     value = ir->CreateCall(mallocFunc, llargs);
+    ASTValue *val = NULL;
     if(exp->type->isArray())
     {
         ASTType *arrty = exp->type->getReferencedTy();
@@ -838,9 +867,47 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         ir->CreateStore(sz, ir->CreateStructGEP(value, 1));
         value = ir->CreateLoad(value);
         //TODO: create a 'create array' function
-    } else
-        value = ir->CreateBitCast(value, codegenType(exp->type)->getPointerTo());
-    return new ASTValue(ty, value);
+    } else {
+        if(exp->type->isReference()){
+            value = ir->CreateBitCast(value, codegenType(exp->type));
+        } else {
+            value = ir->CreateBitCast(value, codegenType(exp->type)->getPointerTo());
+        }
+    }
+
+    if(ty->isReference()){
+        val = new ASTValue(ty, value, false, true);
+    } else {
+        val = new ASTValue(ty->getPointerTy(), value);
+    }
+
+    if(ty->isClass()) {
+         // no default value, and allocated class. set VTable, in case
+        ASTUserType *uty = ty->userType();
+        if(FunctionDeclaration *fdecl = uty->getDefaultConstructor()){
+            std::vector<ASTValue*> args;
+            args.push_back(val);
+            codegenCall(codegenIdentifier(fdecl->identifier), args);
+        }
+        //TODO call default constructor
+        //XXX temp below. set vtable of new class
+        // TODO: also do if type is pointer to class (called through 'new')
+        ASTValue *vtable = getVTable(val);
+
+        codegenType(uty); // XXX to create typeinfo. So we are able to load it below... hacky
+
+        //the pass through identifier is an ugly hack to get typeinfo in case of duplicate ASTType types, eww
+        Value *tival = codegenLValue(uty->getDeclaration()->classDeclaration()->typeinfo);
+
+        vector<Value *> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        tival = ir->CreateGEP(tival, gep); // GEP to class's vtable, so we can store to it
+
+        ir->CreateStore(tival, codegenLValue(vtable));
+    }
+
+    return val;
 }
 
 ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
@@ -1476,6 +1543,12 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
         return new ASTValue(toType, ir->CreateIntCast(codegenValue(val),
                     codegenType(toType), false));
     }
+
+    if(toType->isReference()) {
+        return new ASTValue(toType,
+                ir->CreatePointerCast(codegenValue(val), codegenType(toType)),
+                false); //XXX might be a bit cludgy
+    }
 }
 
 ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
@@ -1664,7 +1737,7 @@ ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs, bool
 
     //if(vrhs->type != vlhs->type)
     {
-            vrhs = promoteType(vrhs, vlhs->getType());
+        vrhs = promoteType(vrhs, vlhs->getType());
         if(vrhs->type->coercesTo(vlhs->type) || (convert && vrhs->type->castsTo(vlhs->type)))
         {
             vrhs = promoteType(vrhs, vlhs->getType());
@@ -1676,6 +1749,7 @@ ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs, bool
             return NULL;
         }
     }
+
     storeValue(vlhs, vrhs);
     return vrhs;
 }
@@ -2026,11 +2100,13 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         defaultValue = promoteType(defaultValue, vty);
     }
 
+    ///////////////
     //XXX work around for undeclared struct
     Identifier *id = NULL;
     ASTUserType *userty = vty->userType();
     if(userty && vty->isUnknown())
     {
+        emit_message(msg::WARNING, "unknown type should be resolved in codegen" + id->getName(), vdecl->loc);
         if(userty->identifier->isUndeclared())
         {
             id = lookup(userty->identifier->getName());
@@ -2041,11 +2117,14 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
             vty = id->getDeclaredType();
         }
     }
+    ///////////////
 
-    AllocaInst *llvmDecl = ir->CreateAlloca(codegenType(vty), 0, vdecl->getName());
+    Type *llty = codegenType(vty);
+
+    AllocaInst *llvmDecl = ir->CreateAlloca(llty, 0, vdecl->getName());
 
     llvmDecl->setAlignment(8);
-    ASTValue *idValue = new ASTValue(vty, llvmDecl, true);
+    ASTValue *idValue = new ASTValue(vty, llvmDecl, true, vty->isReference());
 
     if(defaultValue) {
         defaultValue = promoteType(defaultValue, vty);
@@ -2055,29 +2134,8 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
                 idValue, ir->GetInsertBlock(), vdecl->loc);
         vinst->setDebugLoc(llvm::DebugLoc::get(vdecl->loc.line, vdecl->loc.ch, diScope()));
         //TODO: maybe create a LValue field in CGValue?
-    } else if(vty->isClass()) { // no default value, and allocated class. set VTable, in case
-        ASTUserType *uty = vty->userType();
-        if(FunctionDeclaration *fdecl = uty->getDefaultConstructor()){
-            std::vector<ASTValue*> args;
-            args.push_back(getAddressOf(idValue));
-            codegenCall(codegenIdentifier(fdecl->identifier), args);
-        }
-        //TODO call default constructor
-        //XXX temp below. set vtable of new class
-        // TODO: also do if type is pointer to class (called through 'new')
-        ASTValue *vtable = getVTable(idValue);
-
-        codegenType(userty); // XXX to create typeinfo. So we are able to load it below... hacky
-
-        //the pass through identifier is an ugly hack to get typeinfo in case of duplicate ASTType types, eww
-        Value *tival = codegenLValue(userty->getDeclaration()->classDeclaration()->typeinfo);
-
-        vector<Value *> gep;
-        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        tival = ir->CreateGEP(tival, gep); // GEP to class's vtable, so we can store to it
-
-        ir->CreateStore(tival, codegenLValue(vtable));
+    } else if(vty->isClass()) {
+        //TODO: store null if no value
     }
 
     vdecl->identifier->setValue(idValue);
@@ -2087,7 +2145,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
     IRFunction backup = currentFunction;
     currentFunction = IRFunction();
 
-    FunctionType *fty = (FunctionType*) codegenType(fdecl->prototype);
+    FunctionType *fty = (FunctionType*) codegenType(fdecl->getType());
     Function *func;
     func = (Function*) module->getOrInsertFunction(fdecl->getMangledName(), fty);
 
@@ -2113,9 +2171,17 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
         pushScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
         dwarfStopPoint(fdecl->loc);
 
-        ASTFunctionType *astfty = fdecl->prototype->functionType();
+        ASTFunctionType *astfty = fdecl->getType()->functionType();
         int idx = 0;
-        for(Function::arg_iterator AI = func->arg_begin(); AI != func->arg_end(); AI++, idx++)
+
+        Function::arg_iterator AI = func->arg_begin();
+        if(fdecl->owner) {
+            AI->setName("this");
+            lookup("this")->setValue(new ASTValue(fdecl->owner, AI, false, true));
+            AI++;
+        }
+
+        for(; AI != func->arg_end(); AI++, idx++)
         {
             if(astfty->params.size() < idx){
                     emit_message(msg::FAILURE,
@@ -2124,11 +2190,16 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
             }
 
             AI->setName(fdecl->parameters[idx]->getName());
-            AllocaInst *alloc = new AllocaInst(codegenType(astfty->params[idx]),
+            AllocaInst *alloc = new AllocaInst(codegenType(fdecl->parameters[idx]->getType()),
                                                0, fdecl->parameters[idx]->getName(), BB);
             alloc->setAlignment(8);
-            ASTValue *alloca = new ASTValue(astfty->params[idx], alloc, true);
-            new StoreInst(AI, codegenLValue(alloca), BB);
+            ASTValue *alloca = new ASTValue(fdecl->parameters[idx]->getType(), alloc, true);
+
+            if(fdecl->parameters[idx]->getType()->isReference()) {
+                new StoreInst(AI, codegenRefValue(alloca), BB);
+            } else {
+                new StoreInst(AI, codegenLValue(alloca), BB);
+            }
             // i think we arent using IRBuilder here so we can insert at top of BB
 
             fdecl->parameters[idx]->getIdentifier()->setValue(alloca);

@@ -221,10 +221,9 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         DeclarationQualifier dqual;
         dqual.decorated = false;
 
-        ASTType *functionType = ASTType::getFunctionTy(rType, params,
-                                        clang_isFunctionTypeVariadic(fType));
-        FunctionDeclaration *fdecl = new FunctionDeclaration(id, functionType,
-               parameters, 0, 0, loc, dqual);
+        FunctionDeclaration *fdecl = new FunctionDeclaration(id, NULL, rType,
+               parameters, clang_isFunctionTypeVariadic(fType), 0, 0, loc, dqual);
+
         id->setDeclaration(fdecl, Identifier::ID_FUNCTION);
 
         //unit->functions.push_back(fdecl);

@@ -523,6 +523,7 @@ DeclarationQualifier ParseContext::parseDeclarationQualifier()
     return dq;
 }
 
+//TODO: split up into seperate parts? parse class, func, type, etc
 Declaration *ParseContext::parseDeclaration()
 {
     SourceLocation loc = peek().loc;
@@ -671,7 +672,6 @@ Declaration *ParseContext::parseDeclaration()
     if(peek().is(tok::lparen)) // function decl
     {
         Identifier *owner = NULL;
-        std::vector<ASTType *> params;
         std::vector<VariableDeclaration*> parameters;
         ignore(); // lparen
 
@@ -683,14 +683,14 @@ Declaration *ParseContext::parseDeclaration()
         ASTScope *funcScope = new ASTScope(getScope());
         pushScope(funcScope);
 
+        ASTType *thisTy = NULL;
         // is a method
         if(owner){
-            ASTType *thisTy = owner->getDeclaredType()->getPointerTy();
+            thisTy = owner->getDeclaredType();
             Identifier *this_id = getScope()->getInScope("this");
             VariableDeclaration *this_decl = new VariableDeclaration(thisTy, this_id, NULL, loc, DeclarationQualifier());
             this_id->setDeclaration(this_decl, Identifier::ID_VARIABLE);
-            params.push_back(thisTy);
-            parameters.push_back(this_decl);
+            //parameters.push_back(this_decl);
         }
 
         bool vararg = false;
@@ -712,7 +712,6 @@ Declaration *ParseContext::parseDeclaration()
 
             ASTType *aty = parseType();
             Token t_name = get();
-            params.push_back(aty);
             Identifier *paramId = getScope()->getInScope(t_name.toString());
 
             Expression *defaultValue = NULL;
@@ -747,8 +746,8 @@ Declaration *ParseContext::parseDeclaration()
         Statement *stmt = parseStatement();
         popScope();
 
-        ASTType *proto = ASTType::getFunctionTy(type, params, vararg);
-        Declaration *decl = new FunctionDeclaration(id, proto, parameters,
+        //ASTType *proto = ASTType::getFunctionTy(type, params, vararg);
+        Declaration *decl = new FunctionDeclaration(id, thisTy, type, parameters, vararg,
                 funcScope, stmt, t_id.loc, dqual);
         id->setDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;

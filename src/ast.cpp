@@ -11,6 +11,27 @@ Package::Package(Package *par, std::string nm) : parent(par), scope(NULL), cgVal
     }
 }
 
+ASTType *FunctionDeclaration::getType() {
+    if(!prototype) {
+        std::vector<ASTType *> paramTy;
+
+        if(owner) {
+            if(owner->isReference()) { // XXX hopefully this is only called after type resolution
+            paramTy.push_back(owner);
+            } else {
+                paramTy.push_back(owner->getPointerTy()); //XXX bit messy
+            }
+        }
+
+        for(int i = 0; i < parameters.size(); i++) {
+            paramTy.push_back(parameters[i]->getType());
+        }
+
+        prototype = ASTType::getFunctionTy(returnTy, paramTy, vararg);
+    }
+    return prototype;
+} //TODO: 'prototype' should be 'type'?
+
 size_t UserTypeDeclaration::getAlign() const {
     size_t align = 0;
     VariableDeclaration *vd;

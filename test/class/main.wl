@@ -7,27 +7,32 @@ int main(int argc, char^^ argv)
 {
     MyClass cl
     MySpecialClass scl
-    MySpecialClass^ sclpt = &scl
 
-    sclpt.printCall()
+    cl = new MyClass
+    scl = new MySpecialClass
+
+    printf("cl a: %d\n", cl.a);
     cl.a = 5
+    printf("cl a: %d\n", cl.a);
     scl.svar = 11
     scl.a = 2
     scl.b = 11
     scl.printCall();
-    int i = vcall(&scl)
-    int j = vcall(&cl)
-    printf("out %d\n", i);
-    printf("out %d\n", j);
-    cl.weirdFunc()
-    someStruct s
-    s.myfunc()
+    //int i = vcall(scl)
+    //int j = vcall(cl)
+    //printf("out %d\n", i);
+    //printf("out %d\n", j);
+    //cl.weirdFunc()
+    //sclpt.printCall()
+    SomeStruct s
+    s.i = 5
+    printf("struct %d\n", s.myfunc())
     return 0
 }
 
-MyClass^ weirdFunc(MyClass^ f) return f
+//MyClass weirdFunc(MyClass f) return f
 
-int vcall(MyClass^ myclass) return myclass.myFunction(5,6);
+//int vcall(MyClass myclass) return myclass.myFunction(5,6);
 
 class MySpecialClass : MyClass
 {
@@ -41,9 +46,10 @@ class MySpecialClass : MyClass
         return v1 + v2 + .svar
     }
 
+    /*
     implicit void this() {
         .svar = 0
-    }
+    }*/
 }
 
 class MyClass
@@ -56,7 +62,7 @@ class MyClass
     }
 }
 
-struct someStruct {
+struct SomeStruct {
     int i;
     int myfunc() return .i
 }

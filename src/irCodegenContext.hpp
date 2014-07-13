@@ -174,6 +174,7 @@ class IRCodegenContext : public CodegenContext
     // codegen value
     llvm::Value *codegenValue(ASTValue *v);
     llvm::Value *codegenLValue(ASTValue *v);
+    llvm::Value *codegenRefValue(ASTValue *v);
 
     //debug
     llvm::DIDescriptor diScope(){ return scope->debug; }

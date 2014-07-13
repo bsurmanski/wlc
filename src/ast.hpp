@@ -228,23 +228,29 @@ struct PackageDeclaration : public Declaration {
 struct FunctionDeclaration : public Declaration
 {
     llvm::DISubprogram diSubprogram;
+    ASTType *owner; // aka 'this'
     ASTType *prototype;
+    ASTType *returnTy;
     std::vector<VariableDeclaration*> parameters;
+    bool vararg;
     ASTScope *scope;
     Statement *body;
     void *cgValue;
-    FunctionDeclaration(Identifier *id, ASTType *p, std::vector<VariableDeclaration*> params,
-            ASTScope *sc, Statement *st, SourceLocation loc, DeclarationQualifier dqual) :
-        Declaration(id, loc, dqual), prototype(p), parameters(params), scope(sc),
+
+    FunctionDeclaration(Identifier *id, ASTType *own, ASTType *ret, std::vector<VariableDeclaration*> params,
+            bool varg,  ASTScope *sc, Statement *st, SourceLocation loc, DeclarationQualifier dqual) :
+        Declaration(id, loc, dqual), owner(own), prototype(0), returnTy(ret), vararg(varg),
+        parameters(params), scope(sc),
         body(st), cgValue(NULL) {
             //if(scope)
             //    scope->setOwner(this);
         }
     virtual FunctionDeclaration *functionDeclaration() { return this; }
     ASTScope *getScope() { return scope; }
-    ASTType *getReturnType() { return prototype->functionType()->ret; }
+    ASTType *getReturnType() { return returnTy; }
 
-    virtual ASTType *getType() { return prototype;  } //TODO: 'prototype' should be 'type'?
+    virtual ASTType *getType();
+
     virtual void accept(ASTVisitor *v);
 };
 

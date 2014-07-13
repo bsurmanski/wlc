@@ -77,7 +77,7 @@ struct ASTType
     ASTType *getPointerTy();
     ASTType *getArrayTy(int sz);
     ASTType *getArrayTy();
-    virtual UserTypeDeclaration *getDeclaration() { return NULL; }
+    virtual UserTypeDeclaration *getDeclaration() const { return NULL; }
     virtual size_t getSize()
     {
         switch(kind)
@@ -140,7 +140,7 @@ struct ASTType
         }
     }
 
-    bool coercesTo(ASTType *ty) const
+    virtual bool coercesTo(ASTType *ty) const
     {
         switch(kind)
         {
@@ -229,6 +229,7 @@ struct ASTType
     bool isVector() { return kind == TYPE_VEC; }
     bool isArray() { return kind == TYPE_ARRAY || kind == TYPE_DYNAMIC_ARRAY; }
     bool isComposite() { return compositeType(); }
+    virtual bool isReference() { return false; } //TODO: name is confusing with 'getReferencedTy()'
     virtual bool isPointer() { return false; }
     virtual bool isUnknown() { return false; }
     virtual bool isClass() { return false; }
@@ -339,18 +340,22 @@ struct ASTUserType : public ASTCompositeType {
     long getMemberIndex(std::string member);
     long getVTableIndex(std::string method);
     long getMemberOffset(size_t i);
-    virtual UserTypeDeclaration *getDeclaration() {
+    virtual UserTypeDeclaration *getDeclaration() const {
         return (UserTypeDeclaration*) identifier->getDeclaration();
     }
 
     // only valid after AST is validated
     ASTType *getBaseType();
 
+    virtual bool coercesTo(ASTType *ty) const {
+        return getDeclaration() == ty->getDeclaration(); //TODO: might not work...
+    }
     virtual bool isResolved() { return getDeclaration(); }
 
     ASTScope *getScope();
 
     virtual FunctionDeclaration *getDefaultConstructor();
+    virtual bool isReference();
     virtual bool isClass();
     virtual bool isInterface();
     virtual bool isStruct();

@@ -409,7 +409,7 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
             f->getMangledName(),
             currentFile(),
             f->loc.line, //TODO
-            createPrototype(f->prototype),
+            createPrototype(f->getType()),
             false, //is local
             f->body, //is definition
             f->loc.line,
@@ -417,7 +417,7 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
             false, //isoptimized
             (Function*) f->cgValue);
 
-    //for(int i = 0; i < f->prototype->parameters.size(); i++)
+    //for(int i = 0; i < f->getType()->parameters.size(); i++)
     {
     }
     }

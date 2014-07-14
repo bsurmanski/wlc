@@ -152,14 +152,12 @@ int main(int argc, char^^ argv)
     darr[4],
     );
 
-    /*
     int[] newarr = new int[5]
-    delete newarr
+    //delete newarr
     int^ mymalloc = new int
     delete mymalloc
-    */
 
-    //void function() testFunc = update
+    void function() testFunc = update
 
     int8 spc = 0
     while(!spc) 
@@ -169,7 +167,7 @@ int main(int argc, char^^ argv)
         spc = keystate[SDLK_SPACE]
         SDL_Delay(32)
         SDL_Flip(surf)
-        //testFunc()
+        testFunc()
         update()
     }
 

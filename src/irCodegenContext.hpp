@@ -209,7 +209,7 @@ class IRCodegenContext : public CodegenContext
 
     // ops
     ASTValue *getMember(ASTValue *val, std::string member); // .
-    ASTValue *getValueOf(ASTValue *ptr);    // ^
+    ASTValue *getValueOf(ASTValue *ptr, bool lval=true);    // ^
     ASTValue *getAddressOf(ASTValue *lval); // &
     ASTValue *opAddValues(ASTValue *a, ASTValue *b); // +
     ASTValue *opSubValues(ASTValue *a, ASTValue *b); // -

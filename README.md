@@ -117,8 +117,9 @@ is because in a statement like
     ...
     var myvar = myTuple[i]
 
-it is imposible to determine the type required of 'v', either int or char^.
-It may be possible if all types in the tuple are of a uniform type:
+it is imposible to statically resolve a type for 'myvar', which will be either
+int or char^ depending on if the index 'i' is 0 or 1.  In the future, it may be
+possible if all types in the tuple are of a uniform type:
 
     [int, int, int] myIntTuple
     ...
@@ -154,7 +155,8 @@ Tuples can be implicitly converted to a struct with an identical signature.
     [int, float] myTuple = [1, 2.2]
     MyStrct st = myTuple
 
-this would allow compound struct declarations to use the same syntax as tuples.
+This would also have the benefit of allowing structs to
+share a common syntax as tuples in declarations.
 
     MyStruct s = [1, 2, 3]
     [int,int,int] i = [1, 2, 3]

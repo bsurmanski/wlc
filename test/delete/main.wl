@@ -8,4 +8,7 @@ int main(int argc, char^^ argv) {
 
     MyClass cl = new MyClass
     delete cl
+
+    int[] newarr = new int[5]
+    delete newarr
 }

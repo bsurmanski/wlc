@@ -494,7 +494,6 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
             arrayList.push_back((Function*)
                     ir->CreatePointerCast(func, codegenType(vfty)));
         }
-
     }
 
     int sz = utdecl->classDeclaration() ? utdecl->classDeclaration()->vtable.size() : 0;
@@ -507,6 +506,7 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
     members.push_back(vtable);
 
     GlobalVariable *gv = new GlobalVariable(*module, vtableTy, true, GlobalValue::PrivateLinkage, vtable);
+    gv->setName("TypeInfo_" + ty->getName());
     return new ASTValue(vfty, gv, true);
 }
 
@@ -566,9 +566,9 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
 }
 
 // UNOP ^
-ASTValue *IRCodegenContext::getValueOf(ASTValue *ptr){
+ASTValue *IRCodegenContext::getValueOf(ASTValue *ptr, bool lvalue){
     assert_message(ptr->getType()->isPointer(), msg::FAILURE, "attempt to dereference non pointer type");
-    return new ASTValue(ptr->getType()->getReferencedTy(), codegenValue(ptr), true);
+    return new ASTValue(ptr->getType()->getReferencedTy(), codegenValue(ptr), lvalue);
 }
 
 // UNOP &
@@ -1106,7 +1106,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     ASTType *rtype = NULL;
 
     if(func->getType()->isPointer()){ // dereference function pointer
-        func = getValueOf(func);
+        func = getValueOf(func, false);
     }
     astfty = dynamic_cast<ASTFunctionType*>(func->getType());
     if(!astfty) {
@@ -1673,6 +1673,12 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
         } if(val->type->isArray())
         {
             return promoteArray(val, toType);
+        } else if(val->type->isReference()) {
+            if(toType->isPointer()) {
+                return new ASTValue(toType,
+                        ir->CreatePointerCast(codegenLValue(val),
+                            codegenType(toType)));
+            }
         }
     }
     return val; // no conversion? failed converson?

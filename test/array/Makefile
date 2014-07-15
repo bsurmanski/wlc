@@ -1,5 +1,5 @@
 all:
-	wlc array.wl -o program
+	wlc main.wl -o program
 
-ll:  
-	wlc array.wl -S
+ll:
+	wlc main.wl -S

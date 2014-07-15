@@ -1296,7 +1296,10 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         }  else if(arr->getType()->kind == TYPE_ARRAY)
         {
             ASTType *indexedType = arr->getType()->getReferencedTy();
-            Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), codegenValue(ind));
+            std::vector<Value*> gep;
+            gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
+            gep.push_back(codegenValue(ind));
+            Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
             return new ASTValue(indexedType, val, true);
         } else if(arr->getType()->isPointer())
         {
@@ -1460,8 +1463,12 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 
                 if(dexp->rhs == "ptr")
                 {
-                    return new ASTValue(ty->getPointerTy(),
-                            ir->CreateInBoundsGEP(codegenLValue(lhs), 0), true);
+                    std::vector<Value*> gep;
+                    gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
+                    gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
+                    Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
+                    return new ASTValue(ty->getPointerTy(), llval, false); //XXX static array ptr is immutable(?)
+
                 }
 
                 if(dexp->rhs == "size")

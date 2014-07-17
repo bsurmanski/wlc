@@ -7,7 +7,12 @@ using namespace std;
 #include "irCodegenContext.hpp"
 #include "message.hpp"
 #include "config.hpp"
+
 #include <unistd.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <ftw.h>
+
 #include <vector>
 #include <llvm/Linker.h>
 #include <string.h>
@@ -153,9 +158,18 @@ WLConfig parseCmd(int argc, char **argv)
     return params;
 }
 
+static int remove_ftw(const char *path, const struct stat *st, int, struct FTW*) {
+    int rv = remove(path);
+
+    if(rv)
+        perror(path);
+
+    return rv;
+}
+
 void deinit(WLConfig &config)
 {
-    rmdir(config.tempName.c_str());
+    nftw(config.tempName.c_str(), remove_ftw, 8, FTW_PHYS | FTW_DEPTH);
 }
 
 int main(int argc, char **argv)

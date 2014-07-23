@@ -41,7 +41,7 @@ void IRCodegenContext::dwarfStopPoint(SourceLocation l)
 
 llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
 {
-    ASTUserType *userty = ty->userType();
+    ASTUserType *userty = ty->asUserType();
     UserTypeDeclaration *utdecl = userty->getDeclaration();
     if(!userty) {
         emit_message(msg::FAILURE, "invalid user type");
@@ -128,7 +128,7 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
         emit_message(msg::FAILURE, "unknown union type");
     }
 
-    ASTUserType *userty = ty->userType();
+    ASTUserType *userty = ty->asUserType();
 
     unsigned align = 0;
     unsigned size = 0;
@@ -247,7 +247,7 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
 }
 
 llvm::Type *IRCodegenContext::codegenFunctionType(ASTType *ty) {
-    ASTFunctionType *astfty = ty->functionType();
+    ASTFunctionType *astfty = ty->asFunctionType();
     if(!astfty) {
         emit_message(msg::FAILURE, "attempt to codegen invalid function type");
         return NULL;
@@ -456,7 +456,7 @@ ASTValue *IRCodegenContext::getVTable(ASTValue *instance) {
 }
 
 ASTValue *IRCodegenContext::vtableLookup(ASTValue *instance, std::string func) {
-    ASTUserType *userty = instance->getType()->userType();
+    ASTUserType *userty = instance->getType()->asUserType();
     if(!userty) emit_message(msg::ERROR, "virtual function lookup only valid for class");
 
     //TODO: function index
@@ -514,7 +514,7 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
 ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
     if(val->getType()->isPointer())
         val = getValueOf(val);
-    ASTUserType *userty = val->getType()->userType();
+    ASTUserType *userty = val->getType()->asUserType();
 
     if(!userty){
         emit_message(msg::FAILURE, "cannot get member in non-usertype");
@@ -791,7 +791,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
     bool lvalue = true;
     ASTCompositeType* compty = 0;
     if(ty)
-        ty->compositeType();
+        compty = ty->asCompositeType();
 
     for(int i = 0; i < exp->members.size(); i++)
     {
@@ -883,7 +883,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 
     if(ty->isClass()) {
          // no default value, and allocated class. set VTable, in case
-        ASTUserType *uty = ty->userType();
+        ASTUserType *uty = ty->asUserType();
         if(FunctionDeclaration *fdecl = uty->getDefaultConstructor()){
             std::vector<ASTValue*> args;
             args.push_back(val);
@@ -1394,12 +1394,12 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 lhs = getValueOf(lhs);
 
             //TODO: allow indexing types other than userType and array?
-            if(!lhs->getType()->userType() && !lhs->getType()->isArray()) {
+            if(!lhs->getType()->asUserType() && !lhs->getType()->isArray()) {
                 emit_message(msg::ERROR, "can only index struct or array type", dexp->loc);
                 return NULL;
             }
 
-            if(ASTUserType *userty = lhs->getType()->userType()){
+            if(ASTUserType *userty = lhs->getType()->asUserType()){
                 Identifier *id = userty->getDeclaration()->lookup(dexp->rhs);
                 ASTValue *ret = NULL;
 
@@ -2116,7 +2116,7 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
     ///////////////
     //XXX work around for undeclared struct
     Identifier *id = NULL;
-    ASTUserType *userty = vty->userType();
+    ASTUserType *userty = vty->asUserType();
     if(userty && vty->isUnknown())
     {
         emit_message(msg::WARNING, "unknown type should be resolved in codegen" + id->getName(), vdecl->loc);
@@ -2184,7 +2184,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
         pushScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
         dwarfStopPoint(fdecl->loc);
 
-        ASTFunctionType *astfty = fdecl->getType()->functionType();
+        ASTFunctionType *astfty = fdecl->getType()->asFunctionType();
         int idx = 0;
 
         Function::arg_iterator AI = func->arg_begin();

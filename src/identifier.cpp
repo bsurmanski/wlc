@@ -4,27 +4,35 @@
 #include <assert.h>
 
 Identifier::Identifier(ASTScope *ta, std::string s, IDType t) :
-    table(ta), type(t), name(s), declaration(NULL), astValue(NULL), isMangled(false), expression(0)
+    table(ta), kind(t), name(s), declaration(NULL), astValue(NULL), isMangled(false), expression(0)
 {
     mangled = "";
 }
 
-void Identifier::setDeclaration(Declaration *decl, IDType ty)
+void Identifier::addDeclaration(Declaration *decl, IDType ty)
 {
-    FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(declaration);
-    if(!fdecl || (fdecl && fdecl->body))
+    FunctionDeclaration *fdeclaration = dynamic_cast<FunctionDeclaration*>(declaration);
+    FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(decl);
+    if(fdecl && fdeclaration && fdecl->body){
+        fdecl->nextoverload = fdeclaration; // push decl into front of overload linked list
+        declaration = decl;
+        return;
+    }
+
+    if(!fdeclaration || (fdeclaration && fdeclaration->body)){
         if(declaration)
         {
             emit_message(msg::FATAL, "redefinition of " + getName() +
                     " originally defined at " + declaration->loc.toString(), decl->loc);
         }
+    }
     declaration = decl;
-    type = ty;
+    kind = ty;
 }
 
 ASTType *Identifier::getType()
 {
-    if(type == ID_EXPRESSION){
+    if(kind == ID_EXPRESSION){
         return expression->getType();
     }
 
@@ -34,7 +42,7 @@ ASTType *Identifier::getType()
 ASTType *Identifier::getDeclaredType()
 {
     //TODO: class
-    if(type != ID_USER && type != ID_UNKNOWN) {
+    if(kind != ID_USER && kind != ID_UNKNOWN) {
         //emit_message(msg::FAILURE, "this doesnt look like a type");
         return NULL;
     }
@@ -66,8 +74,6 @@ void Identifier::setValue(ASTValue *val)
 }
 
 std::string Identifier::getMangledName() {
-    if(noMangle) return getName();
-
     if(!isMangled) {
         mangled = table->getMangledName() + "$" + getName();
         isMangled = true;

@@ -50,7 +50,6 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
         string name = clang_getCString(cxname);
 
         Identifier *id = scope->get(name);
-        id->setMangle(false);
         ASTType *ty = ASTTypeFromCType(unit, clang_getCursorType(cursor));
         if(!ty) return CXChildVisit_Break;
         VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
@@ -61,7 +60,6 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
         ASTType *ty = ASTTypeFromCType(unit, clang_getCursorType(cursor));
         if(!ty) return CXChildVisit_Break;
         Identifier *id = scope->get("___" + ty->getName()); // TODO: proper scope name
-        id->setMangle(false);
         VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
         id->setDeclaration(vdecl, Identifier::ID_VARIABLE);
         //members->push_back(vdecl);
@@ -96,7 +94,6 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
     if(!id)
     {
         id = unit->getScope()->get(name);
-        id->setMangle(false);
 
         StructVisitorArg svarg = { unit, &members, tbl };
         clang_visitChildren(typeDecl, StructVisitor, &svarg);
@@ -216,7 +213,6 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         if(!rType) goto ERR;
 
         Identifier *id = unit->getScope()->get(name);
-        id->setMangle(false);
 
         DeclarationQualifier dqual;
         dqual.decorated = false;
@@ -238,7 +234,6 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         if(!wlType) goto ERR;
 
         Identifier *id = unit->getScope()->get(name);
-        id->setMangle(false);
         CXLinkageKind linkage = clang_getCursorLinkage(cursor);
         DeclarationQualifier dqual;
         dqual.external = linkage == CXLinkage_External || linkage == CXLinkage_UniqueExternal;
@@ -261,7 +256,6 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 
                 string name = string(clang_getCString(clang_getCursorSpelling(cursor)));
                 Identifier *id = unit->getScope()->get(name);
-                id->setMangle(false);
                 if(id->getDeclaration())
                 {
                     printf("Macro redefines value, ");
@@ -288,7 +282,6 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         CXString cxname = clang_getCursorSpelling(cursor);
         std::string name = clang_getCString(cxname);
         Identifier *id = unit->getScope()->get(name);
-        id->setMangle(false);
         int64_t val = clang_getEnumConstantDeclValue(cursor);
                 NumericExpression *nval = new NumericExpression(NumericExpression::INT,
                         ASTType::getLongTy(), (uint64_t) val);

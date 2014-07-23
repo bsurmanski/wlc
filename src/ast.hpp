@@ -229,7 +229,7 @@ struct FunctionDeclaration : public Declaration
 {
     llvm::DISubprogram diSubprogram;
     ASTType *owner; // aka 'this'
-    ASTType *prototype;
+    ASTType *prototype; // generated on call to 'getType'. should be called after resolution only
     ASTType *returnTy;
     std::vector<VariableDeclaration*> parameters;
     bool vararg;
@@ -237,11 +237,13 @@ struct FunctionDeclaration : public Declaration
     Statement *body;
     void *cgValue;
 
+    FunctionDeclaration *nextoverload; // linked list of overloaded function declarations
+
     FunctionDeclaration(Identifier *id, ASTType *own, ASTType *ret, std::vector<VariableDeclaration*> params,
             bool varg,  ASTScope *sc, Statement *st, SourceLocation loc, DeclarationQualifier dqual) :
         Declaration(id, loc, dqual), owner(own), prototype(0), returnTy(ret), vararg(varg),
         parameters(params), scope(sc),
-        body(st), cgValue(NULL) {
+        body(st), cgValue(NULL), nextoverload(0) {
             //if(scope)
             //    scope->setOwner(this);
         }
@@ -250,6 +252,15 @@ struct FunctionDeclaration : public Declaration
     ASTType *getReturnType() { return returnTy; }
 
     virtual ASTType *getType();
+
+    virtual std::string getMangledName(){
+        if(identifier && qualifier.decorated){
+            return identifier->getMangledName() + "$$" + getType()->getMangledName();
+        } else if(identifier){
+            return identifier->getName();
+        }
+        return "";
+    }
 
     virtual void accept(ASTVisitor *v);
 };

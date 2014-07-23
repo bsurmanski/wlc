@@ -69,6 +69,11 @@ std::string ASTPointerType::getName(){
     return ptrTo->getName() + "^";
 }
 
+std::string ASTPointerType::getMangledName()
+{
+    return "p" + ptrTo->getMangledName();
+}
+
 //
 // StaticArrayType
 //
@@ -212,8 +217,9 @@ void ASTType::accept(ASTVisitor *v) {
 }
 
 FunctionDeclaration *ASTUserType::getDefaultConstructor() { return getDeclaration()->getDefaultConstructor(); }
+ASTUserType *ASTUserType::asClass() { if(dynamic_cast<ClassDeclaration*>(identifier->getDeclaration())) return this; }
+ASTUserType *ASTUserType::asInterface() { if(dynamic_cast<InterfaceDeclaration*>(identifier->getDeclaration())) return this; }
+ASTUserType *ASTUserType::asStruct() { if(dynamic_cast<StructDeclaration*>(identifier->getDeclaration())) return this; }
+ASTUserType *ASTUserType::asUnion() { if(dynamic_cast<UnionDeclaration*>(identifier->getDeclaration())) return this; }
+
 bool ASTUserType::isReference() { return dynamic_cast<ClassDeclaration*>(identifier->getDeclaration()); }
-bool ASTUserType::isClass() { return dynamic_cast<ClassDeclaration*>(identifier->getDeclaration()); }
-bool ASTUserType::isInterface() { return dynamic_cast<InterfaceDeclaration*>(identifier->getDeclaration()); }
-bool ASTUserType::isStruct() { return dynamic_cast<StructDeclaration*>(identifier->getDeclaration()); }
-bool ASTUserType::isUnion() { return dynamic_cast<UnionDeclaration*>(identifier->getDeclaration()); }

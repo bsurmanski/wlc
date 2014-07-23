@@ -60,6 +60,12 @@ class MyClass
     int myFunction(int a, int b) {
         return a + b
     }
+
+    /*
+    this() {
+        a = 0
+        b = 0
+    }*/
 }
 
 struct SomeStruct {

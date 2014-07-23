@@ -383,7 +383,7 @@ llvm::DIType IRDebug::createType(ASTType *ty)
 
 llvm::DICompositeType IRDebug::createPrototype(ASTType *p)
 {
-    ASTFunctionType *astfty = p->functionType();
+    ASTFunctionType *astfty = p->asFunctionType();
     assert(astfty);
 
     vector<Value*> vec;

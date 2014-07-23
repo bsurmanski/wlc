@@ -29,14 +29,14 @@ struct Identifier
         ID_ANY,
     };
 
-    bool noMangle;
     bool isMangled;
-    IDType type;
+    IDType kind;
     std::string name;
-    std::string mangled;
+    std::string mangled; // mangled base name (without parameter/return qualifier)
     Declaration *declaration;
     Expression *expression;
-    ASTScope *table;
+
+    ASTScope *table; // scope in which identifier is defined
     union
     {
         struct
@@ -48,11 +48,10 @@ struct Identifier
     };
 
     Identifier(ASTScope *ta, std::string s, IDType t = ID_UNKNOWN);
-    void setDeclaration(Declaration *decl, IDType t = ID_UNKNOWN);
+    void addDeclaration(Declaration *decl, IDType t = ID_UNKNOWN);
     Declaration *getDeclaration() { return declaration; }
-    void setExpression(Expression *e) { expression = e; type = ID_EXPRESSION; }
+    void setExpression(Expression *e) { expression = e; kind = ID_EXPRESSION; }
     Expression *getExpression() { return expression; }
-    void setMangle(bool val) { noMangle = !val; }
     std::string getName() { return name; }
     std::string getMangledName();
     ASTType *getType();
@@ -62,18 +61,18 @@ struct Identifier
     ASTValue *getValue();
     ASTScope *getScope() { return table; }
     void setValue(ASTValue *value);
-    bool isUndeclared() { return type == ID_UNKNOWN; }
-    bool isVariable() { return type == ID_VARIABLE; }
-    bool isFunction() { return type == ID_FUNCTION; }
-    bool isUserType() { return type == ID_USER; }
+    bool isUndeclared() { return kind == ID_UNKNOWN; }
+    bool isVariable() { return kind == ID_VARIABLE; }
+    bool isFunction() { return kind == ID_FUNCTION; }
+    bool isUserType() { return kind == ID_USER; }
     bool isStruct();
     bool isUnion();
     bool isClass();
     bool isInterface();
-    bool isPackage() { return type == ID_PACKAGE; }
-    bool isModule() { return type = ID_MODULE; }
-    bool isExpression() { return type == ID_EXPRESSION; }
-    bool isLabel() { return type == ID_LABEL; }
+    bool isPackage() { return kind == ID_PACKAGE; }
+    bool isModule() { return kind == ID_MODULE; }
+    bool isExpression() { return kind == ID_EXPRESSION; }
+    bool isLabel() { return kind == ID_LABEL; }
 
     bool isTypeMember();
     ASTType *getMemberOwner();

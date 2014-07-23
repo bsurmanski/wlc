@@ -44,6 +44,7 @@ struct UserTypeDeclaration;
 struct ASTUserType;
 struct ASTCompositeType;
 struct ASTFunctionType;
+struct ASTPointerType;
 #include <llvm/DebugInfo.h> //XXX
 
 struct ASTType
@@ -216,6 +217,25 @@ struct ASTType
         }
     }
 
+    virtual std::string getMangledName()
+    {
+        switch(kind){
+            case TYPE_CHAR: return "s08";
+            case TYPE_UCHAR: return "u08";
+            case TYPE_BOOL: return "b08";
+            case TYPE_SHORT: return "s16";
+            case TYPE_USHORT: return "u16";
+            case TYPE_INT: return "s32";
+            case TYPE_UINT: return "u32";
+            case TYPE_LONG: return "s64";
+            case TYPE_ULONG: return "u64";
+            case TYPE_FLOAT: return "f32";
+            case TYPE_DOUBLE: return "f64";
+            case TYPE_VOID: return "v00";
+            default: assert(false && "unimplemented getname");
+        }
+    }
+
     virtual ASTType *getReferencedTy() const { return NULL; }
     bool isAggregate() { return kind == TYPE_USER; } //XXX kinda...
     bool isBool() { return kind == TYPE_BOOL; }
@@ -228,18 +248,25 @@ struct ASTType
     bool isNumeric() { return isFloating() || isInteger(); }
     bool isVector() { return kind == TYPE_VEC; }
     bool isArray() { return kind == TYPE_ARRAY || kind == TYPE_DYNAMIC_ARRAY; }
-    bool isComposite() { return compositeType(); }
+    bool isComposite() { return asCompositeType(); }
     virtual bool isReference() { return false; } //TODO: name is confusing with 'getReferencedTy()'
-    virtual bool isPointer() { return false; }
     virtual bool isUnknown() { return false; }
-    virtual bool isClass() { return false; }
-    virtual bool isInterface() { return false; }
-    virtual bool isStruct() { return false; }
-    virtual bool isUnion() { return false; }
+    bool isPointer() { return asPointer(); }
+    bool isClass() { return asClass(); }
+    bool isInterface() { return asInterface(); }
+    bool isStruct() { return asStruct(); }
+    bool isUnion() { return asUnion(); }
+    bool isFunctionType() { return asFunctionType(); }
 
-    virtual ASTUserType *userType() { return NULL; }
-    virtual ASTCompositeType *compositeType() { return NULL; }
-    virtual ASTFunctionType *functionType() { return NULL; }
+    virtual ASTFunctionType *asFunctionType() { return NULL; }
+    virtual ASTCompositeType *asCompositeType() { return NULL; }
+    virtual ASTUserType *asUserType() { return NULL; }
+    virtual ASTUserType *asClass() { return NULL; }
+    virtual ASTUserType *asInterface() { return NULL; }
+    virtual ASTUserType *asUnion() { return NULL; }
+    virtual ASTUserType *asStruct() { return NULL; }
+    virtual ASTPointerType *asPointer() { return NULL; }
+
 
     static std::vector<ASTType *> typeCache;
 #define DECLTY(NM) static ASTType *NM; static ASTType *get##NM();
@@ -274,7 +301,7 @@ struct ASTBasicType : public ASTType {
 struct ASTCompositeType : public ASTType {
     ASTCompositeType(ASTTypeEnum k) : ASTType(k) {}
     virtual ASTType *getMemberType(size_t i) = 0;
-    virtual ASTCompositeType *compositeType() { return this; }
+    virtual ASTCompositeType *asCompositeType() { return this; }
 };
 
 struct ASTFunctionType : public ASTCompositeType {
@@ -289,8 +316,35 @@ struct ASTFunctionType : public ASTCompositeType {
     ASTFunctionType(ASTUserType *own, ASTType *r, std::vector<ASTType *> p, bool va = false) :
         ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION), owner(own) {}
 
+    virtual ASTFunctionType *asFunctionType() { return this; }
     bool isVararg() { return vararg; }
     bool isMethod() { return owner; }
+
+    virtual std::string getName() {
+        std::string name = ret->getName() + " function(";
+        for(int i = 0; i < params.size(); i++){
+            if((i+1) < params.size()){
+                name = name + params[i]->getName() + ", ";
+            } else {
+                name = name + params[i]->getName() + ")";
+            }
+        }
+        return name;
+    }
+
+    virtual std::string getMangledName() {
+        char buf[32];
+        sprintf(buf, "%02d", params.size());
+        std::string name = std::string("f") + std::string(buf) + ret->getMangledName() + "$$";
+        for(int i = 0; i < params.size(); i++){
+            if((i+1) < params.size()){
+                name = name + params[i]->getMangledName() + "$$";
+            } else {
+                name = name + params[i]->getMangledName();
+            }
+        }
+        return name;
+    }
 
     ASTType *getMemberType(size_t index)
     {
@@ -308,17 +362,19 @@ struct UserTypeDeclaration;
  * Represents a user type. Since the declaration of a type may
  * appear after it's usage, the ASTUserType class is mostly
  * a shell used to proxy the Identifier, and subsequently the
- * UserTypeDeclaration class.
+ * UserTypeDeclaration class. This is also why class/struct/union types
+ * can not be represented as separate classes inheriting ASTUserType.
  *
  * The UserTypeDeclaration class should hold all of the true information
  * about a type.
  *
- * Also because of this, most of the methods of this class should not
+ * Also because of the late binding, most of the methods of this class should not
  * be called until type resolution.
  *
  * Additionally, due to the requirement to have ASTType available before it's definition
  * (for example for a variable type, parameter type, cast), and potentially in different
- * packages, ASTUserType does not necessarily represent a unique type.
+ * packages, ASTUserType does not necessarily represent a unique type. This is quite inconvenient,
+ * but due to the late binding, I believe it is necessary
  */
 struct ASTUserType : public ASTCompositeType {
     Identifier *identifier;
@@ -329,7 +385,22 @@ struct ASTUserType : public ASTCompositeType {
     }
 
     virtual std::string getName() { return identifier->getName(); }
-    virtual ASTUserType *userType() { return this; }
+    virtual std::string getMangledName() {
+        if(isClass())
+            return "UC" + identifier->getMangledName();
+        if(isUnion())
+            return "UU" + identifier->getMangledName();
+        if(isInterface())
+            return "UI" + identifier->getMangledName();
+        if(isStruct())
+            return "US" + identifier->getMangledName();
+    }
+    virtual ASTUserType *asUserType() { return this; }
+    virtual ASTUserType *asClass();
+    virtual ASTUserType *asInterface();
+    virtual ASTUserType *asUnion();
+    virtual ASTUserType *asStruct();
+
     virtual bool isUnknown() { return !identifier->getDeclaredType(); }
     virtual bool isOpaque();
     virtual size_t length();
@@ -356,10 +427,6 @@ struct ASTUserType : public ASTCompositeType {
 
     virtual FunctionDeclaration *getDefaultConstructor();
     virtual bool isReference();
-    virtual bool isClass();
-    virtual bool isInterface();
-    virtual bool isStruct();
-    virtual bool isUnion();
 };
 
 struct ASTTupleType : public ASTCompositeType {
@@ -368,7 +435,30 @@ struct ASTTupleType : public ASTCompositeType {
     virtual size_t length() { return types.size(); }
     virtual size_t getSize();
     virtual size_t getAlign();
-    virtual std::string getName() { return ""; }
+    virtual std::string getName() {
+        std::string name = "tuple[";
+        for(int i = 0; i < types.size(); i++) {
+            if((i+1) < types.size()) {
+                name = name + types[i]->getName() + ", ";
+            } else {
+                name = name + types[i]->getName() + "]";
+            }
+        }
+        return name;
+    }
+
+    virtual std::string getMangledName() {
+        std::string mangle = "t" + types.size();
+        for(int i = 0; i < types.size(); i++){
+            if((i+1) < types.size()) {
+                mangle = mangle + types[i]->getMangledName() + "$$";
+            } else {
+                mangle = mangle + types[i]->getMangledName();
+            }
+        }
+        return mangle;
+    }
+
     ASTTupleType(std::vector<ASTType*> t) : ASTCompositeType(TYPE_TUPLE), types(t) {}
 };
 
@@ -376,8 +466,9 @@ struct ASTPointerType : public ASTType {
     ASTType *ptrTo;
     virtual ASTType *getReferencedTy() const { return ptrTo; }
     ASTPointerType(ASTType *pto) : ASTType(TYPE_POINTER), ptrTo(pto) {}
-    virtual bool isPointer() { return true; }
+    virtual ASTPointerType *asPointer() { return this; }
     virtual std::string getName();
+    virtual std::string getMangledName();
 };
 
 struct ASTArrayType : public ASTCompositeType {
@@ -390,6 +481,7 @@ struct ASTArrayType : public ASTCompositeType {
     virtual size_t length() = 0;
     ASTArrayType(ASTType *pto, ASTTypeEnum kind) : arrayOf(pto), ASTCompositeType(kind) {}
     std::string getName() { return "array[" + arrayOf->getName() + "]"; }
+    std::string getMangledName() { return "a" + arrayOf->getMangledName(); }
 };
 
 struct ASTStaticArrayType : public ASTArrayType {
@@ -399,6 +491,8 @@ struct ASTStaticArrayType : public ASTArrayType {
     virtual bool isDynamic() { return false; }
     virtual size_t length() { return size; }
     ASTStaticArrayType(ASTType *pto, int sz) : ASTArrayType(pto, TYPE_ARRAY), size(sz){}
+    //std::string getName() { return "Array[" + arrayOf->getName() + "]"; }
+    //std::string getMangledName() { return "A" + arrayOf->getMangledName(); }
 };
 
 struct ASTDynamicArrayType : public ASTArrayType {

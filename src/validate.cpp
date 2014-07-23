@@ -44,13 +44,13 @@ Identifier *ValidationVisitor::resolveIdentifier(Identifier *id) {
 
 ASTType *ValidationVisitor::resolveType(ASTType *ty) {
     if(!ty->isResolved()) {
-        if(ASTUserType *userty = ty->userType()) {
+        if(ASTUserType *userty = ty->asUserType()) {
             userty->identifier = resolveIdentifier(userty->identifier);
             userty->getScope()->accept(this);
         }
     }
 
-    if(ASTFunctionType *fty = ty->functionType()){
+    if(ASTFunctionType *fty = ty->asFunctionType()){
         for(int i = 0; i < fty->params.size(); i++){
             fty->params[i] = resolveType(fty->params[i]);
         }

@@ -236,8 +236,7 @@ void ParseContext::parseTopLevel(TranslationUnit *unit)
             decl = parseDeclaration();
             if(!decl)
             {
-                emit_message(msg::FAILURE, "invalid global statement, expected global,\
-                        function declaration");
+                emit_message(msg::FAILURE, "invalid global statement, expected global, function declaration");
             }
     }
 }
@@ -570,7 +569,7 @@ Declaration *ParseContext::parseDeclaration()
             static Identifier *objectId = NULL;
             if(!objectId) objectId = getAST()->getRuntimeUnit()->lookup("Object");
             if(!objectId) {
-                emit_message(msg::FAILURE, "runtime package not found");
+                emit_message(msg::FAILURE, "runtime package not found; could not find an 'Object' declaration");
             }
 
             baseId = objectId;
@@ -655,7 +654,9 @@ Declaration *ParseContext::parseDeclaration()
         dropLine();
         return NULL;
     }
-    if(getScope()->contains(t_id.toString())){
+
+    // this identifier has already been defined! if lparen is upcoming, this is a function, give it a free pass to allow for overloading
+    if(getScope()->contains(t_id.toString()) && peek().isNot(tok::lparen)){
         emit_message(msg::ERROR,
             string("redeclaration of variable ") + string("'") + t_id.toString() + string("'"),
             t_id.loc);
@@ -664,8 +665,7 @@ Declaration *ParseContext::parseDeclaration()
     }
 
     Identifier *id = getScope()->getInScope(t_id.toString());
-    if(id->getName() == "main") id->setMangle(false); // dont mangle main
-    if(!dqual.decorated) id->setMangle(false);
+    if(id->getName() == "main") dqual.decorated = false; // dont mangle main
 
     //TODO parse decl specs
 
@@ -689,7 +689,7 @@ Declaration *ParseContext::parseDeclaration()
             thisTy = owner->getDeclaredType();
             Identifier *this_id = getScope()->getInScope("this");
             VariableDeclaration *this_decl = new VariableDeclaration(thisTy, this_id, NULL, loc, DeclarationQualifier());
-            this_id->setDeclaration(this_decl, Identifier::ID_VARIABLE);
+            this_id->addDeclaration(this_decl, Identifier::ID_VARIABLE);
             //parameters.push_back(this_decl);
         }
 
@@ -723,7 +723,7 @@ Declaration *ParseContext::parseDeclaration()
             }
 
             VariableDeclaration *paramDecl = new VariableDeclaration(aty, paramId, defaultValue, loc, DeclarationQualifier());
-            paramId->setDeclaration(paramDecl, Identifier::ID_VARIABLE);
+            paramId->addDeclaration(paramDecl, Identifier::ID_VARIABLE);
             parameters.push_back(paramDecl);
 
             if(peek().is(tok::comma))
@@ -749,7 +749,7 @@ Declaration *ParseContext::parseDeclaration()
         //ASTType *proto = ASTType::getFunctionTy(type, params, vararg);
         Declaration *decl = new FunctionDeclaration(id, thisTy, type, parameters, vararg,
                 funcScope, stmt, t_id.loc, dqual);
-        id->setDeclaration(decl, Identifier::ID_FUNCTION);
+        id->addDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;
     }
 
@@ -766,12 +766,12 @@ Declaration *ParseContext::parseDeclaration()
     if(ASTArrayType *aty = dynamic_cast<ASTArrayType*>(type))
     {
         Declaration *adecl = new VariableDeclaration(type, id, defaultValue, t_id.loc, dqual);
-        id->setDeclaration(adecl, Identifier::ID_VARIABLE);
+        id->addDeclaration(adecl, Identifier::ID_VARIABLE);
         return adecl;
     }
 
     Declaration *decl = new VariableDeclaration(type, id, defaultValue, t_id.loc, dqual);
-    id->setDeclaration(decl, Identifier::ID_VARIABLE);
+    id->addDeclaration(decl, Identifier::ID_VARIABLE);
 
     //TODO: comma, multiple decl
     return decl;

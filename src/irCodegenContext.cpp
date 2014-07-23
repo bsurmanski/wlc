@@ -865,7 +865,6 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         value = ir->CreateAlloca(codegenType(ty));
         ir->CreateStore(ptr, ir->CreateStructGEP(value, 0));
         ir->CreateStore(sz, ir->CreateStructGEP(value, 1));
-        value = ir->CreateLoad(value);
         //TODO: create a 'create array' function
     } else {
         if(exp->type->isReference()){
@@ -877,6 +876,8 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 
     if(ty->isReference()){
         val = new ASTValue(ty, value, false, true);
+    } else if(ty->isArray()) {
+        val = new ASTValue(ty, value, true);
     } else {
         val = new ASTValue(ty->getPointerTy(), value);
     }

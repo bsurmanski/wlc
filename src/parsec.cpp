@@ -53,7 +53,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
         ASTType *ty = ASTTypeFromCType(unit, clang_getCursorType(cursor));
         if(!ty) return CXChildVisit_Break;
         VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
-        id->setDeclaration(vdecl, Identifier::ID_VARIABLE);
+        id->addDeclaration(vdecl, Identifier::ID_VARIABLE);
         members->push_back(vdecl);
     } else if(cursor.kind == CXCursor_UnionDecl || cursor.kind == CXCursor_StructDecl)
     {
@@ -61,7 +61,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
         if(!ty) return CXChildVisit_Break;
         Identifier *id = scope->get("___" + ty->getName()); // TODO: proper scope name
         VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
-        id->setDeclaration(vdecl, Identifier::ID_VARIABLE);
+        id->addDeclaration(vdecl, Identifier::ID_VARIABLE);
         //members->push_back(vdecl);
     } else
     {
@@ -220,7 +220,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         FunctionDeclaration *fdecl = new FunctionDeclaration(id, NULL, rType,
                parameters, clang_isFunctionTypeVariadic(fType), 0, 0, loc, dqual);
 
-        id->setDeclaration(fdecl, Identifier::ID_FUNCTION);
+        id->addDeclaration(fdecl, Identifier::ID_FUNCTION);
 
         //unit->functions.push_back(fdecl);
 
@@ -239,7 +239,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         dqual.external = linkage == CXLinkage_External || linkage == CXLinkage_UniqueExternal;
         dqual.decorated = false;
         VariableDeclaration *vdecl = new VariableDeclaration(wlType, id, 0, loc, dqual);
-        id->setDeclaration(vdecl, Identifier::ID_VARIABLE);
+        id->addDeclaration(vdecl, Identifier::ID_VARIABLE);
         //unit->globals.push_back(vdecl);
 
     } else if(cursor.kind == CXCursor_MacroDefinition)

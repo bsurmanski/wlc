@@ -318,7 +318,7 @@ struct UserTypeDeclaration : public TypeDeclaration
     {
         if(scope) scope->setOwner(id);
         identifier->setDeclaredType(type);
-        identifier->setDeclaration(this, Identifier::ID_USER);
+        identifier->addDeclaration(this, Identifier::ID_USER);
     }
 
     UserTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc, DeclarationQualifier dqual) :

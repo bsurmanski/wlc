@@ -16,7 +16,7 @@ ScopeIterator::ScopeIterator(ASTScope *sc, std::map<std::string, Identifier*>::i
 void ASTScope::addBuiltin()
 {
     //XXX dont think this is needed
-//#define BTYPE(X,SZ,SIGN) Identifier *id_##X = get(#X); id_##X->setDeclaration(new TypeDeclaration(id_##X, new ASTBasicType(id_##X,SZ,SIGN)), Identifier::ID_TYPE);
+//#define BTYPE(X,SZ,SIGN) Identifier *id_##X = get(#X); id_##X->addDeclaration(new TypeDeclaration(id_##X, new ASTBasicType(id_##X,SZ,SIGN)), Identifier::ID_TYPE);
 //#include "tokenkinds.def"
 }
 

@@ -431,7 +431,7 @@ llvm::DIGlobalVariable IRDebug::createGlobal(VariableDeclaration *decl, ASTValue
             decl->loc.line,
             createType(decl->getType()),
             false, //TODO: local to unit?
-            (Value*) val->cgValue);
+            (Value*) val->value);
 }
 
 llvm::Instruction *IRDebug::createVariable(std::string nm, ASTValue *v, BasicBlock *bb, SourceLocation loc, int argn)
@@ -449,6 +449,6 @@ llvm::Instruction *IRDebug::createVariable(std::string nm, ASTValue *v, BasicBlo
                 addr,
                 false);
 
-    Instruction *idinst = di.insertDeclare((llvm::Value*) v->cgValue, div, bb);
+    Instruction *idinst = di.insertDeclare((llvm::Value*) v->value, div, bb);
     return idinst;
 }

@@ -359,7 +359,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 
 llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 {
-    if(!value->cgValue) {
+    if(!value->value) {
         //TODO
         emit_message(msg::FAILURE, "AST Value failed to generate");
     }
@@ -368,7 +368,7 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
         return ir->CreateAlignedLoad(codegenLValue(value), 4);
     }
 
-    return (llvm::Value *) value->cgValue;
+    return (llvm::Value *) value->value;
 }
 
 llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
@@ -378,20 +378,20 @@ llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
         emit_message(msg::FATAL, "rvalue used in lvalue context!");
         return NULL;
     }
-    if(!value->cgValue) {
+    if(!value->value) {
         //TODO
         emit_message(msg::FAILURE, "AST Value failed to generate");
     }
 
     if(value->isLValue() && value->isReference()) {
-        return ir->CreateAlignedLoad(value->cgValue, 4);
+        return ir->CreateAlignedLoad(value->value, 4);
     }
 
-    return (llvm::Value*) value->cgValue;
+    return (llvm::Value*) value->value;
 }
 
 llvm::Value *IRCodegenContext::codegenRefValue(ASTValue *value) {
-    if(!value->cgValue) {
+    if(!value->value) {
         //TODO
         emit_message(msg::FAILURE, "AST Value failed to generate");
     }
@@ -400,7 +400,7 @@ llvm::Value *IRCodegenContext::codegenRefValue(ASTValue *value) {
         emit_message(msg::FAILURE, "Attempting to get reference value of non reference");
     }
 
-    return (llvm::Value*) value->cgValue;
+    return (llvm::Value*) value->value;
 }
 
 ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
@@ -412,7 +412,7 @@ ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
         llval = ir->CreateStore(codegenValue(val), codegenLValue(dest));
     }
 
-    return new ASTValue(dest->type, llval);
+    return new ASTBasicValue(dest->getType(), llval);
 }
 
 ASTValue *IRCodegenContext::getStringValue(std::string str) {
@@ -426,23 +426,23 @@ ASTValue *IRCodegenContext::getStringValue(std::string str) {
 
     //TODO: make this an ARRAY (when arrays are added), so that it has an associated length
 
-    return new ASTValue(ASTType::getCharTy()->getPointerTy(), val);
+    return new ASTBasicValue(ASTType::getCharTy()->getPointerTy(), val);
 }
 
 ASTValue *IRCodegenContext::getFloatValue(ASTType *t, float i){
     //TODO: constant cache -256-255
-    return new ASTValue(t, ConstantFP::get(codegenType(t), i));
+    return new ASTBasicValue(t, ConstantFP::get(codegenType(t), i));
 }
 
 ASTValue *IRCodegenContext::getIntValue(ASTType *t, int i){
     //TODO: constant cache -256-255
-    return new ASTValue(t, ConstantInt::get(codegenType(t), i));
+    return new ASTBasicValue(t, ConstantInt::get(codegenType(t), i));
 }
 
 ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
 {
     assert_message(lval->isLValue(), msg::FAILURE, "attempted to load RValue (must be LValue)");
-    ASTValue *loaded = new ASTValue(lval->type, codegenValue(lval));
+    ASTValue *loaded = new ASTBasicValue(lval->getType(), codegenValue(lval));
     return loaded;
 }
 
@@ -471,7 +471,7 @@ ASTValue *IRCodegenContext::vtableLookup(ASTValue *instance, std::string func) {
     FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
     ASTType *fty = fdecl->getType();
 
-    return new ASTValue(fty, ir->CreatePointerCast(llval, codegenType(fty)->getPointerTo()));
+    return new ASTBasicValue(fty, ir->CreatePointerCast(llval, codegenType(fty)->getPointerTo()));
 }
 
 ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
@@ -507,7 +507,7 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
 
     GlobalVariable *gv = new GlobalVariable(*module, vtableTy, true, GlobalValue::PrivateLinkage, vtable);
     gv->setName("TypeInfo_" + ty->getName());
-    return new ASTValue(vfty, gv, true);
+    return new ASTBasicValue(vfty, gv, true);
 }
 
 // BINOP .
@@ -530,7 +530,7 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         Value *llval = codegenLValue(val);
         llval = ir->CreateInBoundsGEP(llval, gep);
-        ASTValue base(userty->getBaseType(), llval, true, false);
+        ASTBasicValue base(userty->getBaseType(), llval, true, false);
         return getMember(&base, member);
     }
 
@@ -556,7 +556,7 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         Value *llval;
         llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
         llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
-        ASTValue *ret = new ASTValue(mtype, llval, true);
+        ASTBasicValue *ret = new ASTBasicValue(mtype, llval, true);
         ret->setOwner(val);
         return ret;
     } else {
@@ -568,81 +568,81 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
 // UNOP ^
 ASTValue *IRCodegenContext::getValueOf(ASTValue *ptr, bool lvalue){
     assert_message(ptr->getType()->isPointer(), msg::FAILURE, "attempt to dereference non pointer type");
-    return new ASTValue(ptr->getType()->getReferencedTy(), codegenValue(ptr), lvalue);
+    return new ASTBasicValue(ptr->getType()->getReferencedTy(), codegenValue(ptr), lvalue);
 }
 
 // UNOP &
 ASTValue *IRCodegenContext::getAddressOf(ASTValue *lval){
     assert_message(lval->isLValue(), msg::FAILURE, "attempt to get address of non-LValue value");
-    return new ASTValue(lval->getType()->getPointerTy(), codegenLValue(lval), false);
+    return new ASTBasicValue(lval->getType()->getPointerTy(), codegenLValue(lval), false);
 }
 
 // BINOP +
 ASTValue *IRCodegenContext::opAddValues(ASTValue *a, ASTValue *b){
     assert_message(a->getType() == b->getType(), msg::FAILURE, "values must be same type for addition");
     if(a->getType()->isFloating()){
-        return new ASTValue(a->getType(), ir->CreateFAdd(codegenValue(a), codegenValue(b)));
+        return new ASTBasicValue(a->getType(), ir->CreateFAdd(codegenValue(a), codegenValue(b)));
     }
-    return new ASTValue(a->getType(), ir->CreateAdd(codegenValue(a), codegenValue(b)));
+    return new ASTBasicValue(a->getType(), ir->CreateAdd(codegenValue(a), codegenValue(b)));
 }
 
 // BINOP -
 ASTValue *IRCodegenContext::opSubValues(ASTValue *a, ASTValue *b){
     assert_message(a->getType() == b->getType(), msg::FAILURE, "values must be same type for subtraction");
     if(a->getType()->isFloating()){
-        return new ASTValue(a->getType(), ir->CreateFSub(codegenValue(a), codegenValue(b)));
+        return new ASTBasicValue(a->getType(), ir->CreateFSub(codegenValue(a), codegenValue(b)));
     }
-    return new ASTValue(a->getType(), ir->CreateSub(codegenValue(a), codegenValue(b)));
+    return new ASTBasicValue(a->getType(), ir->CreateSub(codegenValue(a), codegenValue(b)));
 }
 
 // BINOP *
 ASTValue *IRCodegenContext::opMulValues(ASTValue *a, ASTValue *b){ // *
     assert_message(a->getType() == b->getType(), msg::FAILURE, "values must be same type for multiplication");
     if(a->getType()->isFloating()){
-        return new ASTValue(a->getType(), ir->CreateFMul(codegenValue(a), codegenValue(b)));
+        return new ASTBasicValue(a->getType(), ir->CreateFMul(codegenValue(a), codegenValue(b)));
     }
     //TODO: sign?
-    return new ASTValue(a->getType(), ir->CreateMul(codegenValue(a), codegenValue(b)));
+    return new ASTBasicValue(a->getType(), ir->CreateMul(codegenValue(a), codegenValue(b)));
 }
 
 // BINOP /
 ASTValue *IRCodegenContext::opDivValues(ASTValue *a, ASTValue *b){ // /
     assert_message(a->getType() == b->getType(), msg::FAILURE, "values must be same type for division");
     if(a->getType()->isFloating()){
-        return new ASTValue(a->getType(), ir->CreateFDiv(codegenValue(a), codegenValue(b)));
+        return new ASTBasicValue(a->getType(), ir->CreateFDiv(codegenValue(a), codegenValue(b)));
     }
 
     if(a->getType()->isSigned()){
-        return new ASTValue(a->getType(), ir->CreateSDiv(codegenValue(a), codegenValue(b)));
+        return new ASTBasicValue(a->getType(), ir->CreateSDiv(codegenValue(a), codegenValue(b)));
     }
 
     // unsigned int div
-    return new ASTValue(a->getType(), ir->CreateUDiv(codegenValue(a), codegenValue(b)));
+    return new ASTBasicValue(a->getType(), ir->CreateUDiv(codegenValue(a), codegenValue(b)));
 }
 
 // BINOP %
 ASTValue *IRCodegenContext::opModValue(ASTValue *a, ASTValue *b){ // %
     assert_message(a->getType() == b->getType(), msg::FAILURE, "values must be same type for modulus");
     if(a->getType()->isFloating()){
-        return new ASTValue(a->getType(), ir->CreateFRem(codegenValue(a), codegenValue(b)));
+        return new ASTBasicValue(a->getType(), ir->CreateFRem(codegenValue(a), codegenValue(b)));
     }
 
     if(a->getType()->isSigned()){
-        return new ASTValue(a->getType(), ir->CreateSRem(codegenValue(a), codegenValue(b)));
+        return new ASTBasicValue(a->getType(), ir->CreateSRem(codegenValue(a), codegenValue(b)));
     }
 
     // unsigned remainder
-    return new ASTValue(a->getType(), ir->CreateURem(codegenValue(a), codegenValue(b)));
+    return new ASTBasicValue(a->getType(), ir->CreateURem(codegenValue(a), codegenValue(b)));
 }
 
 // BINOP <<
 ASTValue *IRCodegenContext::opShlValue(ASTValue *a, ASTValue *b){ // <<
-    return new ASTValue(a->getType(), ir->CreateShl(codegenValue(a), codegenValue(b)));
+    return new ASTBasicValue(a->getType(), ir->CreateShl(codegenValue(a), codegenValue(b)));
 }
 
 // BINOP >>
 ASTValue *IRCodegenContext::opShrValue(ASTValue *a, ASTValue *b){ // >>
-    return new ASTValue(a->getType(), ir->CreateLShr(codegenValue(a), codegenValue(b)));
+    return new ASTBasicValue(a->getType(), ir->CreateLShr(codegenValue(a), codegenValue(b)));
 }
 
 // BINOP **
@@ -667,7 +667,7 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
                 (GlobalVariable*) module->getOrInsertGlobal(id->getMangledName(),
                         codegenType(id->getType()));
                 assert(GV);
-                IRValue irval = IRValue(new ASTValue(id->getType(), GV, true), GV);
+                IRValue irval = IRValue(new ASTBasicValue(id->getType(), GV, true), GV);
                 unit->globals[id->getName()] = irval;
                 return irval;
             }
@@ -693,16 +693,16 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
         if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
         FunctionType *fty = (FunctionType*) codegenType(fdecl->getType());
         Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
-        id->setValue(new ASTValue(fdecl->getType(), func));
+        id->setValue(new ASTBasicValue(fdecl->getType(), func));
     } else if(id->isStruct())
     {
-        id->setValue(new ASTValue(id->getDeclaredType(), NULL));
+        id->setValue(new ASTBasicValue(id->getDeclaredType(), NULL));
     } else if(id->isExpression())
     {
         id->setValue(codegenExpression(id->getExpression()));
     } else if(id->isLabel())
     {
-        id->setValue(new ASTValue(NULL, BasicBlock::Create(context,
+        id->setValue(new ASTBasicValue(NULL, BasicBlock::Create(context,
                         id->getName(), ir->GetInsertBlock()->getParent())));
     }
 
@@ -730,11 +730,11 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
                     llvmval = ConstantInt::get(codegenType(nexp->astType), nexp->intValue);
                     ty = nexp->astType;
                 }
-                return new ASTValue(ty, llvmval); //TODO: assign
+                return new ASTBasicValue(ty, llvmval); //TODO: assign
             case NumericExpression::DOUBLE:
                 llvmval = ConstantFP::get(codegenType(nexp->astType), nexp->floatValue);
                 ty = nexp->astType;
-                return new ASTValue(ty, llvmval); //TODO: assign
+                return new ASTBasicValue(ty, llvmval); //TODO: assign
         }
     }
     else if(StringExpression *sexp = exp->stringExpression())
@@ -831,7 +831,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
         //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         //Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
-        return new ASTValue(tupty, GV, true);
+        return new ASTBasicValue(tupty, GV, true);
     }
 }
 
@@ -875,11 +875,11 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
     }
 
     if(ty->isReference()){
-        val = new ASTValue(ty, value, false, true);
+        val = new ASTBasicValue(ty, value, false, true);
     } else if(ty->isArray()) {
-        val = new ASTValue(ty, value, true);
+        val = new ASTBasicValue(ty, value, true);
     } else {
-        val = new ASTValue(ty->getPointerTy(), value);
+        val = new ASTBasicValue(ty->getPointerTy(), value);
     }
 
     if(ty->isClass()) {
@@ -917,14 +917,14 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
     vector<Type*> llargty;
     ASTValue *val = codegenExpression(exp->expression);
 
-    if(val->type->isArray() && val->type->kind == TYPE_DYNAMIC_ARRAY)
+    if(val->getType()->isArray() && val->getType()->kind == TYPE_DYNAMIC_ARRAY)
     {
         //TODO: duplicate of ".ptr". make a function for this
         std::vector<Value*> gep;
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
-        val = new ASTValue(val->type->getReferencedTy()->getPointerTy(), llval, true);
+        val = new ASTBasicValue(val->getType()->getReferencedTy()->getPointerTy(), llval, true);
     }
 
     val = promoteType(val, ASTType::getCharTy()->getPointerTy());
@@ -936,7 +936,7 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
 
     Value *value = ir->CreateCall(freeFunc, llargs);
     //TODO: call deallocator function
-    //return new ASTValue(exp->type, value);
+    //return new ASTBasicValue(exp->type, value);
     return NULL;
 }
 
@@ -1060,7 +1060,7 @@ void IRCodegenContext::codegenSwitchStatement(SwitchStatement *stmt)
             emit_message(msg::ERROR, "case value can currently only be constant integer values",
                     cs->astCase->loc);
         }
-        ASTValue *caseValue = promoteType(cs->irCase, cond->type);
+        ASTValue *caseValue = promoteType(cs->irCase, cond->getType());
         sinst->addCase((llvm::ConstantInt*) codegenValue(caseValue), cs->irBlock);
     }
 
@@ -1091,7 +1091,7 @@ ASTValue *IRCodegenContext::codegenCall(ASTValue *func, std::vector<ASTValue *> 
     }
 
     llvm::Value *value = ir->CreateCall(codegenValue(func), llargs);
-    return new ASTValue(rtype, value);
+    return new ASTBasicValue(rtype, value);
 }
 
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
@@ -1250,14 +1250,14 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
                         exp->loc);
                 return NULL;
             }
-            val = new ASTValue(lhs->getType(), ir->CreateNeg(codegenValue(lhs)));
+            val = new ASTBasicValue(lhs->getType(), ir->CreateNeg(codegenValue(lhs)));
             return val;
         case tok::tilde:
             emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen (~)", exp->loc);
             return NULL;
         case tok::bang:
             val = promoteType(lhs, ASTType::getBoolTy());
-            return new ASTValue(ASTType::getBoolTy(), ir->CreateNot(codegenValue(val)));
+            return new ASTBasicValue(ASTType::getBoolTy(), ir->CreateNot(codegenValue(val)));
             return val;
         case tok::caret:
             if(!lhs->getType()->isPointer()) {
@@ -1293,7 +1293,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             val = ir->CreateLoad(val);
             val = ir->CreateInBoundsGEP(val, codegenValue(ind));
             val = ir->CreateBitCast(val, codegenType(indexedType->getPointerTy()));
-            return new ASTValue(indexedType, val, true);
+            return new ASTBasicValue(indexedType, val, true);
         }  else if(arr->getType()->kind == TYPE_ARRAY)
         {
             ASTType *indexedType = arr->getType()->getReferencedTy();
@@ -1301,13 +1301,13 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
             gep.push_back(codegenValue(ind));
             Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
-            return new ASTValue(indexedType, val, true);
+            return new ASTBasicValue(indexedType, val, true);
         } else if(arr->getType()->isPointer())
         {
             //TODO: index array
             ASTType *indexedType = arr->getType()->getReferencedTy();
             Value *val = ir->CreateInBoundsGEP(codegenValue(arr), codegenValue(ind));
-            return new ASTValue(indexedType, val, true);
+            return new ASTBasicValue(indexedType, val, true);
         } else if(arr->getType()->kind == TYPE_TUPLE)
         {
             if(ConstantInt *llci = dynamic_cast<ConstantInt*>(codegenValue(ind)))
@@ -1321,7 +1321,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 }
                 ASTType *type = tupty->types[index];
                 Value *val = ir->CreateStructGEP(codegenLValue(arr), index);
-                return new ASTValue(type, val, true);
+                return new ASTBasicValue(type, val, true);
             } else
             {
                 emit_message(msg::ERROR, "tuples can only be indexed with\
@@ -1375,7 +1375,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             {
                 if(dexp->rhs == "sizeof")
                 {
-                    return new ASTValue(ASTType::getULongTy(),
+                    return new ASTBasicValue(ASTType::getULongTy(),
                             ConstantInt::get(Type::getInt64Ty(context),
                                 declty->getSize()));
                 } else if(dexp->rhs == "offsetof")
@@ -1446,7 +1446,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
                     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
                     Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                    return new ASTValue(ty->getPointerTy(), llval, true);
+                    return new ASTBasicValue(ty->getPointerTy(), llval, true);
                 }
 
                 if(dexp->rhs == "size")
@@ -1455,7 +1455,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
                     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 1));
                     Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                    return new ASTValue(ASTType::getULongTy(), llval, true);
+                    return new ASTBasicValue(ASTType::getULongTy(), llval, true);
                 }
             } else if(lhs->getType()->kind == TYPE_ARRAY)
             {
@@ -1468,13 +1468,13 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
                     gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
                     Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                    return new ASTValue(ty->getPointerTy(), llval, false); //XXX static array ptr is immutable(?)
+                    return new ASTBasicValue(ty->getPointerTy(), llval, false); //XXX static array ptr is immutable(?)
 
                 }
 
                 if(dexp->rhs == "size")
                 {
-                    return new ASTValue(ASTType::getULongTy(),
+                    return new ASTBasicValue(ASTType::getULongTy(),
                             ConstantInt::get(Type::getInt64Ty(context), arrty->length()));
                 }
             }
@@ -1490,27 +1490,27 @@ ASTValue *IRCodegenContext::promoteInt(ASTValue *val, ASTType *toType)
 {
     if(toType->isBool())
     {
-        ASTValue zero(val->getType(), ConstantInt::get(codegenType(val->getType()), 0));
-        return new ASTValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(val),
+        ASTBasicValue zero(val->getType(), ConstantInt::get(codegenType(val->getType()), 0));
+        return new ASTBasicValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(val),
                     codegenValue(&zero)));
     }
 
     if(toType->isInteger())
     {
-        return new ASTValue(toType, ir->CreateIntCast(codegenValue(val),
+        return new ASTBasicValue(toType, ir->CreateIntCast(codegenValue(val),
                     codegenType(toType), false)); //TODO: signedness
     }
     if(toType->isPointer())
     {
-        return new ASTValue(toType, ir->CreateIntToPtr(codegenValue(val), codegenType(toType)));
+        return new ASTBasicValue(toType, ir->CreateIntToPtr(codegenValue(val), codegenType(toType)));
     }
 
     if(toType->isFloating())
     {
-        if(val->type->isSigned())
-        return new ASTValue(toType, ir->CreateSIToFP(codegenValue(val),
+        if(val->getType()->isSigned())
+        return new ASTBasicValue(toType, ir->CreateSIToFP(codegenValue(val),
                     codegenType(toType)), false);
-        return new ASTValue(toType, ir->CreateUIToFP(codegenValue(val),
+        return new ASTBasicValue(toType, ir->CreateUIToFP(codegenValue(val),
                     codegenType(toType)), false);
     }
 }
@@ -1519,10 +1519,10 @@ ASTValue *IRCodegenContext::promoteFloat(ASTValue *val, ASTType *toType)
 {
     if(toType->isFloating())
     {
-        return new ASTValue(toType, ir->CreateFPCast(codegenValue(val), codegenType(toType)));
+        return new ASTBasicValue(toType, ir->CreateFPCast(codegenValue(val), codegenType(toType)));
     } else if(toType->isInteger())
     {
-        return new ASTValue(toType, ir->CreateFPToUI(codegenValue(val),
+        return new ASTBasicValue(toType, ir->CreateFPToUI(codegenValue(val),
                     codegenType(toType)));
     }
 }
@@ -1531,7 +1531,7 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
 {
     if(toType->isPointer())
     {
-        return new ASTValue(toType,
+        return new ASTBasicValue(toType,
                 ir->CreatePointerCast(codegenValue(val), codegenType(toType)));
     }
 
@@ -1540,7 +1540,7 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
         Value *i = ir->CreatePtrToInt(codegenValue(val),
                 codegenType(ASTType::getULongTy()));
 
-        return new ASTValue(ASTType::getBoolTy(),
+        return new ASTBasicValue(ASTType::getBoolTy(),
                 ir->CreateICmpNE(i,
                     ConstantInt::get(codegenType(ASTType::getULongTy()), 0)
                     ));
@@ -1548,12 +1548,12 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
 
     if(toType->isInteger())
     {
-        return new ASTValue(toType, ir->CreateIntCast(codegenValue(val),
+        return new ASTBasicValue(toType, ir->CreateIntCast(codegenValue(val),
                     codegenType(toType), false));
     }
 
     if(toType->isReference()) {
-        return new ASTValue(toType,
+        return new ASTBasicValue(toType,
                 ir->CreatePointerCast(codegenValue(val), codegenType(toType)),
                 false); //XXX might be a bit cludgy
     }
@@ -1563,12 +1563,12 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
 {
     if(toType->isStruct())
     {
-        if(((ASTTupleType*) val->type)->types.size() ==
+        if(((ASTTupleType*) val->getType())->types.size() ==
                 toType->length()) //TODO proper test
         {
             Value *toPtr = ir->CreateBitCast(codegenLValue(val),
                     codegenType(toType)->getPointerTo());
-            return new ASTValue(toType, toPtr, true);
+            return new ASTBasicValue(toType, toPtr, true);
         } else
         {
             emit_message(msg::ERROR, "cannot convert tuple to struct");
@@ -1576,7 +1576,7 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
         }
     } else if(toType->kind == TYPE_TUPLE)
     {
-        if(((ASTTupleType*) val->type)->types.size() ==
+        if(((ASTTupleType*) val->getType())->types.size() ==
                 ((ASTTupleType*) toType)->types.size())
         {
             Value *toPtr;
@@ -1586,13 +1586,13 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
                       codegenType(toType)->getPointerTo());
             } else
             {
-                toPtr = ir->CreateAlloca(codegenType(val->type));
+                toPtr = ir->CreateAlloca(codegenType(val->getType()));
                 ir->CreateStore(codegenValue(val), toPtr);
                 toPtr = ir->CreateBitCast(toPtr,
                       codegenType(toType)->getPointerTo());
             }
 
-            return new ASTValue(toType, toPtr, true);
+            return new ASTBasicValue(toType, toPtr, true);
         } else
         {
             emit_message(msg::ERROR, "cannot convert tuple to incompatible tuple");
@@ -1610,7 +1610,7 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
             emit_message(msg::FAILURE, "unimplemented RValue bitcast");
         }
 
-        return new ASTValue(toType, toPtr, true);
+        return new ASTBasicValue(toType, toPtr, true);
     } else if(toType->kind == TYPE_DYNAMIC_ARRAY)
     {
         Value *toPtr;
@@ -1620,7 +1620,7 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
         {
             toPtr = ir->CreateBitCast(codegenLValue(val),
                     codegenType(toType->getReferencedTy())->getPointerTo());
-            ASTTupleType *tupty = (ASTTupleType*) val->type;
+            ASTTupleType *tupty = (ASTTupleType*) val->getType();
             toSize = ConstantInt::get(codegenType(ASTType::getULongTy()), tupty->length());
 
             arr = ir->CreateAlloca(codegenType(toType));
@@ -1631,17 +1631,17 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
             emit_message(msg::FAILURE, "unimplemented RValue bitcast");
         }
 
-        return new ASTValue(toType, arr, true);
+        return new ASTBasicValue(toType, arr, true);
     }
 }
 
 ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
 {
-    if(val->type->kind == TYPE_ARRAY)
+    if(val->getType()->kind == TYPE_ARRAY)
     {
         if(toType->kind == TYPE_POINTER)
         {
-            ASTArrayType *arrty = (ASTArrayType*) val->type;
+            ASTArrayType *arrty = (ASTArrayType*) val->getType();
             if(arrty->arrayOf != toType->getReferencedTy())
             {
                 emit_message(msg::ERROR, "invalid convesion from array to invalid pointer type");
@@ -1649,9 +1649,9 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
             }
             Value *ptr = codegenLValue(val);
             ptr = ir->CreateBitCast(ptr, codegenType(toType));
-            return new ASTValue(toType, ptr, false); //TODO: should be lvalue, but that causes it to load incorrectly
+            return new ASTBasicValue(toType, ptr, false); //TODO: should be lvalue, but that causes it to load incorrectly
         }
-    } else if(val->type->kind == TYPE_DYNAMIC_ARRAY)
+    } else if(val->getType()->kind == TYPE_DYNAMIC_ARRAY)
     {
 
     }
@@ -1662,28 +1662,28 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
 
 ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
 {
-    if(val->type != toType)
+    if(val->getType() != toType)
     {
-        if(val->type->isInteger())
+        if(val->getType()->isInteger())
         {
             return promoteInt(val, toType);
-        } else if(val->type->isFloating())
+        } else if(val->getType()->isFloating())
         {
             return promoteFloat(val, toType);
         }
-        else if(val->type->isPointer())
+        else if(val->getType()->isPointer())
         {
             return promotePointer(val, toType);
         }
-        else if(val->type->kind == TYPE_TUPLE)
+        else if(val->getType()->kind == TYPE_TUPLE)
         {
             return promoteTuple(val, toType);
-        } if(val->type->isArray())
+        } if(val->getType()->isArray())
         {
             return promoteArray(val, toType);
-        } else if(val->type->isReference()) {
+        } else if(val->getType()->isReference()) {
             if(toType->isPointer()) {
-                return new ASTValue(toType,
+                return new ASTBasicValue(toType,
                         ir->CreatePointerCast(codegenLValue(val),
                             codegenType(toType)));
             }
@@ -1696,17 +1696,17 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
 //XXX The way i do this with pointers is kinda silly, also, leaky?
 void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, unsigned op)
 {
-    if((*v1)->type != (*v2)->type)
+    if((*v1)->getType() != (*v2)->getType())
     {
-        if((*v1)->type->isStruct() || (*v2)->type->isStruct())
+        if((*v1)->getType()->isStruct() || (*v2)->getType()->isStruct())
         {
             // TODO: loc
             emit_message(msg::UNIMPLEMENTED, "cannot convert structs (yet)");
         }
-        if((*v2)->type->getPriority() > (*v1)->type->getPriority())
-            *v1 = promoteType(*v1, (*v2)->type);
+        if((*v2)->getType()->getPriority() > (*v1)->getType()->getPriority())
+            *v1 = promoteType(*v1, (*v2)->getType());
         else
-            *v2 = promoteType(*v2, (*v1)->type);
+            *v2 = promoteType(*v2, (*v1)->getType());
     }
 }
 
@@ -1752,14 +1752,14 @@ ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs, bool
     //if(vrhs->type != vlhs->type)
     {
         vrhs = promoteType(vrhs, vlhs->getType());
-        if(vrhs->type->coercesTo(vlhs->type) || (convert && vrhs->type->castsTo(vlhs->type)))
+        if(vrhs->getType()->coercesTo(vlhs->getType()) || (convert && vrhs->getType()->castsTo(vlhs->getType())))
         {
             vrhs = promoteType(vrhs, vlhs->getType());
         }
         else
         {
-            emit_message(msg::ERROR, "cannot assign value of type '" + vrhs->type->getName() +
-                    "' to type '" + vlhs->type->getName() + "'", lhs->loc);
+            emit_message(msg::ERROR, "cannot assign value of type '" + vrhs->getType()->getName() +
+                    "' to type '" + vlhs->getType()->getName() + "'", lhs->loc);
             return NULL;
         }
     }
@@ -1798,7 +1798,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
     if(!isAssignOp((tok::TokenKind) exp->op)) //XXX messy
         codegenResolveBinaryTypes(&lhs, &rhs, exp->op);
-    else if(lhs->type->kind == TYPE_ARRAY)
+    else if(lhs->getType()->kind == TYPE_ARRAY)
     {
         emit_message(msg::ERROR, "cannot assign to statically defined array", exp->loc);
     }
@@ -1828,32 +1828,32 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
             lhs = promoteType(lhs, TYPE);
             rhs = promoteType(rhs, TYPE);
             val = ir->CreateOr(codegenValue(lhs), codegenValue(rhs));
-            return new ASTValue(TYPE, val);
+            return new ASTBasicValue(TYPE, val);
         case tok::ampamp:
         case tok::kw_and:
             TYPE = ASTType::getBoolTy();
             lhs = promoteType(lhs, TYPE);
             rhs = promoteType(rhs, TYPE);
             val = ir->CreateAnd(codegenValue(lhs), codegenValue(rhs));
-            return new ASTValue(TYPE, val);
+            return new ASTBasicValue(TYPE, val);
 
         // BITWISE OPS
         case tok::bar:
         case tok::barequal:
             val = ir->CreateOr(codegenValue(lhs), codegenValue(rhs));
-            retValue = new ASTValue(TYPE, val);
+            retValue = new ASTBasicValue(TYPE, val);
             break;
 
         case tok::caret:
         case tok::caretequal:
             val = ir->CreateXor(codegenValue(lhs), codegenValue(rhs));
-            retValue = new ASTValue(TYPE, val);
+            retValue = new ASTBasicValue(TYPE, val);
             break;
 
         case tok::amp:
         case tok::ampequal:
             val = ir->CreateAnd(codegenValue(lhs), codegenValue(rhs));
-            retValue = new ASTValue(TYPE, val);
+            retValue = new ASTBasicValue(TYPE, val);
             break;
 
         // COMPARE OPS
@@ -1862,13 +1862,13 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                     val = ir->CreateFCmp(CmpInst::FCMP_OEQ, lhs_val, rhs_val);
                 else // sign not required, irrelivant for equality
                     val = ir->CreateICmp(CmpInst::ICMP_EQ, lhs_val, rhs_val);
-                return new ASTValue(ASTType::getBoolTy(), val);
+                return new ASTBasicValue(ASTType::getBoolTy(), val);
         case tok::bangequal:
                 if(TYPE->isFloating())
                     val = ir->CreateFCmp(CmpInst::FCMP_ONE, lhs_val, rhs_val);
                 else // sign not required, irrelivant for equality
                     val = ir->CreateICmp(CmpInst::ICMP_NE, lhs_val, rhs_val);
-                return new ASTValue(ASTType::getBoolTy(), val);
+                return new ASTBasicValue(ASTType::getBoolTy(), val);
 
         case tok::less:
                 if(TYPE->isFloating())
@@ -1877,7 +1877,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                     val = ir->CreateICmpSLT(lhs_val, rhs_val);
                 else
                     val = ir->CreateICmpULT(lhs_val, rhs_val);
-                return new ASTValue(ASTType::getBoolTy(), val);
+                return new ASTBasicValue(ASTType::getBoolTy(), val);
         case tok::lessequal:
                 if(TYPE->isFloating())
                     val = ir->CreateFCmpOLE(lhs_val, rhs_val);
@@ -1885,7 +1885,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                     val = ir->CreateICmpSLE(lhs_val, rhs_val);
                 else
                     val = ir->CreateICmpULE(lhs_val, rhs_val);
-                return new ASTValue(ASTType::getBoolTy(), val);
+                return new ASTBasicValue(ASTType::getBoolTy(), val);
         case tok::greater:
                 if(TYPE->isFloating())
                     val = ir->CreateFCmpOGT(lhs_val, rhs_val);
@@ -1893,7 +1893,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                     val = ir->CreateICmpSGT(lhs_val, rhs_val);
                 else
                     val = ir->CreateICmpUGT(lhs_val, rhs_val);
-                return new ASTValue(ASTType::getBoolTy(), val);
+                return new ASTBasicValue(ASTType::getBoolTy(), val);
         case tok::greaterequal:
                 if(TYPE->isFloating())
                     val = ir->CreateFCmpOGE(lhs_val, rhs_val);
@@ -1901,7 +1901,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                     val = ir->CreateICmpSGE(lhs_val, rhs_val);
                 else
                     val = ir->CreateICmpUGE(lhs_val, rhs_val);
-                return new ASTValue(ASTType::getBoolTy(), val);
+                return new ASTBasicValue(ASTType::getBoolTy(), val);
 
         // ARITHMETIC OPS
         case tok::plus:
@@ -1946,16 +1946,16 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
     if(isAssignOp((tok::TokenKind) exp->op)) //XXX messy
     {
-        if(rhs->type->coercesTo(lhs->type))
+        if(rhs->getType()->coercesTo(lhs->getType()))
         {
             retValue = promoteType(retValue, TYPE); //TODO: merge with decl assign
-        } else if(rhs->type->castsTo(lhs->type) && exp->op == tok::colonequal) // cast equal
+        } else if(rhs->getType()->castsTo(lhs->getType()) && exp->op == tok::colonequal) // cast equal
         {
             retValue = promoteType(retValue, TYPE);
         } else
         {
-            emit_message(msg::ERROR, "cannot assign value of type '" + rhs->type->getName() +
-                    "' to type '" + lhs->type->getName() + "'", exp->loc);
+            emit_message(msg::ERROR, "cannot assign value of type '" + rhs->getType()->getName() +
+                    "' to type '" + lhs->getType()->getName() + "'", exp->loc);
             return NULL;
         }
         storeValue(lhs, retValue);
@@ -2017,14 +2017,14 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     } else if(LabelStatement *lstmt = dynamic_cast<LabelStatement*>(stmt))
     {
         ASTValue *lbl = codegenIdentifier(lstmt->identifier);
-        llvm::BasicBlock *BB = (llvm::BasicBlock*) lbl->cgValue;
+        llvm::BasicBlock *BB = (llvm::BasicBlock*) lbl->value;
         if(!isTerminated())
             ir->CreateBr(BB);
         ir->SetInsertPoint(BB);
     } else if(GotoStatement *gstmt = dynamic_cast<GotoStatement*>(stmt))
     {
         ASTValue *lbl = codegenIdentifier(gstmt->identifier);
-        llvm::BasicBlock *BB = (llvm::BasicBlock*) lbl->cgValue;
+        llvm::BasicBlock *BB = (llvm::BasicBlock*) lbl->value;
         ir->CreateBr(BB);
        // post GOTO block
         BasicBlock *PG = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent());
@@ -2138,7 +2138,7 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
     AllocaInst *llvmDecl = ir->CreateAlloca(llty, 0, vdecl->getName());
 
     llvmDecl->setAlignment(8);
-    ASTValue *idValue = new ASTValue(vty, llvmDecl, true, vty->isReference());
+    ASTValue *idValue = new ASTBasicValue(vty, llvmDecl, true, vty->isReference());
 
     if(defaultValue) {
         defaultValue = promoteType(defaultValue, vty);
@@ -2173,7 +2173,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
         currentFunction.retVal = NULL;
         if(func->getReturnType() != Type::getVoidTy(context))
         {
-            currentFunction.retVal = new ASTValue(fdecl->getReturnType(),
+            currentFunction.retVal = new ASTBasicValue(fdecl->getReturnType(),
                     new AllocaInst(codegenType(fdecl->getReturnType()),
                         0, "ret", BB), true);
         }
@@ -2191,7 +2191,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
         Function::arg_iterator AI = func->arg_begin();
         if(fdecl->owner) {
             AI->setName("this");
-            lookup("this")->setValue(new ASTValue(fdecl->owner, AI, false, true));
+            lookup("this")->setValue(new ASTBasicValue(fdecl->owner, AI, false, true));
             AI++;
         }
 
@@ -2207,7 +2207,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
             AllocaInst *alloc = new AllocaInst(codegenType(fdecl->parameters[idx]->getType()),
                                                0, fdecl->parameters[idx]->getName(), BB);
             alloc->setAlignment(8);
-            ASTValue *alloca = new ASTValue(fdecl->parameters[idx]->getType(), alloc, true);
+            ASTValue *alloca = new ASTBasicValue(fdecl->parameters[idx]->getType(), alloc, true);
 
             if(fdecl->parameters[idx]->getType()->isReference()) {
                 new StoreInst(AI, codegenRefValue(alloca), BB);
@@ -2342,7 +2342,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
             llvmval->setLinkage(linkage);
             llvmval->setInitializer(gValue);
 
-            ASTValue *gv = new ASTValue(idTy, llvmval, true);
+            ASTValue *gv = new ASTBasicValue(idTy, llvmval, true);
             id->setValue(gv);
 
             dwarfStopPoint(vdecl->loc);

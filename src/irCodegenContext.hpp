@@ -172,6 +172,9 @@ class IRCodegenContext : public CodegenContext
     llvm::Type *codegenType(ASTType *ty);
 
     // codegen value
+    llvm::Value *codegenMethod(MethodValue *method);
+    llvm::Value *codegenFunction(FunctionValue *method);
+
     llvm::Value *codegenValue(ASTValue *v);
     llvm::Value *codegenLValue(ASTValue *v);
     llvm::Value *codegenRefValue(ASTValue *v);
@@ -204,7 +207,6 @@ class IRCodegenContext : public CodegenContext
     // vtable
     ASTValue *getThis();
     ASTValue *getVTable(ASTValue *instance);
-    ASTValue *vtableLookup(ASTValue *instance, std::string func);
     ASTValue *createTypeInfo(ASTType *ty);
 
     // ops
@@ -230,6 +232,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenDeleteExpression(DeleteExpression *exp);
 
     ASTValue *codegenIdentifier(Identifier *id);
+    ASTValue *resolveOverload(ASTValue *func, std::vector<ASTValue *> args);
     ASTValue *codegenCall(ASTValue *func, std::vector<ASTValue *> args);
     ASTValue *codegenCallExpression(CallExpression *exp);
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);

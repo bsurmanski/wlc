@@ -59,19 +59,29 @@ struct TupleValue : public ASTValue
 
 struct FunctionValue : public ASTValue {
     FunctionDeclaration *declaration;
-    FunctionValue(FunctionDeclaration *fdecl=NULL) {
+    FunctionValue(FunctionDeclaration *fdecl=NULL) : declaration(fdecl) {
 
     }
 
     virtual ASTType *getType() { return declaration->getType(); }
     virtual bool isLValue() { return false; }
     virtual bool isReference() { return false; }
+    bool isOverloaded() { return declaration->isOverloaded(); }
+    FunctionDeclaration *getDeclaration() { return declaration; }
+
+    FunctionValue *getNextOverload() {
+        if(declaration->getNextOverload()) {
+            return new FunctionValue(declaration->getNextOverload());
+        }
+        return NULL;
+    }
 };
 
 struct MethodValue : public FunctionValue {
     ASTValue *instance; // is this the same as 'owner'?
 
     MethodValue(ASTValue *inst, FunctionDeclaration *fdecl) : FunctionValue(fdecl), instance(inst) {}
+    ASTValue *getInstance() { return instance; }
 };
 
 #endif

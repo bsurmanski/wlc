@@ -11,7 +11,7 @@ Package::Package(Package *par, std::string nm) : parent(par), scope(NULL), cgVal
     }
 }
 
-ASTType *FunctionDeclaration::getType() {
+ASTFunctionType *FunctionDeclaration::getType() {
     if(!prototype) {
         std::vector<ASTType *> paramTy;
 

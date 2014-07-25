@@ -290,7 +290,7 @@ struct ASTType
     static ASTType *DynamicTy; static ASTType *getDynamicTy();
     static ASTType *getTupleTy(std::vector<ASTType *> t);
 
-    static ASTType *getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg=false);
+    static ASTFunctionType *getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg=false);
     static ASTType *getVoidFunctionTy();
 };
 

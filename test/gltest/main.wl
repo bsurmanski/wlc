@@ -5,7 +5,7 @@ import(C) "/usr/include/GL/glext.h"
 import(C) "/usr/include/SDL/SDL.h"
 import(C) "/usr/include/SDL/SDL_keysym.h"
 
-double sin(double f);
+extern nomangle double sin(double f);
 
 float tick = 0
 uint gltick

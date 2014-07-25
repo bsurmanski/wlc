@@ -229,10 +229,11 @@ struct FunctionDeclaration : public Declaration
 {
     llvm::DISubprogram diSubprogram;
     ASTType *owner; // aka 'this'
-    ASTType *prototype; // generated on call to 'getType'. should be called after resolution only
+    ASTFunctionType *prototype; // generated on call to 'getType'. should be called after resolution only
     ASTType *returnTy;
     std::vector<VariableDeclaration*> parameters;
     bool vararg;
+    int vtableIndex;
     ASTScope *scope;
     Statement *body;
     void *cgValue;
@@ -243,7 +244,7 @@ struct FunctionDeclaration : public Declaration
             bool varg,  ASTScope *sc, Statement *st, SourceLocation loc, DeclarationQualifier dqual) :
         Declaration(id, loc, dqual), owner(own), prototype(0), returnTy(ret), vararg(varg),
         parameters(params), scope(sc),
-        body(st), cgValue(NULL), nextoverload(0) {
+        body(st), cgValue(NULL), nextoverload(0), vtableIndex(-1) {
             //if(scope)
             //    scope->setOwner(this);
         }
@@ -251,7 +252,10 @@ struct FunctionDeclaration : public Declaration
     ASTScope *getScope() { return scope; }
     ASTType *getReturnType() { return returnTy; }
 
-    virtual ASTType *getType();
+    int getVTableIndex() { return vtableIndex; }
+    void setVTableIndex(int vti) { vtableIndex = vti; }
+
+    virtual ASTFunctionType *getType();
 
     virtual std::string getMangledName(){
         if(identifier && qualifier.decorated){
@@ -263,6 +267,8 @@ struct FunctionDeclaration : public Declaration
     }
 
     virtual void accept(ASTVisitor *v);
+    bool isOverloaded() { return nextoverload; }
+    FunctionDeclaration *getNextOverload() { return nextoverload; }
 };
 
 struct LabelDeclaration : public Declaration

@@ -12,6 +12,6 @@ int main(int argc, char^^ argv) {
     delete cl
 
     int[] newarr = new int[5]
-    printf("%x\n", newarr.ptr);
+    printf("%x\n", newarr.ptr)
     delete newarr
 }

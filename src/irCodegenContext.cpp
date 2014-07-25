@@ -359,6 +359,15 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 
 llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 {
+    // XXX bit messy this.
+    if(MethodValue *mvalue = dynamic_cast<MethodValue*>(value)) {
+        return codegenMethod(mvalue);
+    }
+
+    if(FunctionValue *fvalue = dynamic_cast<FunctionValue*>(value)) {
+        return codegenFunction(fvalue);
+    }
+
     if(!value->value) {
         //TODO
         emit_message(msg::FAILURE, "AST Value failed to generate");
@@ -455,23 +464,28 @@ ASTValue *IRCodegenContext::getVTable(ASTValue *instance) {
     return getMember(instance, "vtable");
 }
 
-ASTValue *IRCodegenContext::vtableLookup(ASTValue *instance, std::string func) {
-    ASTUserType *userty = instance->getType()->asUserType();
+llvm::Value *IRCodegenContext::codegenMethod(MethodValue *method) {
+    ASTUserType *userty = method->getInstance()->getType()->asUserType();
     if(!userty) emit_message(msg::ERROR, "virtual function lookup only valid for class");
 
     //TODO: function index
-    ASTValue *vtable = getVTable(instance);
+    ASTValue *vtable = getVTable(method->getInstance());
 
     std::vector<Value *> gep;
     //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), userty->getVTableIndex(func))); // specific function
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), method->getDeclaration()->getVTableIndex()));
     Value *llval = ir->CreateLoad(ir->CreateGEP(codegenValue(vtable), gep));
 
-    Identifier *id = userty->getScope()->lookup(func);
-    FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
-    ASTType *fty = fdecl->getType();
+    ASTType *fty = method->getDeclaration()->getType();
+    return ir->CreatePointerCast(llval, codegenType(fty)->getPointerTo());
+}
 
-    return new ASTBasicValue(fty, ir->CreatePointerCast(llval, codegenType(fty)->getPointerTo()));
+llvm::Value *IRCodegenContext::codegenFunction(FunctionValue *function) {
+    Constant *fconst= module->getOrInsertFunction(
+                function->getDeclaration()->getMangledName(),
+                (FunctionType*) codegenType(function->getDeclaration()->getType())
+            );
+    return fconst;
 }
 
 ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
@@ -487,6 +501,7 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
     if(ClassDeclaration *cdecl = utdecl->classDeclaration()) {
         for(int i = 0; i < cdecl->vtable.size(); i++){
             FunctionDeclaration *fdecl = cdecl->vtable[i];
+            fdecl->setVTableIndex(i);
             if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
             FunctionType *fty = (FunctionType*) codegenType(fdecl->getType());
             Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
@@ -538,7 +553,10 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         //TODO: static vs nonvirtual vs virtual function calls
         ASTValue *ret = 0;
         if(val->getType()->isClass()) {
-            ret = vtableLookup(val, member);
+            ASTUserType *userty = val->getType()->asUserType();
+            Identifier *id = userty->getScope()->lookup(member);
+            FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
+            ret = new MethodValue(val, fdecl);
         } else {
             ret = codegenIdentifier(id);
         }
@@ -691,9 +709,7 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
     {
         FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
         if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
-        FunctionType *fty = (FunctionType*) codegenType(fdecl->getType());
-        Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
-        id->setValue(new ASTBasicValue(fdecl->getType(), func));
+        id->setValue(new FunctionValue(fdecl));
     } else if(id->isStruct())
     {
         id->setValue(new ASTBasicValue(id->getDeclaredType(), NULL));
@@ -1094,6 +1110,22 @@ ASTValue *IRCodegenContext::codegenCall(ASTValue *func, std::vector<ASTValue *> 
     return new ASTBasicValue(rtype, value);
 }
 
+ASTValue *resolveOverload(ASTValue *func, std::vector<ASTValue *> args) {
+    FunctionValue *fval = dynamic_cast<FunctionValue*>(func);
+    if(!fval) {
+        // either a function pointer or other derived function;
+        // no overloads
+        return func;
+    }
+
+    FunctionValue *bestOverload = fval;
+    while(fval = fval->getNextOverload()) {
+        //TODO: test all overloads; also, recursive?
+    }
+
+    return fval;
+}
+
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *func = codegenExpression(exp->function);
@@ -1121,6 +1153,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     rtype = astfty->getReturnType();
 
     // allow default values if declaration is known
+    // TODO: easier to get through 'FunctionValue'
     if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->function)){
         fdecl = dynamic_cast<FunctionDeclaration*>(iexp->id->getDeclaration());
     }
@@ -1130,19 +1163,13 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     // allow for uniform function call syntax
     int nargs = 0;
     if(func->getOwner()){
-        ASTValue *ownerVal = NULL;
-        //TODO: figure out correct type for owner
-        if(func->getOwner()->getType()->isPointer()){
-            ownerVal = getAddressOf(func->getOwner());
-        } else {
-            ownerVal = getAddressOf(func->getOwner());
-            //ownerVal = functionValue->getOwner();
-        }
+        ASTValue *ownerVal = getAddressOf(func->getOwner());
         //TODO: cast to correct type if needed
         args.push_back(ownerVal);
         nargs++;
     }
 
+    //TODO: select function if overloaded
     for(int i = 0; i < exp->args.size() || i < astfty->params.size(); i++)
     {
         ASTValue *val = NULL;

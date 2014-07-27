@@ -147,7 +147,7 @@ struct ASTType
         {
             case TYPE_POINTER:
                 return ty->isInteger() || ty == this ||
-                    getReferencedTy()->kind == TYPE_VOID || ty->getReferencedTy()->kind == TYPE_VOID;
+                    getReferencedTy()->kind == TYPE_VOID || (ty->getReferencedTy() && ty->getReferencedTy()->kind == TYPE_VOID);
                 //TODO: check if compatible pointer
             case TYPE_BOOL:
             case TYPE_UCHAR:

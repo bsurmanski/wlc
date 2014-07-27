@@ -32,6 +32,25 @@ ASTFunctionType *FunctionDeclaration::getType() {
     return prototype;
 } //TODO: 'prototype' should be 'type'?
 
+int FunctionDeclaration::minExpectedParameters() {
+    int n = 0;
+
+    for(int i = 0; i < parameters.size(); i++) {
+        if(!parameters[i]->value) {
+            n++;
+        }
+    }
+
+    return n;
+}
+
+int FunctionDeclaration::maxExpectedParameters() {
+    int n = 0;
+
+    if(isVararg()) return 999; //arbitrarily large; shouldn't need more than 999 arguments, right?
+    return parameters.size();
+}
+
 size_t UserTypeDeclaration::getAlign() const {
     size_t align = 0;
     VariableDeclaration *vd;

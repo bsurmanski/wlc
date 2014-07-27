@@ -126,7 +126,7 @@ std::string ASTScope::getMangledName()
         if(parent){
             return parent->getMangledName() + "$" + owner->getName();
         }
-        return owner->getName();
+        return "_WL" + owner->getName();
     }
     return "";
 }

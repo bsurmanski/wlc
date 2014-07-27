@@ -71,7 +71,9 @@ struct FunctionValue : public ASTValue {
 
     FunctionValue *getNextOverload() {
         if(declaration->getNextOverload()) {
-            return new FunctionValue(declaration->getNextOverload());
+            FunctionValue *overload = new FunctionValue(declaration->getNextOverload());
+            overload->setOwner(owner);
+            return overload;
         }
         return NULL;
     }

@@ -18,6 +18,7 @@ int main(int argc, char^^ argv)
     scl.a = 2
     scl.b = 11
     scl.printCall();
+    scl.printCall(5);
     //int i = vcall(scl)
     //int j = vcall(cl)
     //printf("out %d\n", i);
@@ -40,6 +41,10 @@ class MySpecialClass : MyClass
 
     void printCall() {
         printf("stuff\n");
+    }
+
+    void printCall(int i) {
+        printf("printing magic %d\n", i);
     }
 
     int myFunction(int v1, int v2) {

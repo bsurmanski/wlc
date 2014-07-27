@@ -64,8 +64,8 @@ void initShaders()
 
     uint vs = glCreateShader(GL_VERTEX_SHADER)
     uint fs = glCreateShader(GL_FRAGMENT_SHADER)
-    glShaderSource(vs, 1, &vshader, 0)
-    glShaderSource(fs, 1, &fshader, 0)
+    glShaderSource(vs, 1, &vshader, null)
+    glShaderSource(fs, 1, &fshader, null)
     glCompileShader(vs)
     glCompileShader(fs)
 
@@ -75,7 +75,7 @@ void initShaders()
     glGetShaderiv(vs, GL_COMPILE_STATUS, &err)
     if(err != GL_TRUE)
     {
-        glGetShaderInfoLog(vs, 511, 0, TEST)
+        glGetShaderInfoLog(vs, 511, null, TEST)
         printf("VS ERR: %s\n", TEST)    
     }
 
@@ -136,7 +136,7 @@ int main(int argc, char^^ argv)
     while(!spc)
     {
         SDL_PumpEvents()
-        int8^ keystate = SDL_GetKeyState(0)
+        int8^ keystate = SDL_GetKeyState(null)
         spc = keystate[SDLK_SPACE]
         draw()
         SDL_Delay(32)

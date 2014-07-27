@@ -251,11 +251,15 @@ struct FunctionDeclaration : public Declaration
     virtual FunctionDeclaration *functionDeclaration() { return this; }
     ASTScope *getScope() { return scope; }
     ASTType *getReturnType() { return returnTy; }
+    bool isVararg() { return vararg; }
+
 
     int getVTableIndex() { return vtableIndex; }
     void setVTableIndex(int vti) { vtableIndex = vti; }
 
     virtual ASTFunctionType *getType();
+    int minExpectedParameters(); // *minimum* parameters allowed; accounts for default values
+    int maxExpectedParameters(); // maximum params expected
 
     virtual std::string getMangledName(){
         if(identifier && qualifier.decorated){
@@ -665,8 +669,10 @@ struct TypeExpression : public Expression
 struct NewExpression : public Expression
 {
     ASTType *type;
+    std::vector<Expression*> args;
     virtual ASTType *getType() { return type; }
-    NewExpression(ASTType *t, SourceLocation l = SourceLocation()) : Expression(l), type(t) {}
+    NewExpression(ASTType *t, std::vector<Expression*> a, SourceLocation l = SourceLocation()) :
+        Expression(l), type(t), args(a) {}
     virtual NewExpression *newExpression() { return this; }
     virtual void accept(ASTVisitor *v);
 };

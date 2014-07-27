@@ -675,8 +675,7 @@ Declaration *ParseContext::parseDeclaration()
         std::vector<VariableDeclaration*> parameters;
         ignore(); // lparen
 
-        if(getScope()->owner &&
-                getScope()->owner->getDeclaredType()){
+        if(getScope()->owner && getScope()->owner->getDeclaredType()){
             owner = getScope()->owner;
         }
 
@@ -1022,7 +1021,21 @@ Expression *ParseContext::parseNewExpression()
     assert(peek().is(tok::kw_new));
     ignore(); //ignore 'new'
     ASTType *t = parseType();
-    return new NewExpression(t, loc);
+    std::vector<Expression*> args;
+
+    if(peek().is(tok::lparen)) {
+        ignore();
+
+        //TODO: parser argument list
+        if(peek().isNot(tok::rparen)) {
+            emit_message(msg::ERROR, "expected ')' following new constructor call", loc);
+            return NULL;
+        }
+
+        ignore();
+    }
+
+    return new NewExpression(t, args, loc);
 }
 
 Expression *ParseContext::parseExpression(int prec)

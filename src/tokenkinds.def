@@ -71,9 +71,10 @@ FTYPE(float64,8)
 
 VTYPE(vec4,4,float)
 
-KEYWORD(const)
+RESERVE(const)
+RESERVE(enum)
+
 KEYWORD(extern)
-KEYWORD(enum)
 KEYWORD(for)
 KEYWORD(goto)
 KEYWORD(if)
@@ -91,7 +92,6 @@ KEYWORD(not)
 KEYWORD(while)
 KEYWORD(switch)
 KEYWORD(case)
-KEYWORD(pass)
 KEYWORD(import)
 KEYWORD(include)
 KEYWORD(label)
@@ -121,7 +121,7 @@ RESERVE(asm) /* inline asm */
 RESERVE(once) /* declare that statement only happens once, ever. when first encountered  */
 RESERVE(number) /* for variable precission numbers */
 RESERVE(let) /* like D alias, and for constants (let a = 7) */
-RESERVE(this)
+RESERVE(this) /* NOTE: currently implemented as an identifier */
 RESERVE(super)
 RESERVE(go)
 

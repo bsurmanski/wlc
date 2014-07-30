@@ -399,7 +399,7 @@ Statement *ParseContext::parseStatement()
 
         case tok::kw_extern:
         case tok::kw_implicit: //implicit constructor/conversion
-        case tok::kw_nomangle:
+        case tok::kw_undecorated:
         case tok::kw_union:
         case tok::kw_class:
         case tok::kw_struct:
@@ -505,7 +505,7 @@ DeclarationQualifier ParseContext::parseDeclarationQualifier()
             ignore();
             continue;
         }
-        if(peek().is(tok::kw_nomangle)){
+        if(peek().is(tok::kw_undecorated)){
             dq.decorated = false;
             ignore();
             continue;

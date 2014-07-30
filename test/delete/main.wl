@@ -2,7 +2,7 @@ class MyClass {
     int i
 }
 
-extern nomangle int printf(char ^c, ...);
+extern undecorated int printf(char ^c, ...);
 
 int main(int argc, char^^ argv) {
     int ^i = new int

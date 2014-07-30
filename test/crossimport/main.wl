@@ -1,7 +1,7 @@
 import "file1.wl"
 import "file2.wl"
 
-extern nomangle int printf(char^fmt, ...);
+extern undecorated int printf(char^fmt, ...);
 
 int main(int argc, char^^ argv)
 {

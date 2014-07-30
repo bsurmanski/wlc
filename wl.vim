@@ -23,12 +23,15 @@ syn keyword wConstant null
 syn keyword wTypedef alias
 syn keyword wLabel case default label
 syn keyword wStatement return
-syn keyword wStorageClass extern nomangle implicit
+syn keyword wStorageClass extern undecorated implicit
 syn keyword wOperator and or not
 syn keyword wMemOperator new delete renew
 syn keyword wDeclaration var this
 syn keyword wUse use
-hi def link wExternal Include 
+" reserved keywords
+syn keyword wReserve explicit decorated defer foreach asm once number let super
+
+hi def link wExternal Include
 hi def link wScopeDecl StorageClass
 hi def link wAssert Assert
 hi def link wConditional Conditional
@@ -44,6 +47,7 @@ hi def link wOperator Operator
 hi def link wMemOperator Operator
 hi def link wDeclaration Keyword
 hi def link wUse Keyword
+hi def link wReserve Error
 
 " Types
 syn keyword Structure struct union function interface class

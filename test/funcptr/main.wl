@@ -1,4 +1,4 @@
-nomangle int printf(char^ fmt, ...);
+extern undecorated int printf(char^ fmt, ...);
 
 void update() {
     printf("update called!\n");

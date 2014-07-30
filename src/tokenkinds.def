@@ -108,8 +108,11 @@ KEYWORD(var) /* statically checked automatic type variable var myvar = new MyStr
 KEYWORD(new)
 KEYWORD(renew)
 KEYWORD(delete)
-KEYWORD(nomangle) /* change to undecorated */
+KEYWORD(undecorated) /* change to undecorated */
 KEYWORD(implicit) /* for implicit conversions, default constructors, apply to function */
+
+RESERVE(decorated)
+RESERVE(explicit)
 
 // reserved words. hopefully will get around to implementing these
 RESERVE(defer) /* for deferring code until function exit. defer <STATEMENT>*/

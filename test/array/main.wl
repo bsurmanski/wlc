@@ -7,8 +7,8 @@ import(C) "/usr/include/stdio.h"
 import(C) "/usr/include/math.h"
 */
 
-extern nomangle int printf(char^ fmt, ...);
-extern nomangle float sinf(float f);
+extern undecorated int printf(char^ fmt, ...);
+extern undecorated float sinf(float f);
 
 int main(int argc, char^^ argv)
 {

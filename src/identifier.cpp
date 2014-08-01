@@ -87,4 +87,4 @@ bool Identifier::isClass() { return dynamic_cast<ClassDeclaration*>(declaration)
 bool Identifier::isInterface() { return dynamic_cast<InterfaceDeclaration*>(declaration); }
 
 bool Identifier::isTypeMember() { return getScope()->isUserTypeScope(); }
-ASTType *Identifier::getMemberOwner(){ return getScope()->isUserTypeScope(); }
+ASTType *Identifier::getMemberOwner(){ return getScope()->getUserTypeScope(); }

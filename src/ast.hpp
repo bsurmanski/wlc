@@ -347,7 +347,7 @@ struct UserTypeDeclaration : public TypeDeclaration
     virtual long getVTableIndex(std::string method) { return -1; }
     virtual void accept(ASTVisitor *v);
     virtual UserTypeDeclaration *userTypeDeclaration() { return this; }
-    virtual FunctionDeclaration *getDefaultConstructor() { return defaultConstructor; }
+    virtual FunctionDeclaration *getDefaultConstructor(); // XXX default, or no arg?
     virtual void setDefaultConstructor(FunctionDeclaration *f) { defaultConstructor = f; }
 };
 

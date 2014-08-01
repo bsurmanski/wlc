@@ -151,3 +151,18 @@ CONTINUE:;
         }
     }
 }
+
+FunctionDeclaration *UserTypeDeclaration::getDefaultConstructor(){
+    Identifier *id = getScope()->lookup("this");
+    FunctionDeclaration *fdecl = id->getDeclaration()->functionDeclaration();
+    while(fdecl) {
+        if(fdecl->getReturnType() == ASTType::getVoidTy() &&
+                fdecl->getType()->params.size() == 1 &&
+                fdecl->getType()->params[0]->asUserType() &&
+                !fdecl->getType()->isVararg()) {
+            return fdecl;
+        }
+        fdecl = fdecl->getNextOverload();
+    }
+    return NULL;
+}

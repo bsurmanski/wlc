@@ -2,7 +2,6 @@
 
 extern undecorated int printf(char ^fmt, ...);
 
-
 int main(int argc, char^^ argv)
 {
     MyClass cl
@@ -11,6 +10,7 @@ int main(int argc, char^^ argv)
     cl = new MyClass
     scl = new MySpecialClass
 
+    printf("scl svar: %d\n", scl.svar);
     printf("cl a: %d\n", cl.a);
     cl.a = 5
     printf("cl a: %d\n", cl.a);
@@ -51,10 +51,9 @@ class MySpecialClass : MyClass
         return v1 + v2 + .svar
     }
 
-    /*
-    implicit void this() {
-        .svar = 0
-    }*/
+    this() {
+        this.svar = 22
+    }
 }
 
 class MyClass

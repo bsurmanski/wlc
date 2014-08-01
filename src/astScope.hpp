@@ -90,7 +90,7 @@ struct ASTScope
     UserTypeDeclaration *isUserTypeScope() { return dynamic_cast<UserTypeDeclaration*>(owner); }
     */
 
-    ASTType* isUserTypeScope() {
+    ASTType* getUserTypeScope() {
         if(type == Scope_Struct && owner) {
             return owner->getDeclaredType();
         }
@@ -121,6 +121,7 @@ struct ASTScope
     TranslationUnit *getUnit();
 
     ScopeType getScopeType() { return type; }
+    bool isUserTypeScope() { return type == Scope_Struct; }
     void addSibling(ASTScope *t);
     void addBuiltin();
     bool contains(std::string);

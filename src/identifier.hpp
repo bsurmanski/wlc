@@ -76,12 +76,6 @@ struct Identifier
 
     bool isTypeMember();
     ASTType *getMemberOwner();
-
-    /*
-    bool isTypeMember() { return getScope()->isUserTypeScope() && isVariable(); }
-    bool isTypeMethod() { return getScope()->isUserTypeScope() && isFunction(); }
-    */
-
 };
 
 #endif

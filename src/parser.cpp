@@ -420,6 +420,8 @@ Statement *ParseContext::parseStatement()
                 return parseDeclarationStatement();
             }*/
             goto PARSEEXP;
+
+        case tok::kw_this:
         case tok::kw_import:
         case tok::intNum:
         case tok::floatNum:
@@ -645,9 +647,25 @@ Declaration *ParseContext::parseDeclaration()
         return sdecl;
     }
 
-    ASTType *type = parseType();
+    ASTType *type; // return type
+    Token t_id;
+    Identifier *id;
 
-    Token t_id = get();
+    // this is a bit messy
+    // if we see the 'this' keyword, should be a constructor. jump to parsing a function
+    if(peek().is(tok::kw_this)) {
+        if(!getScope()->isUserTypeScope()) {
+            emit_message(msg::ERROR, "'this' keyword found outside of user type scope", peek().loc);
+        }
+        type = ASTType::getVoidTy();
+        t_id = get();
+        id = getScope()->getInScope("this");
+        goto PARSEFUNC;
+    }
+
+    type = parseType();
+
+    t_id = get();
     if(t_id.isNot(tok::identifier)){
         emit_message(msg::ERROR,
             "expected identifier following type (declaration)", t_id.loc);
@@ -664,11 +682,12 @@ Declaration *ParseContext::parseDeclaration()
         return NULL;
     }
 
-    Identifier *id = getScope()->getInScope(t_id.toString());
+    id = getScope()->getInScope(t_id.toString());
     if(id->getName() == "main") dqual.decorated = false; // dont mangle main
 
     //TODO parse decl specs
 
+PARSEFUNC:
     if(peek().is(tok::lparen)) // function decl
     {
         Identifier *owner = NULL;
@@ -1189,7 +1208,7 @@ Expression *ParseContext::parseUnaryExpression(int prec)
 Expression *ParseContext::parseIdentifierExpression()
 {
     SourceLocation loc = peek().loc;
-    if(peek().isNot(tok::identifier))
+    if(peek().isNot(tok::identifier) && peek().isNot(tok::kw_this))
     {
         emit_message(msg::ERROR, "expected identifier expression", loc);
         return NULL;
@@ -1257,7 +1276,7 @@ Expression *ParseContext::parsePrimaryExpression()
         return exp;
     }
 
-    if(peek().is(tok::identifier))
+    if(peek().is(tok::identifier) || peek().is(kw_this))
     {
         return parseIdentifierExpression();
         //TODO: in statement like "MyStruct[].sizeof", this will fail

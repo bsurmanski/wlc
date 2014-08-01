@@ -216,7 +216,9 @@ void ASTType::accept(ASTVisitor *v) {
     //TODO subtypes, etc
 }
 
-FunctionDeclaration *ASTUserType::getDefaultConstructor() { return getDeclaration()->getDefaultConstructor(); }
+FunctionDeclaration *ASTUserType::getDefaultConstructor() {
+    return getDeclaration()->getDefaultConstructor();
+}
 ASTUserType *ASTUserType::asClass() { if(dynamic_cast<ClassDeclaration*>(identifier->getDeclaration())) return this; }
 ASTUserType *ASTUserType::asInterface() { if(dynamic_cast<InterfaceDeclaration*>(identifier->getDeclaration())) return this; }
 ASTUserType *ASTUserType::asStruct() { if(dynamic_cast<StructDeclaration*>(identifier->getDeclaration())) return this; }

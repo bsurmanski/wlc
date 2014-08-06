@@ -591,7 +591,7 @@ ASTValue *IRCodegenContext::getValueOf(ASTValue *ptr, bool lvalue){
 
 // UNOP &
 ASTValue *IRCodegenContext::getAddressOf(ASTValue *lval){
-    assert_message(lval->isLValue(), msg::FAILURE, "attempt to get address of non-LValue value");
+    assert_message(lval->isLValue() || lval->isReference(), msg::FAILURE, "attempt to get address of non-LValue value");
     return new ASTBasicValue(lval->getType()->getPointerTy(), codegenLValue(lval), false);
 }
 
@@ -903,8 +903,16 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         ASTUserType *uty = ty->asUserType();
         if(FunctionDeclaration *fdecl = uty->getDefaultConstructor()){
             std::vector<ASTValue*> args;
-            args.push_back(val);
-            codegenCall(codegenIdentifier(fdecl->identifier), args);
+
+            for(int i = 0; i < exp->args.size(); i++) {
+                args.push_back(codegenExpression(exp->args[i]));
+            }
+
+            ASTValue *func = codegenIdentifier(fdecl->identifier);
+            func->setOwner(val); // XXX MESSY!!! should happen in parser or validator
+            func = resolveOverload(func, args);
+            resolveArguments(func, args);
+            codegenCall(func, args);
         }
         //TODO call default constructor
         //XXX temp below. set vtable of new class
@@ -1150,42 +1158,17 @@ NEXTOVERLOAD:;
     return bestOverload;
 }
 
-ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
-{
-    ASTValue *func = codegenExpression(exp->function);
-    if(!func) {
-        emit_message(msg::ERROR, "unknown expression used as function", exp->loc);
-        return NULL;
-    }
-
+void IRCodegenContext::resolveArguments(ASTValue *func, std::vector<ASTValue*>& args) {
     ASTFunctionType *astfty = NULL;
     FunctionDeclaration *fdecl = NULL;
-
-    if(func->getType()->isPointer()){ // dereference function pointer
-        func = getValueOf(func, false);
-    }
-
-    std::vector<ASTValue *> args; //provided arguments
-
-    for(int i = 0; i < exp->args.size(); i++) {
-        args.push_back(codegenExpression(exp->args[i]));
-    }
-
-    func = resolveOverload(func, args);
-
-    if(!func) {
-        emit_message(msg::ERROR, "no valid function overload found for call", exp->loc);
-        return NULL;
-    }
-
     astfty = dynamic_cast<ASTFunctionType*>(func->getType());
     if(!astfty) {
-        emit_message(msg::ERROR, "invalid value used in function call context", exp->loc);
+        emit_message(msg::ERROR, "invalid value used in function call context");
         if(func->getType()){
             emit_message(msg::ERROR, "value is of type \"" +
-                    func->getType()->getName() + "\"", exp->loc);
+                    func->getType()->getName() + "\"");
         }
-        return NULL;
+        return;
     }
 
     if(FunctionValue * fvalue = dynamic_cast<FunctionValue*>(func)) {
@@ -1220,11 +1203,11 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
             arg = codegenExpression(fdecl->parameters[parami]->value);
         } else {
             //TODO: check arguments before here
-            emit_message(msg::ERROR, "invalid function call found", exp->loc);
+            emit_message(msg::ERROR, "invalid function call found");
             emit_message(msg::ERROR, "could not convert argument of type '" +
                     args[argi]->getType()->getName() + "' to parameter of type '" +
-                    astfty->params[parami]->getName() + "'", exp->loc);
-            return NULL;
+                    astfty->params[parami]->getName() + "'");
+            return;
         }
 
         if(parami < astfty->params.size()) {
@@ -1240,7 +1223,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
                     arg->getType()->getSize() < ASTType::getIntTy()->getSize())
                 arg = promoteType(arg, ASTType::getUIntTy());
         } else {
-            emit_message(msg::ERROR, "function call with too many arguments?", exp->loc);
+            emit_message(msg::ERROR, "function call with too many arguments?");
         }
 
         callArgs.push_back(arg);
@@ -1298,16 +1281,50 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     }
 
     */
-    if(args.size() != exp->args.size()){
+    //if(args.size() != exp->args.size()){
         /*
         emit_message(msg::ERROR,
                 "invalid number of arguments provided for function call", exp->loc);
                 */
         //TODO: add 'this' member as expected argument to methods
         //return NULL;
+    //}
+
+    // copy callArgs back to args
+    args.clear();
+    for(int i = 0; i < callArgs.size(); i++) {
+        args.push_back(callArgs[i]);
+    }
+}
+
+ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
+{
+    ASTValue *func = codegenExpression(exp->function);
+    if(!func) {
+        emit_message(msg::ERROR, "unknown expression used as function", exp->loc);
+        return NULL;
     }
 
-    return codegenCall(func, callArgs);
+
+    if(func->getType()->isPointer()){ // dereference function pointer
+        func = getValueOf(func, false);
+    }
+
+    std::vector<ASTValue *> args; //provided arguments
+
+    for(int i = 0; i < exp->args.size(); i++) {
+        args.push_back(codegenExpression(exp->args[i]));
+    }
+
+    func = resolveOverload(func, args);
+    resolveArguments(func, args);
+
+    if(!func) {
+        emit_message(msg::ERROR, "no valid function overload found for call", exp->loc);
+        return NULL;
+    }
+
+    return codegenCall(func, args);
 }
 
 ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)

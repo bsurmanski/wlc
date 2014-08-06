@@ -1043,15 +1043,7 @@ Expression *ParseContext::parseNewExpression()
     std::vector<Expression*> args;
 
     if(peek().is(tok::lparen)) {
-        ignore();
-
-        //TODO: parser argument list
-        if(peek().isNot(tok::rparen)) {
-            emit_message(msg::ERROR, "expected ')' following new constructor call", loc);
-            return NULL;
-        }
-
-        ignore();
+        parseArgumentList(args);
     }
 
     return new NewExpression(t, args, loc);
@@ -1112,6 +1104,25 @@ Expression *ParseContext::parseTupleExpression()
     return new TupleExpression(members, loc);
 }
 
+void ParseContext::parseArgumentList(std::vector<Expression*> &args) {
+    if(peek().isNot(tok::lparen)) {
+        //error
+    }
+    ignore(); // ignore lparen
+
+    while(peek().isNot(tok::rparen))
+    {
+        args.push_back(parseExpression(getBinaryPrecidence(tok::comma)));
+        if(peek().isNot(tok::comma) && peek().isNot(tok::rparen)) {
+            emit_message(msg::ERROR,
+                    "expected ',' or ')' following call parameter", peek().loc);
+            return;
+        }
+        if(peek().is(tok::comma)) ignore(); // ignore comma or rparen
+    }
+    ignore(); // ignore rparen
+}
+
 Expression *ParseContext::parsePostfixExpression(int prec)
 {
     SourceLocation loc = peek().loc;
@@ -1120,19 +1131,8 @@ Expression *ParseContext::parsePostfixExpression(int prec)
     {
         if(linePeek().is(tok::lparen)) // call
         {
-            ignore(); // ignore lparen
-            vector<Expression*> args;
-            while(peek().isNot(tok::rparen))
-            {
-                args.push_back(parseExpression(getBinaryPrecidence(tok::comma)));
-                if(!peek().is(tok::comma) && !peek().is(tok::rparen)) {
-                    emit_message(msg::ERROR,
-                            "expected ',' or ')' following call parameter", peek().loc);
-                    return NULL;
-                }
-                if(peek().is(tok::comma)) ignore(); // ignore comma or rparen
-            }
-            ignore(); // ignore rparen
+            std::vector<Expression*> args;
+            parseArgumentList(args);
             exp = new CallExpression(exp, args, loc);
         } else if(linePeek().is(tok::lbracket)) //index/slice
         {

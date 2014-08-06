@@ -17,14 +17,8 @@ int main(int argc, char^^ argv)
     scl.svar = 11
     scl.a = 2
     scl.b = 11
-    scl.printCall();
-    scl.printCall(5);
-    //int i = vcall(scl)
-    //int j = vcall(cl)
-    //printf("out %d\n", i);
-    //printf("out %d\n", j);
-    //cl.weirdFunc()
-    //sclpt.printCall()
+    scl.printCall()
+    scl.printCall(5)
     SomeStruct s
     s.i = 5
     printf("struct %d\n", s.myfunc())
@@ -65,11 +59,10 @@ class MyClass
         return a + b
     }
 
-    /*
     this() {
-        a = 0
-        b = 0
-    }*/
+        .a = 0
+        .b = 0
+    }
 }
 
 struct SomeStruct {

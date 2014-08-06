@@ -9,6 +9,7 @@ int main(int argc, char^^ argv)
 
     cl = new MyClass
     scl = new MySpecialClass
+    scl = new MySpecialClass(5)
     return 0
 }
 
@@ -23,6 +24,11 @@ class MySpecialClass : MyClass
     this() {
         this.svar = 22
         printf("myspecialclass constructor\n");
+    }
+
+    this(int i) {
+        .svar = i
+        printf("myspecialclass special constructor\n");
     }
 }
 

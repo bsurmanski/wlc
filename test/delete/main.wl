@@ -1,8 +1,13 @@
+extern undecorated int printf(char ^c, ...);
+
 class MyClass {
     int i
+
+    ~this() {
+        printf("destructor\n");
+    }
 }
 
-extern undecorated int printf(char ^c, ...);
 
 int main(int argc, char^^ argv) {
     int ^i = new int

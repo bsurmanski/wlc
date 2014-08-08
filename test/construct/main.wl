@@ -30,6 +30,10 @@ class MySpecialClass : MyClass
         .svar = i
         printf("myspecialclass special constructor\n");
     }
+
+    ~this() {
+        printf("special class destructor\n");
+    }
 }
 
 class MyClass
@@ -45,5 +49,9 @@ class MyClass
         .a = 0
         .b = 0
         printf("myclass constructor\n");
+    }
+
+    ~this() {
+        printf("class destructor\n");
     }
 }

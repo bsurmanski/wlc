@@ -252,6 +252,7 @@ struct ASTType
     virtual bool isReference() { return false; } //TODO: name is confusing with 'getReferencedTy()'
     virtual bool isUnknown() { return false; }
     bool isPointer() { return asPointer(); }
+    bool isUserType() { return asUserType(); }
     bool isClass() { return asClass(); }
     bool isInterface() { return asInterface(); }
     bool isStruct() { return asStruct(); }
@@ -426,6 +427,8 @@ struct ASTUserType : public ASTCompositeType {
     ASTScope *getScope();
 
     virtual FunctionDeclaration *getDefaultConstructor();
+    virtual FunctionDeclaration *getConstructor();
+    virtual FunctionDeclaration *getDestructor();
     virtual bool isReference();
 };
 

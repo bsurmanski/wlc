@@ -587,9 +587,27 @@ Declaration *ParseContext::parseDeclaration()
         ASTScope *tbl = new ASTScope(getScope(), ASTScope::Scope_Struct);
         tbl->setOwner(id);
         pushScope(tbl);
-        vector<Declaration*> members;
-        vector<FunctionDeclaration*> methods;
-        FunctionDeclaration *defaultConstructor = 0;
+
+        UserTypeDeclaration *sdecl;
+
+        switch(kind)
+        {
+            case kw_union:
+                sdecl = new UnionDeclaration(id, tbl, loc, dqual);
+                break;
+            case kw_struct:
+                sdecl = new StructDeclaration(id, tbl, loc, dqual);
+                break;
+            case kw_class:
+                sdecl = new ClassDeclaration(id, tbl, baseId, loc, dqual);
+                break;
+            case kw_interface:
+                sdecl = new InterfaceDeclaration(id, tbl, loc, dqual);
+                break;
+            default:
+                emit_message(msg::FAILURE, "unknown declaration kind", loc);
+        }
+
         if(peek().is(tok::lbrace))
         {
             ignore(); // eat lbrace
@@ -602,18 +620,27 @@ Declaration *ParseContext::parseDeclaration()
                         emit_message(msg::ERROR, "interface methods should not have associated bodies", loc);
                     }
 
-                    if(d->getName() == "this" && d->qualifier.implicit){
-                        defaultConstructor = fdecl;
-                        continue;
+                    if(d->isConstructor()) {
+                        sdecl->addConstructor(fdecl);
                     }
 
-                    methods.push_back(d->functionDeclaration());
+                    if(d->isDestructor()) {
+                        if(sdecl->destructor) {
+                            emit_message(msg::ERROR, "destructor can not be overloadeded", d->loc);
+                        }
+                        if(d->functionDeclaration()->maxExpectedParameters() > 0) {
+                            emit_message(msg::ERROR, "destructor should not have any arguments", d->loc);
+                        }
+                        sdecl->setDestructor(fdecl);
+                    }
+
+                    sdecl->addMethod(fdecl);
                 }
                 else { // is variable declaration (probably... *TODO)
                     if(kind == kw_interface) {
                         emit_message(msg::ERROR, "interfaces cannot contain variable members, methods only", loc);
                     } else {
-                        members.push_back(d);
+                        sdecl->addMember(d);
                     }
                 }
                 while(peek().is(tok::semicolon)) ignore();
@@ -621,26 +648,6 @@ Declaration *ParseContext::parseDeclaration()
             ignore(); //eat rbrace
         } else ignore(); // eat semicolon
 
-        UserTypeDeclaration *sdecl;
-
-        switch(kind)
-        {
-            case kw_union:
-                sdecl = new UnionDeclaration(id, tbl, members, methods, loc, dqual);
-                break;
-            case kw_struct:
-                sdecl = new StructDeclaration(id, tbl, members, methods, loc, dqual);
-                break;
-            case kw_class:
-                sdecl = new ClassDeclaration(id, tbl, baseId, members, methods, loc, dqual);
-                break;
-            case kw_interface:
-                sdecl = new InterfaceDeclaration(id, tbl, methods, loc, dqual);
-                break;
-            default:
-                emit_message(msg::FAILURE, "unknown declaration kind", loc);
-        }
-        sdecl->setDefaultConstructor(defaultConstructor);
 
         popScope();
 
@@ -650,6 +657,7 @@ Declaration *ParseContext::parseDeclaration()
     ASTType *type; // return type
     Token t_id;
     Identifier *id;
+    SourceLocation idLoc;
 
     // this is a bit messy
     // if we see the 'this' keyword, should be a constructor. jump to parsing a function
@@ -657,15 +665,30 @@ Declaration *ParseContext::parseDeclaration()
         if(!getScope()->isUserTypeScope()) {
             emit_message(msg::ERROR, "'this' keyword found outside of user type scope", peek().loc);
         }
+        idLoc = peek().loc;
+        ignore(); // ignore 'this'
         type = ASTType::getVoidTy();
-        t_id = get();
         id = getScope()->getInScope("this");
+        goto PARSEFUNC;
+    }
+
+    // same as above; destructor
+    if(peek().is(tok::tilde)) {
+        ignore();
+        if(peek().isNot(tok::kw_this)) {
+            emit_message(msg::ERROR, "expected 'this' keyword in declaration following '~'", peek().loc);
+        }
+        idLoc = peek().loc;
+        ignore(); // ignore 'this'
+        type = ASTType::getVoidTy();
+        id = getScope()->getInScope("~this");
         goto PARSEFUNC;
     }
 
     type = parseType();
 
     t_id = get();
+    idLoc = t_id.loc;
     if(t_id.isNot(tok::identifier)){
         emit_message(msg::ERROR,
             "expected identifier following type (declaration)", t_id.loc);
@@ -766,7 +789,7 @@ PARSEFUNC:
 
         //ASTType *proto = ASTType::getFunctionTy(type, params, vararg);
         Declaration *decl = new FunctionDeclaration(id, thisTy, type, parameters, vararg,
-                funcScope, stmt, t_id.loc, dqual);
+                funcScope, stmt, idLoc, dqual);
         id->addDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;
     }
@@ -778,17 +801,17 @@ PARSEFUNC:
         defaultValue = parseExpression();
     } else if(type->kind == TYPE_DYNAMIC) //XXX make isDynamic() function
     {
-        emit_message(msg::ERROR, "dynamic type 'var' without initializer", t_id.loc);
+        emit_message(msg::ERROR, "dynamic type 'var' without initializer", idLoc);
     }
 
     if(ASTArrayType *aty = dynamic_cast<ASTArrayType*>(type))
     {
-        Declaration *adecl = new VariableDeclaration(type, id, defaultValue, t_id.loc, dqual);
+        Declaration *adecl = new VariableDeclaration(type, id, defaultValue, idLoc, dqual);
         id->addDeclaration(adecl, Identifier::ID_VARIABLE);
         return adecl;
     }
 
-    Declaration *decl = new VariableDeclaration(type, id, defaultValue, t_id.loc, dqual);
+    Declaration *decl = new VariableDeclaration(type, id, defaultValue, idLoc, dqual);
     id->addDeclaration(decl, Identifier::ID_VARIABLE);
 
     //TODO: comma, multiple decl
@@ -1036,6 +1059,7 @@ Expression *ParseContext::parseDeleteExpression()
 
 Expression *ParseContext::parseNewExpression()
 {
+    bool call = false;
     SourceLocation loc = peek().loc;
     assert(peek().is(tok::kw_new));
     ignore(); //ignore 'new'
@@ -1043,10 +1067,11 @@ Expression *ParseContext::parseNewExpression()
     std::vector<Expression*> args;
 
     if(peek().is(tok::lparen)) {
+        call = true;
         parseArgumentList(args);
     }
 
-    return new NewExpression(t, args, loc);
+    return new NewExpression(t, args, call, loc);
 }
 
 Expression *ParseContext::parseExpression(int prec)

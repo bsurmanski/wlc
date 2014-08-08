@@ -152,6 +152,7 @@ CONTINUE:;
     }
 }
 
+/*
 FunctionDeclaration *UserTypeDeclaration::getDefaultConstructor(){
     Identifier *id = getScope()->lookup("this");
     FunctionDeclaration *fdecl = id->getDeclaration()->functionDeclaration();
@@ -165,4 +166,4 @@ FunctionDeclaration *UserTypeDeclaration::getDefaultConstructor(){
         fdecl = fdecl->getNextOverload();
     }
     return NULL;
-}
+}*/

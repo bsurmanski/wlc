@@ -898,10 +898,13 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         val = new ASTBasicValue(ty->getPointerTy(), value);
     }
 
-    if(ty->isClass()) {
+    if(ty->isUserType()) {
          // no default value, and allocated class. set VTable, in case
         ASTUserType *uty = ty->asUserType();
-        if(FunctionDeclaration *fdecl = uty->getDefaultConstructor()){
+
+        //TODO: call parent class constructor
+        FunctionDeclaration *fdecl;
+        if((fdecl = uty->getConstructor()) && exp->call){
             std::vector<ASTValue*> args;
 
             for(int i = 0; i < exp->args.size(); i++) {
@@ -914,7 +917,6 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
             resolveArguments(func, args);
             codegenCall(func, args);
         }
-        //TODO call default constructor
         //XXX temp below. set vtable of new class
         // TODO: also do if type is pointer to class (called through 'new')
         ASTValue *vtable = getVTable(val);
@@ -943,12 +945,26 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
 
     if(val->getType()->isArray() && val->getType()->kind == TYPE_DYNAMIC_ARRAY)
     {
-        //TODO: duplicate of ".ptr". make a function for this
+        //TODO: duplicate of ".ptr". make a function for this?
         std::vector<Value*> gep;
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
         val = new ASTBasicValue(val->getType()->getReferencedTy()->getPointerTy(), llval, true);
+    }
+
+    //TODO: call parent class destructor
+    if(val->getType()->isUserType()) {
+        ASTUserType *uty = val->getType()->asUserType();
+        FunctionDeclaration *dtor = uty->getDestructor();
+        if(dtor) {
+            std::vector<ASTValue*> args;
+            ASTValue *func = codegenIdentifier(dtor->identifier);
+            func->setOwner(val); // XXX MESSY!!! should happen in parser or validator
+            func = resolveOverload(func, args);
+            resolveArguments(func, args);
+            codegenCall(func, args);
+        }
     }
 
     val = promoteType(val, ASTType::getCharTy()->getPointerTy());

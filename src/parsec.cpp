@@ -101,9 +101,13 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
         if(typeDecl.kind == CXCursor_StructDecl)
         {
             //TODO: correct source loc
-            utdecl = new StructDeclaration(id, tbl, members, std::vector<FunctionDeclaration*>(), SourceLocation(), DeclarationQualifier());
+            utdecl = new StructDeclaration(id, tbl, SourceLocation(), DeclarationQualifier());
         } else {// is union
-            utdecl = new UnionDeclaration(id, tbl, members, std::vector<FunctionDeclaration*>(), SourceLocation(), DeclarationQualifier());
+            utdecl = new UnionDeclaration(id, tbl, SourceLocation(), DeclarationQualifier());
+        }
+
+        for(int i = 0; i < members.size(); i++) {
+            utdecl->addMember(members[i]);
         }
 
         return utdecl->getDeclaredType();

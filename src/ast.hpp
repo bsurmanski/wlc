@@ -216,6 +216,9 @@ struct Declaration : public ASTNode
     virtual Declaration *declaration() { return this; }
 
     virtual void accept(ASTVisitor *v);
+
+    virtual bool isConstructor() { return false; }
+    virtual bool isDestructor() { return false; }
 };
 
 struct PackageDeclaration : public Declaration {
@@ -273,6 +276,10 @@ struct FunctionDeclaration : public Declaration
     virtual void accept(ASTVisitor *v);
     bool isOverloaded() { return nextoverload; }
     FunctionDeclaration *getNextOverload() { return nextoverload; }
+
+    // perhaps a bit of a silly way to do it
+    virtual bool isConstructor() { return identifier->getName() == "this"; }
+    virtual bool isDestructor() { return identifier->getName() == "~this"; }
 };
 
 struct LabelDeclaration : public Declaration
@@ -317,13 +324,13 @@ struct UserTypeDeclaration : public TypeDeclaration
 {
     ASTType *type;
     ASTScope *scope;
-    FunctionDeclaration *defaultConstructor;
+    FunctionDeclaration *constructor; // linked list of overloadeded constructors; also in 'methods'
+    FunctionDeclaration *destructor; // destructor (should only be one); also in 'methods'
     std::vector<FunctionDeclaration*> methods; //locally declared methods; does not include methods defined in parent
     std::vector<Declaration*> members;
 
-    UserTypeDeclaration(Identifier *id, ASTScope *sc,
-                std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc, DeclarationQualifier dqual) :
-            TypeDeclaration(id, loc, dqual), scope(sc), members(m), methods(met), defaultConstructor(0),
+    UserTypeDeclaration(Identifier *id, ASTScope *sc, SourceLocation loc, DeclarationQualifier dqual) :
+            TypeDeclaration(id, loc, dqual), scope(sc), constructor(0), destructor(0),
             type(new ASTUserType(id, this))
     {
         if(scope) scope->setOwner(id);
@@ -331,8 +338,10 @@ struct UserTypeDeclaration : public TypeDeclaration
         identifier->addDeclaration(this, Identifier::ID_USER);
     }
 
+    /*
     UserTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc, DeclarationQualifier dqual) :
-        TypeDeclaration(id, loc, dqual), type(ty), defaultConstructor(0) {}
+        TypeDeclaration(id, loc, dqual), type(ty), {}
+        */
 
     ASTScope *getScope() { return scope; }
     virtual Identifier *lookup(std::string member)
@@ -347,8 +356,26 @@ struct UserTypeDeclaration : public TypeDeclaration
     virtual long getVTableIndex(std::string method) { return -1; }
     virtual void accept(ASTVisitor *v);
     virtual UserTypeDeclaration *userTypeDeclaration() { return this; }
-    virtual FunctionDeclaration *getDefaultConstructor(); // XXX default, or no arg?
-    virtual void setDefaultConstructor(FunctionDeclaration *f) { defaultConstructor = f; }
+    void addMethod(FunctionDeclaration *fdecl) {
+        methods.push_back(fdecl);
+    }
+    void addMember(Declaration *decl) {
+        members.push_back(decl);
+    }
+    void addConstructor(FunctionDeclaration *fdecl) {
+        if(!constructor) {
+            constructor = fdecl;
+        } else {
+            fdecl->nextoverload = constructor;
+            constructor = fdecl;
+        }
+    }
+    void setDestructor(FunctionDeclaration *fdecl) {
+        // should only be one
+        destructor = fdecl;
+    }
+    //virtual FunctionDeclaration *getDefaultConstructor(); // XXX default, or no arg?
+    //virtual void setDefaultConstructor(FunctionDeclaration *f) { defaultConstructor = f; }
 };
 
 struct ClassDeclaration : public UserTypeDeclaration {
@@ -356,8 +383,8 @@ struct ClassDeclaration : public UserTypeDeclaration {
     ASTValue *typeinfo; //XXX this might be a bad place for this
     std::vector<FunctionDeclaration*> vtable; // populated during validation
     ClassDeclaration(Identifier *id, ASTScope *sc, Identifier *bs,
-            std::vector<Declaration*> m, std::vector<FunctionDeclaration*> met, SourceLocation loc, DeclarationQualifier dqual) :
-        UserTypeDeclaration(id, sc, m, met, loc, dqual), base(bs), typeinfo(0) {
+            SourceLocation loc, DeclarationQualifier dqual) :
+        UserTypeDeclaration(id, sc, loc, dqual), base(bs), typeinfo(0) {
     }
     virtual Identifier *lookup(std::string member){
         Identifier *id = getScope()->lookupInScope(member);
@@ -375,9 +402,8 @@ struct ClassDeclaration : public UserTypeDeclaration {
 };
 
 struct InterfaceDeclaration : public UserTypeDeclaration {
-    InterfaceDeclaration(Identifier *id, ASTScope *sc,
-            std::vector<FunctionDeclaration*> met, SourceLocation loc, DeclarationQualifier dqual) :
-        UserTypeDeclaration(id, sc, std::vector<Declaration*>(), met, loc, dqual) {}
+    InterfaceDeclaration(Identifier *id, ASTScope *sc, SourceLocation loc, DeclarationQualifier dqual) :
+        UserTypeDeclaration(id, sc, loc, dqual) {}
     virtual size_t getSize() const { return 0; } //TODO?
     virtual long getMemberIndex(std::string member) {
         emit_message(msg::FAILURE, "member index is meaningless for interface");
@@ -387,18 +413,18 @@ struct InterfaceDeclaration : public UserTypeDeclaration {
 
 struct StructDeclaration : public UserTypeDeclaration {
     bool packed;
-    StructDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m,
-            std::vector<FunctionDeclaration*> met, SourceLocation loc, DeclarationQualifier dqual) :
-        UserTypeDeclaration(id, sc, m, met, loc, dqual), packed(false) {
+    StructDeclaration(Identifier *id, ASTScope *sc,
+           SourceLocation loc, DeclarationQualifier dqual) :
+        UserTypeDeclaration(id, sc, loc, dqual), packed(false) {
         }
     virtual size_t getSize() const;
     long getMemberIndex(std::string member);
 };
 
 struct UnionDeclaration : public UserTypeDeclaration {
-    UnionDeclaration(Identifier *id, ASTScope *sc, std::vector<Declaration*> m,
-            std::vector<FunctionDeclaration*> met, SourceLocation loc, DeclarationQualifier dqual) :
-        UserTypeDeclaration(id, sc, m, met, loc, dqual) {}
+    UnionDeclaration(Identifier *id, ASTScope *sc,
+            SourceLocation loc, DeclarationQualifier dqual) :
+        UserTypeDeclaration(id, sc, loc, dqual) {}
     virtual size_t getSize() const;
     long getMemberIndex(std::string member) { return 0; }
 };
@@ -668,11 +694,12 @@ struct TypeExpression : public Expression
 
 struct NewExpression : public Expression
 {
+    bool call;
     ASTType *type;
     std::vector<Expression*> args;
     virtual ASTType *getType() { return type; }
-    NewExpression(ASTType *t, std::vector<Expression*> a, SourceLocation l = SourceLocation()) :
-        Expression(l), type(t), args(a) {}
+    NewExpression(ASTType *t, std::vector<Expression*> a, bool c, SourceLocation l = SourceLocation()) :
+        Expression(l), type(t), args(a), call(c) {}
     virtual NewExpression *newExpression() { return this; }
     virtual void accept(ASTVisitor *v);
 };

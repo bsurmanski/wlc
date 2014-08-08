@@ -139,3 +139,29 @@ is so that no argument constructors can be used in structs/etc.
 ###
 codegen type expressions
 create a 'type' runtime type
+
+###
+Generics/Templates
+
+instead of the whole C++/D/Java idea of template/generics, provide the
+same functionality by having static function parameters and currying.
+
+eg.
+
+    void myFunction(static type T, int i) {
+        #T myThing = i
+    }
+
+    void exprFunc(static expression E) {
+        int i = #E * #E
+    }
+
+    void function2() {
+        int j = 2
+        myFunction(int, 5)
+        let newFunc = myFunction!(int) // curry without call
+        newFunc(10)
+        exprFunc(5 * j) // int i = (5*j) * (5*j)
+    }
+
+although this would not handle generic classes...

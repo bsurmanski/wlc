@@ -216,9 +216,19 @@ void ASTType::accept(ASTVisitor *v) {
     //TODO subtypes, etc
 }
 
+//TODO: default constructor?
 FunctionDeclaration *ASTUserType::getDefaultConstructor() {
-    return getDeclaration()->getDefaultConstructor();
+    return NULL; //getDeclaration()->getDefaultConstructor();
 }
+
+FunctionDeclaration *ASTUserType::getConstructor() {
+    return getDeclaration()->constructor;
+}
+
+FunctionDeclaration *ASTUserType::getDestructor() {
+    return getDeclaration()->destructor;
+}
+
 ASTUserType *ASTUserType::asClass() { if(dynamic_cast<ClassDeclaration*>(identifier->getDeclaration())) return this; }
 ASTUserType *ASTUserType::asInterface() { if(dynamic_cast<InterfaceDeclaration*>(identifier->getDeclaration())) return this; }
 ASTUserType *ASTUserType::asStruct() { if(dynamic_cast<StructDeclaration*>(identifier->getDeclaration())) return this; }

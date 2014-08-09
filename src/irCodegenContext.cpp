@@ -374,6 +374,9 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
     }
 
     if(value->isLValue()) {
+        if(value->isReference()) {
+            return codegenLValue(value);
+        }
         return ir->CreateAlignedLoad(codegenLValue(value), 4);
     }
 
@@ -1126,7 +1129,7 @@ ASTValue *IRCodegenContext::codegenCall(ASTValue *func, std::vector<ASTValue *> 
     }
     ASTType *rtype = astfty->getReturnType();
 
-    for(int i = 0; i < args.size(); i++){
+    for(int i = 0; i < args.size(); i++) {
         llargs.push_back(codegenValue(args[i]));
     }
 
@@ -1834,6 +1837,10 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                 return new ASTBasicValue(toType,
                         ir->CreatePointerCast(codegenLValue(val),
                             codegenType(toType)));
+            } else if(val->getType()->extends(toType)) {
+                return new ASTBasicValue(toType,
+                        ir->CreatePointerCast(codegenLValue(val),
+                            codegenType(toType)), false, true);
             }
         }
     }
@@ -2355,7 +2362,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
             AllocaInst *alloc = new AllocaInst(codegenType(fdecl->parameters[idx]->getType()),
                                                0, fdecl->parameters[idx]->getName(), BB);
             alloc->setAlignment(8);
-            ASTValue *alloca = new ASTBasicValue(fdecl->parameters[idx]->getType(), alloc, true);
+            ASTValue *alloca = new ASTBasicValue(fdecl->parameters[idx]->getType(), alloc, true, fdecl->parameters[idx]->getType()->isReference());
 
             if(fdecl->parameters[idx]->getType()->isReference()) {
                 new StoreInst(AI, codegenRefValue(alloca), BB);

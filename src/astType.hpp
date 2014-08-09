@@ -141,13 +141,17 @@ struct ASTType
         }
     }
 
-    virtual bool coercesTo(ASTType *ty) const
+    virtual bool coercesTo(ASTType *ty)
     {
         switch(kind)
         {
             case TYPE_POINTER:
                 return ty->isInteger() || ty == this ||
-                    getReferencedTy()->kind == TYPE_VOID || (ty->getReferencedTy() && ty->getReferencedTy()->kind == TYPE_VOID);
+                    // allow implicit cast from void pointer
+                    getReferencedTy()->kind == TYPE_VOID ||
+                    // allow implicit cast to void pointer
+                    (ty->getReferencedTy() &&
+                     ty->getReferencedTy()->kind == TYPE_VOID);
                 //TODO: check if compatible pointer
             case TYPE_BOOL:
             case TYPE_UCHAR:
@@ -267,6 +271,8 @@ struct ASTType
     virtual ASTUserType *asUnion() { return NULL; }
     virtual ASTUserType *asStruct() { return NULL; }
     virtual ASTPointerType *asPointer() { return NULL; }
+    virtual bool is(ASTType *t) { return this == t; }
+    virtual bool extends(ASTType *t) { return false; }
 
 
     static std::vector<ASTType *> typeCache;
@@ -419,8 +425,9 @@ struct ASTUserType : public ASTCompositeType {
     // only valid after AST is validated
     ASTType *getBaseType();
 
-    virtual bool coercesTo(ASTType *ty) const {
-        return getDeclaration() == ty->getDeclaration(); //TODO: might not work...
+    virtual bool coercesTo(ASTType *ty) {
+        return getDeclaration() == ty->getDeclaration() || //TODO: might not work...
+                    (isClass() && ty->isClass() && extends(ty));
     }
     virtual bool isResolved() { return getDeclaration(); }
 
@@ -430,6 +437,8 @@ struct ASTUserType : public ASTCompositeType {
     virtual FunctionDeclaration *getConstructor();
     virtual FunctionDeclaration *getDestructor();
     virtual bool isReference();
+    virtual bool is(ASTType *t);
+    virtual bool extends(ASTType *t);
 };
 
 struct ASTTupleType : public ASTCompositeType {

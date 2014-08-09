@@ -234,4 +234,20 @@ ASTUserType *ASTUserType::asInterface() { if(dynamic_cast<InterfaceDeclaration*>
 ASTUserType *ASTUserType::asStruct() { if(dynamic_cast<StructDeclaration*>(identifier->getDeclaration())) return this; }
 ASTUserType *ASTUserType::asUnion() { if(dynamic_cast<UnionDeclaration*>(identifier->getDeclaration())) return this; }
 
+bool ASTUserType::is(ASTType *t) {
+    if(ASTUserType *uty = t->asUserType()) {
+        return getDeclaration() == t->getDeclaration();
+    }
+
+}
+
+bool ASTUserType::extends(ASTType *t) {
+    ClassDeclaration *cdecl;
+    if((cdecl = getDeclaration()->classDeclaration()) && cdecl->base) {
+        return cdecl->base->getDeclaration() == t->getDeclaration() ||
+            cdecl->base->getDeclaredType()->extends(t);
+    }
+    return false;
+}
+
 bool ASTUserType::isReference() { return dynamic_cast<ClassDeclaration*>(identifier->getDeclaration()); }

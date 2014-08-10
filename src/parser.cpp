@@ -106,7 +106,11 @@ ASTType *ParseContext::parseType()
             // lbracket already got
             while(peek().isNot(tok::rbracket))
             {
-                tupleTypes.push_back(parseType());
+                ASTType *tupleMember = parseType();
+                if(!tupleMember) {
+                    emit_message(msg::ERROR, "expected subtype while parsing tuple type", peek().loc);
+                }
+                tupleTypes.push_back(tupleMember);
                 if(peek().is(tok::comma)) ignore();
             }
             ignore(); // eat ]
@@ -645,9 +649,21 @@ Declaration *ParseContext::parseDeclaration()
                 }
                 while(peek().is(tok::semicolon)) ignore();
             }
-            ignore(); //eat rbrace
-        } else ignore(); // eat semicolon
 
+            if(peek().isNot(tok::rbrace)) {
+                emit_message(msg::ERROR, "expected right brace following user type declaration", loc);
+                popScope();
+                return NULL;
+            }
+            ignore(); //eat rbrace
+        } else {
+            if(peek().isNot(tok::semicolon)) {
+                emit_message(msg::ERROR, "expected '{' or ';' following user type declaration identifier", loc);
+                popScope();
+                return NULL;
+            }
+            ignore(); // eat semicolon
+        }
 
         popScope();
 
@@ -1175,6 +1191,12 @@ Expression *ParseContext::parsePostfixExpression(int prec)
             int n = 1;
 
             // look ahead and see if we can spot an 'infix cast'
+            // an infix cast is a bit of a strange idea where you may cast to a type
+            // along in a chain of dot-operators.
+            // eg: base.SpecialClass: member.specialClassMember
+            // The above is equivilent to (SpecialClass: base.member).specialClassMember
+            // It is sort of a way to by pass the weird bracket stuff that shows up in C++
+            // But, it might not be a good idea...
             while(lookAhead(n).isNot(tok::dot) && !lookAhead(n).followsNewline() &&
                     !lookAhead(n).isBinaryOp())
             {
@@ -1212,7 +1234,6 @@ Expression *ParseContext::parsePostfixExpression(int prec)
                     peek().loc);
     }
 
-    //TODO: parse postfix of postfix. eg somecall()++;
     return exp;
 }
 
@@ -1301,10 +1322,25 @@ Expression *ParseContext::parsePrimaryExpression()
         return exp;
     }
 
-    if(peek().is(tok::identifier) || peek().is(kw_this))
-    {
-        return parseIdentifierExpression();
-        //TODO: in statement like "MyStruct[].sizeof", this will fail
+    if(peek().is(tok::identifier) || peek().is(kw_this) || peek().is(tok::dot)) {
+        bool local = false;
+
+        // XXX dispite looking like a unary operator, unary dot is actually parsed here
+        // this is because otherwise the recursive descent would fail on statements like
+        // .v[0]
+        if(peek().is(tok::dot)) {
+            ignore();
+            local = true;
+        }
+
+        if(peek().is(tok::identifier) || peek().is(kw_this))
+        {
+            //TODO: in statement like "MyStruct[].sizeof", this will fail
+            IdentifierExpression *iexp = (IdentifierExpression*) parseIdentifierExpression();
+            iexp->setLocal(local);
+            return iexp;
+        }
+        emit_message(msg::FAILURE, "unreachable");
     }
 
     if(peek().isKeywordType())

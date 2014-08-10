@@ -69,7 +69,7 @@ FTYPE(double,8)
 FTYPE(float32,4)
 FTYPE(float64,8)
 
-VTYPE(vec4,4,float)
+//VTYPE(vec4,4,float)
 
 RESERVE(const)
 RESERVE(enum)

@@ -877,13 +877,14 @@ struct PrimaryExpression : public Expression
 
 struct IdentifierExpression : public PrimaryExpression
 {
+    bool local; // whether this identifer is prefixed with a unary dot
     Identifier *id;
     bool isUserType() { return id->isUserType(); }
     bool isVariable() { return id->isVariable(); }
     bool isFunction() { return id->isFunction(); }
     virtual bool isLValue() { return id->isVariable(); }
     IdentifierExpression(Identifier *i, SourceLocation l = SourceLocation()) :
-        PrimaryExpression(l), id(i) {}
+        PrimaryExpression(l), id(i), local(false) {}
     Identifier *identifier() { return id; }
     std::string getName() { return id->getName(); }
     virtual IdentifierExpression *identifierExpression() { return this; }
@@ -893,6 +894,8 @@ struct IdentifierExpression : public PrimaryExpression
         if(id->isUserType()) return id->getDeclaredType();
         return NULL;
     }
+    bool setLocal(bool b) { local = b; }
+    bool isLocal() { return local; }
 };
 
 //struct TypeExpression : public Expression
@@ -922,6 +925,7 @@ struct NumericExpression : public PrimaryExpression
     NumericType type;
     ASTType *astType;
 
+    // this union is a bit silly. should just subclass this...
     union
     {
         double floatValue;

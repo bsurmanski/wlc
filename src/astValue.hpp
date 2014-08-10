@@ -23,6 +23,7 @@ struct ASTValue
     ASTValue *getOwner() { return owner; }
 
     virtual ASTType *getType() = 0;
+    virtual bool isConst() { return false; } // TODO
     virtual bool isLValue() = 0;
     virtual bool isReference() = 0;
 

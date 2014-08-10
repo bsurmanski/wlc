@@ -776,6 +776,9 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         return codegenCallExpression(cexp);
     } else if(IdentifierExpression *iexp = exp->identifierExpression())
     {
+        if(iexp->isLocal()) {
+            return getMember(getThis(), iexp->id->getName());
+        }
         return codegenIdentifier(iexp->id);
     } else if(ImportExpression *iexp = exp->importExpression())
     {
@@ -808,6 +811,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
     std::vector<ASTValue*> vals;
     std::vector<ASTType*> types;
     bool lvalue = true;
+    bool isConst = true;
     ASTCompositeType* compty = 0;
     if(ty)
         compty = ty->asCompositeType();
@@ -823,24 +827,20 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
         types.push_back(val->getType());
 
         if(!val->isLValue()) lvalue = false;
+        if(!val->isConst()) isConst = false;
     }
 
     ASTTupleType *tupty = new ASTTupleType(types);
+    StructType *llty = (StructType*) codegenType(tupty);
 
-    if(lvalue)
-    {
-        emit_message(msg::UNIMPLEMENTED, "lvalue tuple unimplemented", exp->loc);
-        return NULL;
-    }
-    else
+    // tuple is a constant; can optimize tuple as constant global
+    if(isConst)
     {
         std::vector<Constant*> llvals;
         for(int i = 0; i < vals.size(); i++)
         {
             llvals.push_back((Constant*) codegenValue(vals[i]));
         }
-
-        StructType *llty = (StructType*) codegenType(tupty);
 
         GlobalVariable *GV = new GlobalVariable(*module, llty, true,
                 GlobalValue::PrivateLinkage,
@@ -851,6 +851,14 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
         //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         //Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
         return new ASTBasicValue(tupty, GV, true);
+    } else {
+        // alloca, and store all values into a struct type
+        Value *val = ir->CreateAlloca(llty);
+        for(int i = 0; i < vals.size(); i++) {
+            ir->CreateStore(codegenValue(vals[i]), ir->CreateStructGEP(val, i));
+        }
+
+        return new ASTBasicValue(tupty, val, true);
     }
 }
 
@@ -1348,12 +1356,6 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 
 ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
 {
-    //TODO: messy
-    // use operator lowering
-    if(exp->op == tok::dot){
-        return getMember(getThis(), exp->lhs->identifierExpression()->id->getName());
-    }
-
     ASTValue *lhs = codegenExpression(exp->lhs); // expression after unary op: eg in !a, lhs=a
 
     ASTValue *val;

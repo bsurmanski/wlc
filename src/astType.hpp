@@ -503,6 +503,12 @@ struct ASTStaticArrayType : public ASTArrayType {
     virtual bool isDynamic() { return false; }
     virtual size_t length() { return size; }
     ASTStaticArrayType(ASTType *pto, int sz) : ASTArrayType(pto, TYPE_ARRAY), size(sz){}
+    virtual bool coercesTo(ASTType *ty) {
+        if(ASTStaticArrayType *saty = dynamic_cast<ASTStaticArrayType*>(ty)) {
+            return arrayOf->is(saty->arrayOf);
+        }
+        return false;
+    }
     //std::string getName() { return "Array[" + arrayOf->getName() + "]"; }
     //std::string getMangledName() { return "A" + arrayOf->getMangledName(); }
 };

@@ -345,7 +345,7 @@ llvm::DIType IRDebug::createType(ASTType *ty)
                 dity = di.createBasicType("void", 8, 8, dwarf::DW_ATE_address);
                 break;
             case TYPE_POINTER:
-                dity = di.createPointerType(createType(ty->getReferencedTy()), 64, 64);
+                dity = di.createPointerType(createType(ty->getPointerElementTy()), 64, 64);
                 break;
             case TYPE_USER:
                 //XXX work around for cyclic codegen; probably wont even solve it...

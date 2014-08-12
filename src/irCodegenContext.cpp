@@ -327,7 +327,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
             llvmty = Type::getVoidTy(context);
             break;
         case TYPE_POINTER:
-            tmp = ty->getReferencedTy();
+            tmp = ty->getPointerElementTy();
             if(tmp->kind == TYPE_VOID) tmp = ASTType::getCharTy();
             llvmty = codegenType(tmp)->getPointerTo();
             break;
@@ -589,7 +589,7 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
 // UNOP ^
 ASTValue *IRCodegenContext::getValueOf(ASTValue *ptr, bool lvalue){
     assert_message(ptr->getType()->isPointer(), msg::FAILURE, "attempt to dereference non pointer type");
-    return new ASTBasicValue(ptr->getType()->getReferencedTy(), codegenValue(ptr), lvalue);
+    return new ASTBasicValue(ptr->getType()->getPointerElementTy(), codegenValue(ptr), lvalue);
 }
 
 // UNOP &
@@ -713,9 +713,9 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
         FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(id->getDeclaration());
         if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
         id->setValue(new FunctionValue(fdecl));
-    } else if(id->isStruct())
+    } else if(id->isUserType())
     {
-        id->setValue(new ASTBasicValue(id->getDeclaredType(), NULL));
+        id->setValue(new TypeValue(id->getDeclaredType()));
     } else if(id->isExpression())
     {
         id->setValue(codegenExpression(id->getExpression()));
@@ -884,7 +884,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
     ASTValue *val = NULL;
     if(exp->type->isArray())
     {
-        ASTType *arrty = exp->type->getReferencedTy();
+        ASTType *arrty = exp->type->getPointerElementTy();
         ty = arrty->getArrayTy();
         Value *ptr = ir->CreateBitCast(value,
                 codegenType(arrty)->getPointerTo());
@@ -961,7 +961,7 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         Value *llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
-        val = new ASTBasicValue(val->getType()->getReferencedTy()->getPointerTy(), llval, true);
+        val = new ASTBasicValue(val->getType()->getPointerElementTy()->getPointerTy(), llval, true);
     }
 
     //TODO: call parent class destructor
@@ -1326,18 +1326,26 @@ void IRCodegenContext::resolveArguments(ASTValue *func, std::vector<ASTValue*>& 
 
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
+    ASTValue *ret = NULL;
+    std::vector<ASTValue *> args; //provided arguments
     ASTValue *func = codegenExpression(exp->function);
     if(!func) {
         emit_message(msg::ERROR, "unknown expression used as function", exp->loc);
         return NULL;
     }
 
-
-    if(func->getType()->isPointer()){ // dereference function pointer
+    // if this is a type value, this is a non-malloc constructor.
+    // eg. MyStruct st = MyStruct(1,2,3)
+    if(func->isTypeValue()) {
+        ASTUserType *uty = func->asTypeValue()->getReferencedType()->asUserType();
+        func = codegenIdentifier(uty->getConstructor()->getIdentifier()); //XXX bit round about going through id
+        Value *tmpAlloca = ir->CreateAlloca(codegenType(uty));
+        ret = new ASTBasicValue(uty->getReferenceTy(), tmpAlloca, false, true);
+        args.push_back(ret); // push back reference to allocated userType, to be constructed
+        //XXX above should be lvalue
+    } else if(func->getType()->isPointer()){ // dereference function pointer
         func = getValueOf(func, false);
     }
-
-    std::vector<ASTValue *> args; //provided arguments
 
     for(int i = 0; i < exp->args.size(); i++) {
         args.push_back(codegenExpression(exp->args[i]));
@@ -1351,7 +1359,13 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         return NULL;
     }
 
-    return codegenCall(func, args);
+    // XXX bit messy; distinction used to return constructed value for type constructor
+    if(!ret) {
+        ret = codegenCall(func, args);
+    } else {
+        codegenCall(func, args);
+    }
+    return ret;
 }
 
 ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
@@ -1441,7 +1455,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         ASTValue *ind = codegenExpression(iexp->index);
         if(arr->getType()->kind == TYPE_DYNAMIC_ARRAY)
         {
-            ASTType *indexedType = arr->getType()->getReferencedTy();
+            ASTType *indexedType = arr->getType()->getPointerElementTy();
             Value *val = ir->CreateStructGEP(codegenLValue(arr), 0);
             val = ir->CreateLoad(val);
             val = ir->CreateInBoundsGEP(val, codegenValue(ind));
@@ -1449,7 +1463,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             return new ASTBasicValue(indexedType, val, true);
         }  else if(arr->getType()->kind == TYPE_ARRAY)
         {
-            ASTType *indexedType = arr->getType()->getReferencedTy();
+            ASTType *indexedType = arr->getType()->getPointerElementTy();
             std::vector<Value*> gep;
             gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
             gep.push_back(codegenValue(ind));
@@ -1458,7 +1472,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         } else if(arr->getType()->isPointer())
         {
             //TODO: index array
-            ASTType *indexedType = arr->getType()->getReferencedTy();
+            ASTType *indexedType = arr->getType()->getPointerElementTy();
             Value *val = ir->CreateInBoundsGEP(codegenValue(arr), codegenValue(ind));
             return new ASTBasicValue(indexedType, val, true);
         } else if(arr->getType()->kind == TYPE_TUPLE)
@@ -1591,7 +1605,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     emit_message(msg::FATAL, "dot exp on array, not actually an array?", dexp->loc);
                     return NULL;
                 }
-                ASTType *ty = arrty->getReferencedTy();
+                ASTType *ty = arrty->getPointerElementTy();
 
                 if(dexp->rhs == "ptr")
                 {
@@ -1613,7 +1627,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             } else if(lhs->getType()->kind == TYPE_ARRAY)
             {
                 ASTArrayType *arrty = dynamic_cast<ASTArrayType*>(lhs->getType());
-                ASTType *ty = arrty->getReferencedTy();
+                ASTType *ty = arrty->getPointerElementTy();
 
                 if(dexp->rhs == "ptr")
                 {
@@ -1772,7 +1786,7 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
         if(val->isLValue())
         {
             toPtr = ir->CreateBitCast(codegenLValue(val),
-                    codegenType(toType->getReferencedTy())->getPointerTo());
+                    codegenType(toType->getPointerElementTy())->getPointerTo());
             ASTTupleType *tupty = (ASTTupleType*) val->getType();
             toSize = ConstantInt::get(codegenType(ASTType::getULongTy()), tupty->length());
 
@@ -1795,7 +1809,7 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
         if(toType->kind == TYPE_POINTER)
         {
             ASTArrayType *arrty = (ASTArrayType*) val->getType();
-            if(arrty->arrayOf != toType->getReferencedTy())
+            if(arrty->arrayOf != toType->getPointerElementTy())
             {
                 emit_message(msg::ERROR, "invalid convesion from array to invalid pointer type");
                 return NULL;
@@ -1817,6 +1831,12 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
 {
     if(val->getType() != toType)
     {
+        //convert reference value to non-reference type
+        //currently, reference types are simply pointers, so just turn it into an LValue and we're set
+        if(val->isReference() && toType->getReferenceTy()->is(val->getType())) {
+            return new ASTBasicValue(toType, codegenLValue(val), true, false);
+        }
+
         if(val->getType()->isInteger())
         {
             return promoteInt(val, toType);

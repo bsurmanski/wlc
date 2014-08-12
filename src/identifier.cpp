@@ -46,6 +46,7 @@ ASTType *Identifier::getDeclaredType()
         //emit_message(msg::FAILURE, "this doesnt look like a type");
         return NULL;
     }
+
     if(!astType)
     {
         astType = new ASTUserType(this);
@@ -55,6 +56,8 @@ ASTType *Identifier::getDeclaredType()
 
 void Identifier::setDeclaredType(ASTType *ty)
 {
+    if(ty->kind == TYPE_UNKNOWN)
+        emit_message(msg::WARNING, "SETTING UNKNOWN DECL ON IDENT");
     astType = ty;
 }
 

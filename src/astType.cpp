@@ -136,6 +136,14 @@ ASTType *ASTType::getPointerTy()
     return pointerTy;
 }
 
+ASTType *ASTType::getReferenceTy() {
+    if(isReference()) {
+        return this;
+    } else {
+        return getPointerTy();
+    }
+}
+
 ASTType *ASTType::getArrayTy()
 {
     if(!dynamicArrayTy)

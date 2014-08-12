@@ -1400,10 +1400,16 @@ void Parser::parseFile(TranslationUnit *unit, std::string filenm, SourceLocation
 {
     ifstream stream(filenm.c_str());
 
+    // if we can't open the specified file, check if the file is in the 'lib' dir
+    // if we still can't find it; throw a fit
     if(stream.fail())
     {
-        emit_message(msg::ERROR, "unknown file '" + filenm + "'", l);
-        return;
+        stream.clear();
+        stream.open(("/usr/local/include/wl/" + filenm).c_str()); //XXX lib dir shouldnt be hard coded
+        if(stream.fail()) {
+            emit_message(msg::ERROR, "unknown file '" + filenm + "'", l);
+            return;
+        }
     }
 
     Lexer *lexer = new StreamLexer(stream);

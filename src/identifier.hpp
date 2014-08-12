@@ -37,15 +37,12 @@ struct Identifier
     Expression *expression;
 
     ASTScope *table; // scope in which identifier is defined
-    union
+    struct
     {
-        struct
-        {
-            ASTValue *astValue;
-            ASTValue *ref; // pointer to declared variable
-        };
-        ASTType *astType;
+        ASTValue *astValue;
+        ASTValue *ref; // pointer to declared variable
     };
+    ASTType *astType;
 
     Identifier(ASTScope *ta, std::string s, IDType t = ID_UNKNOWN);
     void addDeclaration(Declaration *decl, IDType t = ID_UNKNOWN);

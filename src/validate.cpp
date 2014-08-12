@@ -63,7 +63,7 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
     }
 
     if(ty->isPointer()){
-        resolveType(ty->getReferencedTy());
+        resolveType(ty->getPointerElementTy());
     }
 
     return ty;
@@ -222,6 +222,9 @@ void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp) {
     // resolve type of identifier if needed
     if(exp->id->getType()) //XXX temp?
         resolveType(exp->id->getType());
+
+    if(exp->id->getDeclaredType())
+        exp->id->astType = resolveType(exp->id->getDeclaredType());
 }
 
 void ValidationVisitor::visitNumericExpression(NumericExpression *exp) {

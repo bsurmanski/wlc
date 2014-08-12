@@ -8,6 +8,8 @@ struct ASTValueInfo
     virtual ~ASTValueInfo(){}
 };
 
+struct TypeValue;
+
 struct ASTValue
 {
     // value in which this value is indexing or owned by.
@@ -30,6 +32,8 @@ struct ASTValue
     virtual llvm::Value *codegenValue() { return NULL; }
     virtual llvm::Value *codegenLValue() { return NULL; }
     virtual llvm::Value *codegenRefValue() { return NULL; }
+    virtual bool isTypeValue() { return false; }
+    virtual TypeValue *asTypeValue() { return NULL; }
 };
 
 struct ASTBasicValue : ASTValue
@@ -44,6 +48,17 @@ struct ASTBasicValue : ASTValue
     virtual ASTType *getType() { return type; }
     virtual bool isLValue() { return lValue; }
     virtual bool isReference() { return reference; }
+};
+
+struct TypeValue : ASTValue {
+    ASTType *type;
+    TypeValue(ASTType *ty) : ASTValue(NULL), type(ty) {}
+    virtual ASTType *getType() { return NULL; } //XXX should return a 'TYPE' type
+    virtual ASTType *getReferencedType() { return type; }
+    virtual bool isLValue() { return false; }
+    virtual bool isReference() { return false; }
+    virtual bool isTypeValue() { return true; }
+    virtual TypeValue *asTypeValue() { return this; }
 };
 
 // TODO: use polymorphic values(?)
@@ -86,5 +101,6 @@ struct MethodValue : public FunctionValue {
     MethodValue(ASTValue *inst, FunctionDeclaration *fdecl) : FunctionValue(fdecl), instance(inst) {}
     ASTValue *getInstance() { return instance; }
 };
+
 
 #endif

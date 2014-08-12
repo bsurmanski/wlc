@@ -65,7 +65,7 @@ struct ASTType
     ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), cgType(0)
     {}
 
-    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), cgType(NULL)
+    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), dynamicArrayTy(0), cgType(NULL)
     {}
     virtual ~ASTType(){}
 
@@ -76,6 +76,7 @@ struct ASTType
     //virtual ~ASTType() { delete pointerTy; }
     //ASTType *getUnqual();
     ASTType *getPointerTy();
+    ASTType *getReferenceTy();
     ASTType *getArrayTy(int sz);
     ASTType *getArrayTy();
     virtual UserTypeDeclaration *getDeclaration() const { return NULL; }
@@ -148,10 +149,10 @@ struct ASTType
             case TYPE_POINTER:
                 return ty->isInteger() || ty == this ||
                     // allow implicit cast from void pointer
-                    getReferencedTy()->kind == TYPE_VOID ||
+                    getPointerElementTy()->kind == TYPE_VOID ||
                     // allow implicit cast to void pointer
-                    (ty->getReferencedTy() &&
-                     ty->getReferencedTy()->kind == TYPE_VOID);
+                    (ty->getPointerElementTy() &&
+                     ty->getPointerElementTy()->kind == TYPE_VOID);
                 //TODO: check if compatible pointer
             case TYPE_BOOL:
             case TYPE_UCHAR:
@@ -240,7 +241,7 @@ struct ASTType
         }
     }
 
-    virtual ASTType *getReferencedTy() const { return NULL; }
+    virtual ASTType *getPointerElementTy() const { return NULL; }
     bool isAggregate() { return kind == TYPE_USER; } //XXX kinda...
     bool isBool() { return kind == TYPE_BOOL; }
     bool isInteger() { return kind == TYPE_BOOL || kind == TYPE_CHAR || kind == TYPE_SHORT ||
@@ -253,7 +254,7 @@ struct ASTType
     bool isVector() { return kind == TYPE_VEC; }
     bool isArray() { return kind == TYPE_ARRAY || kind == TYPE_DYNAMIC_ARRAY; }
     bool isComposite() { return asCompositeType(); }
-    virtual bool isReference() { return false; } //TODO: name is confusing with 'getReferencedTy()'
+    virtual bool isReference() { return false; }
     virtual bool isUnknown() { return false; }
     bool isPointer() { return asPointer(); }
     bool isUserType() { return asUserType(); }
@@ -476,7 +477,7 @@ struct ASTTupleType : public ASTCompositeType {
 
 struct ASTPointerType : public ASTType {
     ASTType *ptrTo;
-    virtual ASTType *getReferencedTy() const { return ptrTo; }
+    virtual ASTType *getPointerElementTy() const { return ptrTo; }
     ASTPointerType(ASTType *pto) : ASTType(TYPE_POINTER), ptrTo(pto) {}
     virtual ASTPointerType *asPointer() { return this; }
     virtual std::string getName();
@@ -485,7 +486,7 @@ struct ASTPointerType : public ASTType {
 
 struct ASTArrayType : public ASTCompositeType {
     ASTType *arrayOf;
-    virtual ASTType *getReferencedTy() const { return arrayOf; }
+    virtual ASTType *getPointerElementTy() const { return arrayOf; }
     virtual ASTType *getMemberType(size_t i) { return arrayOf; }
     virtual size_t getSize()= 0;
     virtual size_t getAlign() = 0;

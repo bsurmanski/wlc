@@ -812,7 +812,7 @@ struct UnaryExpression : public Expression
             case tok::bang:
                      return ASTType::getBoolTy();
             case tok::caret:
-                     return lhs->getType()->getReferencedTy();
+                     return lhs->getType()->getPointerElementTy();
             case tok::amp:
                      return lhs->getType()->getPointerTy();
         }

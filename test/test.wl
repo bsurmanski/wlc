@@ -7,9 +7,9 @@ use "importc"
 int RAND_MAX = 2147483647
 
 //import "sdl.wl"
-import(C) "/usr/include/SDL/SDL.h"
-import(C) "/usr/include/stdlib.h"
-import(C) "/usr/include/stdio.h"
+import(C) "SDL/SDL.h"
+import(C) "stdlib.h"
+import(C) "stdio.h"
 
 SDL_Surface^ surf = null
 SDL_Surface^ back = null

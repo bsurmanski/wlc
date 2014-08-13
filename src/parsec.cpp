@@ -323,7 +323,10 @@ void parseCImport(TranslationUnit *unit,
 
     if(access(filenm.c_str(), F_OK) == -1)
     {
-        emit_message(msg::ERROR, "imported C file does not exist: " + filenm, loc);
+        filenm = "/usr/include/" + filenm; //TODO: test all of PATH
+        if(access(filenm.c_str(), F_OK) == -1) {
+            emit_message(msg::ERROR, "imported C file does not exist: " + filenm, loc);
+        }
     }
 
     const char *commandArgs[] = {

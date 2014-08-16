@@ -275,7 +275,7 @@ void ValidationVisitor::visitNewExpression(NewExpression *exp) {
     resolveType(exp->type);
 }
 
-void ValidationVisitor::visitDeleteExpression(DeleteExpression *exp) {
+void ValidationVisitor::visitIdOpExpression(IdOpExpression *exp) {
 
 }
 

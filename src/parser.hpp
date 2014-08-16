@@ -141,7 +141,7 @@ class ParseContext
     Expression *parseCastExpression(int prec = 0);
     Expression *parseExpression(int prec = 0);
     Expression *parseNewExpression();
-    Expression *parseDeleteExpression();
+    Expression *parseIdOpExpression();
     Expression *parseIdentifierExpression();
     Expression *parsePrimaryExpression();
     void parseArgumentList(std::vector<Expression*> &args);

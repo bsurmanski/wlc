@@ -241,7 +241,7 @@ class IRCodegenContext : public CodegenContext
 
     void codegenDelete(ASTValue *val);
     ASTValue *codegenNewExpression(NewExpression *exp);
-    ASTValue *codegenDeleteExpression(DeleteExpression *exp);
+    ASTValue *codegenIdOpExpression(IdOpExpression *exp);
 
     ASTValue *codegenIdentifier(Identifier *id);
     ASTValue *resolveOverload(ASTValue *func, std::vector<ASTValue *> args);

@@ -550,7 +550,7 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
 void IRCodegenContext::retainObject(ASTValue *val) {
     if(val->getType()->isClass()) { //TODO: check for null
         ASTValue *v = getMember(val, "refcount");
-        opIncValue(v);
+        storeValue(v, opIncValue(v));
     }
 }
 
@@ -559,7 +559,7 @@ void IRCodegenContext::releaseObject(ASTValue *val) {
         ASTUserType *uty = val->getType()->asUserType();
 
         ASTValue *v = getMember(val, "refcount");
-        opDecValue(v);
+        storeValue(v, opDecValue(v));
         ASTValue *zero = getIntValue(ASTType::getLongTy(), 0);
         ASTValue *isZero = opLEValue(v, zero);
         BasicBlock *deconstructBr = BasicBlock::Create(context, "del", ir->GetInsertBlock()->getParent());
@@ -937,9 +937,9 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(NewExpression *nexp = dynamic_cast<NewExpression*>(exp))
     {
         return codegenNewExpression(nexp);
-    } else if(DeleteExpression *dexp = dynamic_cast<DeleteExpression*>(exp))
+    } else if(IdOpExpression *dexp = dynamic_cast<IdOpExpression*>(exp))
     {
-        return codegenDeleteExpression(dexp);
+        return codegenIdOpExpression(dexp);
     } else if(UseExpression *uexp = exp->useExpression())
     {
         return NULL;
@@ -1124,20 +1124,29 @@ void IRCodegenContext::codegenDelete(ASTValue *val) {
         } while(uty = dynamic_cast<ASTUserType*>(uty->getBaseType()));
     }
 
-    val = promoteType(val, ASTType::getCharTy()->getPointerTy());
-    llargs.push_back(codegenValue(val));
+    ASTValue *charval = promoteType(val, ASTType::getCharTy()->getPointerTy());
+    llargs.push_back(codegenValue(charval));
     llargty.push_back(codegenType(ASTType::getVoidTy()->getPointerTy()));
 
     FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()), llargty, false);
     Function *freeFunc = (Function*) module->getOrInsertFunction("free", fty);
 
     Value *value = ir->CreateCall(freeFunc, llargs);
+
+    storeValue(val, new ASTBasicValue(val->getType(),
+                ConstantPointerNull::get((llvm::PointerType*) codegenType(val->getType()))));
 }
 
-ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
+ASTValue *IRCodegenContext::codegenIdOpExpression(IdOpExpression *exp)
 {
     ASTValue *val = codegenExpression(exp->expression);
-    codegenDelete(val);
+    if(exp->isDelete()) {
+        codegenDelete(val);
+    } else if(exp->isRetain()) {
+        retainObject(val);
+    } else if(exp->isRelease()) {
+        releaseObject(val);
+    }
 
     //XXX return a value?
     return NULL;

@@ -1064,13 +1064,23 @@ Expression *ParseContext::parseCastExpression(int prec)
     return new CastExpression(type, parseExpression(12), loc); // 12 == cast priority
 }
 
-Expression *ParseContext::parseDeleteExpression()
-{
+
+Expression *ParseContext::parseIdOpExpression() {
     SourceLocation loc = peek().loc;
-    assert(peek().is(tok::kw_delete));
-    ignore(); // ignore 'delete'
+    IdOpExpression::Type type;
+    if(peek().is(tok::kw_delete)) {
+        type = IdOpExpression::Delete;
+    } else if(peek().is(tok::kw_retain)) {
+        type = IdOpExpression::Retain;
+    } else if(peek().is(tok::kw_release)) {
+        type = IdOpExpression::Release;
+    } else {
+        emit_message(msg::ERROR, "expected id operator (delete, retain, release)", loc);
+        return NULL;
+    }
+    ignore(); // ignore op
     IdentifierExpression *ident = (IdentifierExpression*) parseIdentifierExpression();
-    return new DeleteExpression(ident, loc);
+    return new IdOpExpression(ident, type, loc);
 }
 
 Expression *ParseContext::parseNewExpression()
@@ -1107,7 +1117,9 @@ Expression *ParseContext::parseExpression(int prec)
         case tok::kw_new:
             return parseNewExpression();
         case tok::kw_delete:
-            return parseDeleteExpression();
+        case tok::kw_retain:
+        case tok::kw_release:
+            return parseIdOpExpression();
         default:
         return parseBinaryExpression(prec);
     }

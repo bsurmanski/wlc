@@ -54,7 +54,7 @@ class ASTVisitor {
     virtual void visitTupleExpression(TupleExpression *exp){}
     virtual void visitDotExpression(DotExpression *exp){}
     virtual void visitNewExpression(NewExpression *exp){}
-    virtual void visitDeleteExpression(DeleteExpression *exp){}
+    virtual void visitIdOpExpression(IdOpExpression *exp){}
 
     virtual void visitBreakStatement(BreakStatement *stmt){}
     virtual void visitContinueStatement(ContinueStatement *stmt){}

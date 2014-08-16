@@ -197,9 +197,9 @@ void NewExpression::accept(ASTVisitor *v){
     v->visitNewExpression(this);
 }
 
-void DeleteExpression::accept(ASTVisitor *v){
+void IdOpExpression::accept(ASTVisitor *v){
     Expression::accept(v);
-    v->visitDeleteExpression(this);
+    v->visitIdOpExpression(this);
     if(expression)
         expression->accept(v);
 }

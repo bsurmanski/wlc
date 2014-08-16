@@ -646,7 +646,6 @@ struct UseExpression;
 struct TupleExpression;
 struct DotExpression;
 struct NewExpression;
-struct DeleteExpression;
 
 struct Expression : public Statement
 {
@@ -676,7 +675,6 @@ struct Expression : public Statement
     virtual TupleExpression *tupleExpression() { return NULL; }
     virtual DotExpression *dotExpression() { return NULL; }
     virtual NewExpression *newExpression() { return NULL; }
-    virtual DeleteExpression *deleteExpression() { return NULL; }
 
     //TODO: overrides
 
@@ -704,13 +702,22 @@ struct NewExpression : public Expression
     virtual void accept(ASTVisitor *v);
 };
 
-struct DeleteExpression : public Expression
-{
+struct IdOpExpression : public Expression {
     IdentifierExpression *expression;
-    DeleteExpression(IdentifierExpression *e, SourceLocation l = SourceLocation()) :
-        Expression(l), expression(e){}
-    virtual DeleteExpression *deleteExpression() { return this; }
+    enum Type {
+        Delete,
+        Retain,
+        Release
+    };
+
+    Type type;
+
+    IdOpExpression(IdentifierExpression *e, Type t, SourceLocation l = SourceLocation()) :
+        Expression(l), expression(e), type(t) {}
     virtual void accept(ASTVisitor *v);
+    bool isDelete() { return type == Delete; }
+    bool isRetain() { return type == Retain; }
+    bool isRelease() { return type == Release; }
 };
 
 struct TupleExpression : public Expression

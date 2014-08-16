@@ -415,6 +415,25 @@ llvm::Value *IRCodegenContext::codegenRefValue(ASTValue *value) {
     return (llvm::Value*) value->value;
 }
 
+// SCOPE
+void IRCodegenContext::enterScope(IRScope *sc) {
+    sc->parent = scope;
+    scope = sc;
+}
+
+IRScope *IRCodegenContext::exitScope() {
+    IRScope *sc = scope;
+    scope = scope->parent;
+
+    /*
+    ASTScope::iterator it = sc->begin();
+    for(; it != sc->end(); it++) {
+    } */
+
+    return sc;
+}
+
+
 ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 {
     Value *llval = 0;
@@ -537,9 +556,20 @@ void IRCodegenContext::retainObject(ASTValue *val) {
 
 void IRCodegenContext::releaseObject(ASTValue *val) {
     if(val->getType()->isClass()) { //TODO: check for null
+        ASTUserType *uty = val->getType()->asUserType();
+
         ASTValue *v = getMember(val, "refcount");
         opDecValue(v);
-        //TODO: delete if zero
+        ASTValue *zero = getIntValue(ASTType::getLongTy(), 0);
+        ASTValue *isZero = opLEValue(v, zero);
+        BasicBlock *deconstructBr = BasicBlock::Create(context, "del", ir->GetInsertBlock()->getParent());
+        BasicBlock *afterBr = BasicBlock::Create(context, "enddel", ir->GetInsertBlock()->getParent());
+
+        ir->CreateCondBr(codegenValue(isZero), deconstructBr, afterBr); //TODO: expect no deconstruct
+        ir->SetInsertPoint(deconstructBr);
+        codegenDelete(val); //delete object
+        ir->CreateBr(afterBr); // jump to after block once we're done with destructor conditional
+        ir->SetInsertPoint(afterBr);
     }
 }
 
@@ -1057,17 +1087,17 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         tival = ir->CreateGEP(tival, gep); // GEP to class's vtable, so we can store to it
 
         ir->CreateStore(tival, codegenLValue(vtable));
+
+        retainObject(val);
     }
 
     return val;
 }
 
-ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
-{
+
+void IRCodegenContext::codegenDelete(ASTValue *val) {
     vector<Value*> llargs;
     vector<Type*> llargty;
-    ASTValue *val = codegenExpression(exp->expression);
-
     if(val->getType()->isArray() && val->getType()->kind == TYPE_DYNAMIC_ARRAY)
     {
         //TODO: duplicate of ".ptr". make a function for this?
@@ -1078,18 +1108,20 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
         val = new ASTBasicValue(val->getType()->getPointerElementTy()->getPointerTy(), llval, true);
     }
 
-    //TODO: call parent class destructor
     if(val->getType()->isUserType()) {
         ASTUserType *uty = val->getType()->asUserType();
-        FunctionDeclaration *dtor = uty->getDestructor();
-        if(dtor) {
-            std::vector<ASTValue*> args;
-            ASTValue *func = codegenIdentifier(dtor->identifier);
-            func->setOwner(val); // XXX MESSY!!! should happen in parser or validator
-            func = resolveOverload(func, args);
-            resolveArguments(func, args);
-            codegenCall(func, args);
-        }
+        do {
+            //TODO: make destructor virtual
+            FunctionDeclaration *dtor = uty->getDestructor();
+            if(dtor) {
+                std::vector<ASTValue*> args;
+                ASTValue *func = codegenIdentifier(dtor->identifier);
+                func->setOwner(val); // XXX MESSY!!! should happen in parser or validator
+                func = resolveOverload(func, args);
+                resolveArguments(func, args);
+                codegenCall(func, args);
+            }
+        } while(uty = dynamic_cast<ASTUserType*>(uty->getBaseType()));
     }
 
     val = promoteType(val, ASTType::getCharTy()->getPointerTy());
@@ -1100,8 +1132,14 @@ ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
     Function *freeFunc = (Function*) module->getOrInsertFunction("free", fty);
 
     Value *value = ir->CreateCall(freeFunc, llargs);
-    //TODO: call deallocator function
-    //return new ASTBasicValue(exp->type, value);
+}
+
+ASTValue *IRCodegenContext::codegenDeleteExpression(DeleteExpression *exp)
+{
+    ASTValue *val = codegenExpression(exp->expression);
+    codegenDelete(val);
+
+    //XXX return a value?
     return NULL;
 }
 
@@ -1131,7 +1169,7 @@ void IRCodegenContext::codegenIfStatement(IfStatement *stmt)
 
     ir->SetInsertPoint(ontrue);
     codegenStatement(stmt->body);
-    if(!isTerminated())
+    if(!isTerminated()) // ifstmt body can end in unconditional return; if not, create Branch to endif
         ir->CreateBr(endif);
     setTerminated(false);
 
@@ -1326,8 +1364,9 @@ void IRCodegenContext::resolveArguments(ASTValue *func, std::vector<ASTValue*>& 
     // but astfty->params specifies that it is a 'ASTUserType'. which is bad...
     // TODO: make 'this' a reference type or something
     if(func->owner) {
+        //promote type incase we are calling base class function
+        callArgs.push_back(promoteType(getAddressOf(func->owner), astfty->params[parami]));
         parami++;
-        callArgs.push_back(getAddressOf(func->owner));
     }
 
     for(; parami < astfty->params.size() || (astfty->isVararg() && argi < args.size()); parami++) {
@@ -2291,7 +2330,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     } else if(BlockStatement *bstmt = stmt->blockStatement())
     {
         ASTValue *value = NULL;
-        pushScope(new IRScope(bstmt->scope, unit->debug->createScope(getScope()->debug, bstmt->loc)));
+        enterScope(new IRScope(bstmt->scope, unit->debug->createScope(getScope()->debug, bstmt->loc)));
         if(IfStatement *istmt = stmt->ifStatement())
         {
             codegenIfStatement(istmt);
@@ -2305,7 +2344,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         {
             codegenElseStatement(estmt);
         }
-        popScope();
+        exitScope();
     } else emit_message(msg::FAILURE, "i dont know what kind of statmeent this isssss", stmt->loc);
 }
 
@@ -2412,7 +2451,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
 
         dwarfStopPoint(fdecl->loc);
         unit->debug->createFunction(fdecl);
-        pushScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
+        enterScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
         dwarfStopPoint(fdecl->loc);
 
         ASTFunctionType *astfty = fdecl->getType()->asFunctionType();
@@ -2472,7 +2511,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
             ir->CreateRet(codegenValue(astRet));
         }
 
-        popScope();
+        exitScope();
     } else { // function has no body; external linkage (weak external if actually declared 'extern')
         if(fdecl->isExternal())
             func->setLinkage(Function::ExternalWeakLinkage);
@@ -2520,7 +2559,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
     this->unit = u;
     this->module = this->unit->module;
 
-    pushScope(u->getScope());
+    enterScope(u->getScope());
 
     for(int i = 0; i < unit->unit->importUnits.size(); i++) //TODO: import symbols.
     {
@@ -2597,7 +2636,7 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
     }
 
     unit->debug->finalize();
-    popScope();
+    exitScope();
 }
 
 void IRCodegenContext::codegenPackage(Package *p)

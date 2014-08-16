@@ -2,11 +2,6 @@
 
 use "importc"
 
-//undecorated void ^memcpy(void^ dest, void^ src, long n);
-
-int RAND_MAX = 2147483647
-
-//import "sdl.wl"
 import(C) "SDL/SDL.h"
 import(C) "stdlib.h"
 import(C) "stdio.h"
@@ -14,7 +9,6 @@ import(C) "stdio.h"
 SDL_Surface^ surf = null
 SDL_Surface^ back = null
 void^ testval
-
 
 struct SomeStruct
 {
@@ -86,13 +80,13 @@ void randomize(SDL_Surface^ s)
 
 void^ somefunc()
 {
-    return null 
+    return null
     return testval
 }
 
 [int, int] myTupleFunc()
 {
-    return [124, 55]    
+    return [124, 55]
 }
 
 //int[5] statArr = [1,2,3,4,5]
@@ -110,7 +104,7 @@ int main(int argc, char^^ argv)
 
 
     var tuple = [1, 2, 3]
-    //MyNewStruct st = [1, 2, 3]
+    MyNewStruct st = [1, 2, 3, null]
 
     [int, int] intTuple = myTupleFunc()
 

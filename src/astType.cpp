@@ -20,7 +20,7 @@ ASTScope *ASTUserType::getScope() {
 }
 
 bool ASTUserType::isOpaque() {
-    return !getDeclaration()->length();
+    return !getDeclaration()->length() && !getBaseType(); // XXX should be if type does not have body
 }
 
 Declaration *ASTUserType::getMember(size_t i) {

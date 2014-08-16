@@ -345,7 +345,7 @@ struct ASTFunctionType : public ASTCompositeType {
         sprintf(buf, "%02d", params.size());
         std::string name = std::string("f") + std::string(buf) + ret->getMangledName();
         for(int i = 0; i < params.size(); i++){
-            name = "$$" + name + params[i]->getMangledName();
+            name = name + "$$" + params[i]->getMangledName();
         }
         return name;
     }

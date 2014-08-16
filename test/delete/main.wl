@@ -8,6 +8,11 @@ class MyClass {
     }
 }
 
+class MyExtendClass : MyClass {
+    ~this() {
+        printf("extend destructor\n");
+    }
+}
 
 int main(int argc, char^^ argv) {
     int ^i = new int
@@ -15,6 +20,9 @@ int main(int argc, char^^ argv) {
 
     MyClass cl = new MyClass
     delete cl
+
+    MyExtendClass ecl = new MyExtendClass
+    delete ecl
 
     int[] newarr = new int[5]
     printf("%x\n", newarr.ptr)

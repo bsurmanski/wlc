@@ -69,14 +69,21 @@ struct ASTScope
 
     enum ScopeType
     {
-        Scope_Unowned,
-        Scope_Global,
-        Scope_FunctionParameter,
-        Scope_Struct,
-        Scope_Local,
+        Scope_Unowned, // no scope should be unowned (I think)
+        Scope_Global, // contains globals. this is more like a 'module' scope...
+        Scope_FunctionParameter, // only contains identifiers of current function parameters. thats it. Child scope should be 'Scope_Local' for the func body
+        Scope_Struct, // within a struct or user type. struct members and methods expected here
+        Scope_Local, // scope local to a function or method. runable code goes here
     };
 
     ScopeType type;
+
+    bool isUnowned() { return type == Scope_Unowned; }
+    bool isGlobalScope() { return type == Scope_Global; }
+    bool isParameterScope() { return type == Scope_FunctionParameter; }
+    bool isUserTypeScope() { return type == Scope_Struct; }
+    bool isStructScope() { return type == Scope_Struct; }
+    bool isLocalScope() { return type == Scope_Local; }
 
     typedef ScopeIterator iterator;
     ScopeIterator begin() { return ScopeIterator(this, ScopeIterator::ITER_ALL); }
@@ -84,11 +91,6 @@ struct ASTScope
 
     void setOwner(Identifier *own) { owner = own; }
     Identifier *getOwner() { return owner; }
-    /*
-    Package *isPackageScope() { return dynamic_cast<Package*>(owner); }
-    FunctionDeclaration *isFunctionScope() { return dynamic_cast<FunctionDeclaration*>(owner); }
-    UserTypeDeclaration *isUserTypeScope() { return dynamic_cast<UserTypeDeclaration*>(owner); }
-    */
 
     ASTType* getUserTypeScope() {
         if(type == Scope_Struct && owner) {
@@ -121,7 +123,6 @@ struct ASTScope
     TranslationUnit *getUnit();
 
     ScopeType getScopeType() { return type; }
-    bool isUserTypeScope() { return type == Scope_Struct; }
     void addSibling(ASTScope *t);
     void addBuiltin();
     bool contains(std::string);

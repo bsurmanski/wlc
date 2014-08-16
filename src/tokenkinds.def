@@ -108,6 +108,8 @@ KEYWORD(var) /* statically checked automatic type variable var myvar = new MyStr
 KEYWORD(new)
 KEYWORD(renew)
 KEYWORD(delete)
+KEYWORD(retain)
+KEYWORD(release)
 KEYWORD(undecorated) /* change to undecorated */
 KEYWORD(implicit) /* for implicit conversions, default constructors, apply to function */
 KEYWORD(this)

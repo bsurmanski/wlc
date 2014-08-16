@@ -184,8 +184,8 @@ class IRCodegenContext : public CodegenContext
 
     public:
     //scope
-    void pushScope(IRScope *sc) { sc->parent = scope; scope = sc;}
-    IRScope *popScope() { IRScope *tbl = scope; scope = scope->parent; return tbl;}
+    void enterScope(IRScope *sc);
+    IRScope *exitScope();
     IRScope *getScope() { return scope; }
     Identifier *lookup(std::string str){ return scope->lookup(str); }
     Identifier *getInScope(std::string str) { return scope->getInScope(str); }
@@ -239,6 +239,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenExpression(Expression *exp);
     ASTValue *codegenTupleExpression(TupleExpression *exp, ASTType *ty = 0);
 
+    void codegenDelete(ASTValue *val);
     ASTValue *codegenNewExpression(NewExpression *exp);
     ASTValue *codegenDeleteExpression(DeleteExpression *exp);
 

@@ -528,6 +528,21 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
     return new ASTBasicValue(vfty, gv, true);
 }
 
+void IRCodegenContext::retainObject(ASTValue *val) {
+    if(val->getType()->isClass()) { //TODO: check for null
+        ASTValue *v = getMember(val, "refcount");
+        opIncValue(v);
+    }
+}
+
+void IRCodegenContext::releaseObject(ASTValue *val) {
+    if(val->getType()->isClass()) { //TODO: check for null
+        ASTValue *v = getMember(val, "refcount");
+        opDecValue(v);
+        //TODO: delete if zero
+    }
+}
+
 // BINOP .
 ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
     if(val->getType()->isPointer())
@@ -670,6 +685,105 @@ ASTValue *IRCodegenContext::opShrValue(ASTValue *a, ASTValue *b){ // >>
 ASTValue *IRCodegenContext::opPowValue(ASTValue *a, ASTValue *b){ // **
     emit_message(msg::UNIMPLEMENTED, "unimplemented power operator");
 }
+
+// UNOP ++
+ASTValue *IRCodegenContext::opIncValue(ASTValue *a) {
+    if(a->getType()->isFloating()) {
+        return opAddValues(a, getFloatValue(a->getType(), 1.0f));
+    } else {
+        return opAddValues(a, getIntValue(a->getType(), 1));
+    }
+}
+
+// UNOP --
+ASTValue *IRCodegenContext::opDecValue(ASTValue *a) {
+    if(a->getType()->isFloating()) {
+        return opSubValues(a, getFloatValue(a->getType(), 1.0f));
+    } else {
+        return opSubValues(a, getIntValue(a->getType(), 1));
+    }
+}
+
+//XXX expects a and b are same type and are floating or integer
+ASTValue *IRCodegenContext::opEqValue(ASTValue *a, ASTValue *b)
+{
+    llvm::Value *val = NULL;
+    if(a->getType()->isFloating()) {
+        val = ir->CreateFCmp(CmpInst::FCMP_OEQ, codegenValue(a), codegenValue(b));
+    } else { // sign not required, irrelivant for equality
+        val = ir->CreateICmp(CmpInst::ICMP_EQ, codegenValue(a), codegenValue(b));
+    }
+    return new ASTBasicValue(ASTType::getBoolTy(), val);
+}
+
+//XXX expects a and b are same type and are floating or integer
+ASTValue *IRCodegenContext::opNEqValue(ASTValue *a, ASTValue *b)
+{
+    llvm::Value *val = NULL;
+    if(a->getType()->isFloating()) {
+        val = ir->CreateFCmp(CmpInst::FCMP_ONE, codegenValue(a), codegenValue(b));
+    } else { // sign not required, irrelivant for equality
+        val = ir->CreateICmp(CmpInst::ICMP_NE, codegenValue(a), codegenValue(b));
+    }
+    return new ASTBasicValue(ASTType::getBoolTy(), val);
+}
+
+//XXX expects a and b are same type and are floating or integer
+ASTValue *IRCodegenContext::opLTValue(ASTValue *a, ASTValue *b){ // <
+    if(a->getType()->isFloating()) {
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateFCmpOLT(codegenValue(a), codegenValue(b)));
+    } else if(a->getType()->isSigned()){
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateICmpSLT(codegenValue(a), codegenValue(b)));
+    } else {
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateICmpULT(codegenValue(a), codegenValue(b)));
+    }
+}
+
+//XXX expects a and b are same type and are floating or integer
+ASTValue *IRCodegenContext::opGTValue(ASTValue *a, ASTValue *b){ // >
+    if(a->getType()->isFloating()) {
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateFCmpOGT(codegenValue(a), codegenValue(b)));
+    } else if(a->getType()->isSigned()){
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateICmpSGT(codegenValue(a), codegenValue(b)));
+    } else {
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateICmpUGT(codegenValue(a), codegenValue(b)));
+    }
+}
+
+//XXX expects a and b are same type and are floating or integer
+ASTValue *IRCodegenContext::opLEValue(ASTValue *a, ASTValue *b){ // <=
+    if(a->getType()->isFloating()) {
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateFCmpOLE(codegenValue(a), codegenValue(b)));
+    } else if(a->getType()->isSigned()){
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateICmpSLE(codegenValue(a), codegenValue(b)));
+    } else {
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateICmpULE(codegenValue(a), codegenValue(b)));
+    }
+}
+
+//XXX expects a and b are same type and are floating or integer
+ASTValue *IRCodegenContext::opGEValue(ASTValue *a, ASTValue *b){  // >=
+    if(a->getType()->isFloating()) {
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateFCmpOGE(codegenValue(a), codegenValue(b)));
+    } else if(a->getType()->isSigned()){
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateICmpSGE(codegenValue(a), codegenValue(b)));
+    } else {
+        return new ASTBasicValue(ASTType::getBoolTy(),
+                ir->CreateICmpUGE(codegenValue(a), codegenValue(b)));
+    }
+}
+
 
 // does not create IR Value for codegen (unless global).
 // values should be created at declaration
@@ -1382,14 +1496,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
                 return NULL;
             }
 
-            if(lhs->getType()->isFloating())
-            {
-                val = opAddValues(lhs, getFloatValue(lhs->getType(), 1.0f));
-            } else
-            {
-                val = opAddValues(lhs, getIntValue(lhs->getType(), 1));
-            }
-
+            val = opIncValue(lhs);
             storeValue(lhs, val);
             return val;
         case tok::minusminus:
@@ -1398,14 +1505,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
                 return NULL;
             }
 
-            if(lhs->getType()->isFloating())
-            {
-                val = opSubValues(lhs, getFloatValue(lhs->getType(), 1.0f));
-            } else
-            {
-                val = opSubValues(lhs, getIntValue(lhs->getType(), 1));
-            }
-
+            val = opDecValue(lhs);
             storeValue(lhs, val);
             return val;
         case tok::plus:
@@ -1510,26 +1610,13 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         {
             case tok::plusplus:
             old = loadValue(lhs);
-            if(lhs->getType()->isFloating())
-            {
-                val = opAddValues(lhs, getFloatValue(lhs->getType(), 1.0f));
-            } else
-            {
-                val = opAddValues(lhs, getIntValue(lhs->getType(), 1));
-            }
-
+            val = opIncValue(lhs);
             old = loadValue(lhs);
             storeValue(lhs, val);
             return old;
             case tok::minusminus:
-            if(lhs->getType()->isFloating())
-            {
-                val = opSubValues(lhs, getFloatValue(lhs->getType(), 1.0f));
-            } else
-            {
-                val = opSubValues(lhs, getIntValue(lhs->getType(), 1));
-            }
             old = loadValue(lhs);
+            val = opDecValue(lhs);
             storeValue(lhs, val);
             return old;
         }
@@ -2035,51 +2122,17 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
         // COMPARE OPS
         case tok::equalequal:
-                if(TYPE->isFloating())
-                    val = ir->CreateFCmp(CmpInst::FCMP_OEQ, lhs_val, rhs_val);
-                else // sign not required, irrelivant for equality
-                    val = ir->CreateICmp(CmpInst::ICMP_EQ, lhs_val, rhs_val);
-                return new ASTBasicValue(ASTType::getBoolTy(), val);
+                return opEqValue(lhs, rhs);
         case tok::bangequal:
-                if(TYPE->isFloating())
-                    val = ir->CreateFCmp(CmpInst::FCMP_ONE, lhs_val, rhs_val);
-                else // sign not required, irrelivant for equality
-                    val = ir->CreateICmp(CmpInst::ICMP_NE, lhs_val, rhs_val);
-                return new ASTBasicValue(ASTType::getBoolTy(), val);
-
+                return opNEqValue(lhs, rhs);
         case tok::less:
-                if(TYPE->isFloating())
-                    val = ir->CreateFCmpOLT(lhs_val, rhs_val);
-                else if(TYPE->isSigned())
-                    val = ir->CreateICmpSLT(lhs_val, rhs_val);
-                else
-                    val = ir->CreateICmpULT(lhs_val, rhs_val);
-                return new ASTBasicValue(ASTType::getBoolTy(), val);
+                return opLTValue(lhs, rhs);
         case tok::lessequal:
-                if(TYPE->isFloating())
-                    val = ir->CreateFCmpOLE(lhs_val, rhs_val);
-                else if(TYPE->isSigned())
-                    val = ir->CreateICmpSLE(lhs_val, rhs_val);
-                else
-                    val = ir->CreateICmpULE(lhs_val, rhs_val);
-                return new ASTBasicValue(ASTType::getBoolTy(), val);
+                return opLEValue(lhs, rhs);
         case tok::greater:
-                if(TYPE->isFloating())
-                    val = ir->CreateFCmpOGT(lhs_val, rhs_val);
-                else if(TYPE->isSigned())
-                    val = ir->CreateICmpSGT(lhs_val, rhs_val);
-                else
-                    val = ir->CreateICmpUGT(lhs_val, rhs_val);
-                return new ASTBasicValue(ASTType::getBoolTy(), val);
+                return opGTValue(lhs, rhs);
         case tok::greaterequal:
-                if(TYPE->isFloating())
-                    val = ir->CreateFCmpOGE(lhs_val, rhs_val);
-                else if(TYPE->isSigned())
-                    val = ir->CreateICmpSGE(lhs_val, rhs_val);
-                else
-                    val = ir->CreateICmpUGE(lhs_val, rhs_val);
-                return new ASTBasicValue(ASTType::getBoolTy(), val);
-
+                return opGEValue(lhs, rhs);
         // ARITHMETIC OPS
         case tok::plus:
         case tok::plusequal:

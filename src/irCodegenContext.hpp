@@ -208,6 +208,8 @@ class IRCodegenContext : public CodegenContext
     ASTValue *getThis();
     ASTValue *getVTable(ASTValue *instance);
     ASTValue *createTypeInfo(ASTType *ty);
+    void retainObject(ASTValue *val);
+    void releaseObject(ASTValue *val);
 
     // ops
     ASTValue *getMember(ASTValue *val, std::string member); // .
@@ -221,6 +223,15 @@ class IRCodegenContext : public CodegenContext
     ASTValue *opShlValue(ASTValue *a, ASTValue *b); // <<
     ASTValue *opShrValue(ASTValue *a, ASTValue *b); // >>
     ASTValue *opPowValue(ASTValue *a, ASTValue *b); // **
+    ASTValue *opIncValue(ASTValue *a); // a++
+    ASTValue *opDecValue(ASTValue *a); // b--
+
+    ASTValue *opEqValue(ASTValue *a, ASTValue *b); // ==
+    ASTValue *opNEqValue(ASTValue *a, ASTValue *b); // !=
+    ASTValue *opLTValue(ASTValue *a, ASTValue *b); // <
+    ASTValue *opGTValue(ASTValue *a, ASTValue *b); // >
+    ASTValue *opLEValue(ASTValue *a, ASTValue *b); // <=
+    ASTValue *opGEValue(ASTValue *a, ASTValue *b); // >=
 
     //TODO: add compare ops
 

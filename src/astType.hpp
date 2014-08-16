@@ -343,13 +343,9 @@ struct ASTFunctionType : public ASTCompositeType {
     virtual std::string getMangledName() {
         char buf[32];
         sprintf(buf, "%02d", params.size());
-        std::string name = std::string("f") + std::string(buf) + ret->getMangledName() + "$$";
+        std::string name = std::string("f") + std::string(buf) + ret->getMangledName();
         for(int i = 0; i < params.size(); i++){
-            if((i+1) < params.size()){
-                name = name + params[i]->getMangledName() + "$$";
-            } else {
-                name = name + params[i]->getMangledName();
-            }
+            name = "$$" + name + params[i]->getMangledName();
         }
         return name;
     }

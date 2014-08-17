@@ -63,15 +63,35 @@ struct TypeValue : ASTValue {
 
 // TODO: use polymorphic values(?)
 
-/*
 struct TupleValue : public ASTValue
 {
     TupleExpression *tuple;
-    TupleValue(TupleExpression *texp) : ASTValue(texp->getType(), NULL, texp->isLValue()),
+
+    TupleValue(TupleExpression *texp) : ASTValue(NULL),
     tuple(texp)
     {}
+
+    virtual bool isLValue() {
+        for(int i = 0; i < tuple->members.size(); i++) {
+            if(!tuple->members[i]->isLValue())
+                return false;
+        }
+        return true;
+    }
+
+    virtual bool isConst() {
+        for(int i = 0; i < tuple->members.size(); i++) {
+            if(!tuple->members[i]->isConstant())
+                return false;
+        }
+        return true;
+    }
+
+    virtual ASTType *getType() {
+        return tuple->getType();
+    }
+    virtual bool isReference() { return false; }
 };
-*/
 
 struct FunctionValue : public ASTValue {
     FunctionDeclaration *declaration;

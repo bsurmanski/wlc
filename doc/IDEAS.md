@@ -164,4 +164,20 @@ eg.
         exprFunc(5 * j) // int i = (5*j) * (5*j)
     }
 
+or maybe with 'static' replaced with the '#' symbol to signify generics.
+
+    void myFunction(#type T, int i) {
+        #T myThing = i
+    }
+
 although this would not handle generic classes...
+
+perhaps can also have following syntax:
+
+class MyClass(T) {
+    ...
+}
+
+with instanciation as:
+
+MyClass#int classVariable; ...

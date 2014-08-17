@@ -17,3 +17,5 @@ core.*
 tags
 cscope.out
 build/
+
+doc/GRAMMAR.md

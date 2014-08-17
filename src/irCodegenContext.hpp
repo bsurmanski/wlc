@@ -185,9 +185,11 @@ class IRCodegenContext : public CodegenContext
     public:
     //scope
     void enterScope(IRScope *sc);
+    IRScope *endScope(); // !!! end scope does not exit scope, simply runs clean up
     IRScope *exitScope();
     IRScope *getScope() { return scope; }
     Identifier *lookup(std::string str){ return scope->lookup(str); }
+    Identifier *lookupInScope(std::string str){ return scope->lookupInScope(str); }
     Identifier *getInScope(std::string str) { return scope->getInScope(str); }
 
     protected:
@@ -251,7 +253,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);
     ASTValue *codegenUnaryExpression(UnaryExpression *exp);
     ASTValue *codegenBinaryExpression(BinaryExpression *exp);
-    ASTValue *codegenAssign(Expression *lhs, Expression *rhs, bool convert=false);
+    ASTValue *codegenAssign(ASTValue *lhs, ASTValue *rhs, bool convert=false);
 
     // promote
     ASTValue *promoteType(ASTValue *val, ASTType *type);

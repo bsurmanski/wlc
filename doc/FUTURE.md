@@ -3,7 +3,7 @@
 ## Tail call optimization
 self explanitory, avoids stack overflows, makes deep recursive function faster
 
-## Ideas (Not necessarily future additions)
+## Ideas (Not necessarily future additions!!!)
 
 ### General Things
 structs are anologous to C structs. packing and allignment included

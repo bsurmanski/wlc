@@ -456,7 +456,9 @@ PARSEEXP:
                 dropLine();
                 return NULL;
             }
-            return new LabelStatement(getScope()->get(get().toString()), loc);
+            id = getScope()->get(get().toString());
+            id->addDeclaration(NULL, Identifier::ID_LABEL); // set as label; XXX do we need decl?
+            return new LabelStatement(id, loc);
 
         case tok::kw_goto:
             ignore();

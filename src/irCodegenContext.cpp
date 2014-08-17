@@ -421,15 +421,22 @@ void IRCodegenContext::enterScope(IRScope *sc) {
     scope = sc;
 }
 
+IRScope *IRCodegenContext::endScope() {
+    ASTScope::iterator it = scope->begin();
+    for(; it != scope->end(); it++) {
+        Identifier *id = *it;
+        if(id->isVariable() && id->getType()->isClass()) {
+            if(id->getName() != "this") //XXX messy. dont release 'this'
+                releaseObject(codegenIdentifier(id));
+        }
+    }
+    return scope;
+}
+
 IRScope *IRCodegenContext::exitScope() {
     IRScope *sc = scope;
+    if(!isTerminated()) endScope();
     scope = scope->parent;
-
-    /*
-    ASTScope::iterator it = sc->begin();
-    for(; it != sc->end(); it++) {
-    } */
-
     return sc;
 }
 
@@ -478,7 +485,7 @@ ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
 }
 
 ASTValue *IRCodegenContext::getThis() {
-    Identifier *thisId = getScope()->lookupInScope("this");
+    Identifier *thisId = getScope()->lookup("this", false);
     return codegenIdentifier(thisId);
 }
 
@@ -548,6 +555,7 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
 }
 
 void IRCodegenContext::retainObject(ASTValue *val) {
+    //XXX error if not class?
     if(val->getType()->isClass()) { //TODO: check for null
         ASTValue *v = getMember(val, "refcount");
         storeValue(v, opIncValue(v));
@@ -555,15 +563,23 @@ void IRCodegenContext::retainObject(ASTValue *val) {
 }
 
 void IRCodegenContext::releaseObject(ASTValue *val) {
+    //XXX error if not class?
     if(val->getType()->isClass()) { //TODO: check for null
         ASTUserType *uty = val->getType()->asUserType();
 
+        BasicBlock *beginBr = BasicBlock::Create(context, "begindel", ir->GetInsertBlock()->getParent());
+        BasicBlock *deconstructBr = BasicBlock::Create(context, "del", ir->GetInsertBlock()->getParent());
+        BasicBlock *afterBr = BasicBlock::Create(context, "enddel", ir->GetInsertBlock()->getParent());
+
+        //TODO: statically null check if able?
+        ASTBasicValue null = ASTBasicValue(val->getType(), ConstantPointerNull::get((PointerType*) codegenType(val->getType())));
+        ASTValue *isNull = opNEqValue(val, &null);
+        ir->CreateCondBr(codegenValue(isNull), beginBr, afterBr);
+        ir->SetInsertPoint(beginBr);
         ASTValue *v = getMember(val, "refcount");
         storeValue(v, opDecValue(v));
         ASTValue *zero = getIntValue(ASTType::getLongTy(), 0);
         ASTValue *isZero = opLEValue(v, zero);
-        BasicBlock *deconstructBr = BasicBlock::Create(context, "del", ir->GetInsertBlock()->getParent());
-        BasicBlock *afterBr = BasicBlock::Create(context, "enddel", ir->GetInsertBlock()->getParent());
 
         ir->CreateCondBr(codegenValue(isZero), deconstructBr, afterBr); //TODO: expect no deconstruct
         ir->SetInsertPoint(deconstructBr);
@@ -2023,61 +2039,50 @@ void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, u
 }
 
 //TODO: should take astvalue's?
-ASTValue *IRCodegenContext::codegenAssign(Expression *lhs, Expression *rhs, bool convert)
+ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool convert)
 {
-    /*
-    if(!lhs->isLValue())
-    {
-        // XXX work around. if lhs is unknown, isLValue will fail on expression
-        ASTValue *vlhs = codegenExpression(lhs);
-        if(!vlhs->isLValue())
-        {
-            emit_message(msg::ERROR, "assignment requires lvalue", lhs->loc);
-            return NULL;
-        }
-    }*/
-
     // codegen tuple assignment
-    if(TupleExpression *tlhs = lhs->tupleExpression())
+    if(TupleValue *tlhs = dynamic_cast<TupleValue*>(lhs))
     {
-        if(TupleExpression *trhs = rhs->tupleExpression())
+        if(TupleValue *trhs = dynamic_cast<TupleValue*>(rhs))
         {
-            if(tlhs->members.size() > trhs->members.size())
+            if(tlhs->tuple->members.size() > trhs->tuple->members.size())
             {
-                emit_message(msg::ERROR, "tuple assignment requires compatible tuple types", lhs->loc);
+                emit_message(msg::ERROR, "tuple assignment requires compatible tuple types");
                 return NULL;
             }
-            for(int i = 0; i < tlhs->members.size(); i++)
+            for(int i = 0; i < tlhs->tuple->members.size(); i++)
             {
-                codegenAssign(tlhs->members[i], trhs->members[i]);
+                codegenAssign(codegenExpression(tlhs->tuple->members[i]),
+                        codegenExpression(trhs->tuple->members[i]));
             }
         } else {
-            emit_message(msg::ERROR, "tuple assignment requires a tuple on rhs", lhs->loc);
+            emit_message(msg::ERROR, "tuple assignment requires a tuple on rhs");
             return NULL;
         }
-        return codegenExpression(rhs);
+        return rhs;
     }
 
-    ASTValue *vlhs = codegenExpression(lhs);
-    ASTValue *vrhs = codegenExpression(rhs);
+    //ASTValue *vlhs = codegenExpression(lhs);
+    //ASTValue *vrhs = codegenExpression(rhs);
 
     //if(vrhs->type != vlhs->type)
     {
-        vrhs = promoteType(vrhs, vlhs->getType());
-        if(vrhs->getType()->coercesTo(vlhs->getType()) || (convert && vrhs->getType()->castsTo(vlhs->getType())))
+        rhs = promoteType(rhs, lhs->getType());
+        if(rhs->getType()->coercesTo(lhs->getType()) || (convert && rhs->getType()->castsTo(lhs->getType())))
         {
-            vrhs = promoteType(vrhs, vlhs->getType());
+            rhs = promoteType(rhs, lhs->getType());
         }
         else
         {
-            emit_message(msg::ERROR, "cannot assign value of type '" + vrhs->getType()->getName() +
-                    "' to type '" + vlhs->getType()->getName() + "'", lhs->loc);
+            emit_message(msg::ERROR, "cannot assign value of type '" + rhs->getType()->getName() +
+                    "' to type '" + lhs->getType()->getName() + "'");
             return NULL;
         }
     }
 
-    storeValue(vlhs, vrhs);
-    return vrhs;
+    storeValue(lhs, rhs);
+    return rhs;
 }
 
 ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
@@ -2096,12 +2101,12 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         } else emit_message(msg::ERROR, "need to cast to type", exp->loc);
     }
 
-    //XXX temp. shortcut to allow LValue tuples
-    if(exp->op == tok::equal || exp->op == tok::colonequal)
-            return codegenAssign(exp->lhs, exp->rhs, exp->op == tok::colonequal);
-
     ASTValue *lhs = codegenExpression(exp->lhs);
     ASTValue *rhs = codegenExpression(exp->rhs);
+    //XXX temp. shortcut to allow LValue tuples
+    if(exp->op == tok::equal || exp->op == tok::colonequal)
+            return codegenAssign(lhs, rhs, exp->op == tok::colonequal);
+
 
     if(!lhs || !rhs){
         emit_message(msg::FAILURE, "could not codegen expression in binary op", exp->loc);
@@ -2126,7 +2131,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         //ASSIGN
         case tok::equal:
         case tok::colonequal:
-            return codegenAssign(exp->lhs, exp->rhs, exp->op == tok::colonequal);
+            return codegenAssign(lhs, rhs, exp->op == tok::colonequal);
 
         // I dont know, do something with a comma eventually
         case tok::comma:
@@ -2254,6 +2259,7 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
         storeValue(currentFunction.retVal, v);
     }
 
+    endScope();
     ir->CreateBr(currentFunction.exit);
     setTerminated(true);
 }
@@ -2307,6 +2313,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
        // post GOTO block
         BasicBlock *PG = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent());
         ir->SetInsertPoint(PG);
+        //TODO: end scope?
         setTerminated(true);
     } else if(BreakStatement *bstmt = dynamic_cast<BreakStatement*>(stmt))
     {
@@ -2329,13 +2336,14 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         ir->SetInsertPoint(BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()));
     } else if(CompoundStatement *cstmt = stmt->compoundStatement())
     {
+        enterScope(new IRScope(cstmt->getScope(), unit->debug->createScope(getScope()->debug, cstmt->loc)));
         for(int i = 0; i < cstmt->statements.size(); i++)
         {
             if(!isTerminated() || (dynamic_cast<LabelStatement*>(cstmt->statements[i]) ||
                               dynamic_cast<CaseStatement*>(cstmt->statements[i])))
                 codegenStatement(cstmt->statements[i]);
         }
-        return;
+        exitScope();
     } else if(BlockStatement *bstmt = stmt->blockStatement())
     {
         ASTValue *value = NULL;
@@ -2469,7 +2477,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
         Function::arg_iterator AI = func->arg_begin();
         if(fdecl->owner) {
             AI->setName("this");
-            lookup("this")->setValue(new ASTBasicValue(fdecl->owner, AI, false, true));
+            lookupInScope("this")->setValue(new ASTBasicValue(fdecl->owner, AI, false, true));
             AI++;
         }
 

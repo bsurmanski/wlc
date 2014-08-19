@@ -1103,8 +1103,6 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         tival = ir->CreateGEP(tival, gep); // GEP to class's vtable, so we can store to it
 
         ir->CreateStore(tival, codegenLValue(vtable));
-
-        retainObject(val);
     }
 
     return val;
@@ -2081,6 +2079,14 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
         }
     }
 
+    if(lhs->getType()->isClass()) {
+        releaseObject(lhs);
+    }
+
+    if(rhs->getType()->isClass()) {
+        retainObject(rhs);
+    }
+
     storeValue(lhs, rhs);
     return rhs;
 }
@@ -2430,12 +2436,18 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         defaultValue = promoteType(defaultValue, vty);
         storeValue(idValue, defaultValue);
 
+        if(vty->isClass()) {
+            retainObject(defaultValue);
+        }
+
         Instruction *vinst = unit->debug->createVariable(vdecl->getName(),
                 idValue, ir->GetInsertBlock(), vdecl->loc);
         vinst->setDebugLoc(llvm::DebugLoc::get(vdecl->loc.line, vdecl->loc.ch, diScope()));
         //TODO: maybe create a LValue field in CGValue?
     } else if(vty->isClass()) {
-        //TODO: store null if no value
+        // store null to class if no value
+        ASTBasicValue null = ASTBasicValue(vty, ConstantPointerNull::get((PointerType*) codegenType(vty)));
+        storeValue(idValue, &null);
     }
 
     vdecl->identifier->setValue(idValue);
@@ -2495,14 +2507,21 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
             alloc->setAlignment(8);
             ASTValue *alloca = new ASTBasicValue(fdecl->parameters[idx]->getType(), alloc, true, fdecl->parameters[idx]->getType()->isReference());
 
+            // i think we arent using IRBuilder here so we can insert at top of BB
             if(fdecl->parameters[idx]->getType()->isReference()) {
                 new StoreInst(AI, codegenRefValue(alloca), BB);
             } else {
                 new StoreInst(AI, codegenLValue(alloca), BB);
             }
-            // i think we arent using IRBuilder here so we can insert at top of BB
+
+            // retain class parameters
+            // parameters will be released on scope exit
+            if(alloca->getType()->isClass()) {
+                retainObject(alloca);
+            }
 
             fdecl->parameters[idx]->getIdentifier()->setValue(alloca);
+
 
             //register debug params
             //XXX hacky with Instruction, and setDebugLoc manually
@@ -2517,18 +2536,18 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
         if(!isTerminated())
             ir->CreateBr(currentFunction.exit);
 
+        ir->SetInsertPoint(currentFunction.exit);
+        setTerminated(false);
+        exitScope();
         if(!currentFunction.retVal) // returns void
         {
-            ir->SetInsertPoint(currentFunction.exit);
             ir->CreateRetVoid();
         } else
         {
-            ir->SetInsertPoint(currentFunction.exit);
             ASTValue *astRet = loadValue(currentFunction.retVal);
             ir->CreateRet(codegenValue(astRet));
         }
 
-        exitScope();
     } else { // function has no body; external linkage (weak external if actually declared 'extern')
         if(fdecl->isExternal())
             func->setLinkage(Function::ExternalWeakLinkage);

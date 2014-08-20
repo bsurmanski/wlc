@@ -425,7 +425,7 @@ IRScope *IRCodegenContext::endScope() {
     ASTScope::iterator it = scope->begin();
     for(; it != scope->end(); it++) {
         Identifier *id = *it;
-        if(id->isVariable() && id->getType()->isClass()) {
+        if(id->isVariable() && id->getType()->isClass() && !id->getDeclaration()->isWeak()) {
             if(id->getName() != "this") //XXX messy. dont release 'this'
                 releaseObject(codegenIdentifier(id));
         }
@@ -2036,7 +2036,6 @@ void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, u
     }
 }
 
-//TODO: should take astvalue's?
 ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool convert)
 {
     // codegen tuple assignment
@@ -2079,12 +2078,14 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
         }
     }
 
-    if(lhs->getType()->isClass()) {
-        releaseObject(lhs);
-    }
+    if(!lhs->isWeak()) {
+        if(lhs->getType()->isClass()) {
+            releaseObject(lhs);
+        }
 
-    if(rhs->getType()->isClass()) {
-        retainObject(rhs);
+        if(rhs->getType()->isClass()) {
+            retainObject(rhs);
+        }
     }
 
     storeValue(lhs, rhs);
@@ -2430,13 +2431,14 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
     AllocaInst *llvmDecl = ir->CreateAlloca(llty, 0, vdecl->getName());
 
     llvmDecl->setAlignment(8);
-    ASTValue *idValue = new ASTBasicValue(vty, llvmDecl, true, vty->isReference());
+    ASTBasicValue *idValue = new ASTBasicValue(vty, llvmDecl, true, vty->isReference());
+    idValue->setWeak(vdecl->isWeak());
 
     if(defaultValue) {
         defaultValue = promoteType(defaultValue, vty);
         storeValue(idValue, defaultValue);
 
-        if(vty->isClass()) {
+        if(vty->isClass() && !idValue->isWeak()) {
             retainObject(defaultValue);
         }
 
@@ -2505,7 +2507,8 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
             AllocaInst *alloc = new AllocaInst(codegenType(fdecl->parameters[idx]->getType()),
                                                0, fdecl->parameters[idx]->getName(), BB);
             alloc->setAlignment(8);
-            ASTValue *alloca = new ASTBasicValue(fdecl->parameters[idx]->getType(), alloc, true, fdecl->parameters[idx]->getType()->isReference());
+            ASTBasicValue *alloca = new ASTBasicValue(fdecl->parameters[idx]->getType(), alloc, true, fdecl->parameters[idx]->getType()->isReference());
+            alloca->setWeak(fdecl->parameters[idx]->isWeak()); //XXX weak reference
 
             // i think we arent using IRBuilder here so we can insert at top of BB
             if(fdecl->parameters[idx]->getType()->isReference()) {
@@ -2514,9 +2517,9 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
                 new StoreInst(AI, codegenLValue(alloca), BB);
             }
 
-            // retain class parameters
+            // retain class parameters (retain after assigning the passed value above)
             // parameters will be released on scope exit
-            if(alloca->getType()->isClass()) {
+            if(alloca->getType()->isClass() && !alloca->isWeak()) {
                 retainObject(alloca);
             }
 

@@ -26,6 +26,7 @@ struct ASTValue
 
     virtual ASTType *getType() = 0;
     virtual bool isConst() { return false; } // TODO
+    virtual bool isWeak() { return false; } // XXX DITTO
     virtual bool isLValue() = 0;
     virtual bool isReference() = 0;
 
@@ -41,13 +42,16 @@ struct ASTBasicValue : ASTValue
     ASTType *type;
     bool lValue;
     bool reference;
+    bool weak;
 
     ASTBasicValue(ASTType *ty, llvm::Value *val, bool lv=false, bool ref=false) :
-        ASTValue(val), type(ty), lValue(lv), reference(ref) {}
+        ASTValue(val), type(ty), lValue(lv), reference(ref), weak(false) {}
 
     virtual ASTType *getType() { return type; }
     virtual bool isLValue() { return lValue; }
     virtual bool isReference() { return reference; }
+    virtual bool isWeak() { return weak; }
+    virtual void setWeak(bool b) { weak = b; }
 };
 
 struct TypeValue : ASTValue {

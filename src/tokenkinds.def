@@ -113,6 +113,7 @@ KEYWORD(release)
 KEYWORD(undecorated) /* change to undecorated */
 KEYWORD(implicit) /* for implicit conversions, default constructors, apply to function */
 KEYWORD(this)
+KEYWORD(weak) /* weak reference type specifier */
 
 RESERVE(decorated)
 RESERVE(explicit)

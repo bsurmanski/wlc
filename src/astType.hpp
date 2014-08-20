@@ -3,14 +3,13 @@
 
 struct ASTVisitor;
 
+/*
 struct ASTTypeQual
 {
     bool isConst;
-    bool isExtern;
-    bool isStatic;
-    ASTTypeQual() : isConst(false), isExtern(false), isStatic(false) {}
-    ASTTypeQual(bool c, bool e, bool s) : isConst(c), isExtern(e), isStatic(s) {}
-};
+    ASTTypeQual() : isConst(false) {}
+    ASTTypeQual(bool c) : isConst(c) {}
+}; */
 
 enum ASTTypeEnum
 {
@@ -52,6 +51,13 @@ struct ASTType
     ASTTypeEnum kind;
     ASTType *pointerTy;
     ASTType *dynamicArrayTy;
+
+    struct Mod {
+        bool isConst;
+        bool isRef;
+        Mod() : isConst(false), isRef(false) {}
+    } mod;
+
     llvm::Type *cgType; //TODO: should not have llvm in here!
     llvm::DIType diType; //TODO: whatever, prototype
 
@@ -62,17 +68,16 @@ struct ASTType
         if(en != TYPE_UNKNOWN) kind = en;
     }
 
-    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), cgType(0)
+    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), cgType(0), mod()
     {}
 
-    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), dynamicArrayTy(0), cgType(NULL)
+    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), dynamicArrayTy(0), cgType(NULL), mod()
     {}
     virtual ~ASTType(){}
 
     virtual bool isResolved(){ return true; }
 
     void accept(ASTVisitor *v);
-    //ASTType(ASTTypeQual q) : qual(q), unqual(NULL), pointerTy(NULL), cgType(NULL) {}
     //virtual ~ASTType() { delete pointerTy; }
     //ASTType *getUnqual();
     ASTType *getPointerTy();

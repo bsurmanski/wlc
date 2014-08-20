@@ -92,6 +92,11 @@ void ValidationVisitor::visitDeclaration(Declaration *decl) {
         valid = false;
         emit_message(msg::ERROR, "inconsistant AST, undeclared identifier in definition");
     }
+
+    if(decl->qualifier.weak && !decl->getType()->isClass()) {
+        valid = false;
+        emit_message(msg::ERROR, "weak qualifier only applies to class type variables");
+    }
 }
 
 void ValidationVisitor::visitExpression(Expression *exp) {

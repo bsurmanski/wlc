@@ -404,6 +404,7 @@ Statement *ParseContext::parseStatement()
         case tok::kw_extern:
         case tok::kw_implicit: //implicit constructor/conversion
         case tok::kw_undecorated:
+        case tok::kw_weak:
         case tok::kw_union:
         case tok::kw_class:
         case tok::kw_struct:
@@ -502,10 +503,7 @@ PARSEEXP:
 
 DeclarationQualifier ParseContext::parseDeclarationQualifier()
 {
-    DeclarationQualifier dq;
-    dq.external = false;
-    dq.decorated = true;
-    dq.implicit = false;
+    DeclarationQualifier dq = DeclarationQualifier();
 
     while(true) {
         if(peek().is(tok::kw_extern)){
@@ -515,6 +513,11 @@ DeclarationQualifier ParseContext::parseDeclarationQualifier()
         }
         if(peek().is(tok::kw_undecorated)){
             dq.decorated = false;
+            ignore();
+            continue;
+        }
+        if(peek().is(tok::kw_weak)) {
+            dq.weak = true;
             ignore();
             continue;
         }
@@ -755,6 +758,7 @@ PARSEFUNC:
         bool vararg = false;
         while(!peek().is(tok::rparen))
         {
+            DeclarationQualifier qualifier = parseDeclarationQualifier();
             if(peek().is(tok::dotdotdot))
             {
                 vararg = true;
@@ -781,7 +785,7 @@ PARSEFUNC:
                 defaultValue = parseExpression();
             }
 
-            VariableDeclaration *paramDecl = new VariableDeclaration(aty, paramId, defaultValue, loc, DeclarationQualifier());
+            VariableDeclaration *paramDecl = new VariableDeclaration(aty, paramId, defaultValue, loc, qualifier);
             paramId->addDeclaration(paramDecl, Identifier::ID_VARIABLE);
             parameters.push_back(paramDecl);
 

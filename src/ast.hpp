@@ -181,11 +181,13 @@ struct DeclarationQualifier
     bool external;
     bool decorated;
     bool implicit;
+    bool weak;
 
     DeclarationQualifier() {
         external = false;
         decorated = true;
         implicit = false;
+        weak = false;
     }
 };
 
@@ -209,6 +211,7 @@ struct Declaration : public ASTNode
         return "";
     }
     bool isExternal() { return qualifier.external; }
+    bool isWeak() { return qualifier.weak; }
     virtual ASTType *getType() = 0;
 
     Identifier *getIdentifier() { return identifier; }

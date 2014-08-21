@@ -1,0 +1,2 @@
+crashes if first for statement is not decl
+for(*id* = thing ...)

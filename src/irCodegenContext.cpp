@@ -2491,7 +2491,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
         Function::arg_iterator AI = func->arg_begin();
         if(fdecl->owner) {
             AI->setName("this");
-            lookupInScope("this")->setValue(new ASTBasicValue(fdecl->owner, AI, false, true));
+            lookupInScope("this")->setValue(new ASTBasicValue(fdecl->owner->getReferenceTy(), AI, false, true));
             AI++;
         }
 

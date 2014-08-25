@@ -182,12 +182,14 @@ struct DeclarationQualifier
     bool decorated;
     bool implicit;
     bool weak;
+    bool isConst;
 
     DeclarationQualifier() {
         external = false;
         decorated = true;
         implicit = false;
         weak = false;
+        isConst = false;
     }
 };
 

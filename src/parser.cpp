@@ -404,6 +404,7 @@ Statement *ParseContext::parseStatement()
         case tok::kw_extern:
         case tok::kw_implicit: //implicit constructor/conversion
         case tok::kw_undecorated:
+        case tok::kw_const:
         case tok::kw_weak:
         case tok::kw_union:
         case tok::kw_class:
@@ -523,6 +524,11 @@ DeclarationQualifier ParseContext::parseDeclarationQualifier()
         }
         if(peek().is(tok::kw_implicit)){
             dq.implicit = true;
+            ignore();
+            continue;
+        }
+        if(peek().is(tok::kw_const)) {
+            dq.isConst = true;
             ignore();
             continue;
         }

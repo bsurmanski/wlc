@@ -68,7 +68,7 @@ struct ASTType
         if(en != TYPE_UNKNOWN) kind = en;
     }
 
-    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), cgType(0), mod()
+    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), dynamicArrayTy(0), cgType(0), mod()
     {}
 
     ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), dynamicArrayTy(0), cgType(NULL), mod()
@@ -521,6 +521,12 @@ struct ASTDynamicArrayType : public ASTArrayType {
     virtual bool isDynamic() { return true; }
     virtual size_t length() { return 0; }
     ASTDynamicArrayType(ASTType *pto) : ASTArrayType(pto, TYPE_DYNAMIC_ARRAY) {}
+    virtual bool coercesTo(ASTType *ty) {
+        if(ASTDynamicArrayType *daty = dynamic_cast<ASTDynamicArrayType*>(ty)) {
+            return arrayOf->is(daty->arrayOf);
+        }
+        return false;
+    }
 };
 
 #endif

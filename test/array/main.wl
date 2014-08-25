@@ -10,6 +10,8 @@ import(C) "/usr/include/math.h"
 extern undecorated int printf(char^ fmt, ...);
 extern undecorated float sinf(float f);
 
+char^[] strings = ["hello", "goodbye", "hithere", "thats all folks"]
+
 int main(int argc, char^^ argv)
 {
     int[2] i
@@ -21,5 +23,12 @@ int main(int argc, char^^ argv)
     printf("%d\n", i[0]);
     printf("%d\n", i[1]);
     printf("%f\n", x);
+    int[] arr
+    arr = new int[10]
+
+    for(int j = 0; j < strings.size; j++) {
+        printf(strings[j])
+    }
+
     return 0
 }

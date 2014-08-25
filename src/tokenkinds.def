@@ -71,7 +71,6 @@ FTYPE(float64,8)
 
 //VTYPE(vec4,4,float)
 
-RESERVE(const)
 RESERVE(enum)
 
 KEYWORD(extern)
@@ -100,6 +99,7 @@ KEYWORD(function) /* for function pointers */
 KEYWORD(break)
 KEYWORD(continue)
 KEYWORD(use) /* use extensions */
+KEYWORD(const)
 
 // OWL
 KEYWORD(class)

@@ -1,2 +1,33 @@
 crashes if first for statement is not decl
 for(*id* = thing ...)
+
+static members in structs/classes
+
+constant global arrays (int[] i = [1,2,3,4])
+
+if promoteType fails, say so, and say which types are inconvertible
+
+delete, etc should accept qualified identifiers (eg .blocks)
+array 'new' should accept variable length. eg (int[] arr = new int[5 * i])
+
+SDL_BlitSurface doesn't seem to work. (DEFINE macro?)
+
+set member class types and arrays to zero
+
+".vy -= 0.1" error. (values must be same type)
+
+casting of +=, -=
+
+error if member lookup fails (eg .x, but x not in this)
+
+//cannot call function on returned struct eg (getStruct().doStuff()) where the prototype is "MyStruct GetStruct()"
+
+casting requires brakets (eg:  int: x + y)
+
+'struct = Struct()' expression is still a bit silly
+
+new Class() sometimes does not work if Class is declared after use
+
+'or' statement does not have short-circuit
+
+crashes (without warning) if dot expression indexes non-existant id

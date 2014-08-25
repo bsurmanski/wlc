@@ -113,7 +113,7 @@ struct IRScope
     Identifier *lookupInScope(std::string s) { return table->lookupInScope(s); }
 
     IRScope(ASTScope *tbl, llvm::DIDescriptor dbg) : table(tbl), debug(dbg),
-        breakLabel(0), continueLabel(0), parent(0) {}
+        breakLabel(0), continueLabel(0), parent(0), switchStmt(0) {}
 };
 
 class IRDebug;

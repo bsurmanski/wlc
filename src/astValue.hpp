@@ -25,7 +25,7 @@ struct ASTValue
     ASTValue *getOwner() { return owner; }
 
     virtual ASTType *getType() = 0;
-    virtual bool isConst() { return false; } // TODO
+    virtual bool isConstant() { return false; } // TODO
     virtual bool isWeak() { return false; } // XXX DITTO
     virtual bool isLValue() = 0;
     virtual bool isReference() = 0;
@@ -43,15 +43,18 @@ struct ASTBasicValue : ASTValue
     bool lValue;
     bool reference;
     bool weak;
+    bool constant;
 
     ASTBasicValue(ASTType *ty, llvm::Value *val, bool lv=false, bool ref=false) :
-        ASTValue(val), type(ty), lValue(lv), reference(ref), weak(false) {}
+        ASTValue(val), type(ty), lValue(lv), reference(ref), weak(false), constant(false) {}
 
     virtual ASTType *getType() { return type; }
     virtual bool isLValue() { return lValue; }
     virtual bool isReference() { return reference; }
     virtual bool isWeak() { return weak; }
     virtual void setWeak(bool b) { weak = b; }
+    virtual bool isConstant() { return constant; }
+    virtual void setConstant(bool b) { constant = b; }
 };
 
 struct TypeValue : ASTValue {
@@ -83,7 +86,7 @@ struct TupleValue : public ASTValue
         return true;
     }
 
-    virtual bool isConst() {
+    virtual bool isConstant() {
         for(int i = 0; i < tuple->members.size(); i++) {
             if(!tuple->members[i]->isConstant())
                 return false;

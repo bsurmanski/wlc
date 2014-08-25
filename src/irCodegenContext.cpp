@@ -1,4 +1,5 @@
 
+
 #include "ast.hpp"
 #include "token.hpp"
 #include "irCodegenContext.hpp"
@@ -60,7 +61,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         return sty;
     }
 
-    if(unit->types.count(ty->getName())){
+    if(unit->types.count(ty->getName())) {
         Type *llty = unit->types[ty->getName()];
         return llty;
     }
@@ -75,7 +76,6 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     StructType *sty = StructType::create(context);
     sty->setName(ty->getName());
     unit->types[ty->getName()] = IRType(ty, sty);
-
 
     std::vector<Type*> structVec;
 
@@ -219,8 +219,9 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
         emit_message(msg::FAILURE, "attempt to codegen invalid array type");
     }
 
-    if(ty->cgType) return ty->cgType;
+    //if(ty->cgType) return ty->cgType;
 
+    Type *ret = NULL;
     if(arrty->isDynamic())
     {
         //Identifier *id = ast->getRuntimeUnit()->getScope()->lookup("DynamicArray");
@@ -232,18 +233,19 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
         members.push_back(codegenType(ASTType::getLongTy()));
         StructType *aty = StructType::create(context, ty->getName());
         aty->setBody(members);
-        ty->cgType = aty;
 
         unit->debug->createDynamicArrayType(ty);
+
+        ret = aty;
     } else
     {
         llvm::ArrayType *aty = ArrayType::get(codegenType(arrty->arrayOf), arrty->length());
-        ty->cgType = aty;
-
         unit->debug->createArrayType(ty);
+
+        ret = aty;
     }
 
-    return (llvm::Type*) ty->cgType;
+    return ret;
 }
 
 llvm::Type *IRCodegenContext::codegenFunctionType(ASTType *ty) {
@@ -422,12 +424,14 @@ void IRCodegenContext::enterScope(IRScope *sc) {
 }
 
 IRScope *IRCodegenContext::endScope() {
-    ASTScope::iterator it = scope->begin();
-    for(; it != scope->end(); it++) {
-        Identifier *id = *it;
-        if(id->isVariable() && id->getType()->isClass() && !id->getDeclaration()->isWeak()) {
-            if(id->getName() != "this") //XXX messy. dont release 'this'
-                releaseObject(codegenIdentifier(id));
+    if(scope->table->isLocalScope()) { // only release if we are in code block (not global)
+        ASTScope::iterator it = scope->begin();
+        for(; it != scope->end(); it++) {
+            Identifier *id = *it;
+            if(id->isVariable() && id->getType()->isClass() && !id->getDeclaration()->isWeak()) {
+                if(id->getName() != "this") //XXX messy. dont release 'this'
+                    releaseObject(codegenIdentifier(id));
+            }
         }
     }
     return scope;
@@ -591,6 +595,11 @@ void IRCodegenContext::releaseObject(ASTValue *val) {
 
 // BINOP .
 ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
+    // we are trying to get a base that does not exist
+    if(!val->getType()) {
+        emit_message(msg::ERROR, "member '" + member + "' not found in class");
+    }
+
     if(val->getType()->isPointer())
         val = getValueOf(val);
     ASTUserType *userty = val->getType()->asUserType();
@@ -894,6 +903,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     {
         llvm::Value *llvmval;
         ASTType *ty;
+        ASTBasicValue *ret = NULL;
         switch(nexp->type)
         {
             case NumericExpression::INT:
@@ -909,16 +919,20 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
                     llvmval = ConstantInt::get(codegenType(nexp->astType), nexp->intValue);
                     ty = nexp->astType;
                 }
-                return new ASTBasicValue(ty, llvmval); //TODO: assign
+                ret = new ASTBasicValue(ty, llvmval); //TODO: assign
+                ret->setConstant(true);
+                return ret;
             case NumericExpression::DOUBLE:
                 llvmval = ConstantFP::get(codegenType(nexp->astType), nexp->floatValue);
                 ty = nexp->astType;
-                return new ASTBasicValue(ty, llvmval); //TODO: assign
+                ret = new ASTBasicValue(ty, llvmval); //TODO: assign
+                ret->setConstant(true);
+                return ret;
         }
     }
     else if(StringExpression *sexp = exp->stringExpression())
     {
-        return getStringValue(sexp->string);
+        return getStringValue(sexp->string); //TODO: const
     }
     else if(PostfixExpression *pexp = exp->postfixExpression())
     {
@@ -987,7 +1001,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
         types.push_back(val->getType());
 
         if(!val->isLValue()) lvalue = false;
-        if(!val->isConst()) isConst = false;
+        if(!val->isConstant()) isConst = false;
     }
 
     ASTTupleType *tupty = new ASTTupleType(types);
@@ -1066,7 +1080,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
     } else if(ty->isArray()) {
         val = new ASTBasicValue(ty, value, true);
     } else {
-        val = new ASTBasicValue(ty->getPointerTy(), value);
+        val = new ASTBasicValue(ty, value, false, true);
     }
 
     if(ty->isUserType()) {
@@ -1090,19 +1104,22 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         }
         //XXX temp below. set vtable of new class
         // TODO: also do if type is pointer to class (called through 'new')
-        ASTValue *vtable = getVTable(val);
 
-        codegenType(uty); // XXX to create typeinfo. So we are able to load it below... hacky
+        if(ty->isClass()) {
+            ASTValue *vtable = getVTable(val);
 
-        //the pass through identifier is an ugly hack to get typeinfo in case of duplicate ASTType types, eww
-        Value *tival = codegenLValue(uty->getDeclaration()->classDeclaration()->typeinfo);
+            codegenType(uty); // XXX to create typeinfo. So we are able to load it below... hacky
 
-        vector<Value *> gep;
-        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        tival = ir->CreateGEP(tival, gep); // GEP to class's vtable, so we can store to it
+            //the pass through identifier is an ugly hack to get typeinfo in case of duplicate ASTType types, eww
+            Value *tival = codegenLValue(uty->getDeclaration()->classDeclaration()->typeinfo);
 
-        ir->CreateStore(tival, codegenLValue(vtable));
+            vector<Value *> gep;
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            tival = ir->CreateGEP(tival, gep); // GEP to class's vtable, so we can store to it
+
+            ir->CreateStore(tival, codegenLValue(vtable));
+        }
     }
 
     return val;
@@ -1573,6 +1590,9 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
         case tok::plus:
             return lhs;
         case tok::minus:
+            if(lhs->getType()->isFloating()) {
+                return new ASTBasicValue(lhs->getType(), ir->CreateFNeg(codegenValue(lhs)));
+            }
             if(!lhs->getType()->isSigned()){
                 emit_message(msg::UNIMPLEMENTED,
                         "conversion to signed value using '-' unary op",
@@ -1814,7 +1834,7 @@ ASTValue *IRCodegenContext::promoteInt(ASTValue *val, ASTType *toType)
     if(toType->isInteger())
     {
         return new ASTBasicValue(toType, ir->CreateIntCast(codegenValue(val),
-                    codegenType(toType), false)); //TODO: signedness
+                    codegenType(toType), val->getType()->isSigned()));
     }
     if(toType->isPointer())
     {
@@ -1978,44 +1998,60 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
 
 ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
 {
-    if(val->getType() != toType)
-    {
+    ASTValue *ret = NULL;
+    if(val->getType()->is(toType)) {
+        ret = val;
+    } else {
         //convert reference value to non-reference type
         //currently, reference types are simply pointers, so just turn it into an LValue and we're set
-        if(val->isReference() && toType->getReferenceTy()->is(val->getType())) {
-            return new ASTBasicValue(toType, codegenLValue(val), true, false);
+
+        //TODO: if val->dereferencedTy == toType
+        if(val->isReference()) {
+                //(toType->getReferenceTy()->is(val->getType()))) {
+                 //getValueOf(val)->getType()->is(toType))) {
+            if(toType->getReferenceTy()->is(val->getType())) {
+                ret = new ASTBasicValue(toType, codegenLValue(val), true, false);
+            } else if(val->getType()->getPointerTy()->is(toType)) {
+                ret = new ASTBasicValue(toType, codegenLValue(val), false, false);
+            }
         }
 
-        if(val->getType()->isInteger())
-        {
-            return promoteInt(val, toType);
-        } else if(val->getType()->isFloating())
-        {
-            return promoteFloat(val, toType);
-        }
-        else if(val->getType()->isPointer())
-        {
-            return promotePointer(val, toType);
-        }
-        else if(val->getType()->kind == TYPE_TUPLE)
-        {
-            return promoteTuple(val, toType);
-        } if(val->getType()->isArray())
-        {
-            return promoteArray(val, toType);
-        } else if(val->getType()->isReference()) {
-            if(toType->isPointer()) {
-                return new ASTBasicValue(toType,
-                        ir->CreatePointerCast(codegenLValue(val),
-                            codegenType(toType)));
-            } else if(val->getType()->extends(toType)) {
-                return new ASTBasicValue(toType,
-                        ir->CreatePointerCast(codegenLValue(val),
-                            codegenType(toType)), false, true);
+        if(!ret) {
+            if(val->getType()->isInteger()) {
+                ret = promoteInt(val, toType);
+            }
+            else if(val->getType()->isFloating()) {
+                ret = promoteFloat(val, toType);
+            }
+            else if(val->getType()->isPointer()) {
+                ret = promotePointer(val, toType);
+            }
+            else if(val->getType()->kind == TYPE_TUPLE) {
+                ret = promoteTuple(val, toType);
+            } else if(val->getType()->isArray()) {
+                ret = promoteArray(val, toType);
+            } else if(val->getType()->isReference()) {
+                if(toType->isPointer()) {
+                    ret = new ASTBasicValue(toType,
+                            ir->CreatePointerCast(codegenLValue(val),
+                                codegenType(toType)));
+                } else if(val->getType()->extends(toType)) {
+                    ret = new ASTBasicValue(toType,
+                            ir->CreatePointerCast(codegenLValue(val),
+                                codegenType(toType)), false, true);
+                }
             }
         }
     }
-    return val; // no conversion? failed converson?
+
+ // no conversion? failed converson?
+    if(!ret || !ret->getType()) {
+        char err[1024]; //XXX may overflow if type names are too long
+        sprintf(err, "cannot convert value of type '%s' to type '%s'", val->getType()->getName().c_str(), toType->getName().c_str());
+        emit_message(msg::ERROR, std::string(err));
+    }
+
+    return ret;
 }
 
 //XXX is op required?
@@ -2058,6 +2094,11 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
             return NULL;
         }
         return rhs;
+    }
+
+    if(lhs->isConstant()) {
+        emit_message(msg::ERROR, "cannot assign to constant value");
+        return NULL;
     }
 
     //ASTValue *vlhs = codegenExpression(lhs);
@@ -2298,11 +2339,12 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         for(int i = 0; i < cstmt->values.size(); i++)
         {
             Expression *value = cstmt->values[i];
-            if(!value->isConstant())
+            ASTValue *val = codegenExpression(value);
+            if(!val->isConstant())
             {
                 emit_message(msg::ERROR, "case value must be a constant", cstmt->loc);
             }
-            getScope()->addCase(value, codegenExpression(value), caseBB);
+            getScope()->addCase(value, val, caseBB);
         }
 
     } else if(LabelStatement *lstmt = dynamic_cast<LabelStatement*>(stmt))
@@ -2426,30 +2468,37 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
     }
     ///////////////
 
-    Type *llty = codegenType(vty);
+    ASTBasicValue *idValue = NULL;
+    if(vdecl->qualifier.isConst) {
+        idValue = new ASTBasicValue(vty, codegenValue(defaultValue), false);
+        idValue->setConstant(true);
+    } else {
 
-    AllocaInst *llvmDecl = ir->CreateAlloca(llty, 0, vdecl->getName());
+        Type *llty = codegenType(vty);
 
-    llvmDecl->setAlignment(8);
-    ASTBasicValue *idValue = new ASTBasicValue(vty, llvmDecl, true, vty->isReference());
-    idValue->setWeak(vdecl->isWeak());
+        AllocaInst *llvmDecl = ir->CreateAlloca(llty, 0, vdecl->getName());
 
-    if(defaultValue) {
-        defaultValue = promoteType(defaultValue, vty);
-        storeValue(idValue, defaultValue);
+        llvmDecl->setAlignment(8);
+        idValue = new ASTBasicValue(vty, llvmDecl, true, vty->isReference());
+        idValue->setWeak(vdecl->isWeak());
 
-        if(vty->isClass() && !idValue->isWeak()) {
-            retainObject(defaultValue);
+        if(defaultValue) {
+            defaultValue = promoteType(defaultValue, vty);
+            storeValue(idValue, defaultValue);
+
+            if(vty->isClass() && !idValue->isWeak()) {
+                retainObject(defaultValue);
+            }
+
+            Instruction *vinst = unit->debug->createVariable(vdecl->getName(),
+                    idValue, ir->GetInsertBlock(), vdecl->loc);
+            vinst->setDebugLoc(llvm::DebugLoc::get(vdecl->loc.line, vdecl->loc.ch, diScope()));
+            //TODO: maybe create a LValue field in CGValue?
+        } else if(vty->isClass()) {
+            // store null to class if no value
+            ASTBasicValue null = ASTBasicValue(vty, ConstantPointerNull::get((PointerType*) codegenType(vty)));
+            storeValue(idValue, &null);
         }
-
-        Instruction *vinst = unit->debug->createVariable(vdecl->getName(),
-                idValue, ir->GetInsertBlock(), vdecl->loc);
-        vinst->setDebugLoc(llvm::DebugLoc::get(vdecl->loc.line, vdecl->loc.ch, diScope()));
-        //TODO: maybe create a LValue field in CGValue?
-    } else if(vty->isClass()) {
-        // store null to class if no value
-        ASTBasicValue null = ASTBasicValue(vty, ConstantPointerNull::get((PointerType*) codegenType(vty)));
-        storeValue(idValue, &null);
     }
 
     vdecl->identifier->setValue(idValue);
@@ -2653,11 +2702,18 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
             llvmval->setLinkage(linkage);
             llvmval->setInitializer(gValue);
 
-            ASTValue *gv = new ASTBasicValue(idTy, llvmval, true);
-            id->setValue(gv);
-
             dwarfStopPoint(vdecl->loc);
-            unit->debug->createGlobal(vdecl, gv);
+            if(vdecl->qualifier.isConst) {
+                ASTBasicValue *cvalue = new ASTBasicValue(idTy, gValue);
+                cvalue->setConstant(true);
+                id->setValue(cvalue);
+                //TODO create global debug
+            } else {
+                ASTValue *gv = new ASTBasicValue(idTy, llvmval, true, idTy->isReference());
+                id->setValue(gv);
+
+                unit->debug->createGlobal(vdecl, gv);
+            }
 
         } else if(id->isFunction())
         {

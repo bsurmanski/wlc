@@ -1114,13 +1114,6 @@ Expression *ParseContext::parseNewExpression()
 
 Expression *ParseContext::parseExpression(int prec)
 {
-    int n = 1; //look ahead
-    while(lookAhead(n).is(tok::caret))
-        n++;
-    if(lookAhead(n).is(tok::colon))
-    {
-        return parseCastExpression(prec);
-    }
 
     switch(peek().kind)
     {
@@ -1290,6 +1283,14 @@ Expression *ParseContext::parseIdentifierExpression()
 
 Expression *ParseContext::parsePrimaryExpression()
 {
+    int n = 1; //look ahead
+    while(lookAhead(n).is(tok::caret))
+        n++;
+    if(lookAhead(n).is(tok::colon))
+    {
+        return parseCastExpression();
+    }
+
     SourceLocation loc = peek().loc;
     if(peek().is(tok::charstring))
     {

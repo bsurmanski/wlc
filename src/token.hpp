@@ -17,13 +17,71 @@ namespace tok
     };
 }
 
+struct Operator {
+    enum {
+        // unary
+        preinc,
+        predec,
+        positive,
+        negative,
+        negate,
+        bitflip,
+        derefrence,
+        addressOf,
+
+        // postfix
+        call,
+        index,
+        postinc,
+        postdec,
+        member,
+
+        // binary
+        add,
+        sub,
+        mul,
+        pow,
+        div,
+        bor,
+        band,
+        bxor,
+        lor,
+        land,
+        mod,
+
+        // comparison
+        less,
+        lessequal,
+        greater,
+        greaterequal,
+        equal,
+        notequal,
+
+
+    };
+
+    tok::TokenKind kind;
+    Operator(tok::TokenKind k) : kind(k) {}
+
+    int getBinaryPrecidence();
+    int getPostfixPrecidence();
+    int getUnaryPrecidence();
+    bool isBinaryOp();
+    bool isPostfixOp();
+    bool isUnaryOp();
+    bool isAssignOp();
+    bool isCompoundAssignOp();
+};
+
 using namespace tok;
 
 // higher precidence means stronger binding, 0 means no binding
 int getBinaryPrecidence(tok::TokenKind tkind);
 int getPostfixPrecidence(tok::TokenKind tkind);
 int getUnaryPrecidence(tok::TokenKind tkind);
+bool isCompoundAssignOp(tok::TokenKind tkind);
 bool isAssignOp(tok::TokenKind tkind);
+tok::TokenKind getCompoundAssignBase(tok::TokenKind tkind);
 
 struct Token
 {

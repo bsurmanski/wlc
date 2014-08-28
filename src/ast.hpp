@@ -681,6 +681,8 @@ struct Expression : public Statement
     virtual DotExpression *dotExpression() { return NULL; }
     virtual NewExpression *newExpression() { return NULL; }
 
+    virtual Expression *lower() { return this; }
+
     //TODO: overrides
 
     virtual void accept(ASTVisitor *v);
@@ -836,13 +838,16 @@ struct BinaryExpression : public Expression
     virtual BinaryExpression *binaryExpression() { return this; }
     Expression *lhs;
     Expression *rhs;
-    unsigned op;
+    Operator op;
     virtual bool isConstant() { return lhs->isConstant() && rhs->isConstant(); }
-    BinaryExpression(unsigned o, Expression *l, Expression *r, SourceLocation lo = SourceLocation()) :
+    BinaryExpression(tok::TokenKind o, Expression *l, Expression *r, SourceLocation lo = SourceLocation()) :
         Expression(lo), lhs(l), rhs(r), op(o) {}
     virtual void accept(ASTVisitor *v);
+
+    virtual Expression *lower();
+
     virtual ASTType *getType() {
-        switch(op){
+        switch(op.kind){
             case tok::equal:
             case tok::colonequal:
             case tok::plusequal:

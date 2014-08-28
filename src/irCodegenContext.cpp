@@ -2136,10 +2136,10 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
 ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 {
     //TODO: bit messy
-    if(exp->op == tok::dot)
+    if(exp->op.kind == tok::dot)
     {
         emit_message(msg::FAILURE, "this should not be a binop", exp->loc);
-    } else if(exp->op == tok::colon) //cast op
+    } else if(exp->op.kind == tok::colon) //cast op
     {
         ASTValue *rhs = codegenExpression(exp->rhs);
         if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->lhs))
@@ -2152,8 +2152,8 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     ASTValue *lhs = codegenExpression(exp->lhs);
     ASTValue *rhs = codegenExpression(exp->rhs);
     //XXX temp. shortcut to allow LValue tuples
-    if(exp->op == tok::equal || exp->op == tok::colonequal)
-            return codegenAssign(lhs, rhs, exp->op == tok::colonequal);
+    if(exp->op.kind == tok::equal || exp->op.kind == tok::colonequal)
+            return codegenAssign(lhs, rhs, exp->op.kind == tok::colonequal);
 
 
     if(!lhs || !rhs){
@@ -2161,8 +2161,8 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         return NULL;
     }
 
-    if(!isAssignOp((tok::TokenKind) exp->op)) //XXX messy
-        codegenResolveBinaryTypes(&lhs, &rhs, exp->op);
+    if(!exp->op.isAssignOp()) //XXX messy
+        codegenResolveBinaryTypes(&lhs, &rhs, exp->op.kind);
     else if(lhs->getType()->kind == TYPE_ARRAY)
     {
         emit_message(msg::ERROR, "cannot assign to statically defined array", exp->loc);
@@ -2174,12 +2174,12 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 #define rhs_val codegenValue(rhs)
 
     ASTType *TYPE = lhs->getType();
-    switch(exp->op)
+    switch(exp->op.kind)
     {
         //ASSIGN
         case tok::equal:
         case tok::colonequal:
-            return codegenAssign(lhs, rhs, exp->op == tok::colonequal);
+            return codegenAssign(lhs, rhs, exp->op.kind == tok::colonequal);
 
         // I dont know, do something with a comma eventually
         case tok::comma:
@@ -2275,12 +2275,12 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
             return NULL; //XXX: null val
     }
 
-    if(isAssignOp((tok::TokenKind) exp->op)) //XXX messy
+    if((tok::TokenKind) exp->op.isAssignOp()) //XXX messy
     {
         if(rhs->getType()->coercesTo(lhs->getType()))
         {
             retValue = promoteType(retValue, TYPE); //TODO: merge with decl assign
-        } else if(rhs->getType()->castsTo(lhs->getType()) && exp->op == tok::colonequal) // cast equal
+        } else if(rhs->getType()->castsTo(lhs->getType()) && exp->op.kind == tok::colonequal) // cast equal
         {
             retValue = promoteType(retValue, TYPE);
         } else

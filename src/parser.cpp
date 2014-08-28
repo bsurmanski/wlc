@@ -1382,7 +1382,7 @@ Expression *ParseContext::parseBinaryExpression(int prec)
     SourceLocation lhsLoc = peek().loc;
     Expression *lhs = parseUnaryExpression(prec);
 
-    int op;
+    tok::TokenKind op;
     int opPrec;
     while((opPrec = linePeek().getBinaryPrecidence()) > prec)
     {

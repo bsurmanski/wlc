@@ -202,6 +202,9 @@ void ValidationVisitor::visitBinaryExpression(BinaryExpression *exp) {
         valid = false;
         emit_message(msg::ERROR, "binary operator is missing right hand expression");
     }
+
+    if(exp->op.isCompoundAssignOp()) {
+    }
 }
 
 void ValidationVisitor::visitPrimaryExpression(PrimaryExpression *exp) {

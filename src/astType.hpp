@@ -339,9 +339,10 @@ struct ASTFunctionType : public ASTCompositeType {
             if((i+1) < params.size()){
                 name = name + params[i]->getName() + ", ";
             } else {
-                name = name + params[i]->getName() + ")";
+                name = name + params[i]->getName();
             }
         }
+        name = name + ")";
         return name;
     }
 

@@ -2,13 +2,45 @@
 #include <stdlib.h>
 #include <assert.h>
 #include "token.hpp"
+#include "message.hpp"
+
+int Operator::getBinaryPrecidence() {
+    return ::getBinaryPrecidence(kind);
+}
+
+int Operator::getPostfixPrecidence() {
+    return ::getPostfixPrecidence(kind);
+}
+
+int Operator::getUnaryPrecidence() {
+    return ::getUnaryPrecidence(kind);
+}
+
+bool Operator::isBinaryOp() {
+    return getBinaryPrecidence();
+}
+
+//TODO: should distinguish between postfix ++ and prefix ++
+bool Operator::isPostfixOp() {
+    return getPostfixPrecidence();
+}
+
+bool Operator::isUnaryOp() {
+    return getUnaryPrecidence();
+}
+
+bool Operator::isAssignOp() {
+    return ::isAssignOp(kind);
+}
+
+bool Operator::isCompoundAssignOp() {
+    ::isCompoundAssignOp(kind);
+}
 
 
-bool isAssignOp(tok::TokenKind tkind)
-{
+bool isCompoundAssignOp(tok::TokenKind tkind) {
     switch(tkind)
     {
-        case tok::equal:
         case tok::colonequal:
         case tok::plusequal:
         case tok::minusequal:
@@ -22,7 +54,28 @@ bool isAssignOp(tok::TokenKind tkind)
         default:
             return false;
     }
+}
 
+tok::TokenKind getCompoundAssignBase(tok::TokenKind tkind) {
+    switch(tkind)
+    {
+        case tok::colonequal: emit_message(msg::UNIMPLEMENTED, "operator lowering for cast equal unimpl");
+        case tok::plusequal: return tok::plus;
+        case tok::minusequal: return tok::minus;
+        case tok::starequal: return tok::star;
+        case tok::slashequal: return tok::slash;
+        case tok::ampequal: return tok::amp;
+        case tok::barequal: return tok::bar;
+        case tok::caretequal: return tok::caret;
+        case tok::percentequal: return tok::percent;
+        default:
+            return (tok::TokenKind) 0;
+    }
+}
+
+bool isAssignOp(tok::TokenKind tkind)
+{
+    return isCompoundAssignOp(tkind) || tkind == tok::equal;
 }
 
 // higher precidence means stronger binding, 0 means no binding

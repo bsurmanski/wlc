@@ -206,6 +206,8 @@ struct Statement : public ASTNode
     virtual WhileStatement *whileStatement() { return NULL; }
     virtual ForStatement *forStatement() { return NULL; }
     virtual SwitchStatement *switchStatement() { return NULL; }
+
+    virtual Statement *lower() { return this; }
 };
 
 struct BreakStatement : public Statement
@@ -412,6 +414,8 @@ struct Declaration : public Statement
 
     virtual bool isConstructor() { return false; }
     virtual bool isDestructor() { return false; }
+
+    virtual Declaration *lower() { return this; }
 };
 
 struct PackageDeclaration : public Declaration {
@@ -733,6 +737,8 @@ struct TupleExpression : public Expression
             if(!members[i]->isLValue()) ret = false;
         return ret;
     }
+
+    virtual ASTType *getType() { return NULL; } // XXX TODO
     TupleExpression(std::vector<Expression*> e, SourceLocation l = SourceLocation()) :
         Expression(l), members(e) {}
     virtual TupleExpression *tupleExpression() { return this; }
@@ -750,19 +756,22 @@ struct CastExpression : public Expression
     virtual void accept(ASTVisitor *v);
 };
 
+// should be pure virtual
 struct PostfixExpression : public Expression
 {
     PostfixExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
+    //virtual ~PostfixExpression();
     virtual PostfixExpression *postfixExpression() { return this; }
     virtual void accept(ASTVisitor *v);
 };
 
 struct CallExpression : public PostfixExpression
 {
+    virtual ~CallExpression() {}
     virtual CallExpression *callExpression() { return this; }
     Expression *function;
     virtual ASTType *getType() { return function->getType(); }
-    std::vector<Expression *> args;
+    std::vector<Expression *> args; //TODO: make special argument expression to allow for name arguments?
     CallExpression(Expression *f, std::vector<Expression*> a, SourceLocation l = SourceLocation()) :
         PostfixExpression(l), function(f), args(a) {}
     virtual void accept(ASTVisitor *v);
@@ -770,27 +779,31 @@ struct CallExpression : public PostfixExpression
 
 struct IndexExpression : public PostfixExpression
 {
+    virtual ~IndexExpression() {}
     virtual IndexExpression *indexExpression() { return this; }
     virtual bool isLValue() { return lhs->isLValue(); }
     Expression *lhs;
     Expression *index;
     IndexExpression(Expression *l, Expression *i, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), index(i) {}
-    virtual ASTType *getType() { return 0; } //TODO
+    virtual ASTType *getType() { return NULL; } //TODO XXX
     virtual void accept(ASTVisitor *v);
 };
 
 struct PostfixOpExpression : public PostfixExpression
 {
+    virtual ~PostfixOpExpression() {}
     int op;
     Expression *lhs;
     PostfixOpExpression(Expression *l, int o, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), op(o) {}
     virtual void accept(ASTVisitor *v);
+    virtual ASTType *getType() { return NULL; } //TODO XXX
 };
 
 struct DotExpression : public PostfixExpression
 {
+    virtual ~DotExpression() {}
     Expression *lhs;
     std::string rhs;
     virtual bool isLValue() { return lhs->isLValue(); }
@@ -798,6 +811,7 @@ struct DotExpression : public PostfixExpression
         PostfixExpression(lo), lhs(l), rhs(r) {}
     virtual DotExpression *dotExpression() { return this; }
     virtual void accept(ASTVisitor *v);
+    virtual ASTType *getType() { return NULL; } //TODO XXX
 };
 
 struct UnaryExpression : public Expression
@@ -884,6 +898,7 @@ struct BinaryExpression : public Expression
 
 struct PrimaryExpression : public Expression
 {
+    virtual ~PrimaryExpression() {}
     PrimaryExpression(SourceLocation l = SourceLocation()) : Expression(l){}
     virtual PrimaryExpression *primaryExpression() { return this; }
     virtual void accept(ASTVisitor *v);
@@ -891,6 +906,8 @@ struct PrimaryExpression : public Expression
 
 struct IdentifierExpression : public PrimaryExpression
 {
+    virtual ~IdentifierExpression() {}
+
     bool local; // whether this identifer is prefixed with a unary dot
     Identifier *id;
     bool isUserType() { return id->isUserType(); }
@@ -916,6 +933,7 @@ struct IdentifierExpression : public PrimaryExpression
 
 struct StringExpression : public PrimaryExpression
 {
+    virtual ~StringExpression() {}
     std::string string;
     virtual ASTType *getType() { return ASTType::getCharTy()->getArrayTy(string.length()); }
     virtual bool isConstant() { return true; }
@@ -928,6 +946,7 @@ struct StringExpression : public PrimaryExpression
 // XXX super ugly. Maybe just hold an ASTValue* or something instead of this mess?
 struct NumericExpression : public PrimaryExpression
 {
+    virtual ~NumericExpression() {}
     enum NumericType
     {
         FLOAT,
@@ -968,6 +987,7 @@ struct PackageExpression : public Expression
     PackageExpression(Expression *p, SourceLocation l = SourceLocation())
         : Expression(l), package(p) {}
     virtual void accept(ASTVisitor *v);
+    virtual ASTType *getType() { return NULL; } //TODO XXX
 };
 
 
@@ -975,12 +995,14 @@ struct TopLevelExpression : public Expression
 {
     TopLevelExpression(SourceLocation l = SourceLocation()) : Expression(l) {}
     virtual TopLevelExpression *topLevelExpression() { return this; }
+    virtual ASTType *getType() { return NULL; } //TODO XXX
 };
 
 struct UseExpression : public TopLevelExpression
 {
     virtual UseExpression *useExpression() { return this; }
     virtual void accept(ASTVisitor *v);
+    virtual ASTType *getType() { return NULL; } //TODO XXX
 };
 
 // import <STRING> |
@@ -993,11 +1015,12 @@ struct ImportExpression : public TopLevelExpression
     ImportExpression(Expression *im, TranslationUnit *u, SourceLocation l = SourceLocation()) :
         TopLevelExpression(l), expression(im), unit(u) { }
     virtual void accept(ASTVisitor *v);
+    virtual ASTType *getType() { return NULL; } //TODO XXX
 };
 
 struct IncludeExpression : public TopLevelExpression
 {
-
+    virtual ASTType *getType() { return NULL; } //TODO XXX
 };
 
 #endif

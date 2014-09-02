@@ -50,6 +50,10 @@ void FunctionDeclaration::accept(ASTVisitor *v) {
         body->accept(v);
     v->popFunction();
     v->popScope();
+
+    if(nextoverload) {
+        nextoverload->accept(v);
+    }
 }
 
 void LabelDeclaration::accept(ASTVisitor *v){
@@ -74,6 +78,20 @@ void UserTypeDeclaration::accept(ASTVisitor *v){
     v->visitScope(scope);
     v->visitUserTypeDeclaration(this);
     v->visitType(type);
+
+    if(constructor)
+        constructor->accept(v);
+
+    if(destructor)
+        destructor->accept(v);
+
+    for(int i = 0; i < methods.size(); i++) {
+        methods[i]->accept(v);
+    }
+
+    for(int i = 0; i < members.size(); i++) {
+        members[i]->accept(v);
+    }
 }
 
 //

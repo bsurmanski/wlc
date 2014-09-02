@@ -59,8 +59,8 @@ void update()
             if (pixelIsWhite(surf, i-1, j))   n++
             if (pixelIsWhite(surf, i+1, j))   n++
             if (pixelIsWhite(surf, i-1, j+1)) n++
-            if (pixelIsWhite(surf, i,   j+1)) n++
-            if (pixelIsWhite(surf, i+1, j+1)) n++
+            if (pixelIsWhite(surf, i,   j+1)) n+=1
+            if (pixelIsWhite(surf, i+1, j+1)) n+=1
 
             if(n < 2) setPixel(back, i, j, 0)
             if(n == 3) setPixel(back, i, j, 255)

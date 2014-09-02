@@ -2171,8 +2171,13 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         return NULL;
     }
 
-    if(!exp->op.isAssignOp()) //XXX messy
+    if(exp->op.isCompoundAssignOp()) {
+        emit_message(msg::ERROR, "compound assign should be lowered", exp->loc);
+    }
+
+    if(!exp->op.isAssignOp()){ //XXX messy
         codegenResolveBinaryTypes(&lhs, &rhs, exp->op.kind);
+    }
     else if(lhs->getType()->kind == TYPE_ARRAY)
     {
         emit_message(msg::ERROR, "cannot assign to statically defined array", exp->loc);
@@ -2285,8 +2290,10 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
             return NULL; //XXX: null val
     }
 
+    //XXX remove this when ready
     if((tok::TokenKind) exp->op.isAssignOp()) //XXX messy
     {
+        emit_message(msg::ERROR, "this complex assignment operation should already be lowered", exp->loc);
         if(rhs->getType()->coercesTo(lhs->getType()))
         {
             retValue = promoteType(retValue, TYPE); //TODO: merge with decl assign

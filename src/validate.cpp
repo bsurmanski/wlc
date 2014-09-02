@@ -122,6 +122,9 @@ void ValidationVisitor::visitFunctionDeclaration(FunctionDeclaration *decl) {
     }
 
     resolveType(decl->getType());
+
+    if(decl->body)
+        decl->body = decl->body->lower();
 }
 
 void ValidationVisitor::visitLabelDeclaration(LabelDeclaration *decl) {
@@ -138,6 +141,8 @@ void ValidationVisitor::visitVariableDeclaration(VariableDeclaration *decl) {
     }
 
     resolveType(decl->getType());
+
+    if(decl->value) decl->value = decl->value->lower();
 }
 
 void ValidationVisitor::visitTypeDeclaration(TypeDeclaration *decl) {
@@ -176,6 +181,16 @@ void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
         }
     }
 
+    //XXX lower constructor and destructor?
+    for(int i = 0; i < decl->methods.size(); i++) {
+        if(!decl->methods[i]) emit_message(msg::ERROR, "invalid method found in user type declaration", decl->loc);
+        decl->methods[i] = dynamic_cast<FunctionDeclaration*>(decl->methods[i]->lower());
+    }
+
+    for(int i = 0; i < decl->members.size(); i++) {
+        if(!decl->members[i]) emit_message(msg::ERROR, "invalid member found in user type declaration", decl->loc);
+        decl->members[i] = decl->members[i]->lower();
+    }
 
     decl->scope->accept(this);
 }
@@ -185,6 +200,8 @@ void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp) {
     if(!exp->lhs) {
         valid = false;
         emit_message(msg::ERROR, "unary operator is missing expression");
+    } else {
+        exp->lhs = exp->lhs->lower();
     }
 
     if(exp->op == tok::dot && !exp->lhs->identifierExpression()){
@@ -198,14 +215,15 @@ void ValidationVisitor::visitBinaryExpression(BinaryExpression *exp) {
     if(!exp->lhs) {
         valid = false;
         emit_message(msg::ERROR, "binary operator is missing left hand expression");
+    } else {
+        exp->lhs = exp->lhs->lower();
     }
 
     if(!exp->rhs) {
         valid = false;
         emit_message(msg::ERROR, "binary operator is missing right hand expression");
-    }
-
-    if(exp->op.isCompoundAssignOp()) {
+    } else {
+        exp->rhs = exp->rhs->lower();
     }
 }
 
@@ -214,11 +232,30 @@ void ValidationVisitor::visitPrimaryExpression(PrimaryExpression *exp) {
 }
 
 void ValidationVisitor::visitCallExpression(CallExpression *exp) {
+    if(!exp->function) {
+        emit_message(msg::FAILURE, "invalid or missing function in call expression", exp->loc);
+    } else {
+        exp->function = exp->function->lower();
+    }
 
+    for(int i = 0; i < exp->args.size(); i++) {
+        if(!exp->args[i]) emit_message(msg::FAILURE, "invalid or missing argument in call expression", exp->loc);
+        else exp->args[i] = exp->args[i]->lower();
+    }
 }
 
 void ValidationVisitor::visitIndexExpression(IndexExpression *exp) {
+    if(!exp->lhs) {
+        emit_message(msg::ERROR, "invalid or missing base for index expression", exp->loc);
+    } else {
+        exp->lhs = exp->lhs->lower();
+    }
 
+    if(!exp->index) {
+        emit_message(msg::ERROR, "invalid or missing index in index expression", exp->loc);
+    } else {
+        exp->index = exp->index->lower();
+    }
 }
 
 void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp) {
@@ -263,6 +300,11 @@ void ValidationVisitor::visitPackageExpression(PackageExpression *exp) {
 
 void ValidationVisitor::visitCastExpression(CastExpression *exp) {
     resolveType(exp->type);
+    if(!exp->expression) {
+        emit_message(msg::ERROR, "missing value in cast expression", exp->loc);
+    } else {
+        exp->expression = exp->expression->lower();
+    }
 }
 
 void ValidationVisitor::visitUseExpression(UseExpression *exp) {
@@ -274,11 +316,16 @@ void ValidationVisitor::visitTypeExpression(TypeExpression *exp) {
 }
 
 void ValidationVisitor::visitTupleExpression(TupleExpression *exp) {
-
+    for(int i = 0; i < exp->members.size(); i++) {
+        if(!exp->members[i]) emit_message(msg::ERROR, "expression in tuple expression", exp->loc);
+        else exp->members[i] = exp->members[i]->lower();
+    }
 }
 
 void ValidationVisitor::visitDotExpression(DotExpression *exp) {
-
+    if(!exp->lhs) {
+        emit_message(msg::ERROR, "invalid base in dot expression", exp->loc);
+    } else exp->lhs = exp->lhs->lower();
 }
 
 void ValidationVisitor::visitNewExpression(NewExpression *exp) {
@@ -308,7 +355,10 @@ void ValidationVisitor::visitCaseStatement(CaseStatement *stmt) {
     for(int i = 0; i < stmt->values.size(); i++) {
         if(!stmt->values[i]) {
             valid = false;
-            emit_message(msg::ERROR, "invalid case value");
+            emit_message(msg::ERROR, "invalid case value in case statement", stmt->loc);
+        } else if(!stmt->values[i]->isConstant()) {
+            valid = false;
+            emit_message(msg::ERROR, "case value must be constant", stmt->values[i]->loc);
         }
     }
 }
@@ -316,52 +366,72 @@ void ValidationVisitor::visitCaseStatement(CaseStatement *stmt) {
 void ValidationVisitor::visitGotoStatement(GotoStatement *stmt) {
     if(!stmt->identifier) {
         valid = false;
-        emit_message(msg::ERROR, "goto statement expects following identifier");
+        emit_message(msg::ERROR, "goto statement expects following identifier", stmt->loc);
     }
 }
 
 void ValidationVisitor::visitCompoundStatement(CompoundStatement *stmt) {
     if(!stmt->getScope() && stmt->statements.size()) {
         valid = false;
-        emit_message(msg::ERROR, "compound stmtression is missing scope");
+        emit_message(msg::ERROR, "compound statement is missing scope", stmt->loc);
     }
 
-#ifdef DEBUG
     for(int i = 0; i < stmt->statements.size(); i++) {
         if(!stmt->statements[i]) {
             valid = false;
-            emit_message(msg::ERROR, "null statement in compound statement");
-        }
+            emit_message(msg::ERROR, "null statement in compound statement", stmt->loc);
+        } else stmt->statements[i] = stmt->statements[i]->lower();
     }
-#endif
 }
 
 void ValidationVisitor::visitBlockStatement(BlockStatement *stmt) {
 #ifdef DEBUG
     if(!stmt->getScope() && stmt->body) {
         valid = false;
-        emit_message(msg::ERROR, "null scope in block statement");
+        emit_message(msg::ERROR, "null scope in block statement", stmt->loc);
     }
 #endif
+
+    if(stmt->body) {
+        stmt->body = stmt->body->lower();
+    }
 
 }
 
 void ValidationVisitor::visitElseStatement(ElseStatement *stmt) {
     if(!stmt->body) {
         valid = false;
-        emit_message(msg::ERROR, "else stmtression stmtects body statement");
+        emit_message(msg::ERROR, "else statement missing body statement", stmt->loc);
     }
 }
 
 void ValidationVisitor::visitIfStatement(IfStatement *stmt) {
     if(!stmt->body) {
         valid = false;
-        emit_message(msg::ERROR, "if stmtression stmtects body statement");
+        emit_message(msg::ERROR, "if statement missing body statement", stmt->loc);
+    }
+
+    if(!stmt->condition) {
+        emit_message(msg::ERROR, "if statement missing condition", stmt->loc);
+    } else stmt->condition = stmt->condition->lower();
+
+    if(stmt->elsebr) {
+        stmt->elsebr = dynamic_cast<ElseStatement*>(stmt->elsebr->lower());
     }
 }
 
 void ValidationVisitor::visitLoopStatement(LoopStatement *stmt) {
+    if(!stmt->condition) {
+        emit_message(msg::ERROR, "loop statement missing condition", stmt->loc);
+    } else stmt->condition = stmt->condition->lower();
 
+    if(stmt->update) {
+        stmt->update = stmt->update->lower();
+    }
+
+    if(stmt->elsebr) {
+        stmt->elsebr = dynamic_cast<ElseStatement*>(stmt->elsebr->lower());
+    }
 }
 
 void ValidationVisitor::visitWhileStatement(WhileStatement *stmt) {
@@ -369,17 +439,22 @@ void ValidationVisitor::visitWhileStatement(WhileStatement *stmt) {
 }
 
 void ValidationVisitor::visitForStatement(ForStatement *stmt) {
-
+    if(stmt->decl) {
+        stmt->decl = stmt->decl->lower();
+    }
 }
 
 void ValidationVisitor::visitSwitchStatement(SwitchStatement *stmt) {
     if(!stmt->condition) {
         valid = false;
-        emit_message(msg::ERROR, "switch stmtression stmtects condition");
+        emit_message(msg::ERROR, "switch statement missing condition", stmt->loc);
+    } else {
+        stmt->condition = stmt->condition->lower();
     }
 }
 
 void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt) {
+    if(stmt->expression) stmt->expression = stmt->expression->lower();
     /*TODO: reenable when expression->getType() always works
     if(!stmt->expression->getType()->coercesTo(getFunction()->getReturnType())) {
         valid = false;

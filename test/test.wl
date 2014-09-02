@@ -10,6 +10,9 @@ SDL_Surface^ surf = null
 SDL_Surface^ back = null
 void^ testval
 
+//int[] constarray = [1,2,3]
+//TODO
+
 struct SomeStruct
 {
     int i
@@ -43,9 +46,11 @@ int addFunc(int i = 0, int j = 5)
 void update()
 {
     int n = 0 // neighbors
-    for(int j = 1; j < 240; j++)
+    int j
+    int i
+    for(j = 1; j < 240; j++)
     {
-        for(int i = 1; i < 320; ++i)
+        for(i = 1; i < 320; ++i)
         {
             n = 0
             if (pixelIsWhite(surf, i-1, j-1)) n++

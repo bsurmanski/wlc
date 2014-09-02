@@ -36,6 +36,7 @@ void TranslationUnit::accept(ASTVisitor *v) {
 //
 
 void Declaration::accept(ASTVisitor *v) {
+    Statement::accept(v);
     v->visitDeclaration(this);
 }
 
@@ -238,13 +239,6 @@ void CaseStatement::accept(ASTVisitor *v){
 void GotoStatement::accept(ASTVisitor *v){
     Statement::accept(v);
     v->visitGotoStatement(this);
-}
-
-void DeclarationStatement::accept(ASTVisitor *v){
-    Statement::accept(v);
-    v->visitDeclarationStatement(this);
-    if(declaration)
-        declaration->accept(v);
 }
 
 void ReturnStatement::accept(ASTVisitor *v){

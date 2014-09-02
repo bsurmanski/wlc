@@ -152,10 +152,6 @@ CONTINUE:;
     }
 }
 
-Expression *BinaryExpression::lower() {
-    return this;
-}
-
 /*
 FunctionDeclaration *UserTypeDeclaration::getDefaultConstructor(){
     Identifier *id = getScope()->lookup("this");

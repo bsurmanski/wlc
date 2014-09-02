@@ -60,6 +60,7 @@ struct Operator {
 
     };
 
+    //TODO: use above enum
     tok::TokenKind kind;
     Operator(tok::TokenKind k) : kind(k) {}
 

@@ -360,17 +360,6 @@ ImportExpression *ParseContext::parseImport()
     return new ImportExpression(importExpression, importedUnit, loc);
 }
 
-Statement *ParseContext::parseDeclarationStatement()
-{
-    Declaration *decl;
-
-    SourceLocation loc = peek().getLocation();
-    decl = parseDeclaration();
-
-    //TODO: register decl
-    return new DeclarationStatement(decl, loc);
-}
-
 Statement *ParseContext::parseStatement()
 {
     int n = 1; //lookahead
@@ -414,7 +403,7 @@ Statement *ParseContext::parseStatement()
 #define BTYPE(X,SZ,SN) case tok::kw_##X:
 #define FTYPE(X,SZ) case tok::kw_##X:
 #include "tokenkinds.def"
-                return parseDeclarationStatement();
+                return parseDeclaration();
 
             /*
             if(lookAhead(n).is(tok::colon)) // cast
@@ -423,7 +412,7 @@ Statement *ParseContext::parseStatement()
             }
             if(lookAhead(n).is(tok::identifier)) // declaration
             {
-                return parseDeclarationStatement();
+                return parseDeclaration();
             }*/
             goto PARSEEXP;
 

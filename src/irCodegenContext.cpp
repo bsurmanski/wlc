@@ -612,6 +612,10 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
 
     // identifier is either in base or does not exist, recurse to base
     if(!id){
+        if(!userty->getBaseType()) {
+            emit_message(msg::ERROR, "cannot find member '" + member + "' in type");
+            return NULL;
+        }
         // zeroeth member is base class
         std::vector<Value*> gep;
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
@@ -2001,6 +2005,10 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
     ASTValue *ret = NULL;
     if(val->getType()->is(toType)) {
         ret = val;
+    } else if(val->getType()->isFunctionType()) {
+        if(toType->isPointer()) {
+            ret = val; //XXX TODO: make sure target is function pointer type
+        }
     } else {
         //convert reference value to non-reference type
         //currently, reference types are simply pointers, so just turn it into an LValue and we're set
@@ -2139,7 +2147,9 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     if(exp->op.kind == tok::dot)
     {
         emit_message(msg::FAILURE, "this should not be a binop", exp->loc);
-    } else if(exp->op.kind == tok::colon) //cast op
+    }
+
+    if(exp->op.kind == tok::colon) //cast op
     {
         ASTValue *rhs = codegenExpression(exp->rhs);
         if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->lhs))
@@ -2319,9 +2329,9 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     if(Expression *estmt = dynamic_cast<Expression*>(stmt))
     {
         codegenExpression(estmt);
-    } else if (DeclarationStatement *dstmt = dynamic_cast<DeclarationStatement*>(stmt))
+    } else if (Declaration *dstmt = dynamic_cast<Declaration*>(stmt))
     {
-        codegenDeclaration(dstmt->declaration);
+        codegenDeclaration(dstmt);
     } else if (ReturnStatement *rstmt = dynamic_cast<ReturnStatement*>(stmt))
     {
         codegenReturnStatement(rstmt);

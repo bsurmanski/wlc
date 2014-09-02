@@ -126,7 +126,6 @@ class ParseContext
     ASTType *parseType();
     void parseInclude();
     ImportExpression *parseImport();
-    Statement *parseDeclarationStatement();
     Statement *parseStatement();
     CaseStatement *parseCaseStatement();
     Statement *parseIfStatement();

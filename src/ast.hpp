@@ -88,6 +88,11 @@ struct ASTNode {
     virtual TypeDeclaration *typeDeclaration() { return NULL; }
     virtual UserTypeDeclaration *userTypeDeclaration() { return NULL; }
     virtual ClassDeclaration *classDeclaration() { return NULL; }
+
+    // lower complex operations to simpler, more atomic operations.
+    // eg 'a += b' operation should lower to 'a = a + b'
+    // by default do not lower anything
+    virtual ASTNode *lower() { return this; }
 };
 
 struct Package : public ASTNode
@@ -95,7 +100,7 @@ struct Package : public ASTNode
     ASTScope *scope;
     Package *parent;
     Identifier *identifier;
-    void *cgValue; // opaque pointer to specific codegen information
+    void *cgValue; // XXX opaque pointer to specific codegen information
     std::string name;
 
     Package(Package *par=0, std::string nm="wl");
@@ -172,6 +177,190 @@ struct TranslationUnit : public Package
 
 /***
  *
+ * STATEMENTS
+ *
+ ***/
+struct CompoundStatement;
+struct BlockStatement;
+struct ElseStatement;
+struct IfStatement;
+struct LoopStatement;
+struct WhileStatement;
+struct ForStatement;
+struct SwitchStatement;
+
+struct Statement : public ASTNode
+{
+    Statement(SourceLocation l) : loc(l) {}
+    virtual ~Statement(){}
+    SourceLocation loc;
+    void setLocation(SourceLocation l) { loc = l; }
+    SourceLocation getLocation() { return loc; }
+    virtual void accept(ASTVisitor *v);
+
+    virtual CompoundStatement *compoundStatement() { return NULL; }
+    virtual BlockStatement *blockStatement() { return NULL; }
+    virtual ElseStatement *elseStatement() { return NULL; }
+    virtual IfStatement *ifStatement() { return NULL; }
+    virtual LoopStatement *loopStatement() { return NULL; }
+    virtual WhileStatement *whileStatement() { return NULL; }
+    virtual ForStatement *forStatement() { return NULL; }
+    virtual SwitchStatement *switchStatement() { return NULL; }
+};
+
+struct BreakStatement : public Statement
+{
+    BreakStatement(SourceLocation l) : Statement(l) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct ContinueStatement : public Statement
+{
+    ContinueStatement(SourceLocation l) : Statement(l) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+
+struct LabelStatement : public Statement
+{
+    Identifier *identifier;
+    LabelStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct CaseStatement : public Statement
+{
+    std::vector<Expression *> values;
+    CaseStatement(std::vector<Expression*> vals, SourceLocation l = SourceLocation()) :
+        Statement(l), values(vals) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct GotoStatement : Statement
+{
+    Identifier *identifier;
+    GotoStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+// also works like pass. will assign to $ ?
+struct ReturnStatement : public Statement
+{
+    Expression *expression;
+    ReturnStatement(Expression *exp, SourceLocation l) : Statement(l), expression(exp) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+// value of (bool) 0. if 'pass' is encountered, value of pass
+//TODO: probably shouldn't be an expression
+struct CompoundStatement : public Statement
+{
+    //TODO: sym table
+    ASTScope *scope;
+    ASTScope *getScope() { return scope; }
+    std::vector<Statement*> statements;
+    CompoundStatement(ASTScope *sc, std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
+        scope(sc), Statement(l), statements(s) {
+            //if(scope)
+            //    scope->setOwner(this);
+        }
+    virtual CompoundStatement *compoundStatement() { return this; }
+    virtual void accept(ASTVisitor *v);
+};
+
+// value of following expression, or (bool) 1 if not found
+
+struct BlockStatement : public Statement
+{
+    ASTScope *scope;
+    ASTScope *getScope() { return scope; }
+    Statement *body;
+    virtual BlockStatement *blockStatement() { return this; }
+    BlockStatement(ASTScope *sc, Statement *b, SourceLocation l = SourceLocation()) :
+        scope(sc), body(b), Statement(l) {
+            //if(scope)
+            //    scope->setOwner(this);
+        }
+    virtual void accept(ASTVisitor *v);
+};
+
+struct ElseStatement : public BlockStatement
+{
+    ElseStatement(ASTScope *sc, Statement *b, SourceLocation l = SourceLocation()) :
+        BlockStatement(sc, b, l) {}
+    virtual ElseStatement *elseStatement() { return this; }
+    virtual void accept(ASTVisitor *v);
+};
+
+// value of following expression. usually block, with (bool) 0 / (bool) 1 pass
+struct IfStatement : public BlockStatement
+{
+    Expression *condition;
+    ElseStatement *elsebr;
+    virtual IfStatement *ifStatement() { return this; }
+    IfStatement(ASTScope *sc, Expression *c, Statement *b, ElseStatement *e,
+            SourceLocation l = SourceLocation()) :
+        BlockStatement(sc, b, l), condition(c), elsebr(e) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct LoopStatement : public BlockStatement
+{
+    Expression *condition;
+    Statement *update;
+    ElseStatement *elsebr;
+    LoopStatement *loopStatement() { return this; }
+    LoopStatement(ASTScope *sc, Expression *c, Statement *u, Statement *b, ElseStatement *el,
+            SourceLocation l = SourceLocation()) : BlockStatement(sc, b, l), condition(c),
+                                                update(u), elsebr(el) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+// value same as if
+struct WhileStatement : public LoopStatement
+{
+    virtual WhileStatement *whileStatement() { return this; }
+    WhileStatement(ASTScope *sc, Expression *c, Statement *b, ElseStatement *e,
+            SourceLocation l = SourceLocation()) :
+        LoopStatement(sc, c, NULL, b, e, l) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct ForStatement : public LoopStatement
+{
+    Statement *decl;
+    virtual ForStatement *forStatement() { return this; }
+    ForStatement(ASTScope *sc, Statement *d, Expression *c, Statement *u,
+            Statement *b, ElseStatement *e,
+            SourceLocation l = SourceLocation()) : LoopStatement(sc, c, u, b, e, l),
+        decl(d) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+struct SwitchStatement : public BlockStatement
+{
+    Expression *condition;
+    virtual SwitchStatement *switchStatement() { return this; }
+    SwitchStatement(ASTScope *sc, Expression *cond, Statement *b,
+            SourceLocation l = SourceLocation())
+        : BlockStatement(sc, b, l), condition(cond) {}
+    virtual void accept(ASTVisitor *v);
+};
+
+/*
+ * once
+ * {
+ *  DOSTUFF
+ * }; : DOSTUFF will only happen once, on first encounter of the once statement
+ */
+struct OnceStatement : public Statement
+{
+    Statement *stmt;
+    OnceStatement(SourceLocation l) : Statement(l) {}
+};
+
+/***
+ *
  * DECLARATIONS
  *
  ***/
@@ -193,13 +382,12 @@ struct DeclarationQualifier
     }
 };
 
-struct Declaration : public ASTNode
+struct Declaration : public Statement
 {
     Identifier *identifier;
-    SourceLocation loc;
     DeclarationQualifier qualifier;
     Declaration(Identifier *id, SourceLocation l, DeclarationQualifier dqual) :
-        identifier(id), loc(l), qualifier(dqual) {}
+        identifier(id), Statement(l), qualifier(dqual) {}
     virtual ~Declaration(){}
     virtual std::string getName()
     {
@@ -436,197 +624,6 @@ struct UnionDeclaration : public UserTypeDeclaration {
 
 /***
  *
- * STATEMENTS
- *
- ***/
-struct CompoundStatement;
-struct BlockStatement;
-struct ElseStatement;
-struct IfStatement;
-struct LoopStatement;
-struct WhileStatement;
-struct ForStatement;
-struct SwitchStatement;
-
-struct Statement : public ASTNode
-{
-    Statement(SourceLocation l) : loc(l) {}
-    virtual ~Statement(){}
-    SourceLocation loc;
-    void setLocation(SourceLocation l) { loc = l; }
-    SourceLocation getLocation() { return loc; }
-    virtual void accept(ASTVisitor *v);
-
-    virtual CompoundStatement *compoundStatement() { return NULL; }
-    virtual BlockStatement *blockStatement() { return NULL; }
-    virtual ElseStatement *elseStatement() { return NULL; }
-    virtual IfStatement *ifStatement() { return NULL; }
-    virtual LoopStatement *loopStatement() { return NULL; }
-    virtual WhileStatement *whileStatement() { return NULL; }
-    virtual ForStatement *forStatement() { return NULL; }
-    virtual SwitchStatement *switchStatement() { return NULL; }
-};
-
-struct BreakStatement : public Statement
-{
-    BreakStatement(SourceLocation l) : Statement(l) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct ContinueStatement : public Statement
-{
-    ContinueStatement(SourceLocation l) : Statement(l) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-
-struct LabelStatement : public Statement
-{
-    Identifier *identifier;
-    LabelStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct CaseStatement : public Statement
-{
-    std::vector<Expression *> values;
-    CaseStatement(std::vector<Expression*> vals, SourceLocation l = SourceLocation()) :
-        Statement(l), values(vals) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct GotoStatement : Statement
-{
-    Identifier *identifier;
-    GotoStatement(Identifier *id, SourceLocation l) : Statement(l), identifier(id) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct DeclarationStatement : public Statement
-{
-    Declaration *declaration;
-    DeclarationStatement(Declaration *decl, SourceLocation l) : Statement(l), declaration(decl) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-// also works like pass. will assign to $ ?
-struct ReturnStatement : public Statement
-{
-    Expression *expression;
-    ReturnStatement(Expression *exp, SourceLocation l) : Statement(l), expression(exp) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-// value of (bool) 0. if 'pass' is encountered, value of pass
-//TODO: probably shouldn't be an expression
-struct CompoundStatement : public Statement
-{
-    //TODO: sym table
-    ASTScope *scope;
-    ASTScope *getScope() { return scope; }
-    std::vector<Statement*> statements;
-    CompoundStatement(ASTScope *sc, std::vector<Statement*> s, SourceLocation l = SourceLocation()) :
-        scope(sc), Statement(l), statements(s) {
-            //if(scope)
-            //    scope->setOwner(this);
-        }
-    virtual CompoundStatement *compoundStatement() { return this; }
-    virtual void accept(ASTVisitor *v);
-};
-
-// value of following expression, or (bool) 1 if not found
-
-struct BlockStatement : public Statement
-{
-    ASTScope *scope;
-    ASTScope *getScope() { return scope; }
-    Statement *body;
-    virtual BlockStatement *blockStatement() { return this; }
-    BlockStatement(ASTScope *sc, Statement *b, SourceLocation l = SourceLocation()) :
-        scope(sc), body(b), Statement(l) {
-            //if(scope)
-            //    scope->setOwner(this);
-        }
-    virtual void accept(ASTVisitor *v);
-};
-
-struct ElseStatement : public BlockStatement
-{
-    ElseStatement(ASTScope *sc, Statement *b, SourceLocation l = SourceLocation()) :
-        BlockStatement(sc, b, l) {}
-    virtual ElseStatement *elseStatement() { return this; }
-    virtual void accept(ASTVisitor *v);
-};
-
-// value of following expression. usually block, with (bool) 0 / (bool) 1 pass
-struct IfStatement : public BlockStatement
-{
-    Expression *condition;
-    ElseStatement *elsebr;
-    virtual IfStatement *ifStatement() { return this; }
-    IfStatement(ASTScope *sc, Expression *c, Statement *b, ElseStatement *e,
-            SourceLocation l = SourceLocation()) :
-        BlockStatement(sc, b, l), condition(c), elsebr(e) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct LoopStatement : public BlockStatement
-{
-    Expression *condition;
-    Statement *update;
-    ElseStatement *elsebr;
-    LoopStatement *loopStatement() { return this; }
-    LoopStatement(ASTScope *sc, Expression *c, Statement *u, Statement *b, ElseStatement *el,
-            SourceLocation l = SourceLocation()) : BlockStatement(sc, b, l), condition(c),
-                                                update(u), elsebr(el) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-// value same as if
-struct WhileStatement : public LoopStatement
-{
-    virtual WhileStatement *whileStatement() { return this; }
-    WhileStatement(ASTScope *sc, Expression *c, Statement *b, ElseStatement *e,
-            SourceLocation l = SourceLocation()) :
-        LoopStatement(sc, c, NULL, b, e, l) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct ForStatement : public LoopStatement
-{
-    Statement *decl;
-    virtual ForStatement *forStatement() { return this; }
-    ForStatement(ASTScope *sc, Statement *d, Expression *c, Statement *u,
-            Statement *b, ElseStatement *e,
-            SourceLocation l = SourceLocation()) : LoopStatement(sc, c, u, b, e, l),
-        decl(d) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-struct SwitchStatement : public BlockStatement
-{
-    Expression *condition;
-    virtual SwitchStatement *switchStatement() { return this; }
-    SwitchStatement(ASTScope *sc, Expression *cond, Statement *b,
-            SourceLocation l = SourceLocation())
-        : BlockStatement(sc, b, l), condition(cond) {}
-    virtual void accept(ASTVisitor *v);
-};
-
-/*
- * once
- * {
- *  DOSTUFF
- * }; : DOSTUFF will only happen once, on first encounter of the once statement
- */
-struct OnceStatement : public Statement
-{
-    Statement *stmt;
-    OnceStatement(SourceLocation l) : Statement(l) {}
-};
-
-/***
- *
  * EXPRESSIONS
  *
  ***/
@@ -844,8 +841,6 @@ struct BinaryExpression : public Expression
         Expression(lo), lhs(l), rhs(r), op(o) {}
     virtual void accept(ASTVisitor *v);
 
-    virtual Expression *lower();
-
     virtual ASTType *getType() {
         switch(op.kind){
             case tok::equal:
@@ -883,6 +878,8 @@ struct BinaryExpression : public Expression
                 return lhs->getType();
         }
     }
+
+    virtual Expression *lower();
 };
 
 struct PrimaryExpression : public Expression

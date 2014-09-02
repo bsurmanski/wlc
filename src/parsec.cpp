@@ -316,10 +316,12 @@ void parseCImport(TranslationUnit *unit,
     int ofilenm = fileno(stderr);
     int oerr, nerr;
     fflush(stderr);
-    oerr = dup(fileno(stderr));
-    nerr = open("stderr.log", O_WRONLY);
-    dup2(nerr, ofilenm);
-    close(nerr);
+    nerr = open("stderr.log", O_WRONLY | O_CREAT);
+    if(nerr > 0) { // there was no error opening stderr.log
+        oerr = dup(fileno(stderr));
+        dup2(nerr, ofilenm);
+        close(nerr);
+    }
 
     if(access(filenm.c_str(), F_OK) == -1)
     {
@@ -357,8 +359,10 @@ void parseCImport(TranslationUnit *unit,
 
     //popScope();
 
-    // restore stderr
-    fflush(stderr);
-    dup2(oerr, ofilenm);
-    close(oerr);
+    // restore stderr if we changed it earlier (if there was no error opening stderr.log
+    if(nerr > 0) {
+        fflush(stderr);
+        dup2(oerr, ofilenm);
+        close(oerr);
+    }
 }

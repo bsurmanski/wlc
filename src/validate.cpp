@@ -7,7 +7,9 @@
 using namespace std;
 
 //
-// Code for AST traversal, validation, and
+// Code for AST traversal, validation, and lowering
+// if validate returns true, the AST should be in a consistant state, lowered, and ready for codegen;
+// else if validate return false, the AST is invalid, and may be left in an inconsistant state.
 //
 
 //
@@ -316,16 +318,6 @@ void ValidationVisitor::visitGotoStatement(GotoStatement *stmt) {
         valid = false;
         emit_message(msg::ERROR, "goto statement expects following identifier");
     }
-}
-
-void ValidationVisitor::visitDeclarationStatement(DeclarationStatement *stmt) {
-#ifdef DEBUG
-    if(!stmt->declaration) {
-        valid = false;
-        emit_message(msg::ERROR, "null declaration in declaration statement");
-    }
-#endif
-
 }
 
 void ValidationVisitor::visitCompoundStatement(CompoundStatement *stmt) {

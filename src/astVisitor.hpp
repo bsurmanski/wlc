@@ -61,7 +61,6 @@ class ASTVisitor {
     virtual void visitLabelStatement(LabelStatement *stmt){}
     virtual void visitCaseStatement(CaseStatement *stmt){}
     virtual void visitGotoStatement(GotoStatement *stmt){}
-    virtual void visitDeclarationStatement(DeclarationStatement *stmt){}
     virtual void visitReturnStatement(ReturnStatement *stmt){}
 
     virtual void visitCompoundStatement(CompoundStatement *exp){}

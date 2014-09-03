@@ -404,6 +404,7 @@ struct Declaration : public Statement
     }
     bool isExternal() { return qualifier.external; }
     bool isWeak() { return qualifier.weak; }
+    bool isConstant() { return qualifier.isConst; }
     virtual ASTType *getType() = 0;
 
     Identifier *getIdentifier() { return identifier; }
@@ -927,6 +928,10 @@ struct IdentifierExpression : public PrimaryExpression
     }
     bool setLocal(bool b) { local = b; }
     bool isLocal() { return local; }
+    virtual bool isConstant() {
+        return id->getDeclaration() &&
+            id->getDeclaration()->isConstant();
+    }
 };
 
 //struct TypeExpression : public Expression

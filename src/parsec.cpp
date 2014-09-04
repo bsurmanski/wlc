@@ -329,7 +329,7 @@ void parseCImport(TranslationUnit *unit,
     int ofilenm = fileno(stderr);
     int oerr, nerr;
     fflush(stderr);
-    nerr = open("stderr.log", O_WRONLY | O_CREAT);
+    nerr = open("stderr.log", O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
     if(nerr > 0) { // there was no error opening stderr.log
         oerr = dup(fileno(stderr));
         dup2(nerr, ofilenm);

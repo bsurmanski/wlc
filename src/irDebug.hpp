@@ -9,7 +9,7 @@
 #include "irCodegenContext.hpp"
 #include "ast.hpp"
 
-#define CGSTR "wlc 0.11 - Jan 2014 (GGJ)"
+#define CGSTR "wlc 0.21 - Aug 2014 (LD30)"
 #define PROJDIR "/home/brandon/PROJECTS/C/term/wlc"
 
 class IRCodegenContext;

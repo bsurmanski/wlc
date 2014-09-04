@@ -1092,6 +1092,27 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
          // no default value, and allocated class. set VTable, in case
         ASTUserType *uty = ty->asUserType();
 
+        if(ty->isClass()) {
+            ASTValue *vtable = getVTable(val);
+
+            codegenType(uty); // XXX to create typeinfo. So we are able to load it below... hacky
+
+            //the pass through identifier is an ugly hack to get typeinfo in case of duplicate ASTType types, eww
+            Value *tival = codegenLValue(uty->getDeclaration()->classDeclaration()->typeinfo);
+
+            // store vtable
+            vector<Value *> gep;
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            tival = ir->CreateGEP(tival, gep); // GEP to class's vtable, so we can store to it
+
+            ir->CreateStore(tival, codegenLValue(vtable));
+
+            // store zero'd reference count
+            ASTValue *refcount = getMember(val, "refcount");
+            storeValue(refcount, getIntValue(ASTType::getLongTy(), 0));
+        }
+
         //TODO: call parent class constructor
         FunctionDeclaration *fdecl;
         if((fdecl = uty->getConstructor()) && exp->call){
@@ -1110,21 +1131,6 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         //XXX temp below. set vtable of new class
         // TODO: also do if type is pointer to class (called through 'new')
 
-        if(ty->isClass()) {
-            ASTValue *vtable = getVTable(val);
-
-            codegenType(uty); // XXX to create typeinfo. So we are able to load it below... hacky
-
-            //the pass through identifier is an ugly hack to get typeinfo in case of duplicate ASTType types, eww
-            Value *tival = codegenLValue(uty->getDeclaration()->classDeclaration()->typeinfo);
-
-            vector<Value *> gep;
-            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-            tival = ir->CreateGEP(tival, gep); // GEP to class's vtable, so we can store to it
-
-            ir->CreateStore(tival, codegenLValue(vtable));
-        }
     }
 
     return val;

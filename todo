@@ -8,13 +8,7 @@ constant global arrays (int[] i = [1,2,3,4])
 delete, etc should accept qualified identifiers (eg .blocks)
 array 'new' should accept variable length. eg (int[] arr = new int[5 * i])
 
-SDL_BlitSurface doesn't seem to work. (DEFINE macro?)
-
 set member class types and arrays to zero
-
-".vy -= 0.1" error. (values must be same type)
-
-casting of +=, -=
 
 error if member lookup fails (eg .x, but x not in this)
 
@@ -25,3 +19,5 @@ error if member lookup fails (eg .x, but x not in this)
 new Class() sometimes does not work if Class is declared after use
 
 'or' statement does not have short-circuit
+
+destructor call on refcount zero

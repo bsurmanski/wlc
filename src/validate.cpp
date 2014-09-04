@@ -41,6 +41,10 @@ Identifier *ValidationVisitor::resolveIdentifier(Identifier *id) {
                 + string("' in scope"));
     }
 
+    if(id->isExpression()) {
+        id->getExpression()->accept(this);
+    }
+
     return id;
 }
 

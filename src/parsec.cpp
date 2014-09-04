@@ -91,7 +91,7 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
     Identifier *id = unit->getScope()->lookup(name);
 
     UserTypeDeclaration *utdecl = 0;
-    if(!id)
+    if(!id || id->isUndeclared()) //TODO: should just use 'get' above?
     {
         id = unit->getScope()->get(name);
 
@@ -252,27 +252,40 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 
         if(MI->isObjectLike())
         {
-            if(MI->getNumTokens() == 1 && MI->getReplacementToken(0).isLiteral())
+            if(MI->getNumTokens() == 1 && MI->getReplacementToken(0).isLiteral()) // literal value
             {
                 clang::Token tok = MI->getReplacementToken(0);
                 if(tok.getKind() == clang::tok::numeric_constant)
                 {
-
+                    string name = string(clang_getCString(clang_getCursorSpelling(cursor)));
+                    Identifier *id = unit->getScope()->get(name);
+                    if(id->getDeclaration())
+                    {
+                        printf("Macro redefines value, ");
+                        goto MACRO_ERR;
+                    }
+                    NumericExpression *val = new NumericExpression(NumericExpression::DOUBLE,
+                            ASTType::getDoubleTy(), atof(tok.getLiteralData()));
+                    //VariableDeclaration *vdecl = new VariableDeclaration(ASTType::getDoubleTy(),
+                    //        id, val, loc, false);
+                    id->setExpression(val);
+                    //unit->globals.push_back(vdecl);
+                        //printf("MACRO: %s: %f\n", name.c_str(), val->floatValue);
+                } else goto MACRO_ERR;
+            } else if(MI->getNumTokens() == 1 && MI->getReplacementToken(0).isAnyIdentifier()) { // identifier alias
                 string name = string(clang_getCString(clang_getCursorSpelling(cursor)));
-                Identifier *id = unit->getScope()->get(name);
-                if(id->getDeclaration())
+                string alias = string(MI->getReplacementToken(0).getIdentifierInfo()->getName().str());
+
+                Identifier *idName = unit->getScope()->get(name);
+                Identifier *idAlias = unit->getScope()->get(alias);
+                if(idName->getDeclaration())
                 {
-                    printf("Macro redefines value, ");
+                    printf("Macro redefines value");
                     goto MACRO_ERR;
                 }
-                NumericExpression *val = new NumericExpression(NumericExpression::DOUBLE,
-                        ASTType::getDoubleTy(), atof(tok.getLiteralData()));
-                //VariableDeclaration *vdecl = new VariableDeclaration(ASTType::getDoubleTy(),
-                //        id, val, loc, false);
-                id->setExpression(val);
-                //unit->globals.push_back(vdecl);
-                    //printf("MACRO: %s: %f\n", name.c_str(), val->floatValue);
-                } else goto MACRO_ERR;
+
+                IdentifierExpression *val = new IdentifierExpression(idAlias);
+                idName->setExpression(val);
             } else
             {
                 goto MACRO_ERR;

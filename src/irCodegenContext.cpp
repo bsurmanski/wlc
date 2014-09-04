@@ -49,6 +49,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     }
 
     if(userty->identifier->isUndeclared()){ //NOTE superfluous test
+        Identifier *alt = userty->identifier->table->lookup(userty->identifier->getName());
         emit_message(msg::WARNING, "type should be resolved by now");
         userty->identifier = lookup(ty->getName());
         if(userty->identifier->isUndeclared()){

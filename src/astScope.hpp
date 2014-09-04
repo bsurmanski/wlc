@@ -28,7 +28,7 @@ struct ScopeIterator {
     std::map<std::string, Identifier*>::iterator base;
     bool recurse;
 
-    ScopeIterator() : scope(0){}
+    ScopeIterator() : scope(0), base(0){}
     ScopeIterator(ASTScope *sc, Type t, bool rec=false);
     ScopeIterator(ASTScope *sc, std::map<std::string, Identifier*>::iterator b,
             Type t, bool rec=false);

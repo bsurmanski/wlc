@@ -4,7 +4,7 @@
 #include <assert.h>
 
 Identifier::Identifier(ASTScope *ta, std::string s, IDType t) :
-    table(ta), kind(t), name(s), declaration(NULL), astValue(NULL), isMangled(false), expression(0), astType(NULL)
+    table(ta), kind(t), name(s), declaration(NULL), astValue(NULL), ref(NULL), isMangled(false), expression(0), astType(NULL)
 {
     mangled = "";
 }

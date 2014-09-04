@@ -225,6 +225,15 @@ class IRCodegenContext : public CodegenContext
     ASTValue *opShlValue(ASTValue *a, ASTValue *b); // <<
     ASTValue *opShrValue(ASTValue *a, ASTValue *b); // >>
     ASTValue *opPowValue(ASTValue *a, ASTValue *b); // **
+
+    //XXX a bit weird because an expression needs to be passed. this is because ASTValues are
+    // usually evaluated when created and evaluated within a specific basicblock.
+    // unless the ASTValue is LValue, the llvm::Value is not transferable between basic blocks.
+    // since logical OR needs to short circuit, expression B must be evaluated in a secondary basicblock,
+    // which would be bypassed if A is true.
+    // thus, B must not be evaluated before passing to this function.
+    ASTValue *opLOrValue(Expression *a, Expression *b); // or, ||, logical or
+
     ASTValue *opIncValue(ASTValue *a); // a++
     ASTValue *opDecValue(ASTValue *a); // b--
 

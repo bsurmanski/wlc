@@ -19,5 +19,3 @@ error if member lookup fails (eg .x, but x not in this)
 new Class() sometimes does not work if Class is declared after use
 
 'or' statement does not have short-circuit
-
-destructor call on refcount zero

@@ -71,6 +71,7 @@ struct Operator {
     bool isPostfixOp();
     bool isUnaryOp();
     bool isAssignOp();
+    bool isLogicalOp();
     bool isCompoundAssignOp();
 };
 
@@ -82,6 +83,7 @@ int getPostfixPrecidence(tok::TokenKind tkind);
 int getUnaryPrecidence(tok::TokenKind tkind);
 bool isCompoundAssignOp(tok::TokenKind tkind);
 bool isAssignOp(tok::TokenKind tkind);
+bool isLogicalOp(tok::TokenKind tkind);
 tok::TokenKind getCompoundAssignBase(tok::TokenKind tkind);
 
 struct Token

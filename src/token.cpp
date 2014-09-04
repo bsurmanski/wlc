@@ -37,6 +37,10 @@ bool Operator::isCompoundAssignOp() {
     ::isCompoundAssignOp(kind);
 }
 
+bool Operator::isLogicalOp() {
+    ::isLogicalOp(kind);
+}
+
 
 bool isCompoundAssignOp(tok::TokenKind tkind) {
     switch(tkind)
@@ -70,6 +74,18 @@ tok::TokenKind getCompoundAssignBase(tok::TokenKind tkind) {
         case tok::percentequal: return tok::percent;
         default:
             return (tok::TokenKind) 0;
+    }
+}
+
+bool isLogicalOp(tok::TokenKind tkind) {
+    switch(tkind) {
+        case tok::barbar:
+        case tok::kw_or:
+        case tok::ampamp:
+        case tok::kw_and:
+        case tok::bang:
+            return true;
+        default: return false;
     }
 }
 

@@ -746,6 +746,29 @@ ASTValue *IRCodegenContext::opPowValue(ASTValue *a, ASTValue *b){ // **
     emit_message(msg::UNIMPLEMENTED, "unimplemented power operator");
 }
 
+// or, ||, logical or
+ASTValue *IRCodegenContext::opLOrValue(Expression *a, Expression *b) {
+    ASTType *TYPE = ASTType::getBoolTy();
+    ASTValue *aval = promoteType(codegenExpression(a), TYPE);
+
+    BasicBlock *beforeblock = ir->GetInsertBlock();
+    BasicBlock *ortrue = BasicBlock::Create(context, "orend", ir->GetInsertBlock()->getParent());
+    BasicBlock *orfalse = BasicBlock::Create(context, "orfalse", ir->GetInsertBlock()->getParent());
+    Value *val = codegenValue(aval);
+    ir->CreateCondBr(val, ortrue, orfalse);
+    ir->SetInsertPoint(orfalse);
+    ASTValue *bval = promoteType(codegenExpression(b), TYPE);
+    Value *falseVal = codegenValue(bval);
+    ir->CreateBr(ortrue);
+    ir->SetInsertPoint(ortrue);
+
+    PHINode *phiNode = ir->CreatePHI(codegenType(TYPE), 2);
+    phiNode->addIncoming(falseVal, orfalse);
+    phiNode->addIncoming(codegenValue(getIntValue(TYPE, 1)), beforeblock);
+    val = phiNode;
+    return new ASTBasicValue(TYPE, val);
+}
+
 // UNOP ++
 ASTValue *IRCodegenContext::opIncValue(ASTValue *a) {
     if(a->getType()->isFloating()) {
@@ -2050,7 +2073,16 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                     ret = new ASTBasicValue(toType,
                             ir->CreatePointerCast(codegenLValue(val),
                                 codegenType(toType)));
-                } else if(val->getType()->extends(toType)) {
+                }  else if(toType->isBool()) {
+                    // class/reference to boolean
+                    Value *i = ir->CreatePtrToInt(codegenLValue(val),
+                            codegenType(ASTType::getULongTy()));
+
+                    return new ASTBasicValue(ASTType::getBoolTy(),
+                            ir->CreateICmpNE(i,
+                                ConstantInt::get(codegenType(ASTType::getULongTy()), 0)
+                                ));
+                }else if(val->getType()->extends(toType)) {
                     ret = new ASTBasicValue(toType,
                             ir->CreatePointerCast(codegenLValue(val),
                                 codegenType(toType)), false, true);
@@ -2166,8 +2198,16 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         } else emit_message(msg::ERROR, "need to cast to type", exp->loc);
     }
 
-    ASTValue *lhs = codegenExpression(exp->lhs);
-    ASTValue *rhs = codegenExpression(exp->rhs);
+    ASTValue *lhs = NULL;
+    ASTValue *rhs = NULL;
+
+    //TODO: messy. this is here to avoid codegenExpression below (duplicating LHS, RHS values)
+    if(exp->op.kind == tok::kw_or || exp->op.kind == tok::barbar) {
+        return opLOrValue(exp->lhs, exp->rhs);
+    }
+
+    lhs = codegenExpression(exp->lhs);
+    rhs = codegenExpression(exp->rhs);
     //XXX temp. shortcut to allow LValue tuples
     if(exp->op.kind == tok::equal || exp->op.kind == tok::colonequal)
             return codegenAssign(lhs, rhs, exp->op.kind == tok::colonequal);
@@ -2182,7 +2222,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         emit_message(msg::ERROR, "compound assign should be lowered", exp->loc);
     }
 
-    if(!exp->op.isAssignOp()){ //XXX messy
+    if(!exp->op.isAssignOp() && !exp->op.isLogicalOp()){ //XXX messy
         codegenResolveBinaryTypes(&lhs, &rhs, exp->op.kind);
     }
     else if(lhs->getType()->kind == TYPE_ARRAY)
@@ -2211,11 +2251,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         // LOGIC OPS
         case tok::barbar:
         case tok::kw_or:
-            TYPE = ASTType::getBoolTy();
-            lhs = promoteType(lhs, TYPE);
-            rhs = promoteType(rhs, TYPE);
-            val = ir->CreateOr(codegenValue(lhs), codegenValue(rhs));
-            return new ASTBasicValue(TYPE, val);
+            return opLOrValue(exp->lhs, exp->rhs);
         case tok::ampamp:
         case tok::kw_and:
             TYPE = ASTType::getBoolTy();
@@ -2226,19 +2262,16 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
         // BITWISE OPS
         case tok::bar:
-        case tok::barequal:
             val = ir->CreateOr(codegenValue(lhs), codegenValue(rhs));
             retValue = new ASTBasicValue(TYPE, val);
             break;
 
         case tok::caret:
-        case tok::caretequal:
             val = ir->CreateXor(codegenValue(lhs), codegenValue(rhs));
             retValue = new ASTBasicValue(TYPE, val);
             break;
 
         case tok::amp:
-        case tok::ampequal:
             val = ir->CreateAnd(codegenValue(lhs), codegenValue(rhs));
             retValue = new ASTBasicValue(TYPE, val);
             break;
@@ -2258,27 +2291,22 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
                 return opGEValue(lhs, rhs);
         // ARITHMETIC OPS
         case tok::plus:
-        case tok::plusequal:
             retValue = opAddValues(lhs, rhs);
             break;
 
         case tok::minus:
-        case tok::minusequal:
             retValue = opSubValues(lhs, rhs);
             break;
 
         case tok::star:
-        case tok::starequal:
             retValue = opMulValues(lhs, rhs);
             break;
 
         case tok::slash:
-        case tok::slashequal:
             retValue = opDivValues(lhs, rhs);
             break;
 
         case tok::percent:
-        case tok::percentequal:
             retValue = opModValue(lhs, rhs);
             break;
 
@@ -2298,22 +2326,9 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
     }
 
     //XXX remove this when ready
-    if((tok::TokenKind) exp->op.isAssignOp()) //XXX messy
+    if((tok::TokenKind) exp->op.isAssignOp())
     {
         emit_message(msg::ERROR, "this complex assignment operation should already be lowered", exp->loc);
-        if(rhs->getType()->coercesTo(lhs->getType()))
-        {
-            retValue = promoteType(retValue, TYPE); //TODO: merge with decl assign
-        } else if(rhs->getType()->castsTo(lhs->getType()) && exp->op.kind == tok::colonequal) // cast equal
-        {
-            retValue = promoteType(retValue, TYPE);
-        } else
-        {
-            emit_message(msg::ERROR, "cannot assign value of type '" + rhs->getType()->getName() +
-                    "' to type '" + lhs->getType()->getName() + "'", exp->loc);
-            return NULL;
-        }
-        storeValue(lhs, retValue);
     }
 
     return retValue;

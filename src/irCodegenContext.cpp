@@ -769,6 +769,30 @@ ASTValue *IRCodegenContext::opLOrValue(Expression *a, Expression *b) {
     return new ASTBasicValue(TYPE, val);
 }
 
+// and, &&, logical and
+ASTValue *IRCodegenContext::opLAndValue(Expression *a, Expression *b) {
+    // same deal as logical Or above
+    ASTType *TYPE = ASTType::getBoolTy();
+    ASTValue *aval = promoteType(codegenExpression(a), TYPE);
+
+    BasicBlock *beforeblock = ir->GetInsertBlock();
+    BasicBlock *andend = BasicBlock::Create(context, "andend", ir->GetInsertBlock()->getParent());
+    BasicBlock *andtrue = BasicBlock::Create(context, "andtrue", ir->GetInsertBlock()->getParent());
+    Value *val = codegenValue(aval);
+    ir->CreateCondBr(val, andtrue, andend);
+    ir->SetInsertPoint(andtrue);
+    ASTValue *bval = promoteType(codegenExpression(b), TYPE);
+    Value *trueVal = codegenValue(bval);
+    ir->CreateBr(andend);
+    ir->SetInsertPoint(andend);
+
+    PHINode *phiNode = ir->CreatePHI(codegenType(TYPE), 2);
+    phiNode->addIncoming(trueVal, andtrue);
+    phiNode->addIncoming(codegenValue(getIntValue(TYPE, 0)), beforeblock);
+    val = phiNode;
+    return new ASTBasicValue(TYPE, val);
+}
+
 // UNOP ++
 ASTValue *IRCodegenContext::opIncValue(ASTValue *a) {
     if(a->getType()->isFloating()) {
@@ -2206,6 +2230,11 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         return opLOrValue(exp->lhs, exp->rhs);
     }
 
+    //XXX same as above
+    if(exp->op.kind == tok::kw_and || exp->op.kind == tok::ampamp) {
+        return opLAndValue(exp->lhs, exp->rhs);
+    }
+
     lhs = codegenExpression(exp->lhs);
     rhs = codegenExpression(exp->rhs);
     //XXX temp. shortcut to allow LValue tuples
@@ -2251,14 +2280,10 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         // LOGIC OPS
         case tok::barbar:
         case tok::kw_or:
-            return opLOrValue(exp->lhs, exp->rhs);
+            return opLOrValue(exp->lhs, exp->rhs); //XXX not used right now, bypassed near top of function (before expression codegen)
         case tok::ampamp:
         case tok::kw_and:
-            TYPE = ASTType::getBoolTy();
-            lhs = promoteType(lhs, TYPE);
-            rhs = promoteType(rhs, TYPE);
-            val = ir->CreateAnd(codegenValue(lhs), codegenValue(rhs));
-            return new ASTBasicValue(TYPE, val);
+            return opLAndValue(exp->lhs, exp->rhs); //XXX ditto
 
         // BITWISE OPS
         case tok::bar:

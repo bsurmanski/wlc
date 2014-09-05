@@ -233,6 +233,8 @@ class IRCodegenContext : public CodegenContext
     // which would be bypassed if A is true.
     // thus, B must not be evaluated before passing to this function.
     ASTValue *opLOrValue(Expression *a, Expression *b); // or, ||, logical or
+    // same deal with logical and
+    ASTValue *opLAndValue(Expression *a, Expression *b); // and, &&, logical and
 
     ASTValue *opIncValue(ASTValue *a); // a++
     ASTValue *opDecValue(ASTValue *a); // b--

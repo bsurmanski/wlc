@@ -16,5 +16,11 @@ int main(int argc, char^^ argv)
     } else {
         printf("false branch\n")
     }
+
+    if(cl and cl.i) {
+        printf("cli %d\n", cl.i)
+    } else {
+        printf("cl or i does not exist\n");
+    }
     return 0
 }

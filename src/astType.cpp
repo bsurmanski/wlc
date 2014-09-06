@@ -246,7 +246,6 @@ bool ASTUserType::is(ASTType *t) {
     if(ASTUserType *uty = t->asUserType()) {
         return getDeclaration() == t->getDeclaration();
     }
-
 }
 
 bool ASTUserType::extends(ASTType *t) {

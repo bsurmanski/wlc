@@ -181,3 +181,18 @@ class MyClass(T) {
 with instanciation as:
 
 MyClass#int classVariable; ...
+
+#######
+
+function/variable attribute which zeros variables after finished.
+used for crypto code. eg.
+
+    secure int getMagicKey(int val) {
+        char[32] buf
+        int ret
+        ... // use buf to calcuate ret
+        return ret
+    }
+
+buf would be zeroed out before return
+https://news.ycombinator.com/item?id=8277928

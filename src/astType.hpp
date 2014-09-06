@@ -277,7 +277,7 @@ struct ASTType
     virtual ASTUserType *asUnion() { return NULL; }
     virtual ASTUserType *asStruct() { return NULL; }
     virtual ASTPointerType *asPointer() { return NULL; }
-    virtual bool is(ASTType *t) { return this == t; }
+    virtual bool is(ASTType *t) { return this == t; } // NOTE: only valid for basic type, where type is statically defined
     virtual bool extends(ASTType *t) { return false; }
 
 
@@ -365,6 +365,18 @@ struct ASTFunctionType : public ASTCompositeType {
     ASTType *getReturnType() { return ret; }
 
     virtual ASTFunctionType *functionType() { return this; }
+
+    virtual bool is(ASTType *t) {
+        if(ASTFunctionType *oth = dynamic_cast<ASTFunctionType*>(t)) {
+            if(!getReturnType()->is(oth->getReturnType()) ||
+                    params.size() != oth->params.size()) return false;
+            for(int i = 0; i < params.size(); i++) {
+                if(!params[i]->is(oth->params[i])) return false;
+            }
+            return true;
+        }
+        return false;
+    }
 };
 
 struct UserTypeDeclaration;
@@ -474,6 +486,20 @@ struct ASTTupleType : public ASTCompositeType {
         return mangle;
     }
 
+    virtual bool is(ASTType *t) {
+        if(ASTTupleType *oth = dynamic_cast<ASTTupleType*>(t)) {
+            if(types.size() == oth->types.size()) {
+                for(int i = 0; i < types.size(); i++) {
+                    if(!types[i]->is(oth->types[i])) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
     ASTTupleType(std::vector<ASTType*> t) : ASTCompositeType(TYPE_TUPLE), types(t) {}
 };
 
@@ -484,6 +510,12 @@ struct ASTPointerType : public ASTType {
     virtual ASTPointerType *asPointer() { return this; }
     virtual std::string getName();
     virtual std::string getMangledName();
+    virtual bool is(ASTType *t) {
+        if(ASTPointerType *oth = dynamic_cast<ASTPointerType*>(t)) {
+            return ptrTo->is(oth->ptrTo);
+        }
+        return false;
+    }
 };
 
 struct ASTArrayType : public ASTCompositeType {

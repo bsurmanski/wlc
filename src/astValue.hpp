@@ -68,41 +68,57 @@ struct TypeValue : ASTValue {
     virtual TypeValue *asTypeValue() { return this; }
 };
 
-// TODO: use polymorphic values(?)
-
 struct TupleValue : public ASTValue
 {
-    TupleExpression *tuple;
+    //TupleExpression *tuple;
+    ASTCompositeType *type;
+    std::vector<ASTValue*> values;
 
+    /*
     TupleValue(TupleExpression *texp) : ASTValue(NULL),
     tuple(texp)
-    {}
+    {} */
+    TupleValue(std::vector<ASTValue*> vals) : values(vals), ASTValue(NULL), type(NULL) {}
+
 
     virtual bool isLValue() {
-        for(int i = 0; i < tuple->members.size(); i++) {
-            if(!tuple->members[i]->isLValue())
+        for(int i = 0; i < values.size(); i++) {
+            if(!values[i]->isLValue())
                 return false;
         }
         return true;
     }
 
     virtual bool isConstant() {
-        for(int i = 0; i < tuple->members.size(); i++) {
-            if(!tuple->members[i]->isConstant())
+        for(int i = 0; i < values.size(); i++) {
+            if(!values[i]->isConstant())
                 return false;
         }
         return true;
     }
 
+    void setType(ASTCompositeType *ty) {
+        type = ty;
+    }
+
     virtual ASTType *getType() {
-        return tuple->getType();
+        std::vector<ASTType*> tupty;
+
+        if(type) return type;
+
+        for(int i = 0; i < values.size(); i++) {
+            tupty.push_back(values[i]->getType());
+        }
+
+        type = (ASTTupleType*) ASTType::getTupleTy(tupty);
+        return type;
     }
     virtual bool isReference() { return false; }
 };
 
 struct FunctionValue : public ASTValue {
     FunctionDeclaration *declaration;
-    FunctionValue(FunctionDeclaration *fdecl=NULL) : declaration(fdecl) {
+    FunctionValue(FunctionDeclaration *fdecl=NULL) : ASTValue(NULL), declaration(fdecl) {
 
     }
 

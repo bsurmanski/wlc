@@ -14,6 +14,8 @@ error if member lookup fails (eg .x, but x not in this)
 
 //cannot call function on returned struct eg (getStruct().doStuff()) where the prototype is "MyStruct GetStruct()"
 
-'struct = Struct()' expression is still a bit silly
+'myclass = Class()' expression is still a bit silly
 
 new Class() sometimes does not work if Class is declared after use
+
+null all class-typed members before constructor

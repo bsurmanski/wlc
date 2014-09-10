@@ -152,6 +152,14 @@ CONTINUE:;
     }
 }
 
+ASTType *TupleExpression::getType() {
+    std::vector<ASTType*> tupty;
+    for(int i = 0; i < members.size(); i++) {
+        tupty.push_back(members[i]->getType());
+    }
+    return ASTType::getTupleTy(tupty);
+}
+
 /*
 FunctionDeclaration *UserTypeDeclaration::getDefaultConstructor(){
     Identifier *id = getScope()->lookup("this");

@@ -174,6 +174,7 @@ class IRCodegenContext : public CodegenContext
     // codegen value
     llvm::Value *codegenMethod(MethodValue *method);
     llvm::Value *codegenFunction(FunctionValue *method);
+    llvm::Value *codegenTuple(TupleValue *tuple, ASTType *target=0);
 
     llvm::Value *codegenValue(ASTValue *v);
     llvm::Value *codegenLValue(ASTValue *v);
@@ -250,7 +251,7 @@ class IRCodegenContext : public CodegenContext
 
     // expression
     ASTValue *codegenExpression(Expression *exp);
-    ASTValue *codegenTupleExpression(TupleExpression *exp, ASTType *ty = 0);
+    ASTValue *codegenTupleExpression(TupleExpression *exp, ASTCompositeType *ty = 0);
 
     void codegenDelete(ASTValue *val);
     ASTValue *codegenNewExpression(NewExpression *exp);

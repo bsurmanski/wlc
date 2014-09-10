@@ -315,6 +315,7 @@ struct ASTCompositeType : public ASTType {
     ASTCompositeType(ASTTypeEnum k) : ASTType(k) {}
     virtual ASTType *getMemberType(size_t i) = 0;
     virtual ASTCompositeType *asCompositeType() { return this; }
+    virtual size_t length() = 0;
 };
 
 struct ASTFunctionType : public ASTCompositeType {
@@ -329,6 +330,7 @@ struct ASTFunctionType : public ASTCompositeType {
     ASTFunctionType(ASTUserType *own, ASTType *r, std::vector<ASTType *> p, bool va = false) :
         ret(r), params(p), vararg(va), ASTCompositeType(TYPE_FUNCTION), owner(own) {}
 
+    virtual size_t length() { return params.size(); }
     virtual ASTFunctionType *asFunctionType() { return this; }
     bool isVararg() { return vararg; }
     bool isMethod() { return owner; }

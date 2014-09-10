@@ -198,8 +198,8 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
         tupleVec.push_back(codegenType(tupty->types[i]));
     }
 
-    StructType *tty = StructType::create(context);
-    tty->setBody(tupleVec);
+    StructType *tty = StructType::get(context, tupleVec);
+    //tty->setBody(tupleVec);
     ty->cgType = tty;
     unit->debug->createType(ty); // TODO
     return tty;
@@ -371,6 +371,13 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
         return codegenFunction(fvalue);
     }
 
+    if(TupleValue *tvalue = dynamic_cast<TupleValue*>(value)) {
+        //return ir->CreateLoad(codegenTuple(tvalue));
+        return codegenTuple(tvalue);
+    }
+
+    //XXX tuple value
+
     if(!value->value) {
         //TODO
         emit_message(msg::FAILURE, "AST Value failed to generate");
@@ -388,6 +395,11 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 
 llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
 {
+    //XXX duplicate messy code
+    if(TupleValue *tvalue = dynamic_cast<TupleValue*>(value)) {
+        return codegenTuple(tvalue);
+    }
+
     if(!value->isLValue() && !value->isReference())
     {
         emit_message(msg::FATAL, "rvalue used in lvalue context!");
@@ -462,6 +474,7 @@ ASTValue *IRCodegenContext::getStringValue(std::string str) {
     Constant *strConstant = ConstantDataArray::getString(context, str);
     GlobalVariable *GV = new GlobalVariable(*module, strConstant->getType(), true,
             GlobalValue::PrivateLinkage, strConstant);
+
     vector<Value *> gep;
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
@@ -469,17 +482,26 @@ ASTValue *IRCodegenContext::getStringValue(std::string str) {
 
     //TODO: make this an ARRAY (when arrays are added), so that it has an associated length
 
-    return new ASTBasicValue(ASTType::getCharTy()->getPointerTy(), val);
+    // plus one for null
+    // XXX probably need to fix this, or else certain expressions will give invalid length
+    //ASTBasicValue *ret = new ASTBasicValue(ASTType::getCharTy()->getArrayTy(str.length()+1), val, true);
+    ASTBasicValue *ret = new ASTBasicValue(ASTType::getCharTy()->getPointerTy(), val);
+    ret->setConstant(true);
+    return ret;
 }
 
 ASTValue *IRCodegenContext::getFloatValue(ASTType *t, float i){
     //TODO: constant cache -256-255
-    return new ASTBasicValue(t, ConstantFP::get(codegenType(t), i));
+    ASTBasicValue *val = new ASTBasicValue(t, ConstantFP::get(codegenType(t), i));
+    val->setConstant(true);
+    return val;
 }
 
 ASTValue *IRCodegenContext::getIntValue(ASTType *t, int i){
     //TODO: constant cache -256-255
-    return new ASTBasicValue(t, ConstantInt::get(codegenType(t), i));
+    ASTBasicValue *val = new ASTBasicValue(t, ConstantInt::get(codegenType(t), i));
+    val->setConstant(true);
+    return val;
 }
 
 ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
@@ -520,6 +542,90 @@ llvm::Value *IRCodegenContext::codegenFunction(FunctionValue *function) {
                 (FunctionType*) codegenType(function->getDeclaration()->getType())
             );
     return fconst;
+}
+
+llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) {
+    ASTCompositeType* ty;
+    if(!target) target = tuple->getType();
+    ty = dynamic_cast<ASTCompositeType*>(target);
+
+    std::vector<ASTValue*> vals;
+    std::vector<ASTType*> types;
+    bool lvalue = true;
+    bool isConst = true;
+
+    // cannot simply allocate dynamic array type. create static array instead. Then it is
+    // simple to convert static array (later on) to dynamic array by bounding it in the relevent struct.
+    bool dyarray = false;
+    ASTDynamicArrayType *dyarrayTy;
+    if(ASTDynamicArrayType *daty = dynamic_cast<ASTDynamicArrayType*>(ty)) {
+        dyarrayTy = daty;
+        ty = (ASTCompositeType*) daty->getMemberType(0)->getArrayTy(tuple->values.size());
+        dyarray = true;
+    }
+
+    for(int i = 0; i < tuple->values.size(); i++)
+    {
+        //if(i >= ty->length()) emit_message(msg::FAILURE, "unexpected tuple expression length");
+        ASTValue *val = tuple->values[i];
+        val = promoteType(val, ty->getMemberType(i));
+
+        vals.push_back(val);
+        types.push_back(val->getType());
+
+        if(!val->isLValue()) lvalue = false;
+        if(!val->isConstant()) isConst = false;
+    }
+
+
+    Type *llty = codegenType(ty);
+
+    Value *ret;
+    // tuple is a constant; can optimize tuple as constant global
+    if(isConst)
+    {
+        std::vector<Constant*> llvals;
+        for(int i = 0; i < vals.size(); i++)
+        {
+            llvals.push_back((Constant*) codegenValue(vals[i]));
+        }
+
+        Constant *llconst = NULL;
+        if(dynamic_cast<ASTArrayType*>(ty)) {
+            llconst = ConstantArray::get((ArrayType*)llty, llvals);
+        } else {
+            llconst = ConstantStruct::get((StructType*)llty, llvals);
+        }
+
+
+        if(dyarray) {
+            GlobalVariable *GV = new GlobalVariable(*module, llty, true,
+                    GlobalValue::PrivateLinkage,
+                    llconst);
+            GV->setConstant(false);
+
+            std::vector<Constant*> gep;
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            std::vector<Constant*> vals;
+            vals.push_back(ConstantExpr::getGetElementPtr(GV, gep));
+            vals.push_back(ConstantInt::get(codegenType(ASTType::getLongTy()), tuple->values.size()));
+            Constant *st = ConstantStruct::get((StructType*) codegenType(dyarrayTy), vals);
+            //GlobalVariable *DGV = new GlobalVariable(*module, codegenType(dyarrayTy), true,
+            //        GlobalValue::PrivateLinkage, st);
+            return st;
+        }
+
+        return llconst;
+    } else {
+        // alloca, and store all values into a struct type
+        Value *val = ir->CreateAlloca(llty);
+        for(int i = 0; i < vals.size(); i++) {
+            ir->CreateStore(codegenValue(vals[i]), ir->CreateStructGEP(val, i));
+        }
+
+        return ir->CreateLoad(val);
+    }
 }
 
 ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
@@ -600,6 +706,7 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
     if(!val->getType()) {
         emit_message(msg::ERROR, "member '" + member + "' not found in class");
     }
+
 
     if(val->getType()->isPointer())
         val = getValueOf(val);
@@ -1031,23 +1138,22 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     return NULL; //TODO
 }
 
-ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType *ty)
+ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTCompositeType *ty)
 {
     //XXX codegen tuple
+    /*
     std::vector<ASTValue*> vals;
     std::vector<ASTType*> types;
     bool lvalue = true;
     bool isConst = true;
-    ASTCompositeType* compty = 0;
-    if(ty)
-        compty = ty->asCompositeType();
+    if(!ty) ty = dynamic_cast<ASTCompositeType*>(exp->getType());
+    if(!ty) emit_message(msg::FAILURE, "could not get type of tuple expression", exp->loc);
 
     for(int i = 0; i < exp->members.size(); i++)
     {
+        if(i >= ty->length()) emit_message(msg::FAILURE, "unexpected tuple expression length", exp->loc);
         ASTValue *val = codegenExpression(exp->members[i]);
-
-        if(compty)
-            val = promoteType(val, compty->getMemberType(i));
+        val = promoteType(val, ty->getMemberType(i));
 
         vals.push_back(val);
         types.push_back(val->getType());
@@ -1057,7 +1163,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
     }
 
     ASTTupleType *tupty = new ASTTupleType(types);
-    StructType *llty = (StructType*) codegenType(tupty);
+    Type *llty = codegenType(tupty);
 
     // tuple is a constant; can optimize tuple as constant global
     if(isConst)
@@ -1068,14 +1174,17 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
             llvals.push_back((Constant*) codegenValue(vals[i]));
         }
 
+        Constant *llconst = NULL;
+        if(dynamic_cast<ASTArrayType*>(ty)) {
+            llconst = ConstantArray::get((ArrayType*)llty, llvals);
+        } else {
+            llconst = ConstantStruct::get((StructType*)llty, llvals);
+        }
+
         GlobalVariable *GV = new GlobalVariable(*module, llty, true,
                 GlobalValue::PrivateLinkage,
-                ConstantStruct::get(llty, llvals));
+                llconst);
 
-        //vector<Value *> gep;
-        //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        //Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
         return new ASTBasicValue(tupty, GV, true);
     } else {
         // alloca, and store all values into a struct type
@@ -1086,6 +1195,14 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTType
 
         return new ASTBasicValue(tupty, val, true);
     }
+    */
+
+    std::vector<ASTValue*> vals;
+    for(int i = 0; i < exp->members.size(); i++) {
+        vals.push_back(codegenExpression(exp->members[i]));
+    }
+
+    return new TupleValue(vals);
 }
 
 ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
@@ -1882,31 +1999,31 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 
 ASTValue *IRCodegenContext::promoteInt(ASTValue *val, ASTType *toType)
 {
+    ASTBasicValue *ret = NULL;
     if(toType->isBool())
     {
         ASTBasicValue zero(val->getType(), ConstantInt::get(codegenType(val->getType()), 0));
-        return new ASTBasicValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(val),
+        ret = new ASTBasicValue(ASTType::getBoolTy(), ir->CreateICmpNE(codegenValue(val),
                     codegenValue(&zero)));
-    }
-
-    if(toType->isInteger())
+    } else if(toType->isInteger())
     {
-        return new ASTBasicValue(toType, ir->CreateIntCast(codegenValue(val),
+        ret = new ASTBasicValue(toType, ir->CreateIntCast(codegenValue(val),
                     codegenType(toType), val->getType()->isSigned()));
-    }
-    if(toType->isPointer())
+    } else if(toType->isPointer())
     {
-        return new ASTBasicValue(toType, ir->CreateIntToPtr(codegenValue(val), codegenType(toType)));
-    }
-
-    if(toType->isFloating())
+        ret = new ASTBasicValue(toType, ir->CreateIntToPtr(codegenValue(val), codegenType(toType)));
+    } else if(toType->isFloating())
     {
-        if(val->getType()->isSigned())
-        return new ASTBasicValue(toType, ir->CreateSIToFP(codegenValue(val),
-                    codegenType(toType)), false);
-        return new ASTBasicValue(toType, ir->CreateUIToFP(codegenValue(val),
-                    codegenType(toType)), false);
+        if(val->getType()->isSigned()) {
+            ret = new ASTBasicValue(toType, ir->CreateSIToFP(codegenValue(val),
+                        codegenType(toType)), false);
+        } else {
+            ret = new ASTBasicValue(toType, ir->CreateUIToFP(codegenValue(val),
+                        codegenType(toType)), false);
+        }
     }
+    if(val->isConstant()) ret->setConstant(true);
+    return ret;
 }
 
 ASTValue *IRCodegenContext::promoteFloat(ASTValue *val, ASTType *toType)
@@ -1955,6 +2072,13 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
 
 ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
 {
+    TupleValue *tupval = dynamic_cast<TupleValue*>(val);
+    ASTCompositeType *compty = dynamic_cast<ASTCompositeType*>(toType);
+    if(!tupval) emit_message(msg::FAILURE, "promoting invalid value to tuple");
+    if(!compty) emit_message(msg::FAILURE, "promoting tuple to invalid type");
+    tupval->setType(compty);
+    return tupval;
+    /*
     if(toType->isStruct())
     {
         if(((ASTTupleType*) val->getType())->types.size() ==
@@ -2026,7 +2150,7 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
         }
 
         return new ASTBasicValue(toType, arr, true);
-    }
+    }*/
 }
 
 ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
@@ -2150,15 +2274,14 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
     {
         if(TupleValue *trhs = dynamic_cast<TupleValue*>(rhs))
         {
-            if(tlhs->tuple->members.size() > trhs->tuple->members.size())
+            if(tlhs->values.size() > trhs->values.size())
             {
                 emit_message(msg::ERROR, "tuple assignment requires compatible tuple types");
                 return NULL;
             }
-            for(int i = 0; i < tlhs->tuple->members.size(); i++)
+            for(int i = 0; i < tlhs->values.size(); i++)
             {
-                codegenAssign(codegenExpression(tlhs->tuple->members[i]),
-                        codegenExpression(trhs->tuple->members[i]));
+                codegenAssign(tlhs->values[i], trhs->values[i]);
             }
         } else {
             emit_message(msg::ERROR, "tuple assignment requires a tuple on rhs");
@@ -2491,7 +2614,7 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         TupleExpression *texp = dynamic_cast<TupleExpression*>(vdecl->value);
         if(vty && vty->isComposite() && texp)
         {
-            defaultValue = codegenTupleExpression(texp, vty);
+            defaultValue = codegenTupleExpression(texp, dynamic_cast<ASTCompositeType*>(vty));
         } else { // not composite vty
             defaultValue = codegenExpression(vdecl->value);
         }
@@ -2750,9 +2873,12 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
                 gValue = NULL;
             } else if(vdecl->value)
             {
-                gValue = (llvm::Constant*) codegenValue(
-                            promoteType(codegenExpression(vdecl->value), idTy)
-                            );
+                if(!vdecl->value->isConstant()) {
+                    emit_message(msg::ERROR, "global value initializer must be constant", vdecl->value->loc);
+                }
+
+                ASTValue *defaultValue = codegenExpression(vdecl->value);
+                gValue = (llvm::Constant*) codegenValue(promoteType(defaultValue, idTy));
             } else
             {
                 gValue = (llvm::Constant*) llvm::Constant::getNullValue(codegenType(idTy));

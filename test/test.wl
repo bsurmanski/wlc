@@ -10,8 +10,7 @@ SDL_Surface^ surf = null
 SDL_Surface^ back = null
 void^ testval
 
-//int[] constarray = [1,2,3]
-//TODO
+int[] constarray = [1,2,3]
 
 struct SomeStruct
 {
@@ -94,7 +93,7 @@ void^ somefunc()
     return [124, 55]
 }
 
-//int[5] statArr = [1,2,3,4,5]
+int[5] statArr = [1,2,3,4,5]
 int main(int argc, char^^ argv)
 {
     surf = SDL_SetVideoMode(320, 240, 0, SDL_SWSURFACE)
@@ -148,7 +147,6 @@ int main(int argc, char^^ argv)
     darr[1],
     darr[2],
     darr[3],
-    darr[4],
     );
 
     int[] newarr = new int[5]

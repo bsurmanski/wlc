@@ -1,16 +1,18 @@
-/*
-use "importc"
-
-import(C) "/usr/include/SDL/SDL.h"
-import(C) "/usr/include/stdlib.h"
-import(C) "/usr/include/stdio.h"
-import(C) "/usr/include/math.h"
-*/
-
 extern undecorated int printf(char^ fmt, ...);
 extern undecorated float sinf(float f);
 
-char^[] strings = ["hello", "goodbye", "hithere", "thats all folks"]
+//char^[] strings = ["hello", "goodbye", "hithere", "thats all folks"]
+
+int[] vals = [1, 2, 3, 4]
+int[5] vals2 = [1,2,3,4,5]
+
+void arrayFunc() {
+    int[] arr = [1,2,3]
+    for(int i = 0; i < arr.size; i++) {
+        printf("arr%d: %d\n", i, arr[i])
+    }
+    arr[0] = 11
+}
 
 int main(int argc, char^^ argv)
 {
@@ -26,9 +28,21 @@ int main(int argc, char^^ argv)
     int[] arr
     arr = new int[10]
 
-    for(int j = 0; j < strings.size; j++) {
-        printf(strings[j])
+    int[] funcvals = [3,2,1]
+
+    for(int j = 0; j < funcvals.size; j++) {
+        printf("%d\n", funcvals[j])
     }
+
+    printf("%d\n", vals[0])
+    vals[0] = 5
+
+    for(int j = 0; j < vals.size; j++) {
+        printf("%d\n", vals[j])
+    }
+
+    arrayFunc()
+    arrayFunc()
 
     return 0
 }

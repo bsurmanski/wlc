@@ -1260,14 +1260,26 @@ Expression *ParseContext::parseUnaryExpression(int prec)
 Expression *ParseContext::parseIdentifierExpression()
 {
     SourceLocation loc = peek().loc;
-    if(peek().isNot(tok::identifier) && peek().isNot(tok::kw_this))
+    bool local = false;
+
+    if(peek().isNot(tok::identifier) && peek().isNot(tok::kw_this) && peek().isNot(tok::dot))
     {
         emit_message(msg::ERROR, "expected identifier expression", loc);
         return NULL;
     }
 
+    // XXX dispite looking like a unary operator, unary dot is actually parsed here
+    // this is because otherwise the recursive descent would fail on statements like
+    // .v[0]
+    if(peek().is(tok::dot)) {
+        ignore();
+        local = true;
+    }
+
     Identifier *id = getScope()->get(get().toString());
-    return new IdentifierExpression(id, loc);
+    IdentifierExpression *ret = new IdentifierExpression(id, loc);
+    ret->setLocal(local);
+    return ret;
 }
 
 Expression *ParseContext::parsePrimaryExpression()
@@ -1337,24 +1349,8 @@ Expression *ParseContext::parsePrimaryExpression()
     }
 
     if(peek().is(tok::identifier) || peek().is(kw_this) || peek().is(tok::dot)) {
-        bool local = false;
-
-        // XXX dispite looking like a unary operator, unary dot is actually parsed here
-        // this is because otherwise the recursive descent would fail on statements like
-        // .v[0]
-        if(peek().is(tok::dot)) {
-            ignore();
-            local = true;
-        }
-
-        if(peek().is(tok::identifier) || peek().is(kw_this))
-        {
-            //TODO: in statement like "MyStruct[].sizeof", this will fail
-            IdentifierExpression *iexp = (IdentifierExpression*) parseIdentifierExpression();
-            iexp->setLocal(local);
-            return iexp;
-        }
-        emit_message(msg::FAILURE, "unreachable");
+        //TODO: in statement like "MyStruct[].sizeof", this will fail
+        return parseIdentifierExpression();
     }
 
     if(peek().isKeywordType())

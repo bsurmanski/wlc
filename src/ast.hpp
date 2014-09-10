@@ -739,7 +739,14 @@ struct TupleExpression : public Expression
         return ret;
     }
 
-    virtual ASTType *getType() { return NULL; } // XXX TODO
+    virtual bool isConstant() {
+        for(int i = 0; i < members.size(); i++) {
+            if(!members[i]->isConstant()) return false;
+        }
+        return true;
+    }
+
+    virtual ASTType *getType();
     TupleExpression(std::vector<Expression*> e, SourceLocation l = SourceLocation()) :
         Expression(l), members(e) {}
     virtual TupleExpression *tupleExpression() { return this; }

@@ -104,14 +104,20 @@ ASTType *ParseContext::parseType()
             type = ASTType::getVoidTy(); break;
         case tok::lbracket:
             // lbracket already got
-            while(peek().isNot(tok::rbracket))
+            while(true) //break below
             {
                 ASTType *tupleMember = parseType();
                 if(!tupleMember) {
-                    emit_message(msg::ERROR, "expected subtype while parsing tuple type", peek().loc);
+                    return NULL; //this is (probably) not a type, it is an expression
+                    //emit_message(msg::ERROR, "expected subtype while parsing tuple type", peek().loc);
                 }
                 tupleTypes.push_back(tupleMember);
+                if(peek().is(tok::rbracket)) break;
                 if(peek().is(tok::comma)) ignore();
+                else {
+                    emit_message(msg::ERROR, "expected comma in tuple type/expression", peek().loc);
+                    return NULL;
+                }
             }
             ignore(); // eat ]
 

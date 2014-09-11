@@ -376,8 +376,6 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
         return codegenTuple(tvalue);
     }
 
-    //XXX tuple value
-
     if(!value->value) {
         //TODO
         emit_message(msg::FAILURE, "AST Value failed to generate");
@@ -995,6 +993,109 @@ ASTValue *IRCodegenContext::opGEValue(ASTValue *a, ASTValue *b){  // >=
     } else {
         return new ASTBasicValue(ASTType::getBoolTy(),
                 ir->CreateICmpUGE(codegenValue(a), codegenValue(b)));
+    }
+}
+
+ASTValue *IRCodegenContext::opIndexDArray(ASTValue *arr, ASTValue *idx) {
+    ASTType *indexedType = arr->getType()->getPointerElementTy();
+    Value *val = ir->CreateStructGEP(codegenLValue(arr), 0);
+    val = ir->CreateLoad(val);
+    val = ir->CreateInBoundsGEP(val, codegenValue(idx));
+    val = ir->CreateBitCast(val, codegenType(indexedType->getPointerTy()));
+    return new ASTBasicValue(indexedType, val, true);
+}
+
+ASTValue *IRCodegenContext::opIndexSArray(ASTValue *arr, ASTValue *idx) {
+    ASTType *indexedType = arr->getType()->getPointerElementTy();
+    std::vector<Value*> gep;
+    gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
+    gep.push_back(codegenValue(idx));
+    Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
+    return new ASTBasicValue(indexedType, val, true);
+}
+
+ASTValue *IRCodegenContext::opIndexPointer(ASTValue *ptr, ASTValue *idx) {
+    //TODO: index array
+    ASTType *indexedType = ptr->getType()->getPointerElementTy();
+    Value *val = ir->CreateInBoundsGEP(codegenValue(ptr), codegenValue(idx));
+    return new ASTBasicValue(indexedType, val, true);
+}
+
+// b must be constant int
+ASTValue *IRCodegenContext::opIndexTuple(ASTValue *tup, ASTValue *idx) {
+    if(ConstantInt *llci = dynamic_cast<ConstantInt*>(codegenValue(idx)))
+    {
+        ASTTupleType *tupty = (ASTTupleType*) dynamic_cast<ASTTupleType*>(tup->getType());
+        unsigned long long index = llci->getZExtValue();
+        if(tupty->types.size() <= index)
+        {
+            emit_message(msg::ERROR, "invalid tuple index");
+            return NULL;
+        }
+        ASTType *type = tupty->types[index];
+        Value *val = ir->CreateStructGEP(codegenLValue(tup), index);
+        return new ASTBasicValue(type, val, true);
+    } else
+    {
+        emit_message(msg::ERROR, "tuples can only be indexed with\
+                constant integers, due to static typing");
+        return NULL;
+    }
+}
+
+ASTValue *IRCodegenContext::opIndex(ASTValue *a, ASTValue *b) {
+    if(a->getType()->kind == TYPE_DYNAMIC_ARRAY) {
+        return opIndexDArray(a,b);
+    } else if(a->getType()->kind == TYPE_ARRAY) {
+        return opIndexSArray(a,b);
+    } else if(a->getType()->kind == TYPE_POINTER) {
+        return opIndexPointer(a,b);
+    } else if(a->getType()->kind == TYPE_TUPLE) {
+        return opIndexTuple(a,b);
+    } else {
+        emit_message(msg::ERROR, "attempt to index non-pointer/array type");
+        return NULL;
+    }
+}
+
+ASTValue *IRCodegenContext::opAlloca(ASTType *ty) {
+    return new ASTBasicValue(ty, ir->CreateAlloca(codegenType(ty), 0), true);
+}
+
+ASTValue *IRCodegenContext::getArrayPointer(ASTValue *arr) {
+    ASTArrayType *arrty = dynamic_cast<ASTArrayType*>(arr->getType());
+    ASTType *elemty = arrty->getPointerElementTy();
+    if(arr->getType()->kind == TYPE_DYNAMIC_ARRAY) {
+        std::vector<Value*> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        Value *llval = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
+        return new ASTBasicValue(elemty->getPointerTy(), llval, true);
+    } else if(arr->getType()->kind == TYPE_ARRAY) {
+        std::vector<Value*> gep;
+        gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
+        gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
+        Value *llval = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
+        return new ASTBasicValue(elemty->getPointerTy(), llval, false); //XXX static array ptr is immutable(?)
+    } else {
+        emit_message(msg::ERROR, "invalid .ptr on non-array type");
+        return NULL;
+    }
+}
+
+ASTValue *IRCodegenContext::getArraySize(ASTValue *arr) {
+    if(arr->getType()->kind == TYPE_DYNAMIC_ARRAY) {
+        std::vector<Value*> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 1));
+        Value *llval = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
+        return new ASTBasicValue(ASTType::getULongTy(), llval, true);
+    } else if(arr->getType()->kind == TYPE_ARRAY) {
+        return new ASTBasicValue(ASTType::getULongTy(),
+                ConstantInt::get(Type::getInt64Ty(context), arr->getType()->length()));
+    } else {
+        //TODO: allow getArraySize call on tuple?
+        emit_message(msg::ERROR, "invalid .size on non-array type");
     }
 }
 
@@ -1695,52 +1796,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
     {
         ASTValue *arr = codegenExpression(iexp->lhs);
         ASTValue *ind = codegenExpression(iexp->index);
-        if(arr->getType()->kind == TYPE_DYNAMIC_ARRAY)
-        {
-            ASTType *indexedType = arr->getType()->getPointerElementTy();
-            Value *val = ir->CreateStructGEP(codegenLValue(arr), 0);
-            val = ir->CreateLoad(val);
-            val = ir->CreateInBoundsGEP(val, codegenValue(ind));
-            val = ir->CreateBitCast(val, codegenType(indexedType->getPointerTy()));
-            return new ASTBasicValue(indexedType, val, true);
-        }  else if(arr->getType()->kind == TYPE_ARRAY)
-        {
-            ASTType *indexedType = arr->getType()->getPointerElementTy();
-            std::vector<Value*> gep;
-            gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
-            gep.push_back(codegenValue(ind));
-            Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
-            return new ASTBasicValue(indexedType, val, true);
-        } else if(arr->getType()->isPointer())
-        {
-            //TODO: index array
-            ASTType *indexedType = arr->getType()->getPointerElementTy();
-            Value *val = ir->CreateInBoundsGEP(codegenValue(arr), codegenValue(ind));
-            return new ASTBasicValue(indexedType, val, true);
-        } else if(arr->getType()->kind == TYPE_TUPLE)
-        {
-            if(ConstantInt *llci = dynamic_cast<ConstantInt*>(codegenValue(ind)))
-            {
-                ASTTupleType *tupty = (ASTTupleType*) dynamic_cast<ASTTupleType*>(arr->getType());
-                unsigned long long index = llci->getZExtValue();
-                if(tupty->types.size() <= index)
-                {
-                    emit_message(msg::ERROR, "invalid tuple index", exp->loc);
-                    return NULL;
-                }
-                ASTType *type = tupty->types[index];
-                Value *val = ir->CreateStructGEP(codegenLValue(arr), index);
-                return new ASTBasicValue(type, val, true);
-            } else
-            {
-                emit_message(msg::ERROR, "tuples can only be indexed with\
-                        constant integers, due to static typing", exp->loc);
-                return NULL;
-            }
-        } else {
-            emit_message(msg::ERROR, "attempt to index non-pointer/array type", exp->loc);
-            return NULL;
-        }
+        return opIndex(arr, ind);
     } else if(PostfixOpExpression *e = dynamic_cast<PostfixOpExpression*>(exp))
     {
         ASTValue *old;
@@ -1827,7 +1883,8 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 return ret;
             }
 
-            else if(lhs->getType()->kind == TYPE_DYNAMIC_ARRAY)
+            else if(lhs->getType()->kind == TYPE_DYNAMIC_ARRAY ||
+                    lhs->getType()->kind == TYPE_ARRAY)
             {
                 ASTArrayType *arrty = dynamic_cast<ASTArrayType*>(lhs->getType());
                 if(!arrty){
@@ -1838,40 +1895,12 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 
                 if(dexp->rhs == "ptr")
                 {
-                    std::vector<Value*> gep;
-                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                    Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                    return new ASTBasicValue(ty->getPointerTy(), llval, true);
+                    return getArrayPointer(lhs);
                 }
 
                 if(dexp->rhs == "size")
                 {
-                    std::vector<Value*> gep;
-                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 1));
-                    Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                    return new ASTBasicValue(ASTType::getULongTy(), llval, true);
-                }
-            } else if(lhs->getType()->kind == TYPE_ARRAY)
-            {
-                ASTArrayType *arrty = dynamic_cast<ASTArrayType*>(lhs->getType());
-                ASTType *ty = arrty->getPointerElementTy();
-
-                if(dexp->rhs == "ptr")
-                {
-                    std::vector<Value*> gep;
-                    gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
-                    gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
-                    Value *llval = ir->CreateInBoundsGEP(codegenLValue(lhs), gep);
-                    return new ASTBasicValue(ty->getPointerTy(), llval, false); //XXX static array ptr is immutable(?)
-
-                }
-
-                if(dexp->rhs == "size")
-                {
-                    return new ASTBasicValue(ASTType::getULongTy(),
-                            ConstantInt::get(Type::getInt64Ty(context), arrty->length()));
+                    return getArraySize(lhs);
                 }
             }
         emit_message(msg::ERROR, "unknown dot expression", exp->loc);
@@ -2442,10 +2471,6 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
 
         vty = defaultValue->getType();
         vdecl->type = vty;
-    } else if(defaultValue)
-    {
-        //TODO: promote type is borkd
-        defaultValue = promoteType(defaultValue, vty);
     }
 
     ///////////////
@@ -2469,6 +2494,7 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
 
     ASTBasicValue *idValue = NULL;
     if(vdecl->qualifier.isConst) {
+        defaultValue = promoteType(defaultValue, vty);
         idValue = new ASTBasicValue(vty, codegenValue(defaultValue), false);
         idValue->setConstant(true);
     } else {
@@ -2482,15 +2508,37 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         idValue->setWeak(vdecl->isWeak());
 
         if(defaultValue) {
-            defaultValue = promoteType(defaultValue, vty);
             if(defaultValue->isConstant()) {
-                if(defaultValue->getType()->isArray()) { //XXX bit of a hack to prevent modification of constant arrays
-                    storeValue(idValue, defaultValue);
+                int len = defaultValue->getType()->length();
+                if(idValue->getType()->isArray()) { //XXX bit of a hack to prevent modification of constant arrays
+                    if(idValue->getType()->kind == TYPE_DYNAMIC_ARRAY) { //allocate space for the dynamic array data to go
+                        ASTValue *arrptr = getArrayPointer(idValue);
+                        ASTValue *alloca = opAlloca(arrptr->getType()->getPointerElementTy()->getArrayTy(len));
+                        alloca = promoteType(alloca, arrptr->getType());
+                        storeValue(arrptr, alloca);
+
+                        ASTValue *arrsz = getArraySize(idValue);
+                        storeValue(arrsz, getIntValue(ASTType::getLongTy(), len));
+                    }
+
+                    //XXX this is quite ugly
+                    GlobalVariable *DGV = new GlobalVariable(*module, codegenType(defaultValue->getType()), true,
+                            GlobalValue::PrivateLinkage, (Constant*) codegenValue(defaultValue));
+                    ASTBasicValue GBV = ASTBasicValue(defaultValue->getType(), DGV, true);
+                    for(int i = 0; i < len; i++) {
+                        //TODO: replace with memcpy
+                        storeValue(opIndex(idValue, getIntValue(ASTType::getLongTy(), i)),
+                                   promoteType(opIndex(&GBV, getIntValue(ASTType::getLongTy(), i)), idValue->getType()->getPointerElementTy()));
+
+                    }
                     emit_message(msg::WARNING, "constant array assignment", vdecl->loc);
                 } else {
+                    defaultValue = promoteType(defaultValue, vty);
                     storeValue(idValue, defaultValue);
                 }
             } else {
+                //TODO: promote type is borkd
+                defaultValue = promoteType(defaultValue, vty);
                 storeValue(idValue, defaultValue);
             }
 

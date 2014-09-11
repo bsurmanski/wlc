@@ -31,14 +31,14 @@ int main(int argc, char^^ argv)
     int[] funcvals = [3,2,1]
 
     for(int j = 0; j < funcvals.size; j++) {
-        printf("%d\n", funcvals[j])
+        printf("FUNCVAL[j] = %d\n", funcvals[j])
     }
 
-    printf("%d\n", vals[0])
+    printf("VALS[0] = %d\n", vals[0])
     vals[0] = 5
 
     for(int j = 0; j < vals.size; j++) {
-        printf("%d\n", vals[j])
+        printf("VALS[j] = %d\n", vals[j])
     }
 
     arrayFunc()

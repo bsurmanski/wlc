@@ -247,6 +247,19 @@ class IRCodegenContext : public CodegenContext
     ASTValue *opLEValue(ASTValue *a, ASTValue *b); // <=
     ASTValue *opGEValue(ASTValue *a, ASTValue *b); // >=
 
+    ASTValue *opIndexDArray(ASTValue *a, ASTValue *b);
+    ASTValue *opIndexSArray(ASTValue *a, ASTValue *b);
+    ASTValue *opIndexPointer(ASTValue *a, ASTValue *b);
+    ASTValue *opIndexTuple(ASTValue *a, ASTValue *b); // b must be constant int
+    ASTValue *opIndex(ASTValue *a, ASTValue *b); //calls relevent index
+
+    ASTValue *opAlloca(ASTType *ty);
+
+    // arr.ptr
+    ASTValue *getArrayPointer(ASTValue *a);
+    // arr.size
+    ASTValue *getArraySize(ASTValue *a);
+
     // expression
     ASTValue *codegenExpression(Expression *exp);
     ASTValue *codegenTupleExpression(TupleExpression *exp, ASTCompositeType *ty = 0);

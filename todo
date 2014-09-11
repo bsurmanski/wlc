@@ -19,3 +19,10 @@ error if member lookup fails (eg .x, but x not in this)
 new Class() sometimes does not work if Class is declared after use
 
 null all class-typed members before constructor
+
+do not overwrite local tuple constants
+eg:
+    myTup = [0,0,0]
+    printf("%d\n", myTup[0])
+    myTup[0] = 1
+second pass through function will print '1' instead of expected '0'

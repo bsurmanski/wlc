@@ -247,8 +247,6 @@ class IRCodegenContext : public CodegenContext
     ASTValue *opLEValue(ASTValue *a, ASTValue *b); // <=
     ASTValue *opGEValue(ASTValue *a, ASTValue *b); // >=
 
-    //TODO: add compare ops
-
     // expression
     ASTValue *codegenExpression(Expression *exp);
     ASTValue *codegenTupleExpression(TupleExpression *exp, ASTCompositeType *ty = 0);

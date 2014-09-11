@@ -1,7 +1,7 @@
 extern undecorated int printf(char^ fmt, ...);
 extern undecorated float sinf(float f);
 
-//char^[] strings = ["hello", "goodbye", "hithere", "thats all folks"]
+char^[] strings = ["hello", "goodbye", "hithere", "thats all folks"]
 
 int[] vals = [1, 2, 3, 4]
 int[5] vals2 = [1,2,3,4,5]

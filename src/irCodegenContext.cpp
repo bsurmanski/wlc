@@ -48,7 +48,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         emit_message(msg::FAILURE, "invalid user type");
     }
 
-    if(userty->identifier->isUndeclared()){ //NOTE superfluous test
+    if(userty->identifier->isUndeclared()){ //XXX superfluous test
         Identifier *alt = userty->identifier->table->lookup(userty->identifier->getName());
         emit_message(msg::WARNING, "type should be resolved by now");
         userty->identifier = lookup(ty->getName());
@@ -577,7 +577,6 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
         if(!val->isConstant()) isConst = false;
     }
 
-
     Type *llty = codegenType(ty);
 
     Value *ret;
@@ -596,7 +595,6 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
         } else {
             llconst = ConstantStruct::get((StructType*)llty, llvals);
         }
-
 
         if(dyarray) {
             GlobalVariable *GV = new GlobalVariable(*module, llty, true,
@@ -619,6 +617,8 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
         return llconst;
     } else {
         // alloca, and store all values into a struct type
+
+        //XXX will fail on dynamic arrays
         Value *val = ir->CreateAlloca(llty);
         for(int i = 0; i < vals.size(); i++) {
             ir->CreateStore(codegenValue(vals[i]), ir->CreateStructGEP(val, i));
@@ -1140,63 +1140,9 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
 
 ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTCompositeType *ty)
 {
-    //XXX codegen tuple
-    /*
-    std::vector<ASTValue*> vals;
-    std::vector<ASTType*> types;
-    bool lvalue = true;
-    bool isConst = true;
-    if(!ty) ty = dynamic_cast<ASTCompositeType*>(exp->getType());
-    if(!ty) emit_message(msg::FAILURE, "could not get type of tuple expression", exp->loc);
-
-    for(int i = 0; i < exp->members.size(); i++)
-    {
-        if(i >= ty->length()) emit_message(msg::FAILURE, "unexpected tuple expression length", exp->loc);
-        ASTValue *val = codegenExpression(exp->members[i]);
-        val = promoteType(val, ty->getMemberType(i));
-
-        vals.push_back(val);
-        types.push_back(val->getType());
-
-        if(!val->isLValue()) lvalue = false;
-        if(!val->isConstant()) isConst = false;
-    }
-
-    ASTTupleType *tupty = new ASTTupleType(types);
-    Type *llty = codegenType(tupty);
-
-    // tuple is a constant; can optimize tuple as constant global
-    if(isConst)
-    {
-        std::vector<Constant*> llvals;
-        for(int i = 0; i < vals.size(); i++)
-        {
-            llvals.push_back((Constant*) codegenValue(vals[i]));
-        }
-
-        Constant *llconst = NULL;
-        if(dynamic_cast<ASTArrayType*>(ty)) {
-            llconst = ConstantArray::get((ArrayType*)llty, llvals);
-        } else {
-            llconst = ConstantStruct::get((StructType*)llty, llvals);
-        }
-
-        GlobalVariable *GV = new GlobalVariable(*module, llty, true,
-                GlobalValue::PrivateLinkage,
-                llconst);
-
-        return new ASTBasicValue(tupty, GV, true);
-    } else {
-        // alloca, and store all values into a struct type
-        Value *val = ir->CreateAlloca(llty);
-        for(int i = 0; i < vals.size(); i++) {
-            ir->CreateStore(codegenValue(vals[i]), ir->CreateStructGEP(val, i));
-        }
-
-        return new ASTBasicValue(tupty, val, true);
-    }
-    */
-
+    // this does not fully codegen the tuple. Tuple constants are implicitly convertible to
+    // arrays (static or dynamic), structs, or tuple varibles. as such, it is best to codegen
+    // the individual values, hold on to them, and construct the expected type when needed.
     std::vector<ASTValue*> vals;
     for(int i = 0; i < exp->members.size(); i++) {
         vals.push_back(codegenExpression(exp->members[i]));
@@ -1624,67 +1570,6 @@ void IRCodegenContext::resolveArguments(ASTValue *func, std::vector<ASTValue*>& 
         callArgs.push_back(arg);
     }
 
-    // allow for uniform function call syntax
-    /*
-    int nargs = 0;
-    if(func->getOwner()){
-        ASTValue *ownerVal = getAddressOf(func->getOwner());
-        //TODO: cast to correct type if needed
-        args.push_back(ownerVal);
-        nargs++;
-    }
-
-    //TODO: select function if overloaded
-    for(int i = 0; i < exp->args.size() || i < astfty->params.size(); i++)
-    {
-        ASTValue *val = NULL;
-
-        if(i < exp->args.size())
-            val = codegenExpression(exp->args[i]);
-        else if(fdecl && fdecl->parameters[i]->value)
-        {
-            val = codegenExpression(fdecl->parameters[i]->value);
-        } else
-        {
-            break;
-        }
-
-        //TODO: nargs is messy. used to move param forward if implicit 'this'
-        if(astfty->params.size() > i && astfty->params[i+nargs]){
-            val = promoteType(val, astfty->params[i+nargs]);
-        }
-
-        else if(astfty->vararg)
-        {
-            if(val->getType()->isFloating())
-                val = promoteType(val, ASTType::getDoubleTy());
-            else if(val->getType()->isInteger() && val->getType()->isSigned() &&
-                    val->getType()->getSize() < ASTType::getIntTy()->getSize())
-                val = promoteType(val, ASTType::getIntTy());
-            else if(val->getType()->isInteger() &&
-                    val->getType()->getSize() < ASTType::getIntTy()->getSize())
-                val = promoteType(val, ASTType::getUIntTy());
-        }
-
-        if(!val)
-        {
-            emit_message(msg::ERROR, "invalid arguement provided for function", exp->loc);
-        }
-
-        //cargs.push_back(val);
-        args.push_back(val);
-    }
-
-    */
-    //if(args.size() != exp->args.size()){
-        /*
-        emit_message(msg::ERROR,
-                "invalid number of arguments provided for function call", exp->loc);
-                */
-        //TODO: add 'this' member as expected argument to methods
-        //return NULL;
-    //}
-
     // copy callArgs back to args
     args.clear();
     for(int i = 0; i < callArgs.size(); i++) {
@@ -2078,79 +1963,6 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
     if(!compty) emit_message(msg::FAILURE, "promoting tuple to invalid type");
     tupval->setType(compty);
     return tupval;
-    /*
-    if(toType->isStruct())
-    {
-        if(((ASTTupleType*) val->getType())->types.size() ==
-                toType->length()) //TODO proper test
-        {
-            Value *toPtr = ir->CreateBitCast(codegenLValue(val),
-                    codegenType(toType)->getPointerTo());
-            return new ASTBasicValue(toType, toPtr, true);
-        } else
-        {
-            emit_message(msg::ERROR, "cannot convert tuple to struct");
-            return NULL;
-        }
-    } else if(toType->kind == TYPE_TUPLE)
-    {
-        if(((ASTTupleType*) val->getType())->types.size() ==
-                ((ASTTupleType*) toType)->types.size())
-        {
-            Value *toPtr;
-            if(val->isLValue())
-            {
-                toPtr = ir->CreateBitCast(codegenLValue(val),
-                      codegenType(toType)->getPointerTo());
-            } else
-            {
-                toPtr = ir->CreateAlloca(codegenType(val->getType()));
-                ir->CreateStore(codegenValue(val), toPtr);
-                toPtr = ir->CreateBitCast(toPtr,
-                      codegenType(toType)->getPointerTo());
-            }
-
-            return new ASTBasicValue(toType, toPtr, true);
-        } else
-        {
-            emit_message(msg::ERROR, "cannot convert tuple to incompatible tuple");
-            return NULL;
-        }
-    } else if(toType->kind == TYPE_ARRAY)
-    {
-        Value *toPtr;
-        if(val->isLValue())
-        {
-            toPtr = ir->CreateBitCast(codegenLValue(val),
-                    codegenType(toType)->getPointerTo());
-        } else
-        {
-            emit_message(msg::FAILURE, "unimplemented RValue bitcast");
-        }
-
-        return new ASTBasicValue(toType, toPtr, true);
-    } else if(toType->kind == TYPE_DYNAMIC_ARRAY)
-    {
-        Value *toPtr;
-        Value *toSize;
-        AllocaInst *arr;
-        if(val->isLValue())
-        {
-            toPtr = ir->CreateBitCast(codegenLValue(val),
-                    codegenType(toType->getPointerElementTy())->getPointerTo());
-            ASTTupleType *tupty = (ASTTupleType*) val->getType();
-            toSize = ConstantInt::get(codegenType(ASTType::getULongTy()), tupty->length());
-
-            arr = ir->CreateAlloca(codegenType(toType));
-            ir->CreateStore(toPtr, ir->CreateStructGEP(arr, 0));
-            ir->CreateStore(toSize, ir->CreateStructGEP(arr, 1));
-        } else
-        {
-            emit_message(msg::FAILURE, "unimplemented RValue bitcast");
-        }
-
-        return new ASTBasicValue(toType, arr, true);
-    }*/
 }
 
 ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
@@ -2671,7 +2483,16 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
 
         if(defaultValue) {
             defaultValue = promoteType(defaultValue, vty);
-            storeValue(idValue, defaultValue);
+            if(defaultValue->isConstant()) {
+                if(defaultValue->getType()->isArray()) { //XXX bit of a hack to prevent modification of constant arrays
+                    storeValue(idValue, defaultValue);
+                    emit_message(msg::WARNING, "constant array assignment", vdecl->loc);
+                } else {
+                    storeValue(idValue, defaultValue);
+                }
+            } else {
+                storeValue(idValue, defaultValue);
+            }
 
             if(vty->isClass() && !idValue->isWeak()) {
                 retainObject(defaultValue);

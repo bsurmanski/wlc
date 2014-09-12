@@ -864,11 +864,12 @@ ASTValue *IRCodegenContext::opLOrValue(Expression *a, Expression *b) {
     ir->SetInsertPoint(orfalse);
     ASTValue *bval = promoteType(codegenExpression(b), TYPE);
     Value *falseVal = codegenValue(bval);
+    BasicBlock *falsePHIBlock = ir->GetInsertBlock(); //we need to recheck the block we are in because b might be a logical expression that creates a new basic block
     ir->CreateBr(ortrue);
     ir->SetInsertPoint(ortrue);
 
     PHINode *phiNode = ir->CreatePHI(codegenType(TYPE), 2);
-    phiNode->addIncoming(falseVal, orfalse);
+    phiNode->addIncoming(falseVal, falsePHIBlock);
     phiNode->addIncoming(codegenValue(getIntValue(TYPE, 1)), beforeblock);
     val = phiNode;
     return new ASTBasicValue(TYPE, val);
@@ -888,11 +889,12 @@ ASTValue *IRCodegenContext::opLAndValue(Expression *a, Expression *b) {
     ir->SetInsertPoint(andtrue);
     ASTValue *bval = promoteType(codegenExpression(b), TYPE);
     Value *trueVal = codegenValue(bval);
+    BasicBlock *truePHIBlock = ir->GetInsertBlock(); //we need to recheck the block we are in because b might be a logical expression that creates a new basic block
     ir->CreateBr(andend);
     ir->SetInsertPoint(andend);
 
     PHINode *phiNode = ir->CreatePHI(codegenType(TYPE), 2);
-    phiNode->addIncoming(trueVal, andtrue);
+    phiNode->addIncoming(trueVal, truePHIBlock);
     phiNode->addIncoming(codegenValue(getIntValue(TYPE, 0)), beforeblock);
     val = phiNode;
     return new ASTBasicValue(TYPE, val);

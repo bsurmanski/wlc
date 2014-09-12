@@ -11,7 +11,7 @@ class MyClass {
 int main(int argc, char^^ argv)
 {
     weak MyClass cl
-    if(!cl or cl.i) {
+    if(!cl or cl.i and true) {
         printf("true branch\n")
     } else {
         printf("false branch\n")

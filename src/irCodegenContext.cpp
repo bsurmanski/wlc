@@ -1,5 +1,3 @@
-
-
 #include "ast.hpp"
 #include "token.hpp"
 #include "irCodegenContext.hpp"
@@ -685,10 +683,10 @@ void IRCodegenContext::releaseObject(ASTValue *val) {
         ASTValue *isNull = opNEqValue(val, &null);
         ir->CreateCondBr(codegenValue(isNull), beginBr, afterBr);
         ir->SetInsertPoint(beginBr);
-        ASTValue *v = getMember(val, "refcount");
-        storeValue(v, opDecValue(v));
+        ASTValue *refcount = getMember(val, "refcount");
+        storeValue(refcount, opDecValue(refcount));
         ASTValue *zero = getIntValue(ASTType::getLongTy(), 0);
-        ASTValue *isZero = opLEValue(v, zero);
+        ASTValue *isZero = opLEValue(refcount, zero);
 
         ir->CreateCondBr(codegenValue(isZero), deconstructBr, afterBr); //TODO: expect no deconstruct
         ir->SetInsertPoint(deconstructBr);
@@ -701,35 +699,38 @@ void IRCodegenContext::releaseObject(ASTValue *val) {
 // BINOP .
 ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
     // we are trying to get a base that does not exist
+
     if(!val->getType()) {
         emit_message(msg::ERROR, "member '" + member + "' not found in class");
     }
-
 
     if(val->getType()->isPointer())
         val = getValueOf(val);
     ASTUserType *userty = val->getType()->asUserType();
 
-    if(!userty){
+    if(val->getType() && !userty){
         emit_message(msg::FAILURE, "cannot get member in non-usertype");
     }
 
-    Identifier *id = userty->getScope()->lookupInScope(member);
+    ASTType *orig = val->getType();
+    std::vector<Value*> gep;
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
 
-    // identifier is either in base or does not exist, recurse to base
-    if(!id){
-        if(!userty->getBaseType()) {
-            emit_message(msg::ERROR, "cannot find member '" + member + "' in type");
-            return NULL;
+    Identifier *id = NULL;
+    while(!id && userty) {
+        id = userty->getScope()->lookupInScope(member);
+
+        // identifier is either in base or does not exist, recurse to base
+        if(!id) {
+            // zeroeth member is base class
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            userty = dynamic_cast<ASTUserType*>(userty->getBaseType());
         }
-        // zeroeth member is base class
-        std::vector<Value*> gep;
-        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-        Value *llval = codegenLValue(val);
-        llval = ir->CreateInBoundsGEP(llval, gep);
-        ASTBasicValue base(userty->getBaseType(), llval, true, false);
-        return getMember(&base, member);
+    }
+
+    if(!id) {
+        emit_message(msg::FAILURE, "cannot get member '" + member + "' in type '" + orig->getName() + "'");
+        return NULL;
     }
 
     if(id->isFunction()){
@@ -750,14 +751,12 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         int index = userty->getMemberIndex(member);
         if(userty->getBaseType()) index++; // skip over base class index
         ASTType *mtype = id->getType();
-        std::vector<Value*> gep;
-        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
                                     index));
         Value *llval;
         llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
         llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
-        ASTBasicValue *ret = new ASTBasicValue(mtype, llval, true);
+        ASTBasicValue *ret = new ASTBasicValue(mtype, llval, true, mtype->isReference());
         ret->setOwner(val);
         return ret;
     } else {
@@ -1306,6 +1305,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         ASTUserType *uty = ty->asUserType();
 
         if(ty->isClass()) {
+            ir->CreateStore(ConstantAggregateZero::get(codegenType(uty)->getPointerElementType()), codegenValue(val));
             ASTValue *vtable = getVTable(val);
 
             codegenType(uty); // XXX to create typeinfo. So we are able to load it below... hacky
@@ -1321,9 +1321,11 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 
             ir->CreateStore(tival, codegenLValue(vtable));
 
+            /*
             // store zero'd reference count
             ASTValue *refcount = getMember(val, "refcount");
             storeValue(refcount, getIntValue(ASTType::getLongTy(), 0));
+            */
         }
 
         //TODO: call parent class constructor

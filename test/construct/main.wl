@@ -22,7 +22,9 @@ class MySpecialClass : MyClass
     char svar
 
     this() {
-        this.svar = 22
+        .svar = 22
+        .a = 5
+        .b = 10
         printf("myspecialclass constructor\n");
     }
 

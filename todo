@@ -17,3 +17,5 @@ error if member lookup fails (eg .x, but x not in this)
 new Class() sometimes does not work if Class is declared after use
 
 null all class-typed members before constructor
+
+implicit this does not work in super class members declared after class

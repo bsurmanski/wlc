@@ -441,6 +441,7 @@ struct ASTUserType : public ASTCompositeType {
 
     // only valid after AST is validated
     ASTType *getBaseType();
+    Identifier *getBaseIdentifier();
 
     virtual bool coercesTo(ASTType *ty) {
         return getDeclaration() == ty->getDeclaration() || //TODO: might not work...

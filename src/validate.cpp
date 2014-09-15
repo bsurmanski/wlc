@@ -264,18 +264,21 @@ void ValidationVisitor::visitIndexExpression(IndexExpression *exp) {
 
 void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp) {
     // resolve identifier
-    exp->id = resolveIdentifier(exp->id);
+    //XXX messy; deferring local resolution to codegen
+    if(!exp->isLocal()) {
+            exp->id = resolveIdentifier(exp->id);
 
-    if(exp->id->isUndeclared()){
-        emit_message(msg::ERROR, "identifier is expected to be resolved at this point");
+        if(exp->id->isUndeclared()){
+            emit_message(msg::ERROR, "identifier is expected to be resolved at this point");
+        }
+
+        // resolve type of identifier if needed
+        if(exp->id->getType()) //XXX temp?
+            resolveType(exp->id->getType());
+
+        if(exp->id->getDeclaredType())
+            exp->id->astType = resolveType(exp->id->getDeclaredType());
     }
-
-    // resolve type of identifier if needed
-    if(exp->id->getType()) //XXX temp?
-        resolveType(exp->id->getType());
-
-    if(exp->id->getDeclaredType())
-        exp->id->astType = resolveType(exp->id->getDeclaredType());
 }
 
 void ValidationVisitor::visitNumericExpression(NumericExpression *exp) {

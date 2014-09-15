@@ -6,11 +6,17 @@
 //
 
 ASTType *ASTUserType::getBaseType(){
+    Identifier *base = getBaseIdentifier();
+    if(base) {
+        return base->getDeclaredType();
+    }
+    return NULL;
+}
+
+Identifier *ASTUserType::getBaseIdentifier() {
     ClassDeclaration *cdecl = getDeclaration()->classDeclaration();
     if(cdecl) {
-        if(Identifier *base = cdecl->base){
-            return base->getDeclaredType();
-        }
+        return cdecl->base;
     }
     return NULL;
 }

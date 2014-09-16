@@ -119,7 +119,9 @@ size_t ClassDeclaration::getSize() const {
         align = vd->getType()->getAlign();
         if(sz % align)
             sz += (align - (sz % align));
-        sz += vd->type->getSize();
+        //reference types treated as pointers
+        if(vd->getType()->isReference()) sz += 8;
+        else sz += vd->type->getSize();
     }
     return sz;
 }

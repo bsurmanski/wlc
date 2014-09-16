@@ -18,4 +18,10 @@ new Class() sometimes does not work if Class is declared after use
 
 null all class-typed members before constructor
 
-implicit this does not work in super class members declared after class
+recursive types (types that contain references to each other) crash things
+
+rearange class members largest to smallest (for packing efficiency)
+
+import(C), correctly parse 'typedef'
+
+warn of invalid use of local if function member

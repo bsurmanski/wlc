@@ -663,20 +663,28 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
 
 void IRCodegenContext::retainObject(ASTValue *val) {
     //XXX error if not class?
-    if(val->getType()->isClass()) { //TODO: check for null
+    if(val->getType()->isClass()) {
+        BasicBlock *retainBB = BasicBlock::Create(context, "retain", ir->GetInsertBlock()->getParent());
+        BasicBlock *endretainBB = BasicBlock::Create(context, "endretain", ir->GetInsertBlock()->getParent());
+        ASTBasicValue null = ASTBasicValue(val->getType(), ConstantPointerNull::get((PointerType*) codegenType(val->getType())));
+        ASTValue *notNull = opNEqValue(val, &null);
+        ir->CreateCondBr(codegenValue(notNull), retainBB, endretainBB);
+        ir->SetInsertPoint(retainBB);
         ASTValue *v = getMember(val, "refcount");
         storeValue(v, opIncValue(v));
+        ir->CreateBr(endretainBB);
+        ir->SetInsertPoint(endretainBB);
     }
 }
 
 void IRCodegenContext::releaseObject(ASTValue *val) {
     //XXX error if not class?
-    if(val->getType()->isClass()) { //TODO: check for null
+    if(val->getType()->isClass()) {
         ASTUserType *uty = val->getType()->asUserType();
 
-        BasicBlock *beginBr = BasicBlock::Create(context, "begindel", ir->GetInsertBlock()->getParent());
+        BasicBlock *beginBr = BasicBlock::Create(context, "decref", ir->GetInsertBlock()->getParent());
         BasicBlock *deconstructBr = BasicBlock::Create(context, "del", ir->GetInsertBlock()->getParent());
-        BasicBlock *afterBr = BasicBlock::Create(context, "enddel", ir->GetInsertBlock()->getParent());
+        BasicBlock *afterBr = BasicBlock::Create(context, "endref", ir->GetInsertBlock()->getParent());
 
         //TODO: statically null check if able?
         ASTBasicValue null = ASTBasicValue(val->getType(), ConstantPointerNull::get((PointerType*) codegenType(val->getType())));
@@ -1320,12 +1328,6 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
             tival = ir->CreateGEP(tival, gep); // GEP to class's vtable, so we can store to it
 
             ir->CreateStore(tival, codegenLValue(vtable));
-
-            /*
-            // store zero'd reference count
-            ASTValue *refcount = getMember(val, "refcount");
-            storeValue(refcount, getIntValue(ASTType::getLongTy(), 0));
-            */
         }
 
         //TODO: call parent class constructor
@@ -2163,7 +2165,8 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
             releaseObject(lhs);
         }
 
-        if(rhs->getType()->isClass()) {
+        // check for LValue is because we can't retain 'null'
+        if(rhs->getType()->isClass() && rhs->isLValue()) {
             retainObject(rhs);
         }
     }
@@ -2578,16 +2581,16 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
         BasicBlock *BB = BasicBlock::Create(context, "entry", func);
         BasicBlock *exitBB = BasicBlock::Create(context, "exit", func);
         currentFunction.exit = exitBB;
+        ir->SetInsertPoint(BB);
 
         currentFunction.retVal = NULL;
         if(func->getReturnType() != Type::getVoidTy(context))
         {
             currentFunction.retVal = new ASTBasicValue(fdecl->getReturnType(),
-                    new AllocaInst(codegenType(fdecl->getReturnType()),
-                        0, "ret", BB), true);
+                    ir->CreateAlloca(codegenType(fdecl->getReturnType()),
+                        0, "ret"), true);
         }
 
-        ir->SetInsertPoint(BB);
 
         dwarfStopPoint(fdecl->loc);
         unit->debug->createFunction(fdecl);
@@ -2613,35 +2616,35 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
             }
 
             AI->setName(fdecl->parameters[idx]->getName());
-            AllocaInst *alloc = new AllocaInst(codegenType(fdecl->parameters[idx]->getType()),
-                                               0, fdecl->parameters[idx]->getName(), BB);
+            AllocaInst *alloc = ir->CreateAlloca(codegenType(fdecl->parameters[idx]->getType()),
+                                               0, fdecl->parameters[idx]->getName());
             alloc->setAlignment(8);
             ASTBasicValue *alloca = new ASTBasicValue(fdecl->parameters[idx]->getType(), alloc, true, fdecl->parameters[idx]->getType()->isReference());
             alloca->setWeak(fdecl->parameters[idx]->isWeak()); //XXX weak reference
 
             // i think we arent using IRBuilder here so we can insert at top of BB
             if(fdecl->parameters[idx]->getType()->isReference()) {
-                new StoreInst(AI, codegenRefValue(alloca), BB);
+                ir->CreateStore(AI, codegenRefValue(alloca));
             } else {
-                new StoreInst(AI, codegenLValue(alloca), BB);
+                ir->CreateStore(AI, codegenLValue(alloca));
             }
+
+            fdecl->parameters[idx]->getIdentifier()->setValue(alloca);
+
+            //register debug params
+            //XXX hacky with Instruction, and setDebugLoc manually
+            Instruction *ainst = unit->debug->createVariable(fdecl->parameters[idx]->getName(),
+                                                      alloca, ir->GetInsertBlock(), fdecl->loc, idx+1);
+            ainst->setDebugLoc(llvm::DebugLoc::get(fdecl->loc.line, fdecl->loc.ch, diScope()));
+            //TODO: register value to scope
 
             // retain class parameters (retain after assigning the passed value above)
             // parameters will be released on scope exit
             if(alloca->getType()->isClass() && !alloca->isWeak()) {
                 retainObject(alloca);
             }
-
-            fdecl->parameters[idx]->getIdentifier()->setValue(alloca);
-
-
-            //register debug params
-            //XXX hacky with Instruction, and setDebugLoc manually
-            Instruction *ainst = unit->debug->createVariable(fdecl->parameters[idx]->getName(),
-                                                      alloca, BB, fdecl->loc, idx+1);
-            ainst->setDebugLoc(llvm::DebugLoc::get(fdecl->loc.line, fdecl->loc.ch, diScope()));
-            //TODO: register value to scope
         }
+
 
         codegenStatement(fdecl->body);
 

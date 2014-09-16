@@ -595,6 +595,7 @@ struct ClassDeclaration : public UserTypeDeclaration {
 
     void populateVTable();
     virtual size_t getSize() const;
+    virtual size_t getAlign() const { return 8; } //XXX align of pointer
     long getMemberIndex(std::string member);
     virtual ClassDeclaration *classDeclaration() { return this; }
 };

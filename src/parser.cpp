@@ -134,6 +134,9 @@ ASTType *ParseContext::parseType()
             return NULL;
         }
         type = id->getDeclaredType();
+        if(!type) {
+            assert(false);
+        }
         //TODO: do something with id...
     }
 

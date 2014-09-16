@@ -308,6 +308,10 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
     {
         // will generate struct ASTType
         ASTTypeFromCType(unit, clang_getCursorType(cursor));
+    } else if(cursor.kind == CXCursor_TypedefDecl) {
+        Identifier *id = unit->getScope()->get(clang_getCString(clang_getCursorSpelling(cursor)));
+        ASTType *typedefty = ASTTypeFromCType(unit, clang_getTypedefDeclUnderlyingType(cursor));
+        id->setExpression(new TypeExpression(typedefty, loc));
     }
 
     return CXChildVisit_Continue;

@@ -43,6 +43,9 @@ ASTType *Identifier::getDeclaredType()
 {
     //TODO: class
     if(kind != ID_USER && kind != ID_UNKNOWN) {
+        if(kind == ID_EXPRESSION && expression && expression->typeExpression()) {
+            return expression->typeExpression()->getDeclaredType();
+        }
         //emit_message(msg::FAILURE, "this doesnt look like a type");
         return NULL;
     }

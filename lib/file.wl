@@ -3,7 +3,7 @@ use "importc"
 import(C) "stdio.h"
 
 class File {
-    _IO_FILE^ file
+    FILE^ file
     this(char^ filenm) {
         .file = fopen(filenm, "r")
     }

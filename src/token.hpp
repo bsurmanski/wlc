@@ -97,7 +97,7 @@ struct Token
 
     union
     {
-        std::string *strData; // no union with classes? WHY!!! C++!!!!!!!
+        std::string *strData; // no union with classes
         int64_t iData;
         uint64_t uiData;
         double fData;

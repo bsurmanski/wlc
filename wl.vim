@@ -84,6 +84,9 @@ hi def link wFloat Float
 " Strings
 syn region String start=+"+ end=+"[cwd]\=+ contains=@Spell
 
+" Characters
+syn match Character "'[^']*'"
+
 " braces
 syn region wBlock start="{" end="}" transparent fold
 syn region wParen start="(" end=")" transparent

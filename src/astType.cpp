@@ -263,4 +263,6 @@ bool ASTUserType::extends(ASTType *t) {
     return false;
 }
 
-bool ASTUserType::isReference() { return dynamic_cast<ClassDeclaration*>(identifier->getDeclaration()); }
+bool ASTUserType::isReference() {
+    return dynamic_cast<ClassDeclaration*>(identifier->getDeclaration());
+}

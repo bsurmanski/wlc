@@ -1562,7 +1562,7 @@ ASTValue *IRCodegenContext::codegenCall(ASTValue *func, std::vector<ASTValue *> 
     }
 
     llvm::Value *value = ir->CreateCall(codegenValue(func), llargs);
-    return new ASTBasicValue(rtype, value);
+    return new ASTBasicValue(rtype, value, false, rtype->isReference());
 }
 
 ASTValue *IRCodegenContext::resolveOverload(ASTValue *func, std::vector<ASTValue *> args) {
@@ -2338,6 +2338,7 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
     if(exp->expression)
     {
         ASTValue *value = codegenExpression(exp->expression);
+        retainObject(value); // retain return value
         ASTValue *v = promoteType(value, currentFunction.retVal->getType());
         storeValue(currentFunction.retVal, v);
     }

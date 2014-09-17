@@ -1,10 +1,10 @@
 # WLC
-## WL [Wool] Compiler
+## OWL Compiler
 
-*IMPORTANT*: currently the WL compiler is in development. WLC is not yet ready for active usage.
+*IMPORTANT*: currently the OWL compiler is in development. WLC is not yet ready for active usage.
 There is likely to be many bugs and missing features.
 
-WL is a new language meant to be used in a system level context. As such, there will
+OWL is a new language meant to be used in a system level context. As such, there will
 be no garbage collector, no virtual machine, etc.
 
 ## Features
@@ -55,9 +55,9 @@ roughly in order of planned implementation
 Classes are used to encapsulate functionality and state into a single object. On
 top of this, classes provide a way of polymorphism. Polymorphism can be used to
 generalize algorithms by encapsulating implementation specific functionality
-within the class. In WL, classes are reference types, and are reference counted.
+within the class. In OWL, classes are reference types, and are reference counted.
 
-Below is a basic example of class polymorphism in WL:
+Below is a basic example of class polymorphism in OWL:
 
     extern undecorated int printf(char^ fmt, ...);
 
@@ -113,7 +113,7 @@ The above example shows off member access syntax, virtual functions, and
 constructor syntax.
 
 #### Reference Counting
-In WL, Classes are special among types in that they are reference counted. A
+In OWL, Classes are special among types in that they are reference counted. A
 reference is retained on assignment, and released when overwritten or on scope
 exit.
 
@@ -130,7 +130,7 @@ assignment. This provides a way to prevent cyclic references.
     weak Animal myAnimal = human // no retain for myAnimal
 
 ### Arrays
-arrays have an associated size in WL. Arrays can either be statically sized, or
+arrays have an associated size in OWL. Arrays can either be statically sized, or
 dynamically sized. Statically sized arrays cannot be resized but an explicit
 size variable does not need to be stored. Dynamically sized arrays are stored
 with a pointer to the first element as well as a size of the array.
@@ -157,7 +157,7 @@ functions
     }
 
 ### Function Overloading and Default Parameters
-Functions can be overloaded in WL by parameter type. Additionally, function
+Functions can be overloaded in OWL by parameter type. Additionally, function
 parameters can be given default values. If some arguments are not provided, then
 the default value will be used.
 
@@ -255,7 +255,7 @@ Tuples can be unpacked onto multiple variables
 All members of the left hand tuple must be LValues.
 
 ### Switch Statements
-Switch statements in WL provide a way to select among many outcomes depending on
+Switch statements in OWL provide a way to select among many outcomes depending on
 the value of a variable. Cases can be combined to allow many values to map to
 the same outcome. When a subsequent case is encountered, control immediately
 exits the switch. There is no fall-through. Currently, there is no 'default'

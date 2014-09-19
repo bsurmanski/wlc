@@ -766,6 +766,8 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
         ASTBasicValue *ret = new ASTBasicValue(mtype, llval, true, mtype->isReference());
         ret->setOwner(val);
+        ret->setWeak(id->getDeclaration()->isWeak());
+        //TODO set other qualifiers
         return ret;
     } else {
         emit_message(msg::ERROR, "unknown member in user type");

@@ -25,3 +25,5 @@ rearange class members largest to smallest (for packing efficiency)
 import(C), correctly parse 'typedef'
 
 warn of invalid use of local if function member
+
+"MyClass value = null" attempts to retain 'null', which is RValue, and borks

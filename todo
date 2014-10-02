@@ -3,7 +3,6 @@ for(*id* = thing ...)
 
 static members in structs/classes
 
-delete, etc should accept qualified identifiers (eg .blocks)
 array 'new' should accept variable length. eg (int[] arr = new int[5 * i])
 
 set member class types and arrays to zero
@@ -26,4 +25,4 @@ import(C), correctly parse 'typedef'
 
 warn of invalid use of local if function member
 
-"MyClass value = null" attempts to retain 'null', which is RValue, and borks
+functions accept extra parameters (which are then ignored)

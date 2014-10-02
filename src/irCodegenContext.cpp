@@ -1997,8 +1997,7 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
 
     if(toType->isReference()) {
         return new ASTBasicValue(toType,
-                ir->CreatePointerCast(codegenValue(val), codegenType(toType)),
-                false); //XXX might be a bit cludgy
+                ir->CreatePointerCast(codegenValue(val), codegenType(toType)), false, true); //XXX might be a bit cludgy
     }
 }
 

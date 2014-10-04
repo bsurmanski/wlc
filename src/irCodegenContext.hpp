@@ -212,7 +212,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *indexValue(ASTValue *val, int i);
 
     ASTValue *loadValue(ASTValue *val);
-    ASTValue *storeValue(ASTValue *dest, ASTValue *val);
+    void storeValue(ASTValue *dest, ASTValue *val);
 
     ASTValue *getStringValue(std::string str);
     ASTValue *getFloatValue(ASTType *t, float i);

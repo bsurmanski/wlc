@@ -27,8 +27,10 @@ struct ASTValue
     virtual ASTType *getType() = 0;
     virtual bool isConstant() { return false; } // TODO
     virtual bool isWeak() { return false; } // XXX DITTO
+    virtual bool isNoFree() { return false; }
     virtual bool isLValue() = 0;
     virtual bool isReference() = 0;
+
 
     virtual llvm::Value *codegenValue() { return NULL; }
     virtual llvm::Value *codegenLValue() { return NULL; }
@@ -45,8 +47,10 @@ struct ASTBasicValue : ASTValue
     bool weak;
     bool constant;
 
+    bool nofree; // should not free on deallocate. (is stack allocated)
+
     ASTBasicValue(ASTType *ty, llvm::Value *val, bool lv=false, bool ref=false) :
-        ASTValue(val), type(ty), lValue(lv), reference(ref), weak(false), constant(false) {}
+        ASTValue(val), type(ty), lValue(lv), reference(ref), weak(false), constant(false), nofree(false) {}
 
     virtual ASTType *getType() { return type; }
     virtual bool isLValue() { return lValue; }
@@ -55,6 +59,8 @@ struct ASTBasicValue : ASTValue
     virtual void setWeak(bool b) { weak = b; }
     virtual bool isConstant() { return constant; }
     virtual void setConstant(bool b) { constant = b; }
+    virtual void setNoFree(bool b) { nofree = b; }
+    virtual bool isNoFree() { return nofree; }
 };
 
 struct TypeValue : ASTValue {

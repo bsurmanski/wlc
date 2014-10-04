@@ -463,7 +463,7 @@ IRScope *IRCodegenContext::exitScope() {
 }
 
 
-ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
+void IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 {
     Value *llval = 0;
     if(dest->isReference()) {
@@ -472,7 +472,14 @@ ASTValue *IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
         llval = ir->CreateStore(codegenValue(val), codegenLValue(dest));
     }
 
-    return new ASTBasicValue(dest->getType(), llval);
+    //ASTBasicValue *ret = new ASTBasicValue(dest->getType(), llval);
+
+    // if storing a value that is stack allocated, this value should not be freed
+    if(val->isNoFree() && dynamic_cast<ASTBasicValue*>(dest)) {
+        ((ASTBasicValue*)dest)->setNoFree(true);
+    }
+
+    //return dest;
 }
 
 ASTValue *IRCodegenContext::getStringValue(std::string str) {
@@ -1408,14 +1415,17 @@ void IRCodegenContext::codegenDelete(ASTValue *val) {
         } while((uty = dynamic_cast<ASTUserType*>(uty->getBaseType())));
     }
 
-    ASTValue *charval = promoteType(val, ASTType::getCharTy()->getPointerTy());
-    llargs.push_back(codegenValue(charval));
-    llargty.push_back(codegenType(ASTType::getVoidTy()->getPointerTy()));
+    // only call free if object was not stack allocated
+    if(!val->isNoFree()) {
+        ASTValue *charval = promoteType(val, ASTType::getCharTy()->getPointerTy());
+        llargs.push_back(codegenValue(charval));
+        llargty.push_back(codegenType(ASTType::getVoidTy()->getPointerTy()));
 
-    FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()), llargty, false);
-    Function *freeFunc = (Function*) module->getOrInsertFunction("free", fty);
+        FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()), llargty, false);
+        Function *freeFunc = (Function*) module->getOrInsertFunction("free", fty);
 
-    Value *value = ir->CreateCall(freeFunc, llargs);
+        Value *value = ir->CreateCall(freeFunc, llargs);
+    }
 
     storeValue(val, new ASTBasicValue(val->getType(),
                 ConstantPointerNull::get((llvm::PointerType*) codegenType(val->getType()))));
@@ -1729,11 +1739,13 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         if(uty->isReference()) {
             // allocate room for value on stack store in reference
             Value *stackAlloca = ir->CreateAlloca(codegenType(uty)->getPointerElementType());
+            if(uty->isClass()) ir->CreateStore(ConstantAggregateZero::get(codegenType(uty)->getPointerElementType()), stackAlloca);
             ir->CreateStore(stackAlloca, tmpAlloca);
         }
         //XXX below is a bit strange. "isReference?" is in the lvalue field of the BasicValue constructor.
         // it doesnt work the other way around
         ret = new ASTBasicValue(uty->getReferenceTy(), tmpAlloca, uty->isReference(), true);
+        ((ASTBasicValue*) ret)->setNoFree(true);
         args.push_back(ret); // push back reference to allocated userType, to be constructed
         //XXX above should be lvalue
     } else if(func->getType()->isPointer()){ // dereference function pointer
@@ -1755,6 +1767,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     // XXX bit messy; distinction used to return constructed value for type constructor
     if(!ret) {
         ret = codegenCall(func, args);
+        ((ASTBasicValue*) ret)->setNoFree(true);
     } else {
         codegenCall(func, args);
     }

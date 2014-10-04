@@ -13,9 +13,9 @@ class MyClass {
 }
 
 int main(int argc, char^^ argv) {
-    //MyClass cl = MyClass()
+    MyClass cl = MyClass()
 
-    (MyClass()).func()
+    //(MyClass()).func()
 
-    //printf("%d\n", cl.i)
+    printf("%d\n", cl.i)
 }

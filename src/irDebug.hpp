@@ -3,8 +3,15 @@
 
 #include <llvm/IR/Module.h>
 #include <llvm/IR/LLVMContext.h>
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+#include <llvm/IR/DIBuilder.h>
+#endif
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
 #include <llvm/DIBuilder.h>
 #include <llvm/DebugInfo.h>
+#endif
 
 #include "irCodegenContext.hpp"
 #include "ast.hpp"

@@ -2,8 +2,17 @@
 #include "token.hpp"
 #include "irCodegenContext.hpp"
 
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+#define LLVM_35
+#include <llvm/IR/Verifier.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Linker/Linker.h>
+#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+#define LLVM_34
 #include <llvm/Analysis/Verifier.h>
 #include <llvm/Support/raw_ostream.h>
+#endif
 
 #include "message.hpp"
 
@@ -1197,6 +1206,10 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
                 ret = new ASTBasicValue(ty, llvmval); //TODO: assign
                 ret->setConstant(true);
                 return ret;
+
+            case NumericExpression::FLOAT:
+            case NumericExpression::CHAR:
+                return NULL; //TODO verify these are not used
         }
     }
     else if(StringExpression *sexp = exp->stringExpression())
@@ -1380,7 +1393,7 @@ void IRCodegenContext::codegenDelete(ASTValue *val) {
                 resolveArguments(func, args);
                 codegenCall(func, args);
             }
-        } while(uty = dynamic_cast<ASTUserType*>(uty->getBaseType()));
+        } while((uty = dynamic_cast<ASTUserType*>(uty->getBaseType())));
     }
 
     ASTValue *charval = promoteType(val, ASTType::getCharTy()->getPointerTy());
@@ -1600,7 +1613,7 @@ ASTValue *IRCodegenContext::resolveOverload(ASTValue *func, std::vector<ASTValue
         bestOverload = fval;
 NEXTOVERLOAD:;
         //TODO: test all overloads; also, recursive?
-    } while(fval = fval->getNextOverload());
+    } while((fval = fval->getNextOverload()));
 
     return bestOverload;
 }
@@ -2800,6 +2813,24 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
     exitScope();
 }
 
+#ifdef LLVM_35
+void printModule(Module *m, std::string filenm) {
+    std::string err;
+    raw_fd_ostream output(filenm.c_str(), err, llvm::sys::fs::OpenFlags::F_Text);
+    m->print(output, 0);
+    output.close();
+}
+#endif
+
+#ifdef LLVM_34
+void printModule(Module *m, std::string filenm) {
+    std::string err;
+    raw_fd_ostream output(filenm.c_str(), err);
+    m->print(output, 0);
+    output.close();
+}
+#endif
+
 void IRCodegenContext::codegenPackage(Package *p)
 {
     if(p->isTranslationUnit()) // leaf in package tree
@@ -2811,8 +2842,7 @@ void IRCodegenContext::codegenPackage(Package *p)
 
         // XXX debug, output all modules
         std::string outputll = config.tempName + "/" + unit->unit->getName() + ".ll";
-        raw_fd_ostream output(outputll.c_str(), err);
-        unit->module->print(output, 0);
+        printModule(unit->module, outputll);
 
         linker.linkInModule(unit->module, (unsigned) Linker::DestroySource, &err);
 
@@ -2828,6 +2858,34 @@ void IRCodegenContext::codegenPackage(Package *p)
 #include <fcntl.h>
 #include <unistd.h>
 
+#ifdef LLVM_35
+bool checkModule(Module *m) {
+    if(verifyModule(*m))
+    {
+        emit_message(msg::OUTPUT, "failed to compile source code");
+        return false;
+    } else
+    {
+        emit_message(msg::OUTPUT, "successfully compiled source");
+        return true;
+    }
+}
+#endif
+
+#ifdef LLVM_34
+bool checkModule(Module *m) {
+    if(verifyModule(*m, PrintMessageAction))
+    {
+        emit_message(msg::OUTPUT, "failed to compile source code");
+        return false;
+    } else
+    {
+        emit_message(msg::OUTPUT, "successfully compiled source");
+        return true;
+    }
+}
+#endif
+
 std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
 {
     this->ast = ast;
@@ -2840,16 +2898,8 @@ std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
     }
 
     createIdentMetadata(linker.getModule());
-    //linker.getModule()->MaterializeAll();
 
-    if(verifyModule(*linker.getModule(), PrintMessageAction))
-    {
-        emit_message(msg::OUTPUT, "failed to compile source code");
-        //return;
-    } else
-    {
-        emit_message(msg::OUTPUT, "successfully compiled source");
-    }
+    checkModule(linker.getModule());
 
     std::string err;
     std::string outputll;
@@ -2871,9 +2921,7 @@ std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
         outputo = "output.o";
     }
 
-    raw_fd_ostream output(outputll.c_str(), err);
-    linker.getModule()->print(output, 0);
-    output.close();
+    printModule(linker.getModule(), outputll);
 
     std::string llccmd = "llc " + outputll + " --filetype=obj -O0 -o " + outputo;
 

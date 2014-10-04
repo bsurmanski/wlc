@@ -1,6 +1,4 @@
 
-using namespace std;
-
 #include "ast.hpp"
 #include "parser.hpp"
 #include "streamLexer.hpp"
@@ -14,8 +12,15 @@ using namespace std;
 #include <ftw.h>
 
 #include <vector>
-#include <llvm/Linker.h>
 #include <string.h>
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+#include <llvm/Linker/Linker.h>
+#endif
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+#include <llvm/Linker.h>
+#endif
 
 void link(WLConfig params, std::string outputo)
 {
@@ -104,8 +109,8 @@ void compile(WLConfig params)
 WLConfig parseCmd(int argc, char **argv)
 {
     WLConfig params;
-    params.cmd = string(argv[0]);
-    params.files = vector<string>();
+    params.cmd = std::string(argv[0]);
+    params.files = std::vector<std::string>();
     char ftemplate[32] = "/tmp/wlcXXXXXX\0";
     params.tempName = mkdtemp(ftemplate);
     params.output = "a.out"; // default output string
@@ -140,18 +145,18 @@ WLConfig parseCmd(int argc, char **argv)
                 params.incdirs.push_back(optarg);
                 break;
             case 'o':
-                params.output = string(optarg);
+                params.output = std::string(optarg);
                 break;
             case '?':
                 if(optopt == 'l' || optopt == 'L' || optopt == 'I')
                 {
-                    emit_message(msg::FATAL, string("missing argument to '-") +
-                            string((char*) &optopt, 1) + string("'"));
+                    emit_message(msg::FATAL, std::string("missing argument to '-") +
+                            std::string((char*) &optopt, 1) + std::string("'"));
                     break;
                 }
             default:
-                emit_message(msg::FATAL, string("unrecognized command line option '-") +
-                        string(optarg) + string("'"));
+                emit_message(msg::FATAL, std::string("unrecognized command line option '-") +
+                        std::string(optarg) + std::string("'"));
                 break;
         }
     }

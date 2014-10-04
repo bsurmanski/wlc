@@ -171,6 +171,9 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
 #include<clang/Lex/Preprocessor.h>
 #include<clang/Lex/PreprocessingRecord.h>
 #include<clang/Frontend/ASTUnit.h>
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+
 #include "../include/CXTranslationUnit.h"
 #include "../include/CXCursor.h"
 #include "../include/CIndexer.h"
@@ -180,6 +183,16 @@ const clang::MacroInfo *getCursorMacroInfo(CXCursor c)
     const CXTranslationUnit TU = clang_Cursor_getTranslationUnit(c);
     return clang::cxindex::getMacroInfo(MD, TU);
 }
+
+#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+const clang::MacroInfo *getCursorMacroInfo(CXCursor c)
+{
+    return NULL; //TODO: macro info for clang 3.5
+}
+
+#else
+#error unsuported version of llvm
+#endif
 
 
 static CXTranslationUnit *cxUnit = 0;
@@ -249,7 +262,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
     } else if(cursor.kind == CXCursor_MacroDefinition)
     {
         const clang::MacroInfo *MI = getCursorMacroInfo(cursor);
-
+        if(!MI) goto MACRO_ERR;
         if(MI->isObjectLike())
         {
             if(MI->getNumTokens() == 1 && MI->getReplacementToken(0).isLiteral()) // literal value

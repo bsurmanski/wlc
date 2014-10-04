@@ -44,7 +44,16 @@ struct ASTUserType;
 struct ASTCompositeType;
 struct ASTFunctionType;
 struct ASTPointerType;
-#include <llvm/DebugInfo.h> //XXX
+
+//XXX probably should not have llvm type/debug info in ASTType
+#include <llvm/IR/Type.h>
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+#include <llvm/IR/DebugInfo.h>
+#endif
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+#include <llvm/DebugInfo.h>
+#endif
 
 struct ASTType
 {

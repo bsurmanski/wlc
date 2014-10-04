@@ -35,7 +35,7 @@ SourceLocation currentLoc;
 void IRCodegenContext::dwarfStopPoint(int ln)
 {
     llvm::DebugLoc loc = llvm::DebugLoc::get(ln, 1, diScope());
-    assert_message(!loc.isUnknown(), msg::FAILURE, "unknown debug location");
+    assert_message(!loc.isUnknown(), msg::FAILURE, "unknown debug location", location);
     ir->SetCurrentDebugLocation(loc);
 }
 
@@ -43,7 +43,7 @@ void IRCodegenContext::dwarfStopPoint(SourceLocation l)
 {
     currentLoc = l;
     llvm::DebugLoc loc = llvm::DebugLoc::get(l.line, l.ch, diScope());
-    assert_message(!loc.isUnknown(), msg::FAILURE, "unknown debug location");
+    assert_message(!loc.isUnknown(), msg::FAILURE, "unknown debug location", location);
     ir->SetCurrentDebugLocation(loc);
 }
 
@@ -52,12 +52,12 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     ASTUserType *userty = ty->asUserType();
     UserTypeDeclaration *utdecl = userty->getDeclaration();
     if(!userty) {
-        emit_message(msg::FAILURE, "invalid user type");
+        emit_message(msg::FAILURE, "invalid user type", location);
     }
 
     if(userty->identifier->isUndeclared()){ //XXX superfluous test
         Identifier *alt = userty->identifier->table->lookup(userty->identifier->getName());
-        emit_message(msg::WARNING, "type should be resolved by now");
+        emit_message(msg::WARNING, "type should be resolved by now", location);
         userty->identifier = lookup(ty->getName());
         if(userty->identifier->isUndeclared()){
             emit_message(msg::ERROR, "undeclared struct: " + userty->getName());
@@ -103,7 +103,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         {
             structVec.push_back(codegenType(vd->type));
         } else {
-            emit_message(msg::UNIMPLEMENTED, "this cant be declared in a struct (yet?)");
+            emit_message(msg::UNIMPLEMENTED, "this cant be declared in a struct (yet?)", location);
         }
     }
 
@@ -133,7 +133,7 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
 
     // XXX useless below
     if(!ty->isUnion()) {
-        emit_message(msg::FAILURE, "unknown union type");
+        emit_message(msg::FAILURE, "unknown union type", location);
     }
 
     ASTUserType *userty = ty->asUserType();
@@ -158,7 +158,7 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
             }
             //unionVec.push_back(codegenType(vd->type));
         } else
-            emit_message(msg::UNIMPLEMENTED, "this cant be declared in a union (yet?)");
+            emit_message(msg::UNIMPLEMENTED, "this cant be declared in a union (yet?)", location);
     }
 
     if(!userty->isOpaque())
@@ -187,7 +187,7 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
     ASTTupleType *tupty = dynamic_cast<ASTTupleType*>(ty);
     if(ty->kind != TYPE_TUPLE || !tupty)
     {
-        emit_message(msg::FAILURE, "invalid tuple type codegen");
+        emit_message(msg::FAILURE, "invalid tuple type codegen", location);
         return NULL;
     }
 
@@ -195,7 +195,7 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
 
     if(!tupty->types.size())
     {
-        emit_message(msg::ERROR, "invalid 0-tuple");
+        emit_message(msg::ERROR, "invalid 0-tuple", location);
         return NULL;
     }
 
@@ -224,7 +224,7 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
 {
     ASTArrayType *arrty = dynamic_cast<ASTArrayType*>(ty);
     if(!arrty) {
-        emit_message(msg::FAILURE, "attempt to codegen invalid array type");
+        emit_message(msg::FAILURE, "attempt to codegen invalid array type", location);
     }
 
     //if(ty->cgType) return ty->cgType;
@@ -259,7 +259,7 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
 llvm::Type *IRCodegenContext::codegenFunctionType(ASTType *ty) {
     ASTFunctionType *astfty = ty->asFunctionType();
     if(!astfty) {
-        emit_message(msg::FAILURE, "attempt to codegen invalid function type");
+        emit_message(msg::FAILURE, "attempt to codegen invalid function type", location);
         return NULL;
     }
 
@@ -291,16 +291,16 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
             ty = tdecl->getDeclaredType();
             if(!tdecl->getDeclaredType())
             {
-                emit_message(msg::FATAL, "error, invalid type");
+                emit_message(msg::FATAL, "error, invalid type", location);
             }
         } else {
-            emit_message(msg::FATAL, "error, invalid type");
+            emit_message(msg::FATAL, "error, invalid type", location);
             return NULL;
         }
         //TODO
         if(id->isUndeclared()) {
             emit_message(msg::ERROR, string("undeclared type'") +
-                    id->getName() + string("' in scope"));
+                    id->getName() + string("' in scope"), location);
             return NULL;
         }
     }
@@ -385,7 +385,7 @@ llvm::Value *IRCodegenContext::codegenValue(ASTValue *value)
 
     if(!value->value) {
         //TODO
-        emit_message(msg::FAILURE, "AST Value failed to generate");
+        emit_message(msg::FAILURE, "AST Value failed to generate", location);
     }
 
     if(value->isLValue()) {
@@ -407,12 +407,12 @@ llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
 
     if(!value->isLValue() && !value->isReference())
     {
-        emit_message(msg::FATAL, "rvalue used in lvalue context!");
+        emit_message(msg::FATAL, "rvalue used in lvalue context!", location);
         return NULL;
     }
     if(!value->value) {
         //TODO
-        emit_message(msg::FAILURE, "AST Value failed to generate");
+        emit_message(msg::FAILURE, "AST Value failed to generate", location);
     }
 
     if(value->isLValue() && value->isReference()) {
@@ -425,11 +425,11 @@ llvm::Value *IRCodegenContext::codegenLValue(ASTValue *value)
 llvm::Value *IRCodegenContext::codegenRefValue(ASTValue *value) {
     if(!value->value) {
         //TODO
-        emit_message(msg::FAILURE, "AST Value failed to generate");
+        emit_message(msg::FAILURE, "AST Value failed to generate", location);
     }
 
     if(!value->isReference()) {
-        emit_message(msg::FAILURE, "Attempting to get reference value of non reference");
+        emit_message(msg::FAILURE, "Attempting to get reference value of non reference", location);
     }
 
     return (llvm::Value*) value->value;
@@ -511,13 +511,17 @@ ASTValue *IRCodegenContext::getIntValue(ASTType *t, int i){
 
 ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
 {
-    assert_message(lval->isLValue(), msg::FAILURE, "attempted to load RValue (must be LValue)");
+    assert_message(lval->isLValue(), msg::FAILURE, "attempted to load RValue (must be LValue)", location);
     ASTValue *loaded = new ASTBasicValue(lval->getType(), codegenValue(lval));
     return loaded;
 }
 
 ASTValue *IRCodegenContext::getThis() {
     Identifier *thisId = getScope()->lookup("this", false);
+    if(!thisId) {
+        emit_message(msg::ERROR, "attempt to access 'this' in non-class function", location);
+        return NULL;
+    }
     return codegenIdentifier(thisId);
 }
 
@@ -527,7 +531,7 @@ ASTValue *IRCodegenContext::getVTable(ASTValue *instance) {
 
 llvm::Value *IRCodegenContext::codegenMethod(MethodValue *method) {
     ASTUserType *userty = method->getInstance()->getType()->asUserType();
-    if(!userty) emit_message(msg::ERROR, "virtual function lookup only valid for class");
+    if(!userty) emit_message(msg::ERROR, "virtual function lookup only valid for class", location);
 
     //TODO: function index
     ASTValue *vtable = getVTable(method->getInstance());
@@ -775,6 +779,8 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
         ASTBasicValue *ret = new ASTBasicValue(mtype, llval, true, mtype->isReference());
         ret->setOwner(val);
+        ret->setWeak(id->getDeclaration()->isWeak());
+        //TODO set other qualifiers
         return ret;
     } else {
         emit_message(msg::ERROR, "unknown member in user type");
@@ -1129,6 +1135,11 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
             if(unit->globals.count(id->getName()))
             {
                 return unit->globals[id->getName()];
+            } else if(id->getDeclaration()->qualifier.isConst) {
+                VariableDeclaration *vdecl = (VariableDeclaration*) id->getDeclaration();
+                ASTBasicValue *val = dynamic_cast<ASTBasicValue*>(promoteType(codegenExpression(vdecl->value), vdecl->getType()));
+                val->setConstant(true);
+                return val;
             } else
             {
                 GlobalVariable* GV =
@@ -1177,6 +1188,7 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
 
 ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
 {
+    location = exp->loc;
     if(NumericExpression *nexp = exp->numericExpression())
     {
         llvm::Value *llvmval;
@@ -1242,7 +1254,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         return NULL;
     } else if(CastExpression *cexp = exp->castExpression())
     {
-        return promoteType(codegenExpression(cexp->expression), cexp->type);
+        return promoteType(codegenExpression(cexp->expression), cexp->type, true);
     } else if(TupleExpression *texp = dynamic_cast<TupleExpression*>(exp))
     {
         return codegenTupleExpression(texp);
@@ -1575,7 +1587,7 @@ ASTValue *IRCodegenContext::codegenCall(ASTValue *func, std::vector<ASTValue *> 
     }
 
     llvm::Value *value = ir->CreateCall(codegenValue(func), llargs);
-    return new ASTBasicValue(rtype, value);
+    return new ASTBasicValue(rtype, value, false, rtype->isReference());
 }
 
 ASTValue *IRCodegenContext::resolveOverload(ASTValue *func, std::vector<ASTValue *> args) {
@@ -1664,10 +1676,10 @@ void IRCodegenContext::resolveArguments(ASTValue *func, std::vector<ASTValue*>& 
             arg = codegenExpression(fdecl->parameters[parami]->value);
         } else {
             //TODO: check arguments before here
-            emit_message(msg::ERROR, "invalid function call found");
+            emit_message(msg::ERROR, "invalid function call found", location);
             emit_message(msg::ERROR, "could not convert argument of type '" +
                     args[argi]->getType()->getName() + "' to parameter of type '" +
-                    astfty->params[parami]->getName() + "'");
+                    astfty->params[parami]->getName() + "'", location);
             return;
         }
 
@@ -1998,8 +2010,7 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
 
     if(toType->isReference()) {
         return new ASTBasicValue(toType,
-                ir->CreatePointerCast(codegenValue(val), codegenType(toType)),
-                false); //XXX might be a bit cludgy
+                ir->CreatePointerCast(codegenValue(val), codegenType(toType)), false, true); //XXX might be a bit cludgy
     }
 }
 
@@ -2038,7 +2049,7 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
 }
 
 
-ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
+ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType, bool isExplicit)
 {
     ASTValue *ret = NULL;
     if(val->getType()->is(toType)) {
@@ -2094,6 +2105,11 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
                     ret = new ASTBasicValue(toType,
                             ir->CreatePointerCast(codegenLValue(val),
                                 codegenType(toType)), false, true);
+                } else if(isExplicit && toType->isClass()) {
+                    //TODO: make dynamic cast instead of reinterpret cast
+                    ret = new ASTBasicValue(toType,
+                            ir->CreatePointerCast(codegenLValue(val),
+                                codegenType(toType)), false, true);
                 }
             }
         }
@@ -2103,7 +2119,7 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType)
     if(!ret || !ret->getType()) {
         char err[1024]; //XXX may overflow if type names are too long
         sprintf(err, "cannot convert value of type '%s' to type '%s'", val->getType()->getName().c_str(), toType->getName().c_str());
-        emit_message(msg::ERROR, std::string(err));
+        emit_message(msg::ERROR, std::string(err), location);
     }
 
     return ret;
@@ -2118,7 +2134,7 @@ void IRCodegenContext::codegenResolveBinaryTypes(ASTValue **v1, ASTValue **v2, u
         if((*v1)->getType()->isStruct() || (*v2)->getType()->isStruct())
         {
             // TODO: loc
-            emit_message(msg::UNIMPLEMENTED, "cannot convert structs (yet)");
+            emit_message(msg::UNIMPLEMENTED, "cannot convert structs (yet)", location);
         }
         if((*v2)->getType()->getPriority() > (*v1)->getType()->getPriority())
             *v1 = promoteType(*v1, (*v2)->getType());
@@ -2136,7 +2152,7 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
         {
             if(tlhs->values.size() > trhs->values.size())
             {
-                emit_message(msg::ERROR, "tuple assignment requires compatible tuple types");
+                emit_message(msg::ERROR, "tuple assignment requires compatible tuple types", location);
                 return NULL;
             }
             for(int i = 0; i < tlhs->values.size(); i++)
@@ -2144,14 +2160,14 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
                 codegenAssign(tlhs->values[i], trhs->values[i]);
             }
         } else {
-            emit_message(msg::ERROR, "tuple assignment requires a tuple on rhs");
+            emit_message(msg::ERROR, "tuple assignment requires a tuple on rhs", location);
             return NULL;
         }
         return rhs;
     }
 
     if(lhs->isConstant()) {
-        emit_message(msg::ERROR, "cannot assign to constant value");
+        emit_message(msg::ERROR, "cannot assign to constant value", location);
         return NULL;
     }
 
@@ -2168,7 +2184,7 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
         else
         {
             emit_message(msg::ERROR, "cannot assign value of type '" + rhs->getType()->getName() +
-                    "' to type '" + lhs->getType()->getName() + "'");
+                    "' to type '" + lhs->getType()->getName() + "'", location);
             return NULL;
         }
     }
@@ -2351,6 +2367,7 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
     if(exp->expression)
     {
         ASTValue *value = codegenExpression(exp->expression);
+        retainObject(value); // retain return value
         ASTValue *v = promoteType(value, currentFunction.retVal->getType());
         storeValue(currentFunction.retVal, v);
     }
@@ -2363,6 +2380,7 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
 void IRCodegenContext::codegenStatement(Statement *stmt)
 {
     if(!stmt) return;
+    location = stmt->loc;
     dwarfStopPoint(stmt->loc);
     if(Expression *estmt = dynamic_cast<Expression*>(stmt))
     {
@@ -2700,6 +2718,7 @@ void IRCodegenContext::codegenUserTypeDeclaration(UserTypeDeclaration *utdecl) {
 
 void IRCodegenContext::codegenDeclaration(Declaration *decl)
 {
+    location = decl->loc;
     if(FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(decl)) {
         codegenFunctionDeclaration(fdecl);
         if(fdecl->getNextOverload()){ //codegen all function overloads

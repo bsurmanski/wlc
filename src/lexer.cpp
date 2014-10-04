@@ -313,7 +313,17 @@ Token Lexer::lexNumber()
         }
 
         return Token(tok::intNum, num);
-    } else //normal decinal number
+    } else if(numstr[0] == '\'') { // character token
+        char c = getChar();
+        if(c == '\\') {
+            c = getEscapeChar(getChar());
+        }
+        if(peekChar() != '\'') {
+            assert(false && "invalid character constant. expected ' following character");
+        }
+        ignoreChar();
+        return Token(tok::intNum, (double) c);
+    } else //normal decimal number
     {
         while(isdigit(peekChar()) || peekChar() == '.')
         {

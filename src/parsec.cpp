@@ -160,6 +160,8 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
         case CXType_ConstantArray:
             return ASTTypeFromCType(unit,
                     clang_getElementType(ctype))->getArrayTy(clang_getArraySize(ctype));
+        case CXType_FunctionProto:
+            return NULL; //TODO
         default:
             emit_message(msg::WARNING, "failed conversion of CType to WLType: " +
                     string(clang_getCString(clang_getTypeSpelling(ctype))));
@@ -322,9 +324,21 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         // will generate struct ASTType
         ASTTypeFromCType(unit, clang_getCursorType(cursor));
     } else if(cursor.kind == CXCursor_TypedefDecl) {
+        /*
+        // XXX FROM OTHER ATTEMPT ON VULCAN
         Identifier *id = unit->getScope()->get(clang_getCString(clang_getCursorSpelling(cursor)));
         ASTType *typedefty = ASTTypeFromCType(unit, clang_getTypedefDeclUnderlyingType(cursor));
         id->setExpression(new TypeExpression(typedefty, loc));
+        */
+        goto ERR; //TODO
+        CXString cxname = clang_getCursorSpelling(cursor);
+        std::string name = clang_getCString(cxname);
+        CXType ctype = clang_getTypedefDeclUnderlyingType(cursor);
+        ASTType *ty = ASTTypeFromCType(unit, ctype);
+        if(!ty) goto ERR;
+        Identifier *id = unit->getScope()->get(name);
+        id->setKind(Identifier::ID_TYPE);
+        id->setDeclaredType(ty);
     }
 
     return CXChildVisit_Continue;

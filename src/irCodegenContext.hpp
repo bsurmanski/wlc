@@ -148,6 +148,7 @@ struct IRTranslationUnit
 class IRCodegenContext : public CodegenContext
 {
     public:
+    SourceLocation location;
     llvm::LLVMContext &context;
     llvm::IRBuilder<> *ir;
     llvm::Module *module;
@@ -289,7 +290,7 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenAssign(ASTValue *lhs, ASTValue *rhs, bool convert=false);
 
     // promote
-    ASTValue *promoteType(ASTValue *val, ASTType *type);
+    ASTValue *promoteType(ASTValue *val, ASTType *type, bool isExplicit=false);
     ASTValue *promoteInt(ASTValue *val, ASTType *type);
     ASTValue *promoteFloat(ASTValue *val, ASTType *type);
     ASTValue *promotePointer(ASTValue *val, ASTType *type);

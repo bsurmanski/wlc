@@ -36,7 +36,10 @@ ASTType *Identifier::getType()
         return expression->getType();
     }
 
-    return declaration->getType();
+    if(declaration)
+        return declaration->getType();
+
+    return NULL;
 }
 
 ASTType *Identifier::getDeclaredType()

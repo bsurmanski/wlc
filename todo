@@ -1,23 +1,12 @@
-crashes if first for statement is not decl
-for(*id* = thing ...)
-
 static members in structs/classes
 
 array 'new' should accept variable length. eg (int[] arr = new int[5 * i])
 
 set member class types and arrays to zero
 
-error if member lookup fails (eg .x, but x not in this)
-
-//cannot call function on returned struct eg (getStruct().doStuff()) where the prototype is "MyStruct GetStruct()"
-
-'myclass = Class()' expression is still a bit silly
-
-new Class() sometimes does not work if Class is declared after use
-
 null all class-typed members before constructor
 
-recursive types (types that contain references to each other) crash things
+? recursive types (types that contain references to each other) crash things
 
 rearange class members largest to smallest (for packing efficiency)
 
@@ -26,3 +15,6 @@ import(C), correctly parse 'typedef'
 warn of invalid use of local if function member
 
 functions accept extra parameters (which are then ignored)
+
+"new MyClass().func()" parses incorrectly (new should bind harder than '.')
+MyClass().func() does not work (seems to be same as above)

@@ -1725,7 +1725,15 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         ASTUserType *uty = func->asTypeValue()->getReferencedType()->asUserType();
         func = codegenIdentifier(uty->getConstructor()->getIdentifier()); //XXX bit round about going through id
         Value *tmpAlloca = ir->CreateAlloca(codegenType(uty));
-        ret = new ASTBasicValue(uty->getReferenceTy(), tmpAlloca, false, true);
+
+        if(uty->isReference()) {
+            // allocate room for value on stack store in reference
+            Value *stackAlloca = ir->CreateAlloca(codegenType(uty)->getPointerElementType());
+            ir->CreateStore(stackAlloca, tmpAlloca);
+        }
+        //XXX below is a bit strange. "isReference?" is in the lvalue field of the BasicValue constructor.
+        // it doesnt work the other way around
+        ret = new ASTBasicValue(uty->getReferenceTy(), tmpAlloca, uty->isReference(), true);
         args.push_back(ret); // push back reference to allocated userType, to be constructed
         //XXX above should be lvalue
     } else if(func->getType()->isPointer()){ // dereference function pointer
@@ -2569,7 +2577,6 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
                                    promoteType(opIndex(&GBV, getIntValue(ASTType::getLongTy(), i)), idValue->getType()->getPointerElementTy()));
 
                     }
-                    emit_message(msg::WARNING, "constant array assignment", vdecl->loc);
                 } else {
                     defaultValue = promoteType(defaultValue, vty);
                     storeValue(idValue, defaultValue);

@@ -7,7 +7,7 @@ int main(int argc, char^^ argv)
 {
     MyClass cl = new MyClass
     MySpecialClass scl = new MySpecialClass
-    //SomeFace face = cl
+    SomeFace face = cl
     cl.a = 5
     scl.svar = 11
     scl.a = 2

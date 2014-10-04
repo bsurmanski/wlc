@@ -1,3 +1,4 @@
+extern undecorated int printf(char^ fmt, ...);
 
 class OverloadClass {
     int i

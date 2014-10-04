@@ -38,7 +38,7 @@ ifeq ($(LLVMVERSION),3.5.0)
 LLVMLDFLAGS += -lLLVM-3.5 -lclang -lz -lpthread -lcurses -ldl
 endif
 
-ifeq ($(LLVMVERSION),3.4.0)
+ifeq ($(LLVMVERSION),3.4.1)
 LLVMLDFLAGS += -lLLVM-3.4
 CLANGLIBS=$(CLANGLIBS_34)
 endif

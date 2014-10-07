@@ -2,13 +2,13 @@
 #include "token.hpp"
 #include "irCodegenContext.hpp"
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
 #define LLVM_35
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Linker/Linker.h>
-#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 4
 #define LLVM_34
 #include <llvm/Analysis/Verifier.h>
 #include <llvm/Support/raw_ostream.h>

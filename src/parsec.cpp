@@ -174,7 +174,14 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
 #include<clang/Lex/PreprocessingRecord.h>
 #include<clang/Frontend/ASTUnit.h>
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
+const clang::MacroInfo *getCursorMacroInfo(CXCursor c)
+{
+    return NULL; //TODO: macro info for clang 3.5
+}
+
+
+#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 4
 
 #include "../include/CXTranslationUnit.h"
 #include "../include/CXCursor.h"
@@ -184,12 +191,6 @@ const clang::MacroInfo *getCursorMacroInfo(CXCursor c)
     const clang::MacroDefinition *MD = clang::cxcursor::getCursorMacroDefinition(c);
     const CXTranslationUnit TU = clang_Cursor_getTranslationUnit(c);
     return clang::cxindex::getMacroInfo(MD, TU);
-}
-
-#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
-const clang::MacroInfo *getCursorMacroInfo(CXCursor c)
-{
-    return NULL; //TODO: macro info for clang 3.5
 }
 
 #else

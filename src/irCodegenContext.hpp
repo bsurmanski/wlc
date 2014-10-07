@@ -10,12 +10,12 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/IRBuilder.h>
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
 #include <llvm/IR/DIBuilder.h>
 #include <llvm/Linker/Linker.h>
 #endif
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 4
 #include <llvm/DIBuilder.h>
 #include <llvm/DebugInfo.h>
 #include <llvm/Linker.h>

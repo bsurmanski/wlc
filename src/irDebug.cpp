@@ -34,12 +34,12 @@ llvm::DIDescriptor IRDebug::currentScope()
 
 llvm::DIDescriptor IRDebug::createScope(llvm::DIDescriptor parent, SourceLocation loc)
 {
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
     //TODO path discriminator (computed from DILocation di.computeNewDiscriminator(LLVMContext)
     return di.createLexicalBlock(parent, currentFile(), loc.line, loc.ch, 0 /*path discriminator*/);
 #endif
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 4
     return di.createLexicalBlock(parent, currentFile(), loc.line, loc.ch);
 #endif
 }

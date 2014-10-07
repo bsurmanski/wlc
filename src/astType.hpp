@@ -47,11 +47,11 @@ struct ASTPointerType;
 
 //XXX probably should not have llvm type/debug info in ASTType
 #include <llvm/IR/Type.h>
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
 #include <llvm/IR/DebugInfo.h>
 #endif
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 4
 #include <llvm/DebugInfo.h>
 #endif
 

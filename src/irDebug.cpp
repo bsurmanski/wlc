@@ -34,12 +34,11 @@ llvm::DIDescriptor IRDebug::currentScope()
 
 llvm::DIDescriptor IRDebug::createScope(llvm::DIDescriptor parent, SourceLocation loc)
 {
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5
     //TODO path discriminator (computed from DILocation di.computeNewDiscriminator(LLVMContext)
     return di.createLexicalBlock(parent, currentFile(), loc.line, loc.ch, 0 /*path discriminator*/);
-#endif
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 4
+#elif LLVM_VERSION_MAJOR == 3 && (LLVM_VERSION_MINOR == 4 || LLVM_VERSION_MINOR >= 6)
     return di.createLexicalBlock(parent, currentFile(), loc.line, loc.ch);
 #endif
 }
@@ -401,7 +400,7 @@ llvm::DICompositeType IRDebug::createPrototype(ASTType *p)
         vec.push_back(createType(astfty->params[i]));
     }
 
-    DIArray arr = di.getOrCreateArray(vec);
+    DITypeArray arr = di.getOrCreateTypeArray(vec);
     return di.createSubroutineType(diFile, arr);
 }
 
@@ -433,7 +432,9 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
 
 llvm::DIGlobalVariable IRDebug::createGlobal(VariableDeclaration *decl, ASTValue *val)
 {
-    return di.createGlobalVariable(decl->identifier->getName(),
+    return di.createGlobalVariable(currentScope(), 
+			decl->identifier->getName(),
+			decl->identifier->getMangledName(),
             currentFile(),
             decl->loc.line,
             createType(decl->getType()),
@@ -446,16 +447,27 @@ llvm::Instruction *IRDebug::createVariable(std::string nm, ASTValue *v, BasicBlo
     //TODO: name, line, type
     vector<Value*> addr;
 
-    DIVariable div = di.createComplexVariable(
-                argn ? dwarf::DW_TAG_arg_variable : dwarf::DW_TAG_auto_variable,
-                currentScope(),
-                nm,
-                currentFile(),
-                loc.line,
-                createType(v->getType()),
-                addr,
-                false);
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
+	DIVariable div = di.createLocalVariable(
+		argn ? dwarf::DW_TAG_arg_variable : dwarf::DW_TAG_auto_variable,
+		currentScope(),
+		nm,
+		currentFile(),
+		loc.line,
+		createType(v->getType()));
+#else
+	DIVariable div = di.createComplexVariable(
+		argn ? dwarf::DW_TAG_arg_variable : dwarf::DW_TAG_auto_variable,
+		currentScope(),
+		nm,
+		currentFile(),
+		loc.line,
+		createType(v->getType()),
+		addr,
+		false);
+#endif
+    
 
-    Instruction *idinst = di.insertDeclare((llvm::Value*) v->value, div, bb);
+    Instruction *idinst = di.insertDeclare((llvm::Value*) v->value, div, DIExpression(), bb);
     return idinst;
 }

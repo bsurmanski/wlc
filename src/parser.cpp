@@ -1,9 +1,13 @@
 
 #include <cstdio>
-#include <unistd.h>
 #include <fcntl.h>
 
-#include <clang-c/Index.h>
+#ifdef WIN32
+#else
+#include <unistd.h>
+#endif
+
+//#include <clang-c/Index.h>
 
 #include <fstream>
 #include <vector>
@@ -260,6 +264,7 @@ TopLevelExpression *ParseContext::parseTopLevelExpression()
     {
         //XXX
     }
+	return NULL;
 }
 
 UseExpression *ParseContext::parseUseExpression()
@@ -601,7 +606,7 @@ Declaration *ParseContext::parseDeclaration()
         tbl->setOwner(id);
         pushScope(tbl);
 
-        UserTypeDeclaration *sdecl;
+        UserTypeDeclaration *sdecl = NULL;
 
         switch(kind)
         {

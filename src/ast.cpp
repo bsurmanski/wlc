@@ -1,5 +1,24 @@
 #include "ast.hpp"
 
+#ifdef WIN32
+char *realpath(const char *path, char *resolve) {
+	return _fullpath(resolve, path, PATH_MAX);
+}
+std::string getFilebase(std::string s)
+{
+	std::tr2::sys::path filepath(s);
+	return basename(filepath);
+}
+#else
+std::string getFilebase(std::string s)
+{
+	size_t lastDot = s.find_last_of(".");
+	if (lastDot != std::string::npos)
+		s = s.substr(0, lastDot);
+	return basename(s.c_str());
+}
+#endif
+
 Package::Package(Package *par, std::string nm) : parent(par), scope(NULL), cgValue(NULL),
     identifier(NULL)
 {

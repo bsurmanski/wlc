@@ -14,9 +14,9 @@ ASTType *ASTUserType::getBaseType(){
 }
 
 Identifier *ASTUserType::getBaseIdentifier() {
-    ClassDeclaration *cdecl = getDeclaration()->classDeclaration();
-    if(cdecl) {
-        return cdecl->base;
+    ClassDeclaration *cldecl = getDeclaration()->classDeclaration();
+    if(cldecl) {
+        return cldecl->base;
     }
     return NULL;
 }
@@ -54,9 +54,9 @@ long ASTUserType::getMemberIndex(std::string member){
 }
 
 long ASTUserType::getVTableIndex(std::string method){
-    ClassDeclaration *cdecl = getDeclaration()->classDeclaration();
-    for(int i = 0; i < cdecl->vtable.size(); i++) {
-        if(cdecl->vtable[i]->getName() == method) {
+    ClassDeclaration *cldecl = getDeclaration()->classDeclaration();
+    for(int i = 0; i < cldecl->vtable.size(); i++) {
+        if(cldecl->vtable[i]->getName() == method) {
             return i;
         }
     }
@@ -255,10 +255,10 @@ bool ASTUserType::is(ASTType *t) {
 }
 
 bool ASTUserType::extends(ASTType *t) {
-    ClassDeclaration *cdecl;
-    if((cdecl = getDeclaration()->classDeclaration()) && cdecl->base) {
-        return cdecl->base->getDeclaration() == t->getDeclaration() ||
-            cdecl->base->getDeclaredType()->extends(t);
+    ClassDeclaration *cldecl;
+    if((cldecl = getDeclaration()->classDeclaration()) && cldecl->base) {
+        return cldecl->base->getDeclaration() == t->getDeclaration() ||
+            cldecl->base->getDeclaredType()->extends(t);
     }
     return false;
 }

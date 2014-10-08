@@ -170,7 +170,7 @@ class IRCodegenContext : public CodegenContext
     protected:
 
     bool isTerminated() { return terminated; }
-    bool setTerminated(bool b) { terminated = b; }
+    void setTerminated(bool b) { terminated = b; }
 
     // codegen type
     llvm::Type *codegenArrayType(ASTType *ty);

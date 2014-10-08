@@ -6,10 +6,19 @@
 #include "message.hpp"
 #include "config.hpp"
 
+#ifdef WIN32
+#include "win_getopt.h"
+#include <Windows.h>
+#undef ERROR // conflicts with msg::ERROR
+#pragma import clang.lib
+
+#else
 #include <unistd.h>
 #include <dirent.h>
-#include <sys/stat.h>
 #include <ftw.h>
+#endif
+
+#include <sys/stat.h>
 
 #include <vector>
 #include <string.h>
@@ -20,6 +29,37 @@
 
 #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 4
 #include <llvm/Linker.h>
+#endif
+
+#ifdef WIN32
+static void deleteDir(std::string dirnm) {
+	//TODO
+}
+
+static std::string createTempDir() {
+	TCHAR pathnm[64];
+	GetTempPath(64, pathnm);
+	CreateDirectory(pathnm, NULL);
+	return std::string(pathnm);
+}
+#else
+static int remove_ftw(const char *path, const struct stat *st, int, struct FTW*) {
+	int rv = remove(path);
+
+	if (rv)
+		perror(path);
+
+	return rv;
+}
+
+static void deleteDir(std::string dirnm) {
+	nftw(dirnm.c_str(), remove_ftw, 8, FTW_PHYS | FTW_DEPTH);
+}
+
+static std::string createTempDir() {
+	char ftemplate[32] = "/tmp/wlcXXXXXX\0";
+	return std::string(mkdtemp(ftemplate));
+}
 #endif
 
 void link(WLConfig params, std::string outputo)
@@ -111,8 +151,7 @@ WLConfig parseCmd(int argc, char **argv)
     WLConfig params;
     params.cmd = std::string(argv[0]);
     params.files = std::vector<std::string>();
-    char ftemplate[32] = "/tmp/wlcXXXXXX\0";
-    params.tempName = mkdtemp(ftemplate);
+	params.tempName = createTempDir();
     params.output = "a.out"; // default output string
 
     int c;
@@ -163,18 +202,9 @@ WLConfig parseCmd(int argc, char **argv)
     return params;
 }
 
-static int remove_ftw(const char *path, const struct stat *st, int, struct FTW*) {
-    int rv = remove(path);
-
-    if(rv)
-        perror(path);
-
-    return rv;
-}
-
 void deinit(WLConfig &config)
 {
-    nftw(config.tempName.c_str(), remove_ftw, 8, FTW_PHYS | FTW_DEPTH);
+	deleteDir(config.tempName);
 }
 
 int main(int argc, char **argv)

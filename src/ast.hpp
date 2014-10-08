@@ -9,7 +9,16 @@
 #include <map>
 #include <stdlib.h>
 #include <limits.h>
+
+#ifdef WIN32
+#include<filesystem>
+#define PATH_MAX 255
+char *realpath(const char *path, char *resolve);
+std::string getFilebase(std::string s);
+#else
 #include <unistd.h>
+std::string getFilebase(std::string s);
+#endif
 
 #include "astScope.hpp"
 #include "identifier.hpp"
@@ -159,13 +168,7 @@ struct TranslationUnit : public Package
 
     std::string filenm;
     bool expl; // explicitly requested for compile. eg, not included
-    static std::string getFilebase(std::string s)
-    {
-        size_t lastDot = s.find_last_of(".");
-        if(lastDot != std::string::npos)
-            s = s.substr(0, lastDot);
-        return basename(s.c_str());
-    }
+
 
     TranslationUnit(Package *parent, std::string fn = "") :
         Package(parent, getFilebase(fn)), filenm(fn), expl(false) {}
@@ -508,8 +511,8 @@ struct TypeDeclaration : public Declaration
     virtual ASTType *getType() { return NULL; } // XXX return a 'type' type?
     virtual ASTType *getDeclaredType() = 0;
     //virtual std::string getName() { return "" };
-    virtual size_t getSize() const { assert(false && "unknown size"); }
-    virtual size_t getAlign() const { assert(false && "unknown align"); }
+	virtual size_t getSize() const { assert(false && "unknown size"); return 0; }
+	virtual size_t getAlign() const { assert(false && "unknown align"); return 0;  }
     virtual TypeDeclaration *typeDeclaration() { return this; }
 };
 
@@ -934,7 +937,7 @@ struct IdentifierExpression : public PrimaryExpression
         if(id->isUserType()) return id->getDeclaredType();
         return NULL;
     }
-    bool setLocal(bool b) { local = b; }
+    void setLocal(bool b) { local = b; }
     bool isLocal() { return local; }
     virtual bool isConstant() {
         return id->getDeclaration() &&

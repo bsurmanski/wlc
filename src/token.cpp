@@ -34,11 +34,11 @@ bool Operator::isAssignOp() {
 }
 
 bool Operator::isCompoundAssignOp() {
-    ::isCompoundAssignOp(kind);
+    return ::isCompoundAssignOp(kind);
 }
 
 bool Operator::isLogicalOp() {
-    ::isLogicalOp(kind);
+    return ::isLogicalOp(kind);
 }
 
 
@@ -197,7 +197,7 @@ Token::Token(TokenKind k, double data) : kind(k)
 {
     if(kind == tok::intNum)
     {
-        iData = data;
+        iData = (int64_t) data;
     } else if(kind == tok::floatNum)
     {
         fData = data;
@@ -251,6 +251,7 @@ std::string Token::getSpelling()
 #include "tokenkinds.def"
 
     }
+	return "";
 }
 
 std::string Token::toString()

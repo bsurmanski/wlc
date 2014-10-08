@@ -573,7 +573,7 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
     // cannot simply allocate dynamic array type. create static array instead. Then it is
     // simple to convert static array (later on) to dynamic array by bounding it in the relevent struct.
     bool dyarray = false;
-    ASTDynamicArrayType *dyarrayTy;
+    ASTDynamicArrayType *dyarrayTy = NULL;
     if(ASTDynamicArrayType *daty = dynamic_cast<ASTDynamicArrayType*>(ty)) {
         dyarrayTy = daty;
         ty = (ASTCompositeType*) daty->getMemberType(0)->getArrayTy(tuple->values.size());
@@ -654,9 +654,9 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
     ASTType *vfty = ASTType::getVoidFunctionTy()->getPointerTy();
 
     UserTypeDeclaration *utdecl = ty->getDeclaration()->userTypeDeclaration();
-    if(ClassDeclaration *cdecl = utdecl->classDeclaration()) {
-        for(int i = 0; i < cdecl->vtable.size(); i++){
-            FunctionDeclaration *fdecl = cdecl->vtable[i];
+    if(ClassDeclaration *cldecl = utdecl->classDeclaration()) {
+        for(int i = 0; i < cldecl->vtable.size(); i++){
+            FunctionDeclaration *fdecl = cldecl->vtable[i];
             fdecl->setVTableIndex(i);
             if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
             FunctionType *fty = (FunctionType*) codegenType(fdecl->getType());
@@ -878,6 +878,7 @@ ASTValue *IRCodegenContext::opShrValue(ASTValue *a, ASTValue *b){ // >>
 // BINOP **
 ASTValue *IRCodegenContext::opPowValue(ASTValue *a, ASTValue *b){ // **
     emit_message(msg::UNIMPLEMENTED, "unimplemented power operator");
+	return NULL;
 }
 
 // or, ||, logical or
@@ -1198,8 +1199,8 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     location = exp->loc;
     if(NumericExpression *nexp = exp->numericExpression())
     {
-        llvm::Value *llvmval;
-        ASTType *ty;
+        llvm::Value *llvmval = NULL;
+        ASTType *ty = NULL;
         ASTBasicValue *ret = NULL;
         switch(nexp->type)
         {
@@ -2852,22 +2853,30 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
     exitScope();
 }
 
-#ifdef LLVM_35
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
 void printModule(Module *m, std::string filenm) {
-    std::string err;
+    //std::string err;
+	std::error_code err;
     raw_fd_ostream output(filenm.c_str(), err, llvm::sys::fs::OpenFlags::F_Text);
     m->print(output, 0);
     output.close();
 }
-#endif
-
-#ifdef LLVM_34
+#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
+void printModule(Module *m, std::string filenm) {
+	std::string err;
+	raw_fd_ostream output(filenm.c_str(), err, llvm::sys::fs::OpenFlags::F_Text);
+	m->print(output, 0);
+	output.close();
+}
+#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 4
 void printModule(Module *m, std::string filenm) {
     std::string err;
     raw_fd_ostream output(filenm.c_str(), err);
     m->print(output, 0);
     output.close();
 }
+#else
+#error invalid LLVM version
 #endif
 
 void IRCodegenContext::codegenPackage(Package *p)
@@ -2895,7 +2904,10 @@ void IRCodegenContext::codegenPackage(Package *p)
 }
 
 #include <fcntl.h>
+#ifdef WIN32
+#else
 #include <unistd.h>
+#endif
 
 #ifdef LLVM_35
 bool checkModule(Module *m) {

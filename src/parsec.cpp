@@ -1,8 +1,28 @@
 /// C Parsing fun stuff
 
 #include <cstdio>
-#include <unistd.h>
 #include <fcntl.h>
+
+#ifdef WIN32
+#include <io.h>
+#include <sys/stat.h>
+#define dup _dup
+#define dup2 _dup2
+#define open _open
+#define close _close
+#define basename _basename
+#define access _access
+#define fileno _fileno
+#define S_IWUSR _S_IWRITE
+#define S_IWGRP _S_IWRITE
+#define S_IWOTH _S_IWRITE
+#define S_IRUSR _S_IREAD
+#define S_IRGRP _S_IREAD
+#define S_IROTH _S_IREAD
+#define F_OK 04 //file exists and is readible
+#else
+#include <unistd.h>
+#endif
 
 #include <clang-c/Index.h>
 #include <vector>

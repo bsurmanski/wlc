@@ -162,18 +162,19 @@ void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
         emit_message(msg::ERROR, "unresolved user type declaration", decl->loc);
     }
 
-    if(ClassDeclaration *cdecl = decl->classDeclaration()) {
-        if(cdecl->base) {
-            cdecl->base = resolveIdentifier(cdecl->base);
-            if(!cdecl->base->isClass() && !cdecl->base->isStruct()) {
-                emit_message(msg::ERROR, "expected class type in base specifier", cdecl->loc);
-                if(cdecl->base->isInterface()) {
-                    emit_message(msg::ERROR, "interfaces are specified implicitly", cdecl->loc);
+	ClassDeclaration *cldecl = decl->classDeclaration();
+    if(cldecl) {
+        if(cldecl->base) {
+            cldecl->base = resolveIdentifier(cldecl->base);
+            if(!cldecl->base->isClass() && !cldecl->base->isStruct()) {
+                emit_message(msg::ERROR, "expected class type in base specifier", cldecl->loc);
+                if(cldecl->base->isInterface()) {
+                    emit_message(msg::ERROR, "interfaces are specified implicitly", cldecl->loc);
                 }
             }
         }
 
-        cdecl->populateVTable();
+        cldecl->populateVTable();
     }
 
     if(InterfaceDeclaration *idecl = dynamic_cast<InterfaceDeclaration*>(decl)){

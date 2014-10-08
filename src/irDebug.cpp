@@ -400,8 +400,13 @@ llvm::DICompositeType IRDebug::createPrototype(ASTType *p)
         vec.push_back(createType(astfty->params[i]));
     }
 
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
     DITypeArray arr = di.getOrCreateTypeArray(vec);
     return di.createSubroutineType(diFile, arr);
+#else // llvm 3.5 or lower
+    DIArray arr = di.getOrCreateArray(vec);
+    return di.createSubroutineType(diFile, arr);
+#endif
 }
 
 llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
@@ -432,7 +437,8 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
 
 llvm::DIGlobalVariable IRDebug::createGlobal(VariableDeclaration *decl, ASTValue *val)
 {
-    return di.createGlobalVariable(currentScope(), 
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
+    return di.createGlobalVariable(currentScope(),
 			decl->identifier->getName(),
 			decl->identifier->getMangledName(),
             currentFile(),
@@ -440,6 +446,14 @@ llvm::DIGlobalVariable IRDebug::createGlobal(VariableDeclaration *decl, ASTValue
             createType(decl->getType()),
             false, //TODO: local to unit?
             (Value*) val->value);
+#else
+    return di.createGlobalVariable(decl->identifier->getName(),
+            currentFile(),
+            decl->loc.line,
+            createType(decl->getType()),
+            false, //TODO: local to unit?
+            (Value*) val->value);
+#endif
 }
 
 llvm::Instruction *IRDebug::createVariable(std::string nm, ASTValue *v, BasicBlock *bb, SourceLocation loc, int argn)
@@ -466,8 +480,12 @@ llvm::Instruction *IRDebug::createVariable(std::string nm, ASTValue *v, BasicBlo
 		addr,
 		false);
 #endif
-    
 
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
     Instruction *idinst = di.insertDeclare((llvm::Value*) v->value, div, DIExpression(), bb);
+#else // 3.5 or lower
+    Instruction *idinst = di.insertDeclare((llvm::Value*) v->value, div, bb);
+#endif
     return idinst;
 }

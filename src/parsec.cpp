@@ -191,32 +191,24 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
 
 #include<clang/Lex/MacroInfo.h>
 #include<clang/Lex/Preprocessor.h>
-#include<clang/Lex/PreprocessingRecord.h>
-#include<clang/Frontend/ASTUnit.h>
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
-const clang::MacroInfo *getCursorMacroInfo(CXCursor c)
-{
-    return NULL; //TODO: macro info for clang 3.5
+namespace clang {
+    class MacroInfo;
+    class MacroDefinition;
+    namespace cxcursor {
+        const MacroDefinition *getCursorMacroDefinition(CXCursor c);
+    }
+    namespace cxindex {
+        MacroInfo *getMacroInfo(const MacroDefinition *def, CXTranslationUnit TU);
+    }
 }
 
-
-#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR <= 4
-
-#include "../include/CXTranslationUnit.h"
-#include "../include/CXCursor.h"
-#include "../include/CIndexer.h"
 const clang::MacroInfo *getCursorMacroInfo(CXCursor c)
 {
-    const clang::MacroDefinition *MD = clang::cxcursor::getCursorMacroDefinition(c);
+    const clang::MacroDefinition *definition = clang::cxcursor::getCursorMacroDefinition(c);
     const CXTranslationUnit TU = clang_Cursor_getTranslationUnit(c);
-    return clang::cxindex::getMacroInfo(MD, TU);
+    return clang::cxindex::getMacroInfo(definition, TU);
 }
-
-#else
-#error unsuported version of llvm
-#endif
-
 
 static CXTranslationUnit *cxUnit = 0;
 CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)

@@ -17,6 +17,7 @@
 #endif
 
 #include <sys/stat.h>
+#include <ctype.h>
 
 #include <vector>
 #include <string.h>
@@ -155,13 +156,12 @@ WLConfig parseCmd(int argc, char **argv)
     params.output = "a.out"; // default output string
 
     int c;
-    while((c = getopt(argc, argv, "-gcSl:L:I:o:")) != -1)
+    while(optind < argc)
     {
+	c = getopt(argc, argv, "-gcSl:L:I:o:");
+	printf("OPTIND: %d\n", optind);
         switch(c)
         {
-            case 1: // other options
-                params.files.push_back(optarg);
-                break;
             case 'g':
                 params.debug = true;
                 break;
@@ -187,6 +187,7 @@ WLConfig parseCmd(int argc, char **argv)
                 params.output = std::string(optarg);
                 break;
             case '?':
+		printf("QUESTION! %s\n", optarg);
                 if(optopt == 'l' || optopt == 'L' || optopt == 'I')
                 {
                     emit_message(msg::FATAL, std::string("missing argument to '-") +
@@ -194,11 +195,22 @@ WLConfig parseCmd(int argc, char **argv)
                     break;
                 }
             default:
-                emit_message(msg::FATAL, std::string("unrecognized command line option '-") +
-                        std::string(optarg) + std::string("'"));
-                break;
+		if(isalnum(argv[optind][0])) {
+                	params.files.push_back(argv[optind]);
+#ifdef __APPLE__
+optind++; //apples getopt is weird in that it kills itself if a non-option is found (eg a filename to compile)
+#endif
+		}
+		// this is some argument that we cant deal with
+		else {
+			printf("DEFAULT! %s\n", optarg);
+			emit_message(msg::FATAL, std::string("unrecognized command line option '-") +
+				std::string(optarg) + std::string("'"));
+			break;
+		}
         }
     }
+    printf("finished optarg\n");
     return params;
 }
 

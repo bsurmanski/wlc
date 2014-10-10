@@ -1055,7 +1055,12 @@ ASTValue *IRCodegenContext::opIndexPointer(ASTValue *ptr, ASTValue *idx) {
 
 // b must be constant int
 ASTValue *IRCodegenContext::opIndexTuple(ASTValue *tup, ASTValue *idx) {
+// apple version of LLVM libs does not have typeinfo for ConstantInt
+#ifdef __APPLE__
+    if(ConstantInt *llci = static_cast<ConstantInt*>(codegenValue(idx)))
+#else
     if(ConstantInt *llci = dynamic_cast<ConstantInt*>(codegenValue(idx)))
+#endif
     {
         ASTTupleType *tupty = (ASTTupleType*) dynamic_cast<ASTTupleType*>(tup->getType());
         unsigned long long index = llci->getZExtValue();

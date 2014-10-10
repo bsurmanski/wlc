@@ -16,7 +16,7 @@ $(prefix)/lib/libclangFormat.a\
 $(prefix)/lib/libclangBasic.a\
 $(prefix)/lib/libclangLex.a\
 $(prefix)/lib/libclangSerialization.a\
-$(prefix)/lib/libclangAnalysis.a\
+$(prefix)/lib/libclangAnalysis.a
 
 # only used for clang 3.4, to build additional static libraries
 CLANGLIBS_34:=$(prefix)/lib/libclangRewriteCore.a\
@@ -36,13 +36,22 @@ LLVMVERSION=$(shell llvm-config --version | cut -c -3)
 
 LLVMLDFLAGS=
 
+ifeq ($(shell uname -s),Darwin)
+LLVMLDFLAGS += -lllvm
+endif
+
 ifeq ($(LLVMVERSION),3.5)
-LLVMLDFLAGS += -lLLVM-3.5 -lclang -lz -lpthread -lcurses -ldl
+ifeq ($(shell uname -s),Linux)
+LLVMLDFLAGS += -lLLVM-3.5
+endif
+LLVMLDFLAGS += -lclang -lz -lpthread -lcurses -ldl
 CLANGLIBS:=$(CLANGLIBS) $(CLANGLIBS_35)
 endif
 
 ifeq ($(LLVMVERSION),3.4)
+ifeq ($(shell uname -s),Linux)
 LLVMLDFLAGS += -lLLVM-3.4
+endif
 CLANGLIBS:=$(CLANGLIBS) $(CLANGLIBS_34)
 endif
 
@@ -68,7 +77,7 @@ build:
 
 install: wlc
 	sudo cp wlc /usr/local/bin/
-	cp wl.vim ~/.vim/syntax/
+	-cp wl.vim ~/.vim/syntax/
 	sudo mkdir -p /usr/local/include/wl
 	sudo cp -R lib/* /usr/local/include/wl
 

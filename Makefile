@@ -1,27 +1,28 @@
 SRCFILES:=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier.cpp astScope.cpp astType.cpp irDebug.cpp message.cpp parsec.cpp ast.cpp validate.cpp astVisitor.cpp lowering.cpp
 
 # additional clang libraries to build
-CLANGLIBS= /usr/lib/libclang.a\
-/usr/lib/libclangIndex.a\
-/usr/lib/libclangFrontend.a\
-/usr/lib/libclangDriver.a\
-/usr/lib/libclangParse.a\
-/usr/lib/libclangSema.a\
-/usr/lib/libclangEdit.a\
-/usr/lib/libclangTooling.a\
-/usr/lib/libclangRewriteFrontend.a\
-/usr/lib/libclangAST.a\
-/usr/lib/libclangFormat.a\
-/usr/lib/libclangBasic.a\
-/usr/lib/libclangLex.a\
-/usr/lib/libclangSerialization.a\
-/usr/lib/libclangAnalysis.a\
+prefix=/usr
+CLANGLIBS= $(prefix)/lib/libclang.a\
+$(prefix)/lib/libclangIndex.a\
+$(prefix)/lib/libclangFrontend.a\
+$(prefix)/lib/libclangDriver.a\
+$(prefix)/lib/libclangParse.a\
+$(prefix)/lib/libclangSema.a\
+$(prefix)/lib/libclangEdit.a\
+$(prefix)/lib/libclangTooling.a\
+$(prefix)/lib/libclangRewriteFrontend.a\
+$(prefix)/lib/libclangAST.a\
+$(prefix)/lib/libclangFormat.a\
+$(prefix)/lib/libclangBasic.a\
+$(prefix)/lib/libclangLex.a\
+$(prefix)/lib/libclangSerialization.a\
+$(prefix)/lib/libclangAnalysis.a\
 
 # only used for clang 3.4, to build additional static libraries
-CLANGLIBS_34:=/usr/lib/libclangRewriteCore.a\
-/usr/lib/libLLVMSupport.a
+CLANGLIBS_34:=$(prefix)/lib/libclangRewriteCore.a\
+$(prefix)/lib/libLLVMSupport.a
 
-CLANGLIBS_35:=/usr/lib/libclangRewrite.a
+CLANGLIBS_35:=$(prefix)/lib/libclangRewrite.a
 
 NODEPS:=clean install installsyntax
 SRC:=$(foreach file, $(SRCFILES), src/$(file))
@@ -55,7 +56,7 @@ clean:
 	rm -rf build
 
 wlc: $(OBJ)
-	ctags -R -o .git/tags
+	-ctags -R -o .git/tags
 	g++ $(OBJ) $(CLANGLIBS) $(CXXFLAGS) $(LDFLAGS) -o wlc
 
 build/%.o: src/%.cpp

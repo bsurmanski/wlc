@@ -1,58 +1,27 @@
 SRCFILES:=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier.cpp astScope.cpp astType.cpp irDebug.cpp message.cpp parsec.cpp ast.cpp validate.cpp astVisitor.cpp lowering.cpp
 
-
 # additional clang libraries to build
-# only used for clang 3.4, to build additional static libraries
-CLANGLIBS=
-CLANGLIBS_34:=/usr/lib/libclang.a\
+CLANGLIBS= /usr/lib/libclang.a\
 /usr/lib/libclangIndex.a\
 /usr/lib/libclangFrontend.a\
 /usr/lib/libclangDriver.a\
-/usr/lib/libclangTooling.a\
-/usr/lib/libclangSerialization.a\
 /usr/lib/libclangParse.a\
 /usr/lib/libclangSema.a\
-/usr/lib/libclangARCMigrate.a\
-/usr/lib/libclangRewriteFrontend.a\
-/usr/lib/libclangRewriteCore.a\
-/usr/lib/libclangAnalysis.a\
 /usr/lib/libclangEdit.a\
+/usr/lib/libclangTooling.a\
+/usr/lib/libclangRewriteFrontend.a\
 /usr/lib/libclangAST.a\
-/usr/lib/libclangLex.a\
+/usr/lib/libclangFormat.a\
 /usr/lib/libclangBasic.a\
-/usr/lib/libclangFormat.a \
+/usr/lib/libclangLex.a\
+/usr/lib/libclangSerialization.a\
+/usr/lib/libclangAnalysis.a\
+
+# only used for clang 3.4, to build additional static libraries
+CLANGLIBS_34:=/usr/lib/libclangRewriteCore.a\
 /usr/lib/libLLVMSupport.a
 
-CLANGLIBS_35:=/usr/lib/libclang.a\
-/usr/lib/libclangIndex.a\
-/usr/lib/libclangFrontend.a\
-/usr/lib/libclangDriver.a\
-/usr/lib/libclangTooling.a\
-/usr/lib/libclangSerialization.a\
-/usr/lib/libclangParse.a\
-/usr/lib/libclangSema.a\
-/usr/lib/libclangARCMigrate.a\
-/usr/lib/libclangRewrite.a\
-/usr/lib/libclangRewriteFrontend.a\
-/usr/lib/libclangAST.a\
-/usr/lib/libclangASTMatchers.a\
-/usr/lib/libclangAnalysis.a\
-/usr/lib/libclangApplyReplacements.a\
-/usr/lib/libclangBasic.a\
-/usr/lib/libclangCodeGen.a\
-/usr/lib/libclangDynamicASTMatchers.a\
-/usr/lib/libclangEdit.a\
-/usr/lib/libclangFormat.a\
-/usr/lib/libclangFrontendTool.a\
-/usr/lib/libclangLex.a\
-/usr/lib/libclangQuery.a\
-/usr/lib/libclangStaticAnalyzerCheckers.a\
-/usr/lib/libclangStaticAnalyzerCore.a\
-/usr/lib/libclangStaticAnalyzerFrontend.a\
-/usr/lib/libclangTidy.a\
-/usr/lib/libclangTidyGoogleModule.a\
-/usr/lib/libclangTidyLLVMModule.a\
-/usr/lib/libclangTidyMiscModule.a
+CLANGLIBS_35:=/usr/lib/libclangRewrite.a
 
 NODEPS:=clean install installsyntax
 SRC:=$(foreach file, $(SRCFILES), src/$(file))
@@ -66,16 +35,14 @@ LLVMVERSION=$(shell llvm-config --version | cut -c -3)
 
 LLVMLDFLAGS=
 
-TESTVER=1.2.3
-
 ifeq ($(LLVMVERSION),3.5)
 LLVMLDFLAGS += -lLLVM-3.5 -lclang -lz -lpthread -lcurses -ldl
-CLANGLIBS=$(CLANGLIBS_35)
+CLANGLIBS:=$(CLANGLIBS) $(CLANGLIBS_35)
 endif
 
 ifeq ($(LLVMVERSION),3.4)
 LLVMLDFLAGS += -lLLVM-3.4
-CLANGLIBS=$(CLANGLIBS_34)
+CLANGLIBS:=$(CLANGLIBS) $(CLANGLIBS_34)
 endif
 
 CXXFLAGS=`llvm-config --cxxflags` -ggdb -O0 -frtti -UNDEBUG -DDEBUG -I/usr/local/include
@@ -91,11 +58,9 @@ wlc: $(OBJ)
 	ctags -R -o .git/tags
 	g++ $(OBJ) $(CLANGLIBS) $(CXXFLAGS) $(LDFLAGS) -o wlc
 
-build/%.o: src/%.cpp build/%.d
+build/%.o: src/%.cpp
 	g++ $< -c $(CXXFLAGS) -ggdb -O0 -frtti -UNDEBUG -DDEBUG -o $@
-
-build/%.d: src/%.cpp
-	g++ $(CXXFLAGS) -MM -MT '$(patsubst %.d,%.o,$@)' $< -MF $@
+	g++ $(CXXFLAGS) -MM -MT '$@' $< -MF build/$*.d
 
 build:
 	mkdir -p build

@@ -18,3 +18,5 @@ functions accept extra parameters (which are then ignored)
 
 "new MyClass().func()" parses incorrectly (new should bind harder than '.')
 MyClass().func() does not work (seems to be same as above)
+
+tuple assignment does not support dynamic tuples (eg. [a,b] = func(); where func() returns a tuple)

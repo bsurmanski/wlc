@@ -19,3 +19,10 @@ cscope.out
 build/
 
 doc/GRAMMAR.md
+Debug
+Release
+*.exe
+*.pdb
+*.ilk
+*.suo
+*.sdf

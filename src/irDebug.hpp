@@ -20,7 +20,7 @@
 #define PROJDIR "/home/brandon/PROJECTS/C/term/wlc"
 
 class IRCodegenContext;
-class IRTranslationUnit;
+struct IRTranslationUnit;
 class IRDebug
 {
     public:

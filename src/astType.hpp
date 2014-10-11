@@ -1,7 +1,7 @@
 #ifndef _ASTTYPE_HPP
 #define _ASTTYPE_HPP
 
-struct ASTVisitor;
+class ASTVisitor;
 
 /*
 struct ASTTypeQual

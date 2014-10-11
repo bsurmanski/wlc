@@ -24,6 +24,12 @@ struct WLConfig
         link = true;
         debug = false;
         emitllvm = false;
+
+		// if not on windows link with C and Math libraries, by default
+#ifndef WIN32
+		lib.push_back("c");
+		lib.push_back("m");
+#endif
     }
 };
 

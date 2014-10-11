@@ -27,7 +27,7 @@ std::string getFilebase(std::string s);
 #include "astType.hpp"
 #include "message.hpp"
 
-struct ASTVisitor;
+class ASTVisitor;
 
 struct Statement;
 struct Declaration;

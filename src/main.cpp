@@ -10,8 +10,6 @@
 #include "win_getopt.h"
 #include <Windows.h>
 #undef ERROR // conflicts with msg::ERROR
-#pragma import clang.lib
-
 #else
 #include <unistd.h>
 #include <dirent.h>
@@ -40,6 +38,9 @@ static std::string createTempDir() {
 	TCHAR pathnm[64];
 	GetTempPath(64, pathnm);
 	CreateDirectory(pathnm, NULL);
+	for (int i = 0; i < 64; i++) {
+		if (pathnm[i] == '\\') pathnm[i] = '/'; // fix silly windows path
+	}
 	return std::string(pathnm);
 }
 #else
@@ -92,7 +93,7 @@ void link(WLConfig params, std::string outputo)
             libstr += " -i" + params.inc[i];
         }
 
-        std::string linkcmd = "clang " + outputo + " -lc -lm " + libdirstr + incdirstr + libstr + incstr + " -o " + params.output;
+        std::string linkcmd = "clang " + outputo + " " + libdirstr + incdirstr + libstr + incstr + " -o " + params.output;
         int err = system(linkcmd.c_str());
         if(err)
         {
@@ -108,10 +109,9 @@ void compile(WLConfig params)
         Parser parser;
         AST *ast = parser.getAST();
 
-        TranslationUnit *runtime = new TranslationUnit(ast->getRootPackage(),
-                "/usr/local/include/wl/runtime.wl");
+        TranslationUnit *runtime = new TranslationUnit(ast->getRootPackage(), "runtime.wl");
         ast->setRuntimeUnit(runtime);
-        parser.parseFile(runtime, "/usr/local/include/wl/runtime.wl");
+        parser.parseFile(runtime, "runtime.wl");
 
         for(int i = 0; i < params.files.size(); i++)
         {

@@ -10,7 +10,7 @@
 //typedef std::map<std::string, Identifier*>::iterator SymbolIterator;
 struct Package;
 struct TranslationUnit;
-struct ASTVisitor;
+class ASTVisitor;
 
 // TODO: create specialized iterator, that can traverse dependent on variable type
 // iterates different declaration kinds

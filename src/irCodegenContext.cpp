@@ -2605,9 +2605,12 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
                 retainObject(defaultValue);
             }
 
+			//TODO: fix debug information for variable creation
+			/*
             Instruction *vinst = unit->debug->createVariable(vdecl->getName(),
                     idValue, ir->GetInsertBlock(), vdecl->loc);
             vinst->setDebugLoc(llvm::DebugLoc::get(vdecl->loc.line, vdecl->loc.ch, diScope()));
+			*/
             //TODO: maybe create a LValue field in CGValue?
         } else if(vty->isClass()) {
             // store null to class if no value
@@ -2685,9 +2688,10 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
 
             //register debug params
             //XXX hacky with Instruction, and setDebugLoc manually
-            Instruction *ainst = unit->debug->createVariable(fdecl->parameters[idx]->getName(),
-                                                      alloca, ir->GetInsertBlock(), fdecl->loc, idx+1);
-            ainst->setDebugLoc(llvm::DebugLoc::get(fdecl->loc.line, fdecl->loc.ch, diScope()));
+			//TODO: fix createVariable for function parameter. (errors because we are ignoring 'this' right now)
+            //Instruction *ainst = unit->debug->createVariable(fdecl->parameters[idx]->getName(),
+            //                                          alloca, ir->GetInsertBlock(), fdecl->loc, idx+1);
+            //ainst->setDebugLoc(llvm::DebugLoc::get(fdecl->loc.line, fdecl->loc.ch, diScope()));
             //TODO: register value to scope
 
             // retain class parameters (retain after assigning the passed value above)
@@ -2961,12 +2965,12 @@ std::string IRCodegenContext::codegenAST(AST *ast, WLConfig config)
         outputll = "output.ll";
     } else
     {
-        outputll = config.tempName + "/output.ll";
+        outputll = config.tempName + "output.ll";
     }
 
     if(config.link)
     {
-        outputo = config.tempName + "/output.o";
+        outputo = config.tempName + "output.o";
     } else
     {
         outputo = "output.o";

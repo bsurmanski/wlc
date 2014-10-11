@@ -60,7 +60,7 @@ static void deleteDir(std::string dirnm) {
 
 static std::string createTempDir() {
 	char ftemplate[32] = "/tmp/wlcXXXXXX\0";
-	return std::string(mkdtemp(ftemplate));
+	return std::string(mkdtemp(ftemplate)) + "/";
 }
 #endif
 
@@ -158,8 +158,7 @@ WLConfig parseCmd(int argc, char **argv)
     int c;
     while(optind < argc)
     {
-	c = getopt(argc, argv, "-gcSl:L:I:o:");
-	printf("OPTIND: %d\n", optind);
+        c = getopt(argc, argv, "-gcSl:L:I:o:");
         switch(c)
         {
             case 'g':
@@ -187,7 +186,6 @@ WLConfig parseCmd(int argc, char **argv)
                 params.output = std::string(optarg);
                 break;
             case '?':
-		printf("QUESTION! %s\n", optarg);
                 if(optopt == 'l' || optopt == 'L' || optopt == 'I')
                 {
                     emit_message(msg::FATAL, std::string("missing argument to '-") +
@@ -195,22 +193,24 @@ WLConfig parseCmd(int argc, char **argv)
                     break;
                 }
             default:
-		if(isalnum(argv[optind][0])) {
-                	params.files.push_back(argv[optind]);
 #ifdef __APPLE__
-optind++; //apples getopt is weird in that it kills itself if a non-option is found (eg a filename to compile)
+            if(isalnum(argv[optind][0])) {
+                params.files.push_back(argv[optind]);
+                optind++; //apples getopt is weird in that it kills itself if a non-option is found (eg a filename to compile)
+            }
+#else
+            if(isalnum(argv[optind-1][0])) {
+                params.files.push_back(argv[optind-1]);
+            }
 #endif
-		}
-		// this is some argument that we cant deal with
-		else {
-			printf("DEFAULT! %s\n", optarg);
-			emit_message(msg::FATAL, std::string("unrecognized command line option '-") +
-				std::string(optarg) + std::string("'"));
-			break;
-		}
+            // this is some argument that we cant deal with
+            else {
+                emit_message(msg::FATAL, std::string("unrecognized command line option '-") +
+                    std::string(optarg) + std::string("'"));
+                break;
+            }
         }
     }
-    printf("finished optarg\n");
     return params;
 }
 

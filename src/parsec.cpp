@@ -193,13 +193,14 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
 #include<clang/Lex/Preprocessor.h>
 
 namespace clang {
-    class MacroInfo;
     class MacroDefinition;
-    namespace cxcursor {
+    
+	namespace cxcursor {
         const MacroDefinition *getCursorMacroDefinition(CXCursor c);
-    }
+	}
+
     namespace cxindex {
-        MacroInfo *getMacroInfo(const MacroDefinition *def, CXTranslationUnit TU);
+        const MacroInfo *getMacroInfo(const MacroDefinition *def, CXTranslationUnit TU);
     }
 }
 

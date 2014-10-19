@@ -26,3 +26,6 @@ Release
 *.ilk
 *.suo
 *.sdf
+*.opensdf
+*.filters
+*.user

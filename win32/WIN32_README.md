@@ -15,6 +15,17 @@ versions of clang.
 OWL forwards the responsibility of linking onto clang. As such, clang
 must be available and in the PATH environment variable.
 
+## libclang required
+Unfortunately, some symbols required by WLC are internal to libclang.
+These particular symbols are used for macro parsing 
+(specifically clang::cxcursor::getCursorMacroDefinition, 
+and clang::cxindex::getMacroInfo)
+Because of this, the source code of libclang must be supplied to build WLC on
+Windows.
+
+To do so, copy the 'tools\libclang' directory from the clang source code to
+the win32 folder of wlc.
+
 ## Visual Studios Required
 OWL requires Visual Studio to be installed. This is mainly for the 
 linker (required by clang) and the Window's link libraries provided
@@ -34,6 +45,11 @@ on other versions.
 If MINGW or GNUWIN32 is installed, make sure that the Visual Studio's
 'bin' directory has a higher priority in the PATH environment. 
 This is to ensure that clang will use VS's link.exe as intended.
+
+## Make sure the correct character set is specified
+The 'Use Multi-Byte Character' option must be set as 'Not Set'.
+This forces TCHAR to act as char; Without this option, Visual Studios
+may complain about a missing winMain function.
 
 ## Compiling OWL
 To compile OWL, load all source and header files into a visual studios

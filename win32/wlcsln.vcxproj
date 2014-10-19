@@ -1,0 +1,165 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{08F44283-9F2D-4B32-BB8E-CBABD55F5012}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>C:\Program Files %28x86%29\LLVM\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Program Files %28x86%29\LLVM\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <Optimization>Disabled</Optimization>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineX86</TargetMachine>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>LLVMAArch64AsmParser.lib;LLVMAArch64AsmPrinter.lib;LLVMAArch64CodeGen.lib;LLVMAArch64Desc.lib;LLVMAArch64Disassembler.lib;LLVMAArch64Info.lib;LLVMAArch64Utils.lib;LLVMARMAsmParser.lib;LLVMARMAsmPrinter.lib;LLVMARMCodeGen.lib;LLVMARMDesc.lib;LLVMARMDisassembler.lib;LLVMARMInfo.lib;LLVMAnalysis.lib;LLVMAsmParser.lib;LLVMAsmPrinter.lib;LLVMBitReader.lib;LLVMBitWriter.lib;LLVMCodeGen.lib;LLVMCore.lib;LLVMCppBackendCodeGen.lib;LLVMCppBackendInfo.lib;LLVMDebugInfo.lib;LLVMExecutionEngine.lib;LLVMHexagonAsmPrinter.lib;LLVMHexagonCodeGen.lib;LLVMHexagonDesc.lib;LLVMHexagonInfo.lib;LLVMIRReader.lib;LLVMInstCombine.lib;LLVMInstrumentation.lib;LLVMInterpreter.lib;LLVMLTO.lib;LLVMLineEditor.lib;LLVMLinker.lib;LLVMMC.lib;LLVMMCDisassembler.lib;LLVMMCJIT.lib;LLVMMCParser.lib;LLVMMSP430AsmPrinter.lib;LLVMMSP430CodeGen.lib;LLVMMSP430Desc.lib;LLVMMSP430Info.lib;LLVMMipsAsmParser.lib;LLVMMipsAsmPrinter.lib;LLVMMipsCodeGen.lib;LLVMMipsDesc.lib;LLVMMipsDisassembler.lib;LLVMMipsInfo.lib;LLVMNVPTXAsmPrinter.lib;LLVMNVPTXCodeGen.lib;LLVMNVPTXDesc.lib;LLVMNVPTXInfo.lib;LLVMObjCARCOpts.lib;LLVMObject.lib;LLVMOption.lib;LLVMPowerPCAsmParser.lib;LLVMPowerPCAsmPrinter.lib;LLVMPowerPCCodeGen.lib;LLVMPowerPCDesc.lib;LLVMPowerPCDisassembler.lib;LLVMPowerPCInfo.lib;LLVMProfileData.lib;LLVMR600AsmPrinter.lib;LLVMR600CodeGen.lib;LLVMR600Desc.lib;LLVMR600Info.lib;LLVMRuntimeDyld.lib;LLVMScalarOpts.lib;LLVMSelectionDAG.lib;LLVMSparcAsmParser.lib;LLVMSparcAsmPrinter.lib;LLVMSparcCodeGen.lib;LLVMSparcDesc.lib;LLVMSparcDisassembler.lib;LLVMSparcInfo.lib;LLVMSupport.lib;LLVMSystemZAsmParser.lib;LLVMSystemZAsmPrinter.lib;LLVMSystemZCodeGen.lib;LLVMSystemZDesc.lib;LLVMSystemZDisassembler.lib;LLVMSystemZInfo.lib;LLVMTableGen.lib;LLVMTarget.lib;LLVMTransformUtils.lib;LLVMVectorize.lib;LLVMX86AsmParser.lib;LLVMX86AsmPrinter.lib;LLVMX86CodeGen.lib;LLVMX86Desc.lib;LLVMX86Disassembler.lib;LLVMX86Info.lib;LLVMX86Utils.lib;LLVMXCoreAsmPrinter.lib;LLVMXCoreCodeGen.lib;LLVMXCoreDesc.lib;LLVMXCoreDisassembler.lib;LLVMXCoreInfo.lib;LLVMipa.lib;LLVMipo.lib;clangARCMigrate.lib;clangAST.lib;clangASTMatchers.lib;clangAnalysis.lib;clangBasic.lib;clangCodeGen.lib;clangDriver.lib;clangDynamicASTMatchers.lib;clangEdit.lib;clangFormat.lib;clangFrontend.lib;clangFrontendTool.lib;clangIndex.lib;clangLex.lib;clangParse.lib;clangRewrite.lib;clangRewriteFrontend.lib;clangSema.lib;clangSerialization.lib;clangStaticAnalyzerCheckers.lib;clangStaticAnalyzerCore.lib;clangStaticAnalyzerFrontend.lib;clangTooling.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <TargetMachine>MachineX86</TargetMachine>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\ast.cpp" />
+    <ClCompile Include="..\src\astScope.cpp" />
+    <ClCompile Include="..\src\astType.cpp" />
+    <ClCompile Include="..\src\astVisitor.cpp" />
+    <ClCompile Include="..\src\identifier.cpp" />
+    <ClCompile Include="..\src\irCodegenContext.cpp" />
+    <ClCompile Include="..\src\irDebug.cpp" />
+    <ClCompile Include="..\src\lexer.cpp" />
+    <ClCompile Include="..\src\lowering.cpp" />
+    <ClCompile Include="..\src\main.cpp" />
+    <ClCompile Include="..\src\message.cpp" />
+    <ClCompile Include="..\src\parsec.cpp" />
+    <ClCompile Include="..\src\parser.cpp" />
+    <ClCompile Include="..\src\token.cpp" />
+    <ClCompile Include="..\src\validate.cpp" />
+    <ClCompile Include="..\src\win_getopt.cpp" />
+    <ClCompile Include="libclang\ARCMigrate.cpp" />
+    <ClCompile Include="libclang\BuildSystem.cpp" />
+    <ClCompile Include="libclang\CIndex.cpp" />
+    <ClCompile Include="libclang\CIndexCodeCompletion.cpp" />
+    <ClCompile Include="libclang\CIndexCXX.cpp" />
+    <ClCompile Include="libclang\CIndexDiagnostic.cpp" />
+    <ClCompile Include="libclang\CIndexer.cpp" />
+    <ClCompile Include="libclang\CIndexHigh.cpp" />
+    <ClCompile Include="libclang\CIndexInclusionStack.cpp" />
+    <ClCompile Include="libclang\CIndexUSRs.cpp" />
+    <ClCompile Include="libclang\CXComment.cpp" />
+    <ClCompile Include="libclang\CXCompilationDatabase.cpp" />
+    <ClCompile Include="libclang\CXCursor.cpp" />
+    <ClCompile Include="libclang\CXLoadedDiagnostic.cpp" />
+    <ClCompile Include="libclang\CXSourceLocation.cpp" />
+    <ClCompile Include="libclang\CXStoredDiagnostic.cpp" />
+    <ClCompile Include="libclang\CXString.cpp" />
+    <ClCompile Include="libclang\CXType.cpp" />
+    <ClCompile Include="libclang\IndexBody.cpp" />
+    <ClCompile Include="libclang\IndexDecl.cpp" />
+    <ClCompile Include="libclang\Indexing.cpp" />
+    <ClCompile Include="libclang\IndexingContext.cpp" />
+    <ClCompile Include="libclang\IndexTypeSourceInfo.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\src\tokenkinds.def" />
+    <None Include="libclang\libclang.exports" />
+    <None Include="libclang\Makefile" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\ast.hpp" />
+    <ClInclude Include="..\src\astScope.hpp" />
+    <ClInclude Include="..\src\astType.hpp" />
+    <ClInclude Include="..\src\astValue.hpp" />
+    <ClInclude Include="..\src\astVisitor.hpp" />
+    <ClInclude Include="..\src\codegenContext.hpp" />
+    <ClInclude Include="..\src\config.hpp" />
+    <ClInclude Include="..\src\identifier.hpp" />
+    <ClInclude Include="..\src\irCodegenContext.hpp" />
+    <ClInclude Include="..\src\irDebug.hpp" />
+    <ClInclude Include="..\src\irValue.hpp" />
+    <ClInclude Include="..\src\lexer.hpp" />
+    <ClInclude Include="..\src\message.hpp" />
+    <ClInclude Include="..\src\parsec.hpp" />
+    <ClInclude Include="..\src\parser.hpp" />
+    <ClInclude Include="..\src\sourceLocation.hpp" />
+    <ClInclude Include="..\src\streamLexer.hpp" />
+    <ClInclude Include="..\src\token.hpp" />
+    <ClInclude Include="..\src\validate.hpp" />
+    <ClInclude Include="..\src\win_getopt.h" />
+    <ClInclude Include="libclang\CIndexDiagnostic.h" />
+    <ClInclude Include="libclang\CIndexer.h" />
+    <ClInclude Include="libclang\CLog.h" />
+    <ClInclude Include="libclang\CursorVisitor.h" />
+    <ClInclude Include="libclang\CXComment.h" />
+    <ClInclude Include="libclang\CXCursor.h" />
+    <ClInclude Include="libclang\CXLoadedDiagnostic.h" />
+    <ClInclude Include="libclang\CXSourceLocation.h" />
+    <ClInclude Include="libclang\CXString.h" />
+    <ClInclude Include="libclang\CXTranslationUnit.h" />
+    <ClInclude Include="libclang\CXType.h" />
+    <ClInclude Include="libclang\IndexingContext.h" />
+    <ClInclude Include="libclang\Index_Internal.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="libclang\CMakeLists.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

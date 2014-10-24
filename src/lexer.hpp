@@ -22,6 +22,7 @@ class Lexer
     virtual bool eofChar() = 0;
 
     public:
+    virtual ~Lexer() {}
 
     void setFilename(const char *fn) { filenm = fn; }
 

@@ -1,10 +1,6 @@
 #include "ast.hpp"
 
-#ifdef __APPLE__
-#include <libgen.h>
-#endif
-
-#ifdef WIN32
+#if defined WIN32
 char *realpath(const char *path, char *resolve) {
 	return _fullpath(resolve, path, PATH_MAX);
 }
@@ -14,6 +10,7 @@ std::string getFilebase(std::string s)
 	return basename(filepath);
 }
 #elif defined __APPLE__
+#include <libgen.h>
 std::string getFilebase(std::string s)
 {
 	size_t lastDot = s.find_last_of(".");
@@ -25,7 +22,7 @@ std::string getFilebase(std::string s)
 	free(buf);
 	return ret;
 }
-#else
+#else //linux
 std::string getFilebase(std::string s)
 {
 	size_t lastDot = s.find_last_of(".");

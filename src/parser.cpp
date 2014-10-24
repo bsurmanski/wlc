@@ -1421,20 +1421,76 @@ void ParseContext::parseTranslationUnit(TranslationUnit *unit, const char *unitn
     assert_message(!getScope(), msg::FAILURE, "invalid scope stack!", peek().loc);
 }
 
+/**
+ * successively copies each environment variable into buf with each call.
+ *
+ * buf: a buffer to hold the environment variable
+ * env: a pointer to a ';' seperated list of environment variables. will be modified
+ * after each call to point to the start of the next environment variable.
+ */
+void envitern(char *buf, const char **env, size_t max) {
+    if(!buf || !env || !*env || !max) return;
+
+    const char *start = *env;
+
+    // find occurance of ';' or NULL
+    while(**env && **env != ';') {
+        (*env)++;
+    }
+
+    int n = (*env - start);
+    n = (n >= max ? max : n);
+    if(**env == ';') (*env)++;
+
+    memcpy(buf, start, n);
+    buf[n+1] = '\0';
+}
+
+#include <sys/stat.h>
+bool fileExists(std::string filenm) {
+    struct stat st;
+    return stat(filenm.c_str(), &st) == 0;
+}
+
+#if defined WIN32
+const char *builtinInclude = "C:/Program Files/WLC/include/;C:/INSTALL/WLC/include/";
+#else
+const char *builtinInclude = "/usr/local/include/wl/;/usr/include/wl/";
+#endif
+
+std::string findFile(std::string filenm) {
+    struct stat st;
+    if(stat(filenm.c_str(), &st) == 0) {
+        return filenm;
+    }
+
+    char buffer[256] = {0};
+    const char *incenv = getenv("WLINCLUDE");
+    if(!incenv) incenv = builtinInclude;
+
+    while(incenv && *incenv) {
+        envitern(buffer, &incenv, 255);
+        printf("buf: %s\n", buffer);
+        if(fileExists(buffer + filenm)) {
+            return buffer + filenm;
+        }
+    }
+
+    return filenm; //cannot find
+}
+
 void Parser::parseFile(TranslationUnit *unit, std::string filenm, SourceLocation l)
 {
-    ifstream stream(filenm.c_str());
+    std::string absfile = findFile(filenm);
+    printf("FILENM %s\n", absfile.c_str());
+    ifstream stream(absfile.c_str());
 
     // if we can't open the specified file, check if the file is in the 'lib' dir
     // if we still can't find it; throw a fit
     if(stream.fail())
     {
-        stream.clear();
-        stream.open(("/usr/local/include/wl/" + filenm).c_str()); //XXX lib dir shouldnt be hard coded
-        if(stream.fail()) {
-            emit_message(msg::ERROR, "unknown file '" + filenm + "'", l);
-            return;
-        }
+        emit_message(msg::ERROR, "unknown file '" + filenm + "'", l);
+        return;
     }
 
     Lexer *lexer = new StreamLexer(stream);

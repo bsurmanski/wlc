@@ -2865,7 +2865,6 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 
 #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
 void printModule(Module *m, std::string filenm) {
-    //std::string err;
 	std::error_code err;
     raw_fd_ostream output(filenm.c_str(), err, llvm::sys::fs::OpenFlags::F_Text);
     m->print(output, 0);

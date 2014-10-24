@@ -69,7 +69,7 @@ wlc: $(OBJ)
 	g++ $(OBJ) $(CLANGLIBS) $(CXXFLAGS) $(LDFLAGS) -o wlc
 
 build/%.o: src/%.cpp
-	g++ $< -c $(CXXFLAGS) -ggdb -O0 -frtti -UNDEBUG -DDEBUG -o $@
+	g++ $< -c $(CXXFLAGS) -o $@
 	g++ $(CXXFLAGS) -MM -MT '$@' $< -MF build/$*.d
 
 build:

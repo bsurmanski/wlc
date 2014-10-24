@@ -5,6 +5,7 @@ use "importc"
 import(C) "SDL/SDL.h"
 import(C) "stdlib.h"
 import(C) "stdio.h"
+import(C) "string.h"
 
 SDL_Surface^ surf = null
 SDL_Surface^ back = null
@@ -47,9 +48,9 @@ void update()
     int n = 0 // neighbors
     int j
     int i
-    for(j = 1; j < 240; j++)
+    for(j = 1; j < 239; j++)
     {
-        for(i = 1; i < 320; ++i)
+        for(i = 1; i < 319; ++i)
         {
             n = 0
             if (pixelIsWhite(surf, i-1, j-1)) n++
@@ -66,6 +67,7 @@ void update()
             if(n > 3) setPixel(back, i, j, 0)
         }
     }
+	
     memcpy(surf.pixels, back.pixels, 240 * surf.pitch)
 }
 
@@ -163,7 +165,8 @@ int main(int argc, char^^ argv)
         spc = keystate[SDLK_SPACE]
         SDL_Delay(32)
         SDL_Flip(surf)
-        testFunc()
+		
+        //testFunc()
         update()
     }
 

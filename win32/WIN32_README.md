@@ -61,3 +61,8 @@ field, add all .lib and .imp files found in the LLVM lib directory.
 
 Additionally, any .dll's associated with the .imp files 
 (such as libclang.dll) should be found in the PATH.
+
+## Additional Libraries
+If using Additional libraries on Windows, use the Visual Studios version of the 
+library instead of the MinGW Version. Additionally, use the x86 version 
+instead of the x64 version.

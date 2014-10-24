@@ -64,12 +64,19 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
     DeclarationQualifier dqual;
     dqual.decorated = false;
 
-    if(cursor.kind == CXCursor_FieldDecl)
+	if (clang_isAttribute(cursor.kind)) {
+		char message[256];
+		CXString cxname = clang_getCursorDisplayName(cursor);
+		string name = clang_getCString(cxname);
+		
+		sprintf(message, "declaration attribute ignored: %s", name.c_str());
+		emit_message(msg::WARNING, message);
+	} else if(cursor.kind == CXCursor_FieldDecl)
     {
         CXString cxname = clang_getCursorSpelling(cursor);
         string name = clang_getCString(cxname);
 
-        Identifier *id = scope->get(name);
+        Identifier *id = scope->getInScope(name);
         ASTType *ty = ASTTypeFromCType(unit, clang_getCursorType(cursor));
         if(!ty) return CXChildVisit_Break;
         VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
@@ -85,7 +92,9 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
         //members->push_back(vdecl);
     } else
     {
-        emit_message(msg::FAILURE, "unknown field in C record", loc);
+		char message[256];
+		sprintf(message, "unknown field in C record: %d, %s:%d", cursor.kind, loc.filenm, loc.line);
+        emit_message(msg::FAILURE, message, loc);
     }
 
     return CXChildVisit_Continue;
@@ -366,6 +375,20 @@ ERR:
     return CXChildVisit_Continue;
 }
 
+#ifdef WIN32
+std::string getAbsoluteIncludePath(std::string file) {
+	char *ienv = getenv("INCLUDE");
+	if (!ienv) return "C:/Program Files (x86)/Microsoft Visual Studio 12.0/VC/include/" + file; // default location
+	//printf("INCLUDE: %s\n", ienv); 
+	//TODO split ienv delimiter, search for any existing files
+	return "C:/Program Files (x86)/Microsoft Visual Studio 12.0/VC/include/" + file;
+}
+#else
+std::string getAbsoluteIncludePath(std::string file) {
+	return "/usr/include/" + file;
+}
+#endif
+
 void parseCImport(TranslationUnit *unit,
         std::string filenm,
         SourceLocation loc)
@@ -383,7 +406,7 @@ void parseCImport(TranslationUnit *unit,
 
     if(access(filenm.c_str(), F_OK) == -1)
     {
-        filenm = "/usr/include/" + filenm; //TODO: test all of PATH
+		filenm = getAbsoluteIncludePath(filenm);
         if(access(filenm.c_str(), F_OK) == -1) {
             emit_message(msg::ERROR, "imported C file does not exist: " + filenm, loc);
         }

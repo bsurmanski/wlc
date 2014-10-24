@@ -1056,7 +1056,8 @@ ASTValue *IRCodegenContext::opIndexPointer(ASTValue *ptr, ASTValue *idx) {
 // b must be constant int
 ASTValue *IRCodegenContext::opIndexTuple(ASTValue *tup, ASTValue *idx) {
 // apple version of LLVM libs does not have typeinfo for ConstantInt
-#ifdef __APPLE__
+// TODO: find a better way to check for ConstantInt type
+#if defined __APPLE__ || defined WIN32
     if(ConstantInt *llci = static_cast<ConstantInt*>(codegenValue(idx)))
 #else
     if(ConstantInt *llci = dynamic_cast<ConstantInt*>(codegenValue(idx)))

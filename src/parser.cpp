@@ -1443,7 +1443,7 @@ void envitern(char *buf, const char **env, size_t max) {
     if(**env == ';') (*env)++;
 
     memcpy(buf, start, n);
-    buf[n+1] = '\0';
+    buf[n] = '\0';
 }
 
 #include <sys/stat.h>

@@ -13,6 +13,16 @@ ScopeIterator::ScopeIterator(ASTScope *sc, std::map<std::string, Identifier*>::i
         Type t, bool rec) : scope(sc), base(b), type(t), recurse(rec) {
             }
 
+ScopeIterator &ScopeIterator::operator++() {
+	// Windows checks. weird stuff happens...
+	if (scope->empty() || !base->second) return *this;
+	base++;
+	return *this;
+}
+
+bool ScopeIterator::operator==(const ScopeIterator &it){ return (scope->empty() && it.scope->empty()) || it.base == base; }
+bool ScopeIterator::operator!=(const ScopeIterator &it){ return !(*this == it); }
+
 void ASTScope::addBuiltin()
 {
     //XXX dont think this is needed

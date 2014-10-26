@@ -1470,7 +1470,6 @@ std::string findFile(std::string filenm) {
 
     while(incenv && *incenv) {
         envitern(buffer, &incenv, 255);
-        printf("buf: %s\n", buffer);
         if(fileExists(buffer + filenm)) {
             return buffer + filenm;
         }
@@ -1482,7 +1481,6 @@ std::string findFile(std::string filenm) {
 void Parser::parseFile(TranslationUnit *unit, std::string filenm, SourceLocation l)
 {
     std::string absfile = findFile(filenm);
-    printf("FILENM %s\n", absfile.c_str());
     ifstream stream(absfile.c_str());
 
     // if we can't open the specified file, check if the file is in the 'lib' dir

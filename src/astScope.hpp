@@ -11,6 +11,7 @@
 struct Package;
 struct TranslationUnit;
 class ASTVisitor;
+struct ASTScope;
 
 // TODO: create specialized iterator, that can traverse dependent on variable type
 // iterates different declaration kinds
@@ -41,10 +42,7 @@ struct ScopeIterator {
 
     Identifier *operator*(){ return base->second; }
     Identifier *operator->(){ return base->second; }
-    ScopeIterator &operator++() {
-        base++;
-        return *this;
-    }
+	ScopeIterator &operator++();
 
     ScopeIterator operator++(int) {
         ScopeIterator it = ScopeIterator(*this);
@@ -52,8 +50,8 @@ struct ScopeIterator {
         return it;
     }
 
-    bool operator==(const ScopeIterator &it){ return it.base == base; }
-    bool operator!=(const ScopeIterator &it){ return !(*this == it); }
+	bool operator==(const ScopeIterator &it);
+	bool operator!=(const ScopeIterator &it);
 
 };
 
@@ -127,6 +125,7 @@ struct ASTScope
     void addSibling(ASTScope *t);
     void addBuiltin();
     bool contains(std::string);
+	bool empty() { return symbols.empty(); }
     Identifier *getInScope(std::string); // retrieves and creates if non-existant (only from current scope, not parents)
     Identifier *get(std::string); // retrieves and creates if non-existant
     Identifier *lookup(std::string, bool imports=true); // same as 'get', but does not create on not-found

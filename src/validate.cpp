@@ -471,15 +471,19 @@ void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt) {
 }
 
 void ValidationVisitor::visitScope(ASTScope *sc){
-    ASTScope::iterator end = sc->end();
-    for(ASTScope::iterator it = sc->begin(); it != end; ++it){
+	if (sc->empty()) {
+		return;
+	}
+    //ASTScope::iterator end = sc->end();
+    for(ASTScope::iterator it = sc->begin(); it != sc->end();){
         Identifier *id = *it;
-        if(it->isUndeclared()) {
+		if (it != sc->end()) // wtf is this? why isn't ++it just at the top? Windows is a whiner. need to increment before we modify id
+			++it;
+        if(id->isUndeclared()) {
             id = sc->resolveIdentifier(id);
-            if(!id || id->isUndeclared()) {
-                emit_message(msg::ERROR, "could not resolve symbol in scope: " + id->getName());
-            }
-
+			if (!id || id->isUndeclared()) {
+				emit_message(msg::ERROR, "could not resolve symbol in scope: " + id->getName());
+			}
         }
 
         //TODO: condition shouldnt be needed

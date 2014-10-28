@@ -524,14 +524,9 @@ ASTValue *IRCodegenContext::indexValue(ASTValue *val, int i) {
         return NULL;
     }
 
-    std::vector<Value*> gep;
-    if(val->isLValue()) {
-        //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-    }
-
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), i));
-    Value *v = ir->CreateGEP(codegenValue(val), gep);
-    return new ASTBasicValue(compty->getMemberType(i), v, true);
+    //TODO: handle if val is LValue
+    Value *v = ir->CreateExtractValue(codegenValue(val), i);
+    return new ASTBasicValue(compty->getMemberType(i), v);
 }
 
 ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
@@ -2212,9 +2207,10 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
                 {
                     codegenAssign(tlhs->values[i], indexValue(rhs, i));
                 }
+            } else {
+                emit_message(msg::ERROR, "tuple assignment requires a tuple on rhs", location);
+                return NULL;
             }
-            emit_message(msg::ERROR, "tuple assignment requires a tuple on rhs", location);
-            return NULL;
         }
         return rhs;
     }

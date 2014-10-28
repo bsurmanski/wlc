@@ -516,6 +516,24 @@ ASTValue *IRCodegenContext::getIntValue(ASTType *t, int i){
     return val;
 }
 
+ASTValue *IRCodegenContext::indexValue(ASTValue *val, int i) {
+    ASTCompositeType *compty = val->getType()->asCompositeType();
+
+    if(!compty) {
+        emit_message(msg::ERROR, "attempt to index non-composite type");
+        return NULL;
+    }
+
+    std::vector<Value*> gep;
+    if(val->isLValue()) {
+        //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+    }
+
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), i));
+    Value *v = ir->CreateGEP(codegenValue(val), gep);
+    return new ASTBasicValue(compty->getMemberType(i), v, true);
+}
+
 ASTValue *IRCodegenContext::loadValue(ASTValue *lval)
 {
     assert_message(lval->isLValue(), msg::FAILURE, "attempted to load RValue (must be LValue)", location);
@@ -2188,6 +2206,13 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
                 codegenAssign(tlhs->values[i], trhs->values[i]);
             }
         } else {
+            //TODO: messy; this is here because a function call returns a BasicValue and not a TupleValue
+            if(rhs->getType()->isTuple()) {
+                for(int i = 0; i < tlhs->values.size(); i++)
+                {
+                    codegenAssign(tlhs->values[i], indexValue(rhs, i));
+                }
+            }
             emit_message(msg::ERROR, "tuple assignment requires a tuple on rhs", location);
             return NULL;
         }
@@ -2612,11 +2637,11 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
             }
 
 			//TODO: fix debug information for variable creation
-			/*
+            /*
             Instruction *vinst = unit->debug->createVariable(vdecl->getName(),
                     idValue, ir->GetInsertBlock(), vdecl->loc);
             vinst->setDebugLoc(llvm::DebugLoc::get(vdecl->loc.line, vdecl->loc.ch, diScope()));
-			*/
+            */
             //TODO: maybe create a LValue field in CGValue?
         } else if(vty->isClass()) {
             // store null to class if no value

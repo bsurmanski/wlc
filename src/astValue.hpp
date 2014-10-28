@@ -80,12 +80,7 @@ struct TupleValue : public ASTValue
     ASTCompositeType *type;
     std::vector<ASTValue*> values;
 
-    /*
-    TupleValue(TupleExpression *texp) : ASTValue(NULL),
-    tuple(texp)
-    {} */
     TupleValue(std::vector<ASTValue*> vals) : values(vals), ASTValue(NULL), type(NULL) {}
-
 
     virtual bool isLValue() {
         for(int i = 0; i < values.size(); i++) {

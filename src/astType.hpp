@@ -44,6 +44,7 @@ struct ASTUserType;
 struct ASTCompositeType;
 struct ASTFunctionType;
 struct ASTPointerType;
+struct ASTTupleType;
 
 //XXX probably should not have llvm type/debug info in ASTType
 #include <llvm/IR/Type.h>
@@ -277,6 +278,7 @@ struct ASTType
     bool isStruct() { return asStruct(); }
     bool isUnion() { return asUnion(); }
     bool isFunctionType() { return asFunctionType(); }
+    bool isTuple() { return asTuple(); }
 
     virtual ASTFunctionType *asFunctionType() { return NULL; }
     virtual ASTCompositeType *asCompositeType() { return NULL; }
@@ -286,6 +288,7 @@ struct ASTType
     virtual ASTUserType *asUnion() { return NULL; }
     virtual ASTUserType *asStruct() { return NULL; }
     virtual ASTPointerType *asPointer() { return NULL; }
+    virtual ASTTupleType *asTuple() { return NULL; }
     virtual bool is(ASTType *t) { return this == t; } // NOTE: only valid for basic type, where type is statically defined
     virtual bool extends(ASTType *t) { return false; }
 
@@ -314,6 +317,7 @@ struct ASTType
 
     static ASTFunctionType *getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg=false);
     static ASTType *getVoidFunctionTy();
+
 };
 
 struct ASTBasicType : public ASTType {
@@ -470,6 +474,7 @@ struct ASTUserType : public ASTCompositeType {
 
 struct ASTTupleType : public ASTCompositeType {
     std::vector<ASTType*> types;
+    virtual ASTTupleType *asTuple() { return this; }
     virtual ASTType *getMemberType(size_t i) { return types[i]; }
     virtual size_t length() { return types.size(); }
     virtual size_t getSize();

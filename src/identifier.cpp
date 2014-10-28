@@ -19,12 +19,11 @@ void Identifier::addDeclaration(Declaration *decl, IDType ty)
         return;
     }
 
-    if(!fdeclaration || (fdeclaration && fdeclaration->body)){
-        if(declaration)
-        {
-            emit_message(msg::FATAL, "redefinition of " + getName() +
-                    " originally defined at " + declaration->loc.toString(), decl->loc);
-        }
+    // if already declared, but not a function; or if a function with a body and new decl is
+    // not a function; then there is a conflict
+    if((!fdeclaration && declaration) || (fdeclaration && fdeclaration->body)){
+        emit_message(msg::FATAL, "redefinition of " + getName() +
+                " originally defined at " + declaration->loc.toString(), decl->loc);
     }
     declaration = decl;
     kind = ty;

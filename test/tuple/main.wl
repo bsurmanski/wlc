@@ -6,7 +6,7 @@ int main(int argc, char^^ argv)
 {
     int a = 5
     int b = 6
-    [a, b] = [1, 2]
+    [a, b] = func()
     [int, int] c = func()
     printf("A: %d B: %d\n", a, b)
     printf("C1: %d C2: %d\n", c[0], c[1])

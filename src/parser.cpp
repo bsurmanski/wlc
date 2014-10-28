@@ -54,96 +54,113 @@ void ParseContext::recover()
     }
 }
 
-ASTType *ParseContext::parseType()
-{
-    std::vector<ASTType*> tupleTypes;
+ASTType *ParseContext::parseBasicType() {
+    Token t = get();
+   switch(t.kind) {
+   case tok::kw_var:
+       return ASTType::getDynamicTy();
+   case tok::kw_bool:
+       return ASTType::getBoolTy();
+
+    case tok::kw_int8:
+    case tok::kw_char:
+        return ASTType::getCharTy();
+    case tok::kw_uint8:
+    case tok::kw_uchar:
+        return ASTType::getUCharTy();
+
+    case tok::kw_int16:
+    case tok::kw_short:
+        return ASTType::getShortTy();
+    case tok::kw_uint16:
+    case tok::kw_ushort:
+        return ASTType::getUShortTy();
+
+    case tok::kw_int32:
+    case tok::kw_int:
+        return ASTType::getIntTy();
+    case tok::kw_uint32:
+    case tok::kw_uint:
+        return ASTType::getUIntTy();
+
+    case tok::kw_int64:
+    case tok::kw_long:
+        return ASTType::getLongTy();
+    case tok::kw_uint64:
+    case tok::kw_ulong:
+        return ASTType::getULongTy();
+
+    case tok::kw_float:
+    case tok::kw_float32:
+        return ASTType::getFloatTy();
+    case tok::kw_float64:
+    case tok::kw_double:
+        return ASTType::getDoubleTy();
+    case tok::kw_void:
+        return ASTType::getVoidTy();
+    default:
+        emit_message(msg::UNIMPLEMENTED, "unparsed type");
+   }
+}
+
+/**
+ * A scalar type is any type excluding pointers and arrays.
+ * This may be a little misleading because 'scalar' in this context
+ * includes structs and tuples. This is to allow handling of complex
+ * new expressions like 'new int[i + 5]'; the NewExpression needs to be
+ * aware of the variable size 'i+5' and arrayTypes have no concept of
+ * exact variable length
+ */
+ASTType *ParseContext::parseScalarType() {
     ASTType *type = NULL;
     bool ptr = false;
-    Token t = get();
-    //cond_message(t.isNot(tok::identifier) && !t.isKeywordType(), msg::FAILURE, "unrecognized type");
-    if(t.isNot(tok::identifier) && !t.isKeywordType() && t.isNot(tok::lbracket)) return NULL;
-    if(t.isKeywordType() || t.is(tok::lbracket))
-    {
-       switch(t.kind)
-       {
-       case tok::kw_var:
-           type = ASTType::getDynamicTy(); break;
-       case tok::kw_bool:
-           type = ASTType::getBoolTy(); break;
+    Token t = peek();
 
-        case tok::kw_int8:
-        case tok::kw_char:
-            type = ASTType::getCharTy(); break;
-        case tok::kw_uint8:
-        case tok::kw_uchar:
-            type = ASTType::getUCharTy(); break;
+    // basic keyword type
+    if(t.isKeywordType()) {
+        return parseBasicType();
+    }
 
-        case tok::kw_int16:
-        case tok::kw_short:
-            type = ASTType::getShortTy(); break;
-        case tok::kw_uint16:
-        case tok::kw_ushort:
-            type = ASTType::getUShortTy(); break;
-
-        case tok::kw_int32:
-        case tok::kw_int:
-            type = ASTType::getIntTy(); break;
-        case tok::kw_uint32:
-        case tok::kw_uint:
-            type = ASTType::getUIntTy(); break;
-
-        case tok::kw_int64:
-        case tok::kw_long:
-            type = ASTType::getLongTy(); break;
-        case tok::kw_uint64:
-        case tok::kw_ulong:
-            type = ASTType::getULongTy(); break;
-
-        case tok::kw_float:
-        case tok::kw_float32:
-            type = ASTType::getFloatTy(); break;
-        case tok::kw_float64:
-        case tok::kw_double:
-            type = ASTType::getDoubleTy(); break;
-        case tok::kw_void:
-            type = ASTType::getVoidTy(); break;
-        case tok::lbracket:
-            // lbracket already got
-            while(true) //break below
-            {
-                ASTType *tupleMember = parseType();
-                if(!tupleMember) {
-                    return NULL; //this is (probably) not a type, it is an expression
-                    //emit_message(msg::ERROR, "expected subtype while parsing tuple type", peek().loc);
-                }
-                tupleTypes.push_back(tupleMember);
-                if(peek().is(tok::rbracket)) break;
-                if(peek().is(tok::comma)) ignore();
-                else {
-                    emit_message(msg::ERROR, "expected comma in tuple type/expression", peek().loc);
-                    return NULL;
-                }
+    // tuple type
+    if(t.is(tok::lbracket)) {
+        std::vector<ASTType*> tupleTypes;
+        ignore(); //ignore [
+        while(true) //break below
+        {
+            ASTType *tupleMember = parseType();
+            if(!tupleMember) {
+                return NULL; //this is (probably) not a type, it is an expression
+                //emit_message(msg::ERROR, "expected subtype while parsing tuple type", peek().loc);
             }
-            ignore(); // eat ]
+            tupleTypes.push_back(tupleMember);
+            if(peek().is(tok::rbracket)) break;
+            if(peek().is(tok::comma)) ignore();
+            else {
+                emit_message(msg::ERROR, "expected comma in tuple type/expression", peek().loc);
+                return NULL;
+            }
+        }
+        ignore(); // eat ]
 
-            type = ASTType::getTupleTy(tupleTypes);
-            break;
-        default:
-            emit_message(msg::UNIMPLEMENTED, "unparsed type");
-       }
-    } else {
+        return ASTType::getTupleTy(tupleTypes);
+    }
+
+    if(t.is(tok::identifier)) {
+        ignore();
         //TODO: should be get so structs dont need fwd decl?
         Identifier *id = getScope()->get(t.toString());
         if(!id) {
             emit_message(msg::ERROR, "unknown type or variable", t.loc);
             return NULL;
         }
-        type = id->getDeclaredType();
-        if(!type) {
-            return NULL;
-        }
+        return id->getDeclaredType();
         //TODO: do something with id...
     }
+    return NULL;
+}
+
+ASTType *ParseContext::parseType() {
+    ASTType *type = parseScalarType();
 
     while(true)
     {
@@ -263,6 +280,7 @@ TopLevelExpression *ParseContext::parseTopLevelExpression()
 {
     switch(peek().kind)
     {
+        default: break;
         //XXX
     }
 	return NULL;

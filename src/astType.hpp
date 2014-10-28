@@ -161,14 +161,6 @@ struct ASTType
     {
         switch(kind)
         {
-            case TYPE_POINTER:
-                return ty->isInteger() || ty == this ||
-                    // allow implicit cast from void pointer
-                    getPointerElementTy()->kind == TYPE_VOID ||
-                    // allow implicit cast to void pointer
-                    (ty->getPointerElementTy() &&
-                     ty->getPointerElementTy()->kind == TYPE_VOID);
-                //TODO: check if compatible pointer
             case TYPE_BOOL:
             case TYPE_UCHAR:
             case TYPE_CHAR:
@@ -551,9 +543,17 @@ struct ASTPointerType : public ASTType {
     }
 
     virtual bool coercesTo(ASTType *ty) {
+        if(ty->isInteger()) return true;
         ASTPointerType *pty = ty->asPointer();
         if(!pty) return false;
-        return ptrTo->is(pty->ptrTo);
+
+        return ptrTo->is(pty->ptrTo) ||
+            // allow implicit cast from void pointer
+            getPointerElementTy()->kind == TYPE_VOID ||
+            // allow implicit cast to void pointer
+            (pty->getPointerElementTy() &&
+             pty->getPointerElementTy()->kind == TYPE_VOID);
+        //TODO: check if compatible pointer
     }
 };
 

@@ -123,7 +123,11 @@ class ParseContext
     void pushRecover();
     void popRecover();
     void recover();
+
+    ASTType *parseBasicType();
+    ASTType *parseScalarType(); //scalar type is anything but pointer/array. this includes struct and tuples
     ASTType *parseType();
+
     void parseInclude();
     ImportExpression *parseImport();
     Statement *parseStatement();

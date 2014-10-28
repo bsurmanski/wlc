@@ -517,6 +517,22 @@ struct ASTTupleType : public ASTCompositeType {
         return false;
     }
 
+    virtual bool coercesTo(ASTType *ty) {
+        ASTTupleType *otup = ty->asTuple();
+        if(!otup || length() != otup->length()) return false;
+
+        for(int i = 0; i < length(); i++) {
+            // TODO: allow tuple coercion if one tuple contains
+            // base pointer to other class?
+            // eg [int, SomeClass] -> [int, BaseClass]
+            if(!getMemberType(i)->is(otup->getMemberType(i))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     ASTTupleType(std::vector<ASTType*> t) : ASTCompositeType(TYPE_TUPLE), types(t) {}
 };
 
@@ -532,6 +548,12 @@ struct ASTPointerType : public ASTType {
             return ptrTo->is(oth->ptrTo);
         }
         return false;
+    }
+
+    virtual bool coercesTo(ASTType *ty) {
+        ASTPointerType *pty = ty->asPointer();
+        if(!pty) return false;
+        return ptrTo->is(pty->ptrTo);
     }
 };
 

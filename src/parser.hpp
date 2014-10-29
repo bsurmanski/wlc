@@ -126,6 +126,10 @@ class ParseContext
 
     ASTType *parseBasicType();
     ASTType *parseScalarType(); //scalar type is anything but pointer/array. this includes struct and tuples
+    ASTType *parsePointerModifiedType(ASTType *base);
+    ASTType *parseArrayModifiedType(ASTType *base);
+    ASTType *parseFunctionModifiedType(ASTType *base); //where base is the return-type
+    ASTType *parseModifiedType(ASTType *base);
     ASTType *parseType();
 
     void parseInclude();

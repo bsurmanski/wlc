@@ -159,74 +159,93 @@ ASTType *ParseContext::parseScalarType() {
     return NULL;
 }
 
-ASTType *ParseContext::parseType() {
-    ASTType *type = parseScalarType();
+ASTType *ParseContext::parsePointerModifiedType(ASTType *base) {
+    if(peek().is(tok::caret)) {
+        ignore(); // eat ^
+        return base->getPointerTy();
+    }
+    return base;
+}
 
+ASTType *ParseContext::parseArrayModifiedType(ASTType *base) {
+    if(peek().is(tok::lbracket)) {
+        ASTType *type = base;
+        ignore(); // eat [
+
+        // contains index; statically sized
+        if(peek().isNot(tok::rbracket)) {
+            if(peek().isNot(tok::intNum)) {
+                emit_message(msg::ERROR, "array index must be integer", peek().loc);
+                return NULL;
+            }
+
+            int sz = get().intData();
+            type = type->getArrayTy(sz);
+        } else { // no index, dynamically sized
+            type = type->getArrayTy();
+        }
+
+        if(peek().isNot(tok::rbracket)) {
+            emit_message(msg::ERROR, "expected ']'", peek().loc);
+            dropLine();
+            return NULL;
+        }
+        ignore(); // eat ]
+        return type;
+    }
+
+    return base;
+}
+
+ASTType *ParseContext::parseFunctionModifiedType(ASTType *base) {
+    if(peek().is(tok::kw_function)) {
+        ASTType *ret = base;
+        ignore(); // eat 'function'
+        if(peek().isNot(tok::lparen)) {
+            emit_message(msg::ERROR, "expected '(' in function pointer type specification");
+            return NULL;
+        }
+        ignore(); // eat '('
+
+        std::vector<ASTType*> params;
+        while(peek().isNot(tok::rparen)){
+            ASTType *param = parseType();
+            params.push_back(param);
+
+            if(peek().is(tok::comma)) {
+                ignore();
+            } else if(peek().is(tok::rparen)) {
+                break;
+            } else {
+                emit_message(msg::ERROR, "expected ',' or ')' in function type specification");
+                return NULL;
+            } // TODO: vararg
+        }
+
+        ignore(); //eat ')' of function type
+
+        return ASTType::getFunctionTy(ret, params)->getPointerTy(); // 'function' is a pointer
+    }
+
+    return base;
+}
+
+ASTType *ParseContext::parseModifiedType(ASTType *base) {
+    ASTType *type = base;
     while(true)
     {
-        if(peek().is(tok::caret))
-        {
-            ignore(); // eat ^
-            type = type->getPointerTy();
+        if(peek().is(tok::caret)) {
+            type = parsePointerModifiedType(type);
             continue;
         }
 
-        if(peek().is(tok::lbracket)) // XXX should this be parsed as part of the type, or as a postfix expression?
-        {
-            ignore(); // eat [
-            if(peek().isNot(tok::rbracket))
-            {
-                if(peek().isNot(tok::intNum))
-                {
-                    emit_message(msg::ERROR, "array index must be integer", peek().loc);
-                    return NULL;
-                }
-
-                int sz = get().intData();
-                type = type->getArrayTy(sz);
-            } else
-            {
-                type = type->getArrayTy();
-            }
-
-            if(peek().isNot(tok::rbracket)) {
-                emit_message(msg::ERROR, "expected ']'", peek().loc);
-                dropLine();
-                return NULL;
-            }
-            ignore(); // eat ]
+        if(peek().is(tok::lbracket)) {
+            type = parseArrayModifiedType(type);
             continue;
         }
 
-        if(peek().is(tok::kw_function))
-        {
-            ASTType *ret = type;
-            ignore(); // eat 'function'
-            if(peek().isNot(tok::lparen)) {
-                emit_message(msg::ERROR, "expected '(' in function pointer type specification");
-                return NULL;
-            }
-            ignore(); // eat '('
-
-            std::vector<ASTType*> params;
-            while(peek().isNot(tok::rparen)){
-                ASTType *param = parseType();
-                params.push_back(param);
-
-                if(peek().is(tok::comma)) {
-                    ignore();
-                } else if(peek().is(tok::rparen)) {
-                    break;
-                } else {
-                    emit_message(msg::ERROR, "expected ',' or ')' in function type specification");
-                    return NULL;
-                } // TODO: vararg
-            }
-
-            ignore(); //eat ')' of function type
-
-            type = ASTType::getFunctionTy(ret, params)->getPointerTy(); // 'function' is a pointer
-
+        if(peek().is(tok::kw_function)) {
+            type = parseFunctionModifiedType(type);
             continue;
         }
 
@@ -234,6 +253,12 @@ ASTType *ParseContext::parseType() {
     }
 
     return type;
+
+}
+
+ASTType *ParseContext::parseType() {
+    ASTType *type = parseScalarType();
+    return parseModifiedType(type);
 }
 
 // parse top level expression and apply to translation unit

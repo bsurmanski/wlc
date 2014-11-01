@@ -27,6 +27,17 @@ The current feature set rivals that of C, with some additional primitive types
 There is also a planned subset of OWL called WL, without object oriented
 features.
 
+## The Name
+The name is mostly meaningless. I wanted a short 2-3 letter name that was simple
+and memorable. 
+
+If you wish, the name may also stand for 'Objective WL', where WL may stand for
+'Without-object Language'.
+
+Any relation to other bird-inspired languages is purely coincidental as OWL
+started development and was named before said hypothetical language was
+announced.
+
 ## Features
 
 * statically typed

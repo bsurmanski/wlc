@@ -19,7 +19,7 @@ The most obvious deviant features are classes, pointer syntax, cast syntax,
 tuples, importing, function overloading and optional semicolons.
 
 The language can currently interface with C by importing C headers, as an
-extension (see 'importc' Use Extension).
+extension (see *Current 'Use' Extension*).
 
 The current feature set rivals that of C, with some additional primitive types
 (mainly classes, tuples, and dynamic arrays).
@@ -132,6 +132,11 @@ Below is a basic example of class polymorphism in OWL:
 The above example shows off member access syntax, virtual functions, and
 constructor syntax.
 
+Classes in OWL only allow single inheritance. Apart from the explicit members,
+classes are implemented with an implicit virtual table pointer and 64-bit
+reference count. This implies that the benefit of polymorphism in OWL comes at
+the cost of 128-bit overhead in contrast to traditional structs.
+
 #### Reference Counting
 In OWL, Classes are special among types in that they are reference counted. A
 reference is retained on assignment, and released when overwritten or on scope
@@ -152,8 +157,11 @@ assignment. This provides a way to prevent cyclic references.
 ### Arrays
 arrays have an associated size in OWL. Arrays can either be statically sized, or
 dynamically sized. Statically sized arrays cannot be resized but an explicit
-size variable does not need to be stored. Dynamically sized arrays are stored
-with a pointer to the first element as well as a size of the array.
+size variable does not need to be stored. Static arrays are implemented as a
+simple pointer. Dynamically sized arrays are stored with a pointer to the first
+element as well as a size of the array. This implies that dynamic arrays have an
+overhead of an additional 64-bit 'size' member over the statically typed
+arrays.
 
     // stored as 5 elements of integers
     int[5] staticArray = [1,2,3,4,5]   
@@ -200,9 +208,11 @@ the default value will be used.
     add(1, 2)   // valid, return 3  (i=1, j=2)
 
 ### Tuples
-Due to limitations of static typing, tuples will be more like unnamed structs than
-true tuples. This means that indexing can only be done with static integers. This 
-is because in a statement like
+Tuple provide a way to combine multiple data types into a single record without
+providing an explicit type name.  Due to limitations of static typing, tuples
+will be more like unnamed structs than true tuples of dynamic languages. This
+means that indexing can only be done with static integers. This is because in a
+statement like
 
     [int, char^] myTuple 
     ...
@@ -300,6 +310,8 @@ Importing defines the symbol of the imported module to be used within the
 importing module. Modules will only be evaluated once, regardless of the number
 of other modules which import it.
 
+The current module handling is fairly simple and likely to change in the future.
+
 ### 'Use' statement
 use statements enable specific compiler extensions, or modify language syntax. 
 When complete, use statements will likely have a syntax of
@@ -324,14 +336,14 @@ See the 'Ideas' document for some examples of possible 'use' extensions.
 There may be a set of extensions that are required for a 'conforming' compiler, and a 'embedded' 
 standard can be created that does not have the extensions.
 
-#### Current Use Extensions
+#### Current 'Use' Extensions
 
 ##### importc
 Used to enable the 'import(C)' construct, which allow importing symbols from a
 C header. import(C) allows most C symbols to be imported and used. This includes
 function declarations, global variables, macro constants, and typedefs.
 
-While import(C) works for most cases, unfortuntely some more complicated
+While import(C) works for most cases, unfortunately some more complicated
 preprocessor macros can not be used. Currently functional macros and macros that
 contain complex expressions cannot be parsed and are ignored.
 

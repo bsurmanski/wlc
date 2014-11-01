@@ -7,6 +7,26 @@ There is likely to be many bugs and missing features.
 OWL is a new language meant to be used in a system level context. As such, there will
 be no garbage collector, no virtual machine, etc.
 
+## Language Summary
+The OWL language is an object-oriented system level programming language without
+a garbage collector. It is intended to be used in real time applications where
+low overhead is important. The basic design and syntax follows that of C,
+only deviating where a given choice no longer makes sense in a modern context or
+where the compromise between pleasing code outweighs any slight compiler
+complexity incurred. 
+
+The most obvious deviant features are classes, pointer syntax, cast syntax,
+tuples, importing, function overloading and optional semicolons.
+
+The language can currently interface with C by importing C headers, as an
+extension (see 'importc' Use Extension).
+
+The current feature set rivals that of C, with some additional primitive types
+(mainly classes, tuples, and dynamic arrays).
+
+There is also a planned subset of OWL called WL, without object oriented
+features.
+
 ## Features
 
 * statically typed
@@ -342,4 +362,10 @@ without:
             return .member
         }
     }
+
+
+## Contact
+For more information, contact me at:
+email: b (dot) surmanski (at) gmail (dot) com
+twitter: bsurmanski
 

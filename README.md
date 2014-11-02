@@ -16,7 +16,8 @@ where the compromise between pleasing code outweighs any slight compiler
 complexity incurred. 
 
 The most obvious deviant features are classes, pointer syntax, cast syntax,
-tuples, importing, function overloading and optional semicolons.
+tuples, importing, function overloading, uniform function call syntax and
+optional semicolons.
 
 The language can currently interface with C by importing C headers, as an
 extension (see *Current 'Use' Extension*).
@@ -33,10 +34,6 @@ and memorable.
 
 If you wish, the name may also stand for 'Objective WL', where WL may stand for
 'Without-object Language'.
-
-Any relation to other bird-inspired languages is purely coincidental as OWL
-started development and was named before said hypothetical language was
-announced.
 
 ## Features
 
@@ -70,6 +67,7 @@ announced.
 * switch statements
 * unions
 * classes
+* uniform function call syntax
 
 ## Planned Functionality
 roughly in order of planned implementation
@@ -386,6 +384,37 @@ without:
         }
     }
 
+## Building And Installing
+
+### Linux
+For linux, a Makefile is provided. WLC requries the following to build:
+
+* LLVM (3.4 - 3.6)
+* g++
+* zlib
+* curses (for LLVM)
+* libdl
+
+after running 'make', 'make install' may be run. The Makefile is hardcoded
+to install wlc to /usr/local/bin, any OWL libraries to /usr/local/include/wl,
+and to copy the vim syntax file to ~/.vim/syntax.
+
+### Windows
+A Visual Studios project file is provided in the *win32* directory. For Windows,
+the libclang source must be availible to compile.
+
+For more information, view the WIN32\_README.md file in the *win32* directory.
+
+### OSX
+WLC is likely to compile on OSX using the provided Makefile with minor
+modification. In the past, I have successfully compiled WLC on OSX, and ran a
+simple test program. Unfortunately, WLC has not been tested or fully ported to
+OSX. 
+
+In the current state, WLC should be able to compile pure OWL code, but importing
+C headers is almost certain to fail. 
+
+A proper OSX port can be created on request.
 
 ## Contact
 For more information, contact me at:

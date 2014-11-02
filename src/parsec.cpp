@@ -68,7 +68,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
 		char message[256];
 		CXString cxname = clang_getCursorDisplayName(cursor);
 		string name = clang_getCString(cxname);
-		
+
 		sprintf(message, "declaration attribute ignored: %s", name.c_str());
 		emit_message(msg::WARNING, message);
 	} else if(cursor.kind == CXCursor_FieldDecl)
@@ -203,7 +203,7 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
 
 namespace clang {
     class MacroDefinition;
-    
+
 	namespace cxcursor {
         const MacroDefinition *getCursorMacroDefinition(CXCursor c);
 	}
@@ -302,8 +302,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
                         printf("Macro redefines value, ");
                         goto MACRO_ERR;
                     }
-                    NumericExpression *val = new NumericExpression(NumericExpression::DOUBLE,
-                            ASTType::getDoubleTy(), atof(tok.getLiteralData()));
+                    NumericExpression *val = new FloatExpression(ASTType::getDoubleTy(), atof(tok.getLiteralData()));
                     //VariableDeclaration *vdecl = new VariableDeclaration(ASTType::getDoubleTy(),
                     //        id, val, loc, false);
                     id->setExpression(val);
@@ -338,8 +337,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         std::string name = clang_getCString(cxname);
         Identifier *id = unit->getScope()->get(name);
         int64_t val = clang_getEnumConstantDeclValue(cursor);
-                NumericExpression *nval = new NumericExpression(NumericExpression::INT,
-                        ASTType::getLongTy(), (uint64_t) val);
+        NumericExpression *nval = new IntExpression(ASTType::getLongTy(), (uint64_t) val);
 
         id->setExpression(nval);
     } else if(cursor.kind == CXCursor_StructDecl)
@@ -379,7 +377,7 @@ ERR:
 std::string getAbsoluteIncludePath(std::string file) {
 	char *ienv = getenv("INCLUDE");
 	if (!ienv) return "C:/Program Files (x86)/Microsoft Visual Studio 12.0/VC/include/" + file; // default location
-	//printf("INCLUDE: %s\n", ienv); 
+	//printf("INCLUDE: %s\n", ienv);
 	//TODO split ienv delimiter, search for any existing files
 	return "C:/Program Files (x86)/Microsoft Visual Studio 12.0/VC/include/" + file;
 }

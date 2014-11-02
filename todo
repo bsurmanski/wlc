@@ -20,3 +20,5 @@ functions accept extra parameters (which are then ignored)
 MyClass().func() does not work (seems to be same as above)
 
 "[int, int]^ tup; tup++" breaks things (eg, passing tuple by reference)
+
+unions do not take into account class lifetime

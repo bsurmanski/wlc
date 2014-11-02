@@ -645,6 +645,8 @@ struct PostfixExpression;
 struct IndexExpression;
 struct IdentifierExpression;
 struct NumericExpression;
+struct IntExpression;
+struct FloatExpression;
 struct StringExpression;
 struct DeclarationExpression;
 struct PassExpression;
@@ -675,6 +677,8 @@ struct Expression : public Statement
     virtual IndexExpression *indexExpression() { return NULL; }
     virtual IdentifierExpression *identifierExpression() { return NULL; }
     virtual NumericExpression *numericExpression() { return NULL; }
+    virtual IntExpression *intExpression() { return NULL; }
+    virtual FloatExpression *floatExpression() { return NULL; }
     virtual StringExpression *stringExpression() { return NULL; }
     virtual PassExpression *passExpression() { return NULL; }
     virtual TopLevelExpression *topLevelExpression() { return NULL; }
@@ -692,6 +696,11 @@ struct Expression : public Statement
     //TODO: overrides
 
     virtual void accept(ASTVisitor *v);
+
+    virtual int asInteger() {
+        emit_message(msg::ERROR, "this value cannot be converted to integer", loc);
+        return 0;
+    }
 };
 
 struct TypeExpression : public Expression
@@ -960,38 +969,39 @@ struct StringExpression : public PrimaryExpression
     virtual void accept(ASTVisitor *v);
 };
 
-// XXX super ugly. Maybe just hold an ASTValue* or something instead of this mess?
 struct NumericExpression : public PrimaryExpression
 {
     virtual ~NumericExpression() {}
-    enum NumericType
-    {
-        FLOAT,
-        DOUBLE,
-        CHAR,
-        INT,
-    };
 
-    NumericType type;
     ASTType *astType;
-
-    // this union is a bit silly. should just subclass this...
-    union
-    {
-        double floatValue;
-        uint64_t intValue;
-        char charValue;
-    };
 
     virtual ASTType *getType() { return astType; }
     virtual bool isConstant() { return true; }
-    NumericExpression(NumericType t, ASTType* ty, double val, SourceLocation l = SourceLocation()) :
-        PrimaryExpression(l), type(t),  astType(ty), floatValue(val) {}
-    NumericExpression(NumericType t, ASTType *ty, uint64_t val, SourceLocation l = SourceLocation()) :
-        PrimaryExpression(l), type(t), astType(ty), intValue(val) {}
+    NumericExpression(ASTType* ty, SourceLocation l = SourceLocation()) :
+        PrimaryExpression(l), type(t),  astType(ty) {}
+
     virtual NumericExpression *numericExpression() { return this; }
     virtual void accept(ASTVisitor *v);
+
+    virtual int asInteger() {
+        if(type == INT) {
+            return intValue;
+        }
+    }
+}; //XXX subclass as bool/char type also?
+
+struct FloatExpression : public NumericExpression {
+    double value;
+    FloatExpression(ASTType *ty, double val, SourceLocation l = SourceLocation()) : NumericExpression(ty, l), value(val) {}
+    virtual FloatExpression *floatExpression() { return this; }
 };
+
+struct IntExpression : public NumericExpression {
+    uint64_t value;
+    IntExpression(ASTType *ty, uint64_t val, SourceLocation l = SourceLocation()) : NumericExpression(ty, l), value(val) {}
+    virtual IntExpression *intExpression() { return this; }
+};
+
 
 struct Statement;
 

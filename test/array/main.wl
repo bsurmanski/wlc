@@ -6,6 +6,9 @@ char^[] strings = ["hello", "goodbye", "hithere", "thats all folks"]
 int[] vals = [1, 2, 3, 4]
 int[5] vals2 = [1,2,3,4,5]
 
+const int SIZE = 5
+int[SIZE] sillyArray
+
 void arrayFunc() {
     int[] arr = [1,2,3]
     for(int i = 0; i < arr.size; i++) {

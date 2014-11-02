@@ -27,10 +27,9 @@ struct ASTValue
     virtual ASTType *getType() = 0;
     virtual bool isConstant() { return false; } // TODO
     virtual bool isWeak() { return false; } // XXX DITTO
-    virtual bool isNoFree() { return false; }
+    virtual bool isNoFree() { return false; } // if stack allocated; only destruct, no free
     virtual bool isLValue() = 0;
     virtual bool isReference() = 0;
-
 
     virtual llvm::Value *codegenValue() { return NULL; }
     virtual llvm::Value *codegenLValue() { return NULL; }

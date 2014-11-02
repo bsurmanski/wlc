@@ -1216,40 +1216,34 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
 ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
 {
     location = exp->loc;
-    if(NumericExpression *nexp = exp->numericExpression())
+    if(IntExpression *iexp = exp->intExpression())
     {
         llvm::Value *llvmval = NULL;
         ASTType *ty = NULL;
         ASTBasicValue *ret = NULL;
-        switch(nexp->type)
-        {
-            case NumericExpression::INT:
-                if(nexp->astType->isPointer())
-                {
-                    if(!nexp->intValue)
-                    {
-                        llvmval = ConstantPointerNull::get((PointerType*) codegenType(nexp->astType));
-                        ty = nexp->astType;
-                    }
-                } else
-                {
-                    llvmval = ConstantInt::get(codegenType(nexp->astType), nexp->intValue);
-                    ty = nexp->astType;
-                }
-                ret = new ASTBasicValue(ty, llvmval); //TODO: assign
-                ret->setConstant(true);
-                return ret;
-            case NumericExpression::DOUBLE:
-                llvmval = ConstantFP::get(codegenType(nexp->astType), nexp->floatValue);
-                ty = nexp->astType;
-                ret = new ASTBasicValue(ty, llvmval); //TODO: assign
-                ret->setConstant(true);
-                return ret;
 
-            case NumericExpression::FLOAT:
-            case NumericExpression::CHAR:
-                return NULL; //TODO verify these are not used
+        if(iexp->astType->isPointer())
+        {
+            if(!iexp->value)
+            {
+                llvmval = ConstantPointerNull::get((PointerType*) codegenType(iexp->astType));
+                ty = iexp->astType;
+            }
+        } else
+        {
+            llvmval = ConstantInt::get(codegenType(iexp->astType), iexp->value);
+            ty = iexp->astType;
         }
+        ret = new ASTBasicValue(ty, llvmval); //TODO: assign
+        ret->setConstant(true);
+        return ret;
+    }
+    else if(FloatExpression *fexp = exp->floatExpression()) {
+        llvm::Value *llvmval = ConstantFP::get(codegenType(fexp->astType), fexp->value);
+        ASTType *ty = fexp->astType;
+        ASTBasicValue *ret = new ASTBasicValue(ty, llvmval); //TODO: assign
+        ret->setConstant(true);
+        return ret;
     }
     else if(StringExpression *sexp = exp->stringExpression())
     {

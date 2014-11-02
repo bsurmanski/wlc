@@ -174,13 +174,18 @@ ASTType *ParseContext::parseArrayModifiedType(ASTType *base) {
 
         // contains index; statically sized
         if(peek().isNot(tok::rbracket)) {
-            if(peek().isNot(tok::intNum)) {
-                emit_message(msg::ERROR, "array index must be integer", peek().loc);
+            Expression *arrsz = parseExpression();
+            if(!arrsz->isConstant()) {
+                emit_message(msg::ERROR, "array size must be constant", peek().loc);
                 return NULL;
             }
 
-            int sz = get().intData();
-            type = type->getArrayTy(sz);
+            if(!arrsz->getType()->coercesTo(ASTType::getIntTy())) {
+                emit_message(msg::ERROR, "array size must be an integer value", peek().loc);
+                return NULL;
+            }
+
+            type = type->getArrayTy(arrsz->asInteger());
         } else { // no index, dynamically sized
             type = type->getArrayTy();
         }
@@ -1363,32 +1368,32 @@ Expression *ParseContext::parsePrimaryExpression()
 
     if(peek().is(tok::intNum))
     {
-        return new NumericExpression(NumericExpression::INT, ASTType::getLongTy(),
+        return new IntExpression(ASTType::getLongTy(),
                 (uint64_t) get().intData(), loc);
     }
 
     if(peek().is(tok::floatNum))
     {
-        return new NumericExpression(NumericExpression::DOUBLE, ASTType::getDoubleTy(),
+        return new FloatExpression(ASTType::getDoubleTy(),
                 get().floatData(), loc);
     }
 
     if(peek().is(tok::kw_true))
     {
         ignore();
-        return new NumericExpression(NumericExpression::INT, ASTType::getBoolTy(),
+        return new IntExpression(ASTType::getBoolTy(),
                 (uint64_t) 1L, loc); //TODO: bool type
     }
     if(peek().is(tok::kw_false))
     {
         ignore();
-        return new NumericExpression(NumericExpression::INT, ASTType::getBoolTy(),
+        return new IntExpression(ASTType::getBoolTy(),
                 (uint64_t) 0L, loc); //TODO: bool
     }
     if(peek().is(tok::kw_null))
     {
         ignore();
-        return new NumericExpression(NumericExpression::INT, ASTType::getVoidTy()->getPointerTy(),
+        return new IntExpression(ASTType::getVoidTy()->getPointerTy(),
                 (uint64_t) 0L, loc); //TODO: void^
     }
 

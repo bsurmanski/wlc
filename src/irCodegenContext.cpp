@@ -1148,6 +1148,7 @@ ASTValue *IRCodegenContext::getArraySize(ASTValue *arr) {
         //TODO: allow getArraySize call on tuple?
         emit_message(msg::ERROR, "invalid .size on non-array type");
     }
+    return NULL;
 }
 
 
@@ -2012,8 +2013,7 @@ ASTValue *IRCodegenContext::promoteInt(ASTValue *val, ASTType *toType)
     return ret;
 }
 
-ASTValue *IRCodegenContext::promoteFloat(ASTValue *val, ASTType *toType)
-{
+ASTValue *IRCodegenContext::promoteFloat(ASTValue *val, ASTType *toType) {
     if(toType->isFloating())
     {
         return new ASTBasicValue(toType, ir->CreateFPCast(codegenValue(val), codegenType(toType)));
@@ -2022,10 +2022,10 @@ ASTValue *IRCodegenContext::promoteFloat(ASTValue *val, ASTType *toType)
         return new ASTBasicValue(toType, ir->CreateFPToUI(codegenValue(val),
                     codegenType(toType)));
     }
+    return NULL;
 }
 
-ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
-{
+ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType) {
     if(toType->isPointer())
     {
         return new ASTBasicValue(toType,
@@ -2053,10 +2053,10 @@ ASTValue *IRCodegenContext::promotePointer(ASTValue *val, ASTType *toType)
         return new ASTBasicValue(toType,
                 ir->CreatePointerCast(codegenValue(val), codegenType(toType)), false, true); //XXX might be a bit cludgy
     }
+    return NULL;
 }
 
-ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
-{
+ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType) {
     TupleValue *tupval = dynamic_cast<TupleValue*>(val);
     ASTCompositeType *compty = dynamic_cast<ASTCompositeType*>(toType);
     if(!tupval) emit_message(msg::FAILURE, "promoting invalid value to tuple");
@@ -2065,8 +2065,7 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType)
     return tupval;
 }
 
-ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType)
-{
+ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType) {
     if(val->getType()->kind == TYPE_ARRAY)
     {
         if(toType->kind == TYPE_POINTER)

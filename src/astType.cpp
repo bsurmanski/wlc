@@ -243,15 +243,28 @@ FunctionDeclaration *ASTUserType::getDestructor() {
     return getDeclaration()->destructor;
 }
 
-ASTUserType *ASTUserType::asClass() { if(dynamic_cast<ClassDeclaration*>(identifier->getDeclaration())) return this; }
-ASTUserType *ASTUserType::asInterface() { if(dynamic_cast<InterfaceDeclaration*>(identifier->getDeclaration())) return this; }
-ASTUserType *ASTUserType::asStruct() { if(dynamic_cast<StructDeclaration*>(identifier->getDeclaration())) return this; }
-ASTUserType *ASTUserType::asUnion() { if(dynamic_cast<UnionDeclaration*>(identifier->getDeclaration())) return this; }
+ASTUserType *ASTUserType::asClass() {
+       	if(dynamic_cast<ClassDeclaration*>(identifier->getDeclaration())) return this;
+	return NULL;
+}
+ASTUserType *ASTUserType::asInterface() {
+       	if(dynamic_cast<InterfaceDeclaration*>(identifier->getDeclaration())) return this;
+	return NULL;
+}
+ASTUserType *ASTUserType::asStruct() {
+       	if(dynamic_cast<StructDeclaration*>(identifier->getDeclaration())) return this;
+	return NULL;
+}
+ASTUserType *ASTUserType::asUnion() {
+       	if(dynamic_cast<UnionDeclaration*>(identifier->getDeclaration())) return this;
+	return NULL;
+}
 
 bool ASTUserType::is(ASTType *t) {
     if(ASTUserType *uty = t->asUserType()) {
         return getDeclaration() == t->getDeclaration();
     }
+    return false;
 }
 
 bool ASTUserType::extends(ASTType *t) {

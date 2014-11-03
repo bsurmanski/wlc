@@ -101,6 +101,7 @@ ASTType *ParseContext::parseBasicType() {
     default:
         emit_message(msg::UNIMPLEMENTED, "unparsed type");
    }
+   return NULL;
 }
 
 /**

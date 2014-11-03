@@ -12,6 +12,7 @@ struct WLConfig
     std::vector<std::string> inc; // -i
     std::vector<std::string> libdirs; // -L
     std::vector<std::string> incdirs; // -I
+    std::vector<std::string> frameworks; // -f (OSX ONLY)
 
     std::string tempName;
 

@@ -185,6 +185,11 @@ WLConfig parseCmd(int argc, char **argv)
             case 'o':
                 params.output = std::string(optarg);
                 break;
+#ifdef __APPLE__
+            case 'f':
+                params.frameworks.push_back(optarg);   
+                break;
+#endif
             case '?':
                 if(optopt == 'l' || optopt == 'L' || optopt == 'I')
                 {

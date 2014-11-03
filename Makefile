@@ -2,27 +2,31 @@ SRCFILES:=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifie
 
 # additional clang libraries to build
 llvm_prefix=/usr
-CLANGLIBS= $(llvm_prefix)/lib/libclang.a\
-$(llvm_prefix)/lib/libclangIndex.a\
-$(llvm_prefix)/lib/libclangFrontend.a\
-$(llvm_prefix)/lib/libclangDriver.a\
-$(llvm_prefix)/lib/libclangParse.a\
-$(llvm_prefix)/lib/libclangSema.a\
-$(llvm_prefix)/lib/libclangEdit.a\
-$(llvm_prefix)/lib/libclangTooling.a\
-$(llvm_prefix)/lib/libclangRewriteFrontend.a\
-$(llvm_prefix)/lib/libclangAST.a\
-$(llvm_prefix)/lib/libclangFormat.a\
-$(llvm_prefix)/lib/libclangBasic.a\
-$(llvm_prefix)/lib/libclangLex.a\
-$(llvm_prefix)/lib/libclangSerialization.a\
-$(llvm_prefix)/lib/libclangAnalysis.a
+ifeq ($(shell if [ -e /usr/local/lib/libclang.a ]; then echo "EXISTS"; fi ),EXISTS)
+	llvm_prefix=/usr/local
+endif
+
+CLANGLIBS = libclang.a\
+libclangIndex.a\
+libclangFrontend.a\
+libclangDriver.a\
+libclangParse.a\
+libclangSema.a\
+libclangEdit.a\
+libclangTooling.a\
+libclangRewriteFrontend.a\
+libclangAST.a\
+libclangFormat.a\
+libclangBasic.a\
+libclangLex.a\
+libclangSerialization.a\
+libclangAnalysis.a
 
 # only used for clang 3.4, to build additional static libraries
-CLANGLIBS_34:=$(llvm_prefix)/lib/libclangRewriteCore.a\
-$(llvm_prefix)/lib/libLLVMSupport.a
+CLANGLIBS_34:=libclangRewriteCore.a\
+libLLVMSupport.a
 
-CLANGLIBS_35:=$(llvm_prefix)/lib/libclangRewrite.a
+CLANGLIBS_35:=libclangRewrite.a
 
 NODEPS:=clean install installsyntax
 SRC:=$(foreach file, $(SRCFILES), src/$(file))
@@ -54,6 +58,8 @@ LLVMLDFLAGS += -lLLVM-3.4
 endif
 CLANGLIBS:=$(CLANGLIBS) $(CLANGLIBS_34)
 endif
+
+CLANGLIBS:=$(foreach file, $(CLANGLIBS), $(llvm_prefix)/lib/$(file))
 
 CXXFLAGS=`llvm-config --cxxflags` -ggdb -O0 -frtti -UNDEBUG -DDEBUG -I/usr/local/include
 LDFLAGS=`llvm-config --ldflags --libs` $(LLVMLDFLAGS)

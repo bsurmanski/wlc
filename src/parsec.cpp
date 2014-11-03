@@ -75,6 +75,10 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
     {
         CXString cxname = clang_getCursorSpelling(cursor);
         string name = clang_getCString(cxname);
+	if(name.empty()) {
+		emit_message(msg::WARNING, "unknown member of C struct", loc);
+		return CXChildVisit_Continue;
+	}
 
         Identifier *id = scope->getInScope(name);
         ASTType *ty = ASTTypeFromCType(unit, clang_getCursorType(cursor));
@@ -92,6 +96,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
         //members->push_back(vdecl);
     } else
     {
+ERR:
 		char message[256];
 		sprintf(message, "unknown field in C record: %d, %s:%d", cursor.kind, loc.filenm, loc.line);
         emit_message(msg::FAILURE, message, loc);
@@ -404,7 +409,7 @@ void parseCImport(TranslationUnit *unit,
 
     if(access(filenm.c_str(), F_OK) == -1)
     {
-		filenm = getAbsoluteIncludePath(filenm);
+	filenm = getAbsoluteIncludePath(filenm);
         if(access(filenm.c_str(), F_OK) == -1) {
             emit_message(msg::ERROR, "imported C file does not exist: " + filenm, loc);
         }

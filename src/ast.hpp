@@ -863,6 +863,7 @@ struct UnaryExpression : public Expression
             case tok::amp:
                      return lhs->getType()->getPointerTy();
         }
+	return NULL;
     }
 };
 
@@ -913,6 +914,7 @@ struct BinaryExpression : public Expression
                 //TODO: resolve type
                 return lhs->getType();
         }
+	return NULL;
     }
 
     virtual Expression *lower();

@@ -1,6 +1,8 @@
 #ifndef _ASTTYPE_HPP
 #define _ASTTYPE_HPP
 
+#include <sstream>
+
 class ASTVisitor;
 
 /*
@@ -120,8 +122,7 @@ struct ASTType
     // conversion priority
     unsigned getPriority()
     {
-        switch(kind)
-        {
+        switch(kind) {
             case TYPE_USER:
                 return 0;
             case TYPE_TUPLE:
@@ -154,13 +155,14 @@ struct ASTType
                 return 14;
             case TYPE_DOUBLE:
                 return 15;
+	    default:
+		assert(false && "unknown type");
         }
+	return 0;
     }
 
-    virtual bool coercesTo(ASTType *ty)
-    {
-        switch(kind)
-        {
+    virtual bool coercesTo(ASTType *ty) {
+        switch(kind) {
             case TYPE_BOOL:
             case TYPE_UCHAR:
             case TYPE_CHAR:
@@ -173,9 +175,9 @@ struct ASTType
             case TYPE_FLOAT:
             case TYPE_DOUBLE:
                 return ty->isNumeric();
-            default:
-                return false;
+            default: break;
         }
+	return false;
     }
 
     bool castsTo(ASTType *ty) const
@@ -355,7 +357,7 @@ struct ASTFunctionType : public ASTCompositeType {
 
     virtual std::string getMangledName() {
         char buf[32];
-        sprintf(buf, "%02d", params.size());
+        sprintf(buf, "%02lu", params.size());
         std::string name = std::string("f") + std::string(buf) + ret->getMangledName();
         for(int i = 0; i < params.size(); i++){
             name = name + "$$" + params[i]->getMangledName();
@@ -423,6 +425,8 @@ struct ASTUserType : public ASTCompositeType {
             return "UI" + identifier->getMangledName();
         if(isStruct())
             return "US" + identifier->getMangledName();
+	assert(false && "unknown user type");
+	return "";
     }
     virtual ASTUserType *asUserType() { return this; }
     virtual ASTUserType *asClass();
@@ -484,15 +488,16 @@ struct ASTTupleType : public ASTCompositeType {
     }
 
     virtual std::string getMangledName() {
-        std::string mangle = "t" + types.size();
+	std::stringstream sstream;
+        sstream << "t" << types.size();
         for(int i = 0; i < types.size(); i++){
             if((i+1) < types.size()) {
-                mangle = mangle + types[i]->getMangledName() + "$$";
+                sstream << types[i]->getMangledName() << "$$";
             } else {
-                mangle = mangle + types[i]->getMangledName();
+                sstream << types[i]->getMangledName();
             }
         }
-        return mangle;
+        return sstream.str();
     }
 
     virtual bool is(ASTType *t) {

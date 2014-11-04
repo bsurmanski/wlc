@@ -83,12 +83,16 @@ std::string ASTPointerType::getMangledName()
 //
 // StaticArrayType
 //
+size_t ASTStaticArrayType::length() {
+    return size->asInteger();
+}
+
 size_t ASTStaticArrayType::getAlign() {
     return arrayOf->getAlign();
 }
 
 size_t ASTStaticArrayType::getSize() {
-    return size * arrayOf->getSize();
+    return size->asInteger() * arrayOf->getSize();
 }
 
 //
@@ -105,8 +109,7 @@ size_t ASTDynamicArrayType::getSize() {
 //
 // ASTTupleType
 //
-size_t ASTTupleType::getSize()
-{
+size_t ASTTupleType::getSize() {
     size_t sz = 0;
     unsigned align;
     for(int i = 0; i < types.size(); i++)
@@ -119,8 +122,7 @@ size_t ASTTupleType::getSize()
     return sz;
 }
 
-size_t ASTTupleType::getAlign()
-{
+size_t ASTTupleType::getAlign() {
     size_t max = 0;
     for(int i = 0; i < types.size(); i++)
     {
@@ -133,8 +135,7 @@ size_t ASTTupleType::getAlign()
 //
 // ASTType
 //
-ASTType *ASTType::getPointerTy()
-{
+ASTType *ASTType::getPointerTy() {
     if(!pointerTy)
     {
         pointerTy = new ASTPointerType(this);
@@ -150,8 +151,7 @@ ASTType *ASTType::getReferenceTy() {
     }
 }
 
-ASTType *ASTType::getArrayTy()
-{
+ASTType *ASTType::getArrayTy() {
     if(!dynamicArrayTy)
     {
         dynamicArrayTy = new ASTDynamicArrayType(this);
@@ -159,13 +159,26 @@ ASTType *ASTType::getArrayTy()
     return dynamicArrayTy;
 }
 
-ASTType *ASTType::getArrayTy(int sz)
-{
+ASTType *ASTType::getArrayTy(unsigned sz) {
+    return getArrayTy(new IntExpression(ASTType::getIntTy(), sz));
+}
+
+ASTType *ASTType::getArrayTy(Expression *sz) {
     ASTType *aty = 0;
-    if(!arrayTy.count(sz))
-    {
-        aty = arrayTy[sz] = new ASTStaticArrayType(this, sz);
-    } else aty = arrayTy[sz];
+
+    if(sz->intExpression()) {
+        int isz = sz->intExpression()->asInteger();
+        if(arrayTy.count(isz)) {
+            aty = arrayTy[isz];
+        } else {
+            aty = arrayTy[isz] = new ASTStaticArrayType(this, sz);
+        }
+    }
+
+    if(!aty) {
+        aty = new ASTStaticArrayType(this, sz);
+    }
+
     return aty;
 }
 

@@ -186,7 +186,7 @@ ASTType *ParseContext::parseArrayModifiedType(ASTType *base) {
                 return NULL;
             }
 
-            type = type->getArrayTy(arrsz->asInteger());
+            type = type->getArrayTy(arrsz);
         } else { // no index, dynamically sized
             type = type->getArrayTy();
         }

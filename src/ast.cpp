@@ -209,3 +209,8 @@ FunctionDeclaration *UserTypeDeclaration::getDefaultConstructor(){
     }
     return NULL;
 }*/
+
+
+ASTType *StringExpression::getType() {
+    return ASTType::getCharTy()->getArrayTy(string.length());
+}

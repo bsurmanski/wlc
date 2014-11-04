@@ -2,7 +2,8 @@
 ## OWL Compiler
 
 *IMPORTANT*: currently the OWL compiler is in development. WLC is not yet ready for active usage.
-There is likely to be many bugs and missing features.
+There is likely to be many bugs and missing features. Additionally, development
+may not be stable. It is recommended to download a tagged release version.
 
 OWL is a new language meant to be used in a system level context. As such, there will
 be no garbage collector, no virtual machine, etc.
@@ -418,6 +419,8 @@ A proper OSX port can be created on request.
 
 ## Contact
 For more information, contact me at:
+
 email: b (dot) surmanski (at) gmail (dot) com
+
 twitter: bsurmanski
 

@@ -955,6 +955,21 @@ struct IdentifierExpression : public PrimaryExpression
         return id->getDeclaration() &&
             id->getDeclaration()->isConstant();
     }
+
+    virtual int asInteger() {
+        if(isConstant()) {
+            VariableDeclaration *vdecl = id->getDeclaration()->variableDeclaration();
+            if(vdecl && vdecl->value && vdecl->value->intExpression()) {
+                return vdecl->value->asInteger();
+            } else {
+                std::string err = "cannot convert constant of type " + vdecl->value->getType()->getName() + " to static int";
+                emit_message(msg::ERROR, err, loc);
+            }
+        } else {
+            emit_message(msg::ERROR, "attempt to convert non-const identifier to int", loc);
+        }
+        return 0;
+    }
 };
 
 //struct TypeExpression : public Expression
@@ -963,7 +978,9 @@ struct StringExpression : public PrimaryExpression
 {
     virtual ~StringExpression() {}
     std::string string;
-    virtual ASTType *getType() { return ASTType::getCharTy()->getArrayTy(string.length()); }
+
+    virtual ASTType *getType();
+
     virtual bool isConstant() { return true; }
     StringExpression(std::string str, SourceLocation l = SourceLocation()) :
         PrimaryExpression(l), string(str) {}
@@ -980,16 +997,10 @@ struct NumericExpression : public PrimaryExpression
     virtual ASTType *getType() { return astType; }
     virtual bool isConstant() { return true; }
     NumericExpression(ASTType* ty, SourceLocation l = SourceLocation()) :
-        PrimaryExpression(l), type(t),  astType(ty) {}
+        PrimaryExpression(l), astType(ty) {}
 
     virtual NumericExpression *numericExpression() { return this; }
     virtual void accept(ASTVisitor *v);
-
-    virtual int asInteger() {
-        if(type == INT) {
-            return intValue;
-        }
-    }
 }; //XXX subclass as bool/char type also?
 
 struct FloatExpression : public NumericExpression {
@@ -1002,6 +1013,10 @@ struct IntExpression : public NumericExpression {
     uint64_t value;
     IntExpression(ASTType *ty, uint64_t val, SourceLocation l = SourceLocation()) : NumericExpression(ty, l), value(val) {}
     virtual IntExpression *intExpression() { return this; }
+
+    virtual int asInteger() {
+            return value;
+    }
 };
 
 

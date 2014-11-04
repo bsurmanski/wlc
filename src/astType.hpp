@@ -94,7 +94,8 @@ struct ASTType
     //ASTType *getUnqual();
     ASTType *getPointerTy();
     ASTType *getReferenceTy();
-    ASTType *getArrayTy(int sz);
+    ASTType *getArrayTy(Expression *sz);
+    ASTType *getArrayTy(unsigned sz);
     ASTType *getArrayTy();
     virtual UserTypeDeclaration *getDeclaration() const { return NULL; }
     virtual size_t getSize()
@@ -576,12 +577,12 @@ struct ASTArrayType : public ASTCompositeType {
 };
 
 struct ASTStaticArrayType : public ASTArrayType {
-    unsigned size;
+    Expression *size;
     virtual size_t getSize();
     virtual size_t getAlign();
     virtual bool isDynamic() { return false; }
-    virtual size_t length() { return size; }
-    ASTStaticArrayType(ASTType *pto, int sz) : ASTArrayType(pto, TYPE_ARRAY), size(sz){}
+    virtual size_t length();
+    ASTStaticArrayType(ASTType *pto, Expression *sz) : ASTArrayType(pto, TYPE_ARRAY), size(sz){}
     virtual bool coercesTo(ASTType *ty) {
         if(ASTStaticArrayType *saty = dynamic_cast<ASTStaticArrayType*>(ty)) {
             return arrayOf->is(saty->arrayOf);

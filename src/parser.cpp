@@ -610,7 +610,7 @@ Declaration *ParseContext::parseDeclaration()
         ignore(); // eat "struct" etc
 
         Token t_id = get(); // eat ID
-        if(t_id.isNot(tok::identifier)){
+        if(t_id.isNot(tok::identifier)) {
             emit_message(msg::ERROR,
                 "expected struct name following 'struct' keyword", t_id.loc);
             dropLine();
@@ -629,8 +629,7 @@ Declaration *ParseContext::parseDeclaration()
         Identifier *id = getScope()->get(t_id.toString());
         Identifier *baseId = NULL;
 
-        if(peek().is(tok::colon))
-        {
+        if(peek().is(tok::colon)) {
             ignore(); // eat ':'
             if(kind != kw_class) {
                 emit_message(msg::ERROR, "only classes can inherit from a base", peek().loc);
@@ -647,7 +646,7 @@ Declaration *ParseContext::parseDeclaration()
             baseId = objectId;
         }
 
-        if(peek().isNot(tok::lbrace) && peek().isNot(tok::semicolon)){
+        if(peek().isNot(tok::lbrace) && peek().isNot(tok::semicolon)) {
             emit_message(msg::ERROR,
                 "expected '{' following struct declarator", peek().loc);
             dropLine();
@@ -660,8 +659,7 @@ Declaration *ParseContext::parseDeclaration()
 
         UserTypeDeclaration *sdecl = NULL;
 
-        switch(kind)
-        {
+        switch(kind) {
             case kw_union:
                 sdecl = new UnionDeclaration(id, tbl, loc, dqual);
                 break;
@@ -678,11 +676,9 @@ Declaration *ParseContext::parseDeclaration()
                 emit_message(msg::FAILURE, "unknown declaration kind", loc);
         }
 
-        if(peek().is(tok::lbrace))
-        {
+        if(peek().is(tok::lbrace)) {
             ignore(); // eat lbrace
-            while(peek().isNot(tok::rbrace))
-            {
+            while(peek().isNot(tok::rbrace)) {
                 Declaration *d = parseDeclaration();
 
                 if(FunctionDeclaration *fdecl = d->functionDeclaration()) {

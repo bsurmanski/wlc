@@ -97,8 +97,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     //
     //TODO: use iterator
     //
-    for(int i = 0; i < userty->length(); i++)
-    {
+    for(int i = 0; i < userty->length(); i++) {
         if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(userty->getMember(i)))
         {
             structVec.push_back(codegenType(vd->type));
@@ -107,8 +106,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         }
     }
 
-    if(!userty->isOpaque())
-    {
+    if(!userty->isOpaque()) {
         sty->setBody(structVec);
     }
 
@@ -121,14 +119,12 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     return sty;
 }
 
-llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty)
-{
+llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty) {
     return codegenUserType(ty);
 }
 
 //TODO: fix union types. codegen is incorrect (calls 'codegen usertype')
-llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
-{
+llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty) {
     //return codegenUserType(ty);
 
     // XXX useless below
@@ -142,18 +138,14 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
     unsigned size = 0;
     ASTType *alignedType = 0;
     std::vector<Type*> unionVec;
-    for(int i = 0; i < userty->length(); i++)
-    {
-        if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(userty->getMember(i)))
-        {
-            if(vd->getType()->getAlign() > align)
-            {
+    for(int i = 0; i < userty->length(); i++) {
+        if(VariableDeclaration *vd = dynamic_cast<VariableDeclaration*>(userty->getMember(i))) {
+            if(vd->getType()->getAlign() > align) {
                 alignedType = vd->type;
                 align = vd->getType()->getAlign();
             }
 
-            if(vd->getType()->getSize() > size)
-            {
+            if(vd->getType()->getSize() > size) {
                 size = vd->getType()->getSize();
             }
             //unionVec.push_back(codegenType(vd->type));
@@ -161,8 +153,7 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty)
             emit_message(msg::UNIMPLEMENTED, "this cant be declared in a union (yet?)", location);
     }
 
-    if(!userty->isOpaque())
-    {
+    if(!userty->isOpaque()) {
         unionVec.push_back(codegenType(alignedType));
         if(size - alignedType->getSize())
             unionVec.push_back(ArrayType::get(Type::getInt8Ty(context),
@@ -185,16 +176,14 @@ llvm::Type *IRCodegenContext::codegenClassType(ASTType *ty) //TODO: actual codeg
 llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
 {
     ASTTupleType *tupty = dynamic_cast<ASTTupleType*>(ty);
-    if(ty->kind != TYPE_TUPLE || !tupty)
-    {
+    if(ty->kind != TYPE_TUPLE || !tupty) {
         emit_message(msg::FAILURE, "invalid tuple type codegen", location);
         return NULL;
     }
 
     if(ty->cgType) return ty->cgType;
 
-    if(!tupty->types.size())
-    {
+    if(!tupty->types.size()) {
         emit_message(msg::ERROR, "invalid 0-tuple", location);
         return NULL;
     }

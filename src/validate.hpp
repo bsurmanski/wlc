@@ -14,6 +14,8 @@ enum Validity {
 class ValidationVisitor : public ASTVisitor {
     bool valid;
 
+    SourceLocation location;
+
     public:
     bool isValid() { return valid; }
     ValidationVisitor();

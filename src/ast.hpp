@@ -394,13 +394,12 @@ struct Declaration : public Statement
     Declaration(Identifier *id, SourceLocation l, DeclarationQualifier dqual) :
         identifier(id), Statement(l), qualifier(dqual) {}
     virtual ~Declaration(){}
-    virtual std::string getName()
-    {
+    virtual std::string getName() {
         if(identifier) return identifier->getName();
         return "";
     }
-    virtual std::string getMangledName(){
-        if(identifier){
+    virtual std::string getMangledName() {
+        if(identifier) {
             return identifier->getMangledName();
         }
         return "";

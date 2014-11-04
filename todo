@@ -1,6 +1,6 @@
 static members in structs/classes
 
-array 'new' should accept variable length. eg (int[] arr = new int[5 * i])
+array 'new' should only manually calculate array size if size expression is not static (eg calc for new int[i+5])
 
 set member class types and arrays to zero
 

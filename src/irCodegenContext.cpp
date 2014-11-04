@@ -1310,16 +1310,28 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTComp
 
 ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 {
-    if(exp->type->kind == TYPE_DYNAMIC_ARRAY)
-    {
+    if(exp->type->kind == TYPE_DYNAMIC_ARRAY) {
         emit_message(msg::ERROR, "cannot created unsized array. meaningless alloaction", exp->loc);
         return NULL;
     }
 
+    Value *size = NULL;
+
+    //XXX a bit messy here
+    // manually calculate array size
+    // TODO: only manually calculate size if exp->type->size is not constant
+    if(exp->type->isArray()) {
+        ASTStaticArrayType *arrayTy = dynamic_cast<ASTStaticArrayType*>(exp->type);
+        ASTValue *sz = promoteType(codegenExpression(arrayTy->size), ASTType::getLongTy());
+        sz = opMulValues(sz, getIntValue(ASTType::getLongTy(), arrayTy->arrayOf->getSize()));
+        size = codegenValue(sz);
+    } else {
+        size = ConstantInt::get(codegenType(ASTType::getULongTy()), exp->type->getSize());
+    }
+
     ASTType *ty = exp->type;
     vector<Value*> llargs;
-    llargs.push_back(ConstantInt::get(codegenType(ASTType::getULongTy()),
-                exp->type->getSize()));
+    llargs.push_back(size);
     vector<Type*> llargty;
     llargty.push_back(codegenType(ASTType::getULongTy()));
     FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()->getPointerTy()),
@@ -1328,19 +1340,19 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
     Value *value;
     value = ir->CreateCall(mallocFunc, llargs);
     ASTValue *val = NULL;
-    if(exp->type->isArray())
-    {
+
+    if(exp->type->isArray()) {
         ASTType *arrty = exp->type->getPointerElementTy();
         ty = arrty->getArrayTy();
-        Value *ptr = ir->CreateBitCast(value,
-                codegenType(arrty)->getPointerTo());
-        Value *sz = ConstantInt::get(codegenType(ASTType::getULongTy()), exp->type->length());
+        Value *ptr = ir->CreateBitCast(value, codegenType(arrty)->getPointerTo());
+        ASTValue *sz = codegenExpression(dynamic_cast<ASTStaticArrayType*> (exp->type)->size);
+        sz = promoteType(sz, ASTType::getLongTy());
         value = ir->CreateAlloca(codegenType(ty));
         ir->CreateStore(ptr, ir->CreateStructGEP(value, 0));
-        ir->CreateStore(sz, ir->CreateStructGEP(value, 1));
+        ir->CreateStore(codegenValue(sz), ir->CreateStructGEP(value, 1));
         //TODO: create a 'create array' function
     } else {
-        if(exp->type->isReference()){
+        if(exp->type->isReference()) {
             value = ir->CreateBitCast(value, codegenType(exp->type));
         } else {
             value = ir->CreateBitCast(value, codegenType(exp->type)->getPointerTo());

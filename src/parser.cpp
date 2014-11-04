@@ -176,10 +176,12 @@ ASTType *ParseContext::parseArrayModifiedType(ASTType *base) {
         // contains index; statically sized
         if(peek().isNot(tok::rbracket)) {
             Expression *arrsz = parseExpression();
+
+            /*
             if(!arrsz->isConstant()) {
                 emit_message(msg::ERROR, "array size must be constant", peek().loc);
                 return NULL;
-            }
+            } */
 
             if(!arrsz->getType()->coercesTo(ASTType::getIntTy())) {
                 emit_message(msg::ERROR, "array size must be an integer value", peek().loc);

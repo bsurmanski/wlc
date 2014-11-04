@@ -716,7 +716,6 @@ struct NewExpression : public Expression
 {
     bool call;
     ASTType *type;
-    //TODO: array size of new; "new int[i+1]"
     std::vector<Expression*> args;
     virtual ASTType *getType() { return type; }
     NewExpression(ASTType *t, std::vector<Expression*> a, bool c, SourceLocation l = SourceLocation()) :

@@ -27,7 +27,7 @@ int main(int argc, char^^ argv) {
     MyExtendClass ecl = new MyExtendClass
     delete ecl
 
-    //int[] newarr = new int[5]
+    int[] newarr = new int[5]
     //printf("%x\n", newarr.ptr)
-    //delete newarr
+    delete newarr
 }

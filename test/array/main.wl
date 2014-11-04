@@ -52,5 +52,12 @@ int main(int argc, char^^ argv)
     arrayFunc()
     printf("\n");
 
+    int sz = 5
+    sz++
+    sz *= 10
+
+    int[] dynszarr = new int[sz]
+    printf("should be 60: %d\n", dynszarr.size)
+
     return 0
 }

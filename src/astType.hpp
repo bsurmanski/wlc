@@ -274,6 +274,9 @@ struct ASTType
     bool isUnion() { return asUnion(); }
     bool isFunctionType() { return asFunctionType(); }
     bool isTuple() { return asTuple(); }
+    bool isArray() { return asArray(); }
+    bool isDArray() { return asDArray(); }
+    bool isSArray() { return asSArray(); }
 
     virtual ASTFunctionType *asFunctionType() { return NULL; }
     virtual ASTCompositeType *asCompositeType() { return NULL; }
@@ -284,6 +287,9 @@ struct ASTType
     virtual ASTUserType *asStruct() { return NULL; }
     virtual ASTPointerType *asPointer() { return NULL; }
     virtual ASTTupleType *asTuple() { return NULL; }
+    virtual ASTArrayType *asArray() { return NULL; }
+    virtual ASTDynamicArrayType *asDArray() { return NULL; }
+    virtual ASTStaticArrayType *asSArray() { return NULL; }
     virtual bool is(ASTType *t) { return this == t; } // NOTE: only valid for basic type, where type is statically defined
     virtual bool extends(ASTType *t) { return false; }
 
@@ -574,6 +580,8 @@ struct ASTArrayType : public ASTCompositeType {
     ASTArrayType(ASTType *pto, ASTTypeEnum kind) : arrayOf(pto), ASTCompositeType(kind) {}
     std::string getName() { return "array[" + arrayOf->getName() + "]"; }
     std::string getMangledName() { return "a" + arrayOf->getMangledName(); }
+
+    virtual ASTArrayType *asArray() { return this; }
 };
 
 struct ASTStaticArrayType : public ASTArrayType {
@@ -589,6 +597,8 @@ struct ASTStaticArrayType : public ASTArrayType {
         }
         return false;
     }
+
+    virtual ASTStaticArrayType *asSArray() { return this; }
     //std::string getName() { return "Array[" + arrayOf->getName() + "]"; }
     //std::string getMangledName() { return "A" + arrayOf->getMangledName(); }
 };
@@ -605,6 +615,8 @@ struct ASTDynamicArrayType : public ASTArrayType {
         }
         return false;
     }
+
+    virtual ASTDynamicArrayType *asDArray() { return this; }
 };
 
 #endif

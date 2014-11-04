@@ -81,6 +81,21 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
         resolveType(ty->getPointerElementTy());
     }
 
+    if(ty->isTuple()) {
+        ASTTupleType *tupty = ty->asTuple();
+        if(!tupty->types.size()) {
+            emit_message(msg::ERROR, "invalid 0-tuple", location);
+        }
+
+        for(int i = 0; i < tupty->types.size(); i++) {
+            resolveType(tupty->types[i]);
+        }
+    }
+
+    if(ty->isArray()) {
+        resolveType(ty->asArray()->arrayOf());
+    }
+
     return ty;
 }
 

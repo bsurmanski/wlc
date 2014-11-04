@@ -47,6 +47,9 @@ struct ASTCompositeType;
 struct ASTFunctionType;
 struct ASTPointerType;
 struct ASTTupleType;
+struct ASTArrayType;
+struct ASTStaticArrayType;
+struct ASTDynamicArrayType;
 
 //XXX probably should not have llvm type/debug info in ASTType
 #include <llvm/IR/Type.h>
@@ -262,7 +265,7 @@ struct ASTType
     bool isFloating() { return kind == TYPE_FLOAT || kind == TYPE_DOUBLE; }
     bool isNumeric() { return isFloating() || isInteger(); }
     bool isVector() { return kind == TYPE_VEC; }
-    bool isArray() { return kind == TYPE_ARRAY || kind == TYPE_DYNAMIC_ARRAY; }
+    //bool isArray() { return kind == TYPE_ARRAY || kind == TYPE_DYNAMIC_ARRAY; }
     bool isComposite() { return asCompositeType(); }
     virtual bool isReference() { return false; }
     virtual bool isUnknown() { return false; }

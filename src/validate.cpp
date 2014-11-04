@@ -59,9 +59,7 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
             }
 
             location = ty->getDeclaration()->loc;
-
-            userty->getScope()->accept(this);
-
+            //userty->getScope()->accept(this);
         }
     }
 
@@ -93,7 +91,11 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
     }
 
     if(ty->isArray()) {
-        resolveType(ty->asArray()->arrayOf());
+        resolveType(ty->asArray()->arrayOf);
+    }
+
+    if(ty->kind == TYPE_UNKNOWN || ty->kind == TYPE_UNKNOWN_USER) {
+        emit_message(msg::FATAL, "invalid type", location);
     }
 
     return ty;
@@ -162,17 +164,20 @@ void ValidationVisitor::visitLabelDeclaration(LabelDeclaration *decl) {
 }
 
 void ValidationVisitor::visitVariableDeclaration(VariableDeclaration *decl) {
+    if(decl->value) decl->value = decl->value->lower();
+
     if(decl->getType()->kind == TYPE_DYNAMIC) {
         if(!decl->value) {
             valid = false;
             emit_message(msg::ERROR,
                     "dynamically typed variables must have valid initializer", location);
         }
+
+        decl->type = decl->value->getType();
     }
 
     resolveType(decl->getType());
 
-    if(decl->value) decl->value = decl->value->lower();
 }
 
 void ValidationVisitor::visitTypeDeclaration(TypeDeclaration *decl) {
@@ -256,6 +261,8 @@ void ValidationVisitor::visitBinaryExpression(BinaryExpression *exp) {
     } else {
         exp->rhs = exp->rhs->lower();
     }
+
+
 }
 
 void ValidationVisitor::visitPrimaryExpression(PrimaryExpression *exp) {

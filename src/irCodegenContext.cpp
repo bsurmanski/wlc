@@ -184,7 +184,7 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
     if(ty->cgType) return ty->cgType;
 
     if(!tupty->types.size()) {
-        emit_message(msg::ERROR, "invalid 0-tuple", location);
+        emit_message(msg::FAILURE, "0-tuple found in codegen", location);
         return NULL;
     }
 
@@ -273,6 +273,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
     // XXX: type resolution is below; should be in some other pass, not codegen
     if(ty->kind == TYPE_UNKNOWN || ty->kind == TYPE_UNKNOWN_USER)
     {
+        emit_message(msg::WARNING, "type resolution in codegen", location);
         Identifier* id = lookup(ty->getName());
         Declaration* decl = id->getDeclaration();
         if(TypeDeclaration* tdecl = dynamic_cast<TypeDeclaration*>(decl))
@@ -2422,7 +2423,11 @@ void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
 
 void IRCodegenContext::codegenStatement(Statement *stmt)
 {
-    if(!stmt) return;
+    if(!stmt) {
+        emit_message(msg::WARNING, "null statement found in codegen", location);
+        return;
+    }
+
     location = stmt->loc;
     dwarfStopPoint(stmt->loc);
     if(Expression *estmt = dynamic_cast<Expression*>(stmt))
@@ -2449,9 +2454,8 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         {
             Expression *value = cstmt->values[i];
             ASTValue *val = codegenExpression(value);
-            if(!val->isConstant())
-            {
-                emit_message(msg::ERROR, "case value must be a constant", cstmt->loc);
+            if(!val->isConstant()) {
+                emit_message(msg::ERROR, "case value must be a constant (err, found in codegen)", cstmt->loc);
             }
             getScope()->addCase(value, val, caseBB);
         }
@@ -2520,7 +2524,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
             codegenElseStatement(estmt);
         }
         exitScope();
-    } else emit_message(msg::FAILURE, "i dont know what kind of statmeent this isssss", stmt->loc);
+    } else emit_message(msg::FAILURE, "codegen doesn't know what kind of statement this is", stmt->loc);
 }
 
 void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
@@ -2542,10 +2546,10 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         }
     }
 
-    if(vty->kind == TYPE_DYNAMIC)
-    {
-        if(!defaultValue)
-        {
+    //XXX remove block
+    if(vty->kind == TYPE_DYNAMIC) {
+        emit_message(msg::WARNING, "dynamic type found in codegen", vdecl->loc);
+        if(!defaultValue) {
             emit_message(msg::FAILURE,
                     "failure to codegen dynamic 'var' type default expression", vdecl->loc);
         }

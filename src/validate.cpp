@@ -3,6 +3,7 @@
 #include "astType.hpp"
 #include "validate.hpp"
 #include "message.hpp"
+#include "token.hpp" // for getting operator precidence
 
 using namespace std;
 
@@ -99,6 +100,30 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
     }
 
     return ty;
+}
+
+/**
+ * get the type which both t1 and t2 may promote to
+ */
+ASTType *ValidationVisitor::commonType(ASTType *t1, ASTType *t2) {
+    if(t1->is(t2)) return t1;
+
+
+    if(t1->isUserType() || t2->isUserType()) {
+        if(t1->extends(t2)) return t2;
+        if(t2->extends(t1)) return t1;
+
+        if(t1->isUserType() != t2->isUserType()) {
+            emit_message(msg::ERROR, "attempt to cast user type to non-user type");
+        }
+    }
+
+    if(t1->isNumeric() && t2->isNumeric()) {
+        if(t1->getPriority() > t2->getPriority()) return t1;
+        else return t2;
+    }
+
+    return NULL;
 }
 
 void ValidationVisitor::visitPackage(Package *pak) {
@@ -240,9 +265,63 @@ void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp) {
         exp->lhs = exp->lhs->lower();
     }
 
-    if(exp->op == tok::dot && !exp->lhs->identifierExpression()){
+    if(exp->op == tok::dot && !exp->lhs->identifierExpression()) {
         valid = false;
         emit_message(msg::ERROR, "unary dot operator expects identifier following dot", location);
+    }
+
+    if(!getUnaryPrecidence((tok::TokenKind) exp->op)) {
+        emit_message(msg::FAILURE, "unary expression found without unary operation", location);
+    }
+
+    switch(exp->op) {
+        case tok::plusplus:
+            if(!exp->lhs->isLValue()) {
+                emit_message(msg::ERROR, "++ operator expects LValue", location);
+            }
+
+            if(!exp->lhs->getType()->isNumeric() && !exp->lhs->getType()->isPointer()) {
+                emit_message(msg::ERROR, "++ operator is only valid on numeric expressions", location);
+            }
+            break;
+        case tok::minusminus:
+            if(!exp->lhs->isLValue()) {
+                emit_message(msg::ERROR, "-- operator expects LValue", location);
+            }
+
+            if(!exp->lhs->getType()->isNumeric() && !exp->lhs->getType()->isPointer()) {
+                emit_message(msg::ERROR, "-- operator is only valid on numeric expressions", location);
+            }
+            break;
+        case tok::plus:
+        case tok::minus:
+            if(!exp->lhs->getType()->isNumeric()) {
+                emit_message(msg::ERROR, "unary +- is only valid on numeric expressions", location);
+            }
+            break;
+        case tok::bang:
+            if(!exp->lhs->getType()->isBool()) {
+                if(exp->lhs->getType()->coercesTo(ASTType::getBoolTy())) {
+                    //TODO: note in AST that this is implicit
+                    exp->lhs = new CastExpression(ASTType::getBoolTy(), exp->lhs, exp->lhs->loc);
+                } else {
+                    emit_message(msg::ERROR, "'!' operator applied to type not implicitly convertable to bool", location);
+                }
+            }
+            break;
+        case tok::tilde:
+            emit_message(msg::UNIMPLEMENTED, "unimplemented unary operator '~'", location);
+            break;
+        case tok::caret:
+            if(!exp->lhs->getType()->isPointer()) {
+                emit_message(msg::ERROR, "attempt to dereference non-pointer type", location);
+            }
+            break;
+        case tok::amp:
+            if(!exp->lhs->isLValue()) {
+                emit_message(msg::ERROR, "& operator expects LValue", location);
+            }
+            break;
     }
 }
 

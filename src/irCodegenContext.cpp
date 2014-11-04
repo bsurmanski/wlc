@@ -1797,11 +1797,10 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
 
     ASTValue *val;
     Value *llval = 0;
-    switch(exp->op)
-    {
+    switch(exp->op) {
         case tok::plusplus:
             if(!lhs->isLValue()) {
-                emit_message(msg::ERROR, "can only incrememt LValue", exp->loc);
+                emit_message(msg::ERROR, "CODEGEN: can only incrememt LValue", exp->loc);
                 return NULL;
             }
 
@@ -1810,7 +1809,7 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
             return val;
         case tok::minusminus:
             if(!lhs->isLValue()) {
-                emit_message(msg::ERROR, "can only decrement LValue", exp->loc);
+                emit_message(msg::ERROR, "CODEGEN: can only decrement LValue", exp->loc);
                 return NULL;
             }
 
@@ -1825,14 +1824,14 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
             }
             if(!lhs->getType()->isSigned()){
                 emit_message(msg::UNIMPLEMENTED,
-                        "conversion to signed value using '-' unary op",
+                        "CODEGEN: conversion to signed value using '-' unary op",
                         exp->loc);
                 return NULL;
             }
             val = new ASTBasicValue(lhs->getType(), ir->CreateNeg(codegenValue(lhs)));
             return val;
         case tok::tilde:
-            emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen (~)", exp->loc);
+            emit_message(msg::UNIMPLEMENTED, "CODEGEN: unimplemented unary codegen (~)", exp->loc);
             return NULL;
         case tok::bang:
             val = promoteType(lhs, ASTType::getBoolTy());
@@ -1840,18 +1839,18 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
             return val;
         case tok::caret:
             if(!lhs->getType()->isPointer()) {
-                emit_message(msg::ERROR, "attempt to dereference non-pointer type", exp->loc);
+                emit_message(msg::ERROR, "CODEGEN: attempt to dereference non-pointer type", exp->loc);
                 return NULL;
             }
             return getValueOf(lhs);
         case tok::amp:
             if(!lhs->isLValue()){
-                emit_message(msg::ERROR, "attempt to take reference of non-LValue", exp->loc);
+                emit_message(msg::ERROR, "CODEGEN: attempt to take reference of non-LValue", exp->loc);
                 return NULL;
             }
             return getAddressOf(lhs);
         default:
-            emit_message(msg::UNIMPLEMENTED, "unimplemented unary codegen", exp->loc);
+            emit_message(msg::UNIMPLEMENTED, "CODEGEN: unimplemented unary codegen", exp->loc);
     }
     return NULL;
 }

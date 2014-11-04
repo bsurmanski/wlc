@@ -21,6 +21,7 @@ class ValidationVisitor : public ASTVisitor {
     ValidationVisitor();
     Identifier *resolveIdentifier(Identifier *id);
     ASTType *resolveType(ASTType *ty);
+    ASTType *commonType(ASTType *t1, ASTType *t2);
     virtual void visitPackage(Package *pak);
     virtual void visitTranslationUnit(TranslationUnit *tu);
 

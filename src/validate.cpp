@@ -102,6 +102,24 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
     return ty;
 }
 
+Expression *ValidationVisitor::coerceTo(ASTType *ty, Expression *exp) {
+    ASTType *expty = exp->getType();
+
+    if(expty->is(ty)) {
+        return exp;
+    }
+
+    if(expty->coercesTo(ty)) {
+        //TODO: note in AST that this is implicit
+        return new CastExpression(ty, exp, exp->loc);
+    }
+
+    emit_message(msg::ERROR, "attempt to coerce expression of type '" + expty->getName() +
+            "' to incompatible type '" + ty->getName() + "'", location);
+
+    return NULL;
+}
+
 /**
  * get the type which both t1 and t2 may promote to
  */
@@ -301,12 +319,7 @@ void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp) {
             break;
         case tok::bang:
             if(!exp->lhs->getType()->isBool()) {
-                if(exp->lhs->getType()->coercesTo(ASTType::getBoolTy())) {
-                    //TODO: note in AST that this is implicit
-                    exp->lhs = new CastExpression(ASTType::getBoolTy(), exp->lhs, exp->lhs->loc);
-                } else {
-                    emit_message(msg::ERROR, "'!' operator applied to type not implicitly convertable to bool", location);
-                }
+                exp->lhs = coerceTo(ASTType::getBoolTy(), exp->lhs);
             }
             break;
         case tok::tilde:
@@ -341,6 +354,19 @@ void ValidationVisitor::visitBinaryExpression(BinaryExpression *exp) {
         exp->rhs = exp->rhs->lower();
     }
 
+    if(!exp->op.getBinaryPrecidence()) {
+        emit_message(msg::FAILURE, "invalid operator found in binary expression", location);
+    }
+
+    // should never happen
+    if(exp->op.kind == tok::colon) {
+        emit_message(msg::FAILURE, "cast found as binary expression", location);
+    }
+
+    // should never happen
+    if(exp->op.kind == tok::dot) {
+        emit_message(msg::FAILURE, "dot found as binary expression", location);
+    }
 
 }
 
@@ -353,6 +379,10 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
         emit_message(msg::FAILURE, "invalid or missing function in call expression", exp->loc);
     } else {
         exp->function = exp->function->lower();
+
+        if(!exp->function->getType()->isFunctionType()) {
+            emit_message(msg::ERROR, "attempt to call non-function type", location);
+        }
     }
 
     for(int i = 0; i < exp->args.size(); i++) {
@@ -535,6 +565,8 @@ void ValidationVisitor::visitIfStatement(IfStatement *stmt) {
         emit_message(msg::ERROR, "if statement missing condition", location);
     } else stmt->condition = stmt->condition->lower();
 
+    stmt->condition = coerceTo(ASTType::getBoolTy(), stmt->condition);
+
     if(stmt->elsebr) {
         stmt->elsebr = dynamic_cast<ElseStatement*>(stmt->elsebr->lower());
     }
@@ -543,7 +575,11 @@ void ValidationVisitor::visitIfStatement(IfStatement *stmt) {
 void ValidationVisitor::visitLoopStatement(LoopStatement *stmt) {
     if(!stmt->condition) {
         emit_message(msg::ERROR, "loop statement missing condition", location);
-    } else stmt->condition = stmt->condition->lower();
+    } else {
+        stmt->condition = stmt->condition->lower();
+        stmt->condition = coerceTo(ASTType::getBoolTy(), stmt->condition);
+    }
+
 
     if(stmt->update) {
         stmt->update = stmt->update->lower();

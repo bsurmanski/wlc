@@ -2249,22 +2249,6 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
 
 ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 {
-    //TODO: bit messy
-    if(exp->op.kind == tok::dot)
-    {
-        emit_message(msg::FAILURE, "this should not be a binop", exp->loc);
-    }
-
-    if(exp->op.kind == tok::colon) //cast op
-    {
-        ASTValue *rhs = codegenExpression(exp->rhs);
-        if(IdentifierExpression *iexp = dynamic_cast<IdentifierExpression*>(exp->lhs))
-        {
-            ASTType *ty = iexp->identifier()->getDeclaredType();
-            return promoteType(rhs, ty);
-        } else emit_message(msg::ERROR, "need to cast to type", exp->loc);
-    }
-
     ASTValue *lhs = NULL;
     ASTValue *rhs = NULL;
 
@@ -2391,12 +2375,6 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         default:
             emit_message(msg::UNIMPLEMENTED, "unimplemented operator", exp->loc);
             return NULL; //XXX: null val
-    }
-
-    //XXX remove this when ready
-    if((tok::TokenKind) exp->op.isAssignOp())
-    {
-        emit_message(msg::ERROR, "this complex assignment operation should already be lowered", exp->loc);
     }
 
     return retValue;

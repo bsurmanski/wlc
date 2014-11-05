@@ -790,7 +790,11 @@ struct CallExpression : public PostfixExpression
     virtual ~CallExpression() {}
     virtual CallExpression *callExpression() { return this; }
     Expression *function;
-    virtual ASTType *getType() { return function->getType(); }
+    virtual ASTType *getType() {
+        ASTFunctionType *fty = function->getType()->asFunctionType();
+        if(!fty) return NULL;
+        return fty->getReturnType();
+    }
     std::vector<Expression *> args; //TODO: make special argument expression to allow for name arguments?
     CallExpression(Expression *f, std::vector<Expression*> a, SourceLocation l = SourceLocation()) :
         PostfixExpression(l), function(f), args(a) {}

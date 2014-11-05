@@ -202,6 +202,7 @@ to be casted, the ':=' operator can be used to cast to the type of the left hand
 
 the cast assign operator effectively casts a value without the required noise of casting.
 
+### Infix Cast
 Another addition added to help reduce casting noise is the 'infix' cast. This style of casting
 is used for long 'dot expression' chains. In a long chain of member references, 
 it is often necessary to cast one of the members to another type. Due to the nature of 
@@ -218,6 +219,7 @@ close to the casted type. Heres an example:
 
 compare the two equivilent casts in the assignment of foo1, and foo2. the second of which
 can be read left to right without the need to look back to the beginning of the expression. 
+The infix cast syntax is experimental and may be removed for simplicity.
 
 ## Why are braces optional for a function body?
 this allows quick oneliner functions to be easy to write and read. This also 

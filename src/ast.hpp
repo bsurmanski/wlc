@@ -799,6 +799,11 @@ struct CallExpression : public PostfixExpression
         PostfixExpression(l), function(f), args(a) {}
 
     virtual ASTType *getType() {
+        // this is a constructor call
+        if(function->getDeclaredType()) {
+            return function->getDeclaredType();
+        }
+
         ASTFunctionType *fty = function->getType()->asFunctionType();
         if(!fty) return NULL;
         return fty->getReturnType();

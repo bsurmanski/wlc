@@ -16,7 +16,7 @@ warn of invalid use of local if function member
 
 functions accept extra parameters (which are then ignored)
 
-MyClass().func() does not work
+allocating class on stack does not set vtable
 
 "[int, int]^ tup; tup++" breaks things (eg, passing tuple by reference)
 

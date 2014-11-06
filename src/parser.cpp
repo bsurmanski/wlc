@@ -453,6 +453,11 @@ Statement *ParseContext::parseStatement()
                 }
             } else if(id->isStruct() || id->isUnion() || id->isClass()) //XXX Class
             {
+                // this looks like a stack allocated user type
+                // eg. the RHS of  "MyClass cl = MyClass()"
+                if(lookAhead(1).is(tok::lparen)) {
+                    goto PARSEEXP;
+                }
                 //FALLTHROUGH TO DECL
             } else goto PARSEEXP; //IF NOT UNDECLARED OR STRUCT, THIS IS PROBABLY AN EXPRESSION
 
@@ -903,8 +908,7 @@ Statement *ParseContext::parseCompoundStatement(){
     ASTScope *tbl = new ASTScope(getScope());
     pushScope(tbl);
     vector<Statement*> stmts;
-    while(peek().isNot(tok::rbrace))
-    {
+    while(peek().isNot(tok::rbrace)) {
         if(Statement *stmt = parseStatement())
             stmts.push_back(stmt);
     }
@@ -1165,9 +1169,7 @@ Expression *ParseContext::parseNewExpression()
 
 Expression *ParseContext::parseExpression(int prec)
 {
-
-    switch(peek().kind)
-    {
+    switch(peek().kind) {
         case tok::kw_import:
             return parseImport();
         case tok::kw_delete:

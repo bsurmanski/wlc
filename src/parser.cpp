@@ -1170,8 +1170,6 @@ Expression *ParseContext::parseExpression(int prec)
     {
         case tok::kw_import:
             return parseImport();
-        case tok::kw_new:
-            return parseNewExpression();
         case tok::kw_delete:
         case tok::kw_retain:
         case tok::kw_release:
@@ -1236,8 +1234,7 @@ Expression *ParseContext::parsePostfixExpression(int prec)
 {
     SourceLocation loc = peek().loc;
     Expression *exp = parsePrimaryExpression();
-    while((linePeek().getPostfixPrecidence()) > prec)
-    {
+    while((linePeek().getPostfixPrecidence()) > prec) {
         if(linePeek().is(tok::lparen)) // call
         {
             std::vector<Expression*> args;
@@ -1310,6 +1307,7 @@ Expression *ParseContext::parseUnaryExpression(int prec)
     SourceLocation loc = peek().loc;
     int op;
     int opPrec;
+
     if((opPrec = peek().getUnaryPrecidence()) > prec)
     {
         op = get().kind;
@@ -1413,6 +1411,10 @@ Expression *ParseContext::parsePrimaryExpression()
     if(peek().is(tok::identifier) || peek().is(kw_this) || peek().is(tok::dot)) {
         //TODO: in statement like "MyStruct[].sizeof", this will fail
         return parseIdentifierExpression();
+    }
+
+    if(peek().is(tok::kw_new)) {
+        return parseNewExpression();
     }
 
     if(peek().isKeywordType())

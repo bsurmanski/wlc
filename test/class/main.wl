@@ -19,6 +19,7 @@ int main(int argc, char^^ argv)
     scl.b = 11
     scl.printCall()
     scl.printCall(5)
+
     SomeStruct s
     s.i = 5
     printf("struct %d\n", s.myfunc())

@@ -1911,8 +1911,9 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 
             lhs = codegenExpression(dexp->lhs);
 
-            if(lhs->getType()->isPointer())
-                lhs = getValueOf(lhs);
+            if(lhs->getType()->isPointer()) {
+                emit_message(msg::ERROR, "CODEGEN: invalid dot on pointer type", location);
+            }
 
             //TODO: allow indexing types other than userType and array?
             if(!lhs->getType()->asUserType() && !lhs->getType()->isArray()) {

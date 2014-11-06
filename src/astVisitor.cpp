@@ -142,6 +142,10 @@ void CallExpression::accept(ASTVisitor *v){
     v->visitCallExpression(this);
     if(function)
         function->accept(v);
+
+    for(int i = 0; i < args.size(); i++) {
+        args[i]->accept(v);
+    }
 }
 
 void IndexExpression::accept(ASTVisitor *v){

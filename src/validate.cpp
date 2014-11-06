@@ -492,19 +492,35 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
     } else exp->lhs = exp->lhs->lower();
 
     ASTType *lhstype = exp->lhs->getType();
+    if(!lhstype) {
+        ASTType *declty = exp->lhs->getDeclaredType();
+        if(!declty) {
+            emit_message(msg::ERROR, "invalid lhs of dot expression", location);
+        }
+
+        if(exp->rhs != "sizeof" && exp->rhs != "offsetof") {
+            emit_message(msg::ERROR, "invalid property '" + exp->rhs + "' in type '" + declty->getName() + "'", location);
+        }
+
+        return;
+    }
+
+    // dereference pointer types on dot expression
     if(lhstype->isPointer()) {
-        lhstype = lhstype->asPointer()->ptrTo;
+        exp->lhs = new UnaryExpression(tok::caret, exp->lhs, location);
+        lhstype = exp->lhs->getType();
     }
 
     if(lhstype->isArray()) {
         if(exp->rhs != "sizeof" && exp->rhs != "size" && exp->rhs != "ptr") {
             emit_message(msg::ERROR, "invalid property '" + exp->rhs + "' in array", location);
         }
-    }
-    if(!lhstype->isUserType()) {
-        if(exp->rhs != "sizeof" && exp->rhs != "offsetof") {
-            emit_message(msg::ERROR, "invalid dot expression on non-user type", location);
+    } else if(lhstype->isUserType()) {
+        if(!lhstype->getDeclaration()->lookup(exp->rhs)) {
+            emit_message(msg::ERROR, "member '" + exp->rhs + "' not found in user type '" + lhstype->getName() + "'", location);
         }
+    } else {
+        emit_message(msg::ERROR, "invalid dot expression on non-user type", location);
     }
 }
 

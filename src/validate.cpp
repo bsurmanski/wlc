@@ -378,12 +378,26 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
     if(!exp->function) {
         emit_message(msg::FAILURE, "invalid or missing function in call expression", exp->loc);
     } else {
+
         exp->function = exp->function->lower();
 
-        if(!exp->function->getType()->isFunctionType()) {
+        // this is a type declaration.
+        // we are calling a type. eg a constructor call
+        // of style MyStruct(1, 2 3)
+        if(exp->function->getDeclaredType()) {
+            ASTUserType *uty = exp->function->getDeclaredType()->asUserType();
+            if(!uty) {
+                emit_message(msg::ERROR, "constructor syntax on non-user type '" +
+                        exp->function->getDeclaredType()->getName() + "'", location);
+            }
+
+            //TODO: currently breaks because codegen needs to alloc 'this'
+            //exp->function = new IdentifierExpression(uty->getConstructor()->getIdentifier(), location);
+        } else if(!exp->function->getType()->isFunctionType()) {
             emit_message(msg::ERROR, "attempt to call non-function type", location);
         }
     }
+
 
     for(int i = 0; i < exp->args.size(); i++) {
         if(!exp->args[i]) emit_message(msg::FAILURE, "invalid or missing argument in call expression", exp->loc);
@@ -476,6 +490,22 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
     if(!exp->lhs) {
         emit_message(msg::ERROR, "invalid base in dot expression", exp->loc);
     } else exp->lhs = exp->lhs->lower();
+
+    ASTType *lhstype = exp->lhs->getType();
+    if(lhstype->isPointer()) {
+        lhstype = lhstype->asPointer()->ptrTo;
+    }
+
+    if(lhstype->isArray()) {
+        if(exp->rhs != "sizeof" && exp->rhs != "size" && exp->rhs != "ptr") {
+            emit_message(msg::ERROR, "invalid property '" + exp->rhs + "' in array", location);
+        }
+    }
+    if(!lhstype->isUserType()) {
+        if(exp->rhs != "sizeof" && exp->rhs != "offsetof") {
+            emit_message(msg::ERROR, "invalid dot expression on non-user type", location);
+        }
+    }
 }
 
 void ValidationVisitor::visitNewExpression(NewExpression *exp) {

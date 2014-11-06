@@ -186,6 +186,28 @@ CONTINUE:;
     }
 }
 
+
+//TODO XXX
+ASTType *DotExpression::getType() {
+    if(rhs == "sizeof" || rhs == "offsetof") {
+        return ASTType::getLongTy();
+    }
+
+    ASTType *lhstype = lhs->getType();
+
+    //if type is pointer, implicit dereference on dot expression
+    if(lhstype->asPointer()) {
+        lhstype = lhstype->asPointer()->ptrTo;
+    }
+
+    if(ASTUserType *uty = lhstype->asUserType()) {
+        Identifier *dotid = uty->getDeclaration()->lookup(rhs);
+        if(dotid) return dotid->getType();
+    }
+
+    return NULL;
+}
+
 ASTType *TupleExpression::getType() {
     std::vector<ASTType*> tupty;
     for(int i = 0; i < members.size(); i++) {

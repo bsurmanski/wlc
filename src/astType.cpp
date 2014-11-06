@@ -33,6 +33,12 @@ Declaration *ASTUserType::getMember(size_t i) {
     return getDeclaration()->members[i];
 }
 
+Declaration *ASTUserType::getMember(std::string member) {
+    long mi = getMemberIndex(member);
+    if(mi < 0) return NULL;
+    return getMember(mi);
+}
+
 size_t ASTUserType::length() {
     return getDeclaration()->length();
 }
@@ -45,7 +51,9 @@ size_t ASTUserType::getAlign() {
 }
 
 ASTType *ASTUserType::getMemberType(size_t i) {
-    return getMember(i)->getType();
+    Declaration *memb = getMember(i);
+    if(memb) return memb->getType();
+    return NULL;
 }
 
 long ASTUserType::getMemberIndex(std::string member){

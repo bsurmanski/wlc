@@ -75,7 +75,7 @@ roughly in order of planned implementation
 
 * enums
 * vector types
-* generic
+* generics
 * interfaces
 
 

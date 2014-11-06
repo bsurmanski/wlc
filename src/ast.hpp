@@ -387,6 +387,8 @@ struct DeclarationQualifier
     }
 };
 
+//TODO: make declaration inherit expression
+// this would allow statements like if(MyBaseClass bcl := cl)
 struct Declaration : public Statement
 {
     Identifier *identifier;
@@ -789,15 +791,18 @@ struct CallExpression : public PostfixExpression
 {
     virtual ~CallExpression() {}
     virtual CallExpression *callExpression() { return this; }
+
     Expression *function;
+    std::vector<Expression *> args; //TODO: make special argument expression to allow for name arguments?
+
+    CallExpression(Expression *f, std::vector<Expression*> a, SourceLocation l = SourceLocation()) :
+        PostfixExpression(l), function(f), args(a) {}
+
     virtual ASTType *getType() {
         ASTFunctionType *fty = function->getType()->asFunctionType();
         if(!fty) return NULL;
         return fty->getReturnType();
     }
-    std::vector<Expression *> args; //TODO: make special argument expression to allow for name arguments?
-    CallExpression(Expression *f, std::vector<Expression*> a, SourceLocation l = SourceLocation()) :
-        PostfixExpression(l), function(f), args(a) {}
     virtual void accept(ASTVisitor *v);
 };
 
@@ -825,6 +830,7 @@ struct PostfixOpExpression : public PostfixExpression
     virtual ASTType *getType() { return NULL; } //TODO XXX
 };
 
+//XXX lower dot expression to index expression?
 struct DotExpression : public PostfixExpression
 {
     virtual ~DotExpression() {}
@@ -835,7 +841,7 @@ struct DotExpression : public PostfixExpression
         PostfixExpression(lo), lhs(l), rhs(r) {}
     virtual DotExpression *dotExpression() { return this; }
     virtual void accept(ASTVisitor *v);
-    virtual ASTType *getType() { return NULL; } //TODO XXX
+    virtual ASTType *getType();
 };
 
 struct UnaryExpression : public Expression

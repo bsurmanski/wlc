@@ -450,6 +450,7 @@ struct ASTUserType : public ASTCompositeType {
     virtual size_t getSize();
     virtual size_t getAlign();
     Declaration *getMember(size_t i);
+    Declaration *getMember(std::string member);
     ASTType *getMemberType(size_t i);
     long getMemberIndex(std::string member);
     long getVTableIndex(std::string method);

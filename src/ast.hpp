@@ -309,6 +309,8 @@ struct IfStatement : public BlockStatement
     virtual void accept(ASTVisitor *v);
 };
 
+//TODO: remove while/for ASTNodes. just have metadata inside loopStatement
+// about which type of loop it is
 struct LoopStatement : public BlockStatement
 {
     Expression *condition;

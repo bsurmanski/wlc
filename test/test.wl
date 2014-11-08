@@ -92,7 +92,7 @@ void^ somefunc()
 
 [int, int] myTupleFunc()
 {
-    return [124, 55]
+    return [int: 124, int: 55]
 }
 
 int[5] statArr = [1,2,3,4,5]

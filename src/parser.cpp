@@ -964,8 +964,7 @@ Statement *ParseContext::parseIfStatement()
     return new IfStatement(scope, cond, body, els, loc);
 }
 
-Statement *ParseContext::parseWhileStatement()
-{
+Statement *ParseContext::parseWhileStatement() {
     SourceLocation loc = peek().loc;
     Expression *cond = NULL;
     Statement *body = NULL;
@@ -979,7 +978,7 @@ Statement *ParseContext::parseWhileStatement()
     assert_message(peek().is(tok::lparen), msg::ERROR,
             "expected '(' following 'while' keyword", peek().loc);
     ignore(); // eat '('
-    cond = parseExpression();
+    if(peek().isNot(tok::rparen)) cond = parseExpression();
     assert_message(peek().is(tok::rparen), msg::ERROR,
             "expected ')' following 'while' condition", peek().loc);
     ignore(); // eat ')'
@@ -1025,21 +1024,21 @@ Statement *ParseContext::parseForStatement()
     }
     ignore(); // eat '('
 
-    decl = parseStatement();
+    if(peek().isNot(tok::semicolon)) decl = parseStatement();
     if(!peek().is(tok::semicolon)) {
         emit_message(msg::ERROR, "expected ';' following 'for' declaration", peek().loc);
         return NULL;
     }
     ignore(); // eat ';'
 
-    cond = parseExpression();
+    if(peek().isNot(tok::semicolon)) cond = parseExpression();
     if(!peek().is(tok::semicolon)) {
         emit_message(msg::ERROR, "expected ';' following for condition", peek().loc);
         return NULL;
     }
     ignore(); // eat ';'
 
-    upd = parseStatement();
+    if(peek().isNot(tok::rparen)) upd = parseStatement();
     if(!peek().is(tok::rparen)) {
         emit_message(msg::ERROR, "expected ')', following 'for' update statement", peek().loc);
         return NULL;
@@ -1337,8 +1336,7 @@ Expression *ParseContext::parseIdentifierExpression()
     return ret;
 }
 
-Expression *ParseContext::parsePrimaryExpression()
-{
+Expression *ParseContext::parsePrimaryExpression() {
     int n = 1; //look ahead
     while(lookAhead(n).is(tok::caret))
         n++;

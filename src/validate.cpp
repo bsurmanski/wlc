@@ -596,7 +596,6 @@ void ValidationVisitor::visitBlockStatement(BlockStatement *stmt) {
     if(stmt->body) {
         stmt->body = stmt->body->lower();
     }
-
 }
 
 void ValidationVisitor::visitElseStatement(ElseStatement *stmt) {
@@ -614,9 +613,10 @@ void ValidationVisitor::visitIfStatement(IfStatement *stmt) {
 
     if(!stmt->condition) {
         emit_message(msg::ERROR, "if statement missing condition", location);
-    } else stmt->condition = stmt->condition->lower();
-
-    stmt->condition = coerceTo(ASTType::getBoolTy(), stmt->condition);
+    } else {
+        stmt->condition = stmt->condition->lower();
+        stmt->condition = coerceTo(ASTType::getBoolTy(), stmt->condition);
+    }
 
     if(stmt->elsebr) {
         stmt->elsebr = dynamic_cast<ElseStatement*>(stmt->elsebr->lower());
@@ -625,12 +625,13 @@ void ValidationVisitor::visitIfStatement(IfStatement *stmt) {
 
 void ValidationVisitor::visitLoopStatement(LoopStatement *stmt) {
     if(!stmt->condition) {
-        emit_message(msg::ERROR, "loop statement missing condition", location);
+        // lower loop without condition have true condition
+        // eg while() --> while(true)
+        stmt->condition = new IntExpression(ASTType::getBoolTy(), 1L, stmt->loc);
     } else {
         stmt->condition = stmt->condition->lower();
         stmt->condition = coerceTo(ASTType::getBoolTy(), stmt->condition);
     }
-
 
     if(stmt->update) {
         stmt->update = stmt->update->lower();
@@ -661,12 +662,16 @@ void ValidationVisitor::visitSwitchStatement(SwitchStatement *stmt) {
 }
 
 void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt) {
-    if(stmt->expression) stmt->expression = stmt->expression->lower();
-    /*TODO: reenable when expression->getType() always works
-    if(!stmt->expression->getType()->coercesTo(getFunction()->getReturnType())) {
-        valid = false;
-        emit_message(msg::ERROR, "returned value can not be converted to return type", stmt->loc);
-    }*/
+    if(stmt->expression) {
+        stmt->expression = stmt->expression->lower();
+
+        if(!stmt->expression->getType()->coercesTo(getFunction()->getReturnType())) {
+            valid = false;
+            emit_message(msg::ERROR, "returned value can not be converted to return type", stmt->loc);
+        } else if(!stmt->expression->getType()->is(getFunction()->getReturnType())){
+            stmt->expression = coerceTo(getFunction()->getReturnType(), stmt->expression);
+        }
+    }
 }
 
 void ValidationVisitor::visitScope(ASTScope *sc){

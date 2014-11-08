@@ -11,10 +11,19 @@ enum Validity {
     INVALID
 };
 
+/*
+ * ValidationVisitor is used to as a semantics checking
+ * and lowering pass. Should be run on AST after parsing is fully
+ * complete. will traverse AST and emit error if AST is invalid.
+ * At the same time, it will lower any complex operations (eg +=)
+ *
+ * TODO: perhaps create a pass for validation without lowering?
+ */
 class ValidationVisitor : public ASTVisitor {
     bool valid;
 
     SourceLocation location;
+    ASTScope *scope;
 
     public:
     bool isValid() { return valid; }

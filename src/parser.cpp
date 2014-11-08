@@ -693,6 +693,7 @@ Declaration *ParseContext::parseDeclaration()
 
                     if(d->isConstructor()) {
                         sdecl->addConstructor(fdecl);
+                        goto NEXT;
                     }
 
                     if(d->isDestructor()) {
@@ -703,17 +704,19 @@ Declaration *ParseContext::parseDeclaration()
                             emit_message(msg::ERROR, "destructor should not have any arguments", d->loc);
                         }
                         sdecl->setDestructor(fdecl);
+                        goto NEXT;
                     }
 
                     sdecl->addMethod(fdecl);
-                }
-                else { // is variable declaration (probably... *TODO)
+                } else { // is variable declaration (probably... *TODO)
                     if(kind == kw_interface) {
                         emit_message(msg::ERROR, "interfaces cannot contain variable members, methods only", loc);
                     } else {
                         sdecl->addMember(d);
                     }
                 }
+
+NEXT:
                 while(peek().is(tok::semicolon)) ignore();
             }
 
@@ -1322,7 +1325,6 @@ Expression *ParseContext::parseUnaryExpression(int prec)
 Expression *ParseContext::parseIdentifierExpression()
 {
     SourceLocation loc = peek().loc;
-    bool local = false;
 
     if(peek().isNot(tok::identifier) && peek().isNot(tok::kw_this) && peek().isNot(tok::dot))
     {
@@ -1330,17 +1332,8 @@ Expression *ParseContext::parseIdentifierExpression()
         return NULL;
     }
 
-    // XXX dispite looking like a unary operator, unary dot is actually parsed here
-    // this is because otherwise the recursive descent would fail on statements like
-    // .v[0]
-    if(peek().is(tok::dot)) {
-        ignore();
-        local = true;
-    }
-
     Identifier *id = getScope()->get(get().toString());
     IdentifierExpression *ret = new IdentifierExpression(id, loc);
-    ret->setLocal(local);
     return ret;
 }
 
@@ -1381,19 +1374,19 @@ Expression *ParseContext::parsePrimaryExpression()
     {
         ignore();
         return new IntExpression(ASTType::getBoolTy(),
-                (uint64_t) 1L, loc); //TODO: bool type
+                (uint64_t) 1L, loc);
     }
     if(peek().is(tok::kw_false))
     {
         ignore();
         return new IntExpression(ASTType::getBoolTy(),
-                (uint64_t) 0L, loc); //TODO: bool
+                (uint64_t) 0L, loc);
     }
     if(peek().is(tok::kw_null))
     {
         ignore();
         return new IntExpression(ASTType::getVoidTy()->getPointerTy(),
-                (uint64_t) 0L, loc); //TODO: void^
+                (uint64_t) 0L, loc);
     }
 
     //TODO: eat char constant
@@ -1408,6 +1401,22 @@ Expression *ParseContext::parsePrimaryExpression()
         }
         ignore();
         return exp;
+    }
+
+    // XXX dispite looking like a unary operator, unary dot is actually parsed here
+    // this is because otherwise the recursive descent would fail on statements like
+    // .v[0]
+    if(peek().is(tok::dot)) {
+        ignore();
+
+        if(peek().isNot(tok::identifier) && peek().isNot(tok::kw_this)) {
+            emit_message(msg::ERROR, "expected identifier expression", loc);
+            return NULL;
+        }
+
+        //XXX: let lower in validate? create new ASTNode 'PrefixDotExpression'?
+        Expression *thisExp = new IdentifierExpression(getScope()->lookup("this"), loc);
+        return new DotExpression(thisExp, get().toString());
     }
 
     if(peek().is(tok::identifier) || peek().is(kw_this) || peek().is(tok::dot)) {

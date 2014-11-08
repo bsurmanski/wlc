@@ -393,8 +393,16 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
 
             //TODO: currently breaks because codegen needs to alloc 'this'
             //exp->function = new IdentifierExpression(uty->getConstructor()->getIdentifier(), location);
-        } else if(!exp->function->getType()->isFunctionType()) {
-            emit_message(msg::ERROR, "attempt to call non-function type", location);
+        } else {
+            // dereference function pointer
+
+            if(exp->function->getType()->isPointer()) {
+                //exp->function = new UnaryExpression(tok::caret, exp->function, location);
+            } else
+
+            if(!exp->function->getType()->isFunctionType()) {
+                emit_message(msg::ERROR, "attempt to call non-function type", location);
+            }
         }
     }
 
@@ -421,21 +429,18 @@ void ValidationVisitor::visitIndexExpression(IndexExpression *exp) {
 
 void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp) {
     // resolve identifier
-    //XXX messy; deferring local resolution to codegen
-    if(!exp->isLocal()) {
-            exp->id = resolveIdentifier(exp->id);
+    exp->id = resolveIdentifier(exp->id);
 
-        if(exp->id->isUndeclared()){
-            emit_message(msg::ERROR, "identifier is expected to be resolved at this point", location);
-        }
-
-        // resolve type of identifier if needed
-        if(exp->id->getType()) //XXX temp?
-            resolveType(exp->id->getType());
-
-        if(exp->id->getDeclaredType())
-            exp->id->astType = resolveType(exp->id->getDeclaredType());
+    if(exp->id->isUndeclared()){
+        emit_message(msg::ERROR, "identifier is expected to be resolved at this point", location);
     }
+
+    // resolve type of identifier if needed
+    if(exp->id->getType()) //XXX temp?
+        resolveType(exp->id->getType());
+
+    if(exp->id->getDeclaredType())
+        exp->id->astType = resolveType(exp->id->getDeclaredType());
 }
 
 void ValidationVisitor::visitNumericExpression(NumericExpression *exp) {

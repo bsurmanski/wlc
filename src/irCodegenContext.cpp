@@ -1256,9 +1256,6 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         return codegenCallExpression(cexp);
     } else if(IdentifierExpression *iexp = exp->identifierExpression())
     {
-        if(iexp->isLocal()) {
-            return getMember(getThis(), iexp->id->getName());
-        }
         return codegenIdentifier(iexp->id);
     } else if(ImportExpression *iexp = exp->importExpression())
     {
@@ -2154,7 +2151,7 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType, bool isE
  // no conversion? failed converson?
     if(!ret || !ret->getType()) {
         char err[1024]; //XXX may overflow if type names are too long
-        sprintf(err, "cannot convert value of type '%s' to type '%s'", val->getType()->getName().c_str(), toType->getName().c_str());
+        sprintf(err, "CODEGEN: cannot convert value of type '%s' to type '%s'", val->getType()->getName().c_str(), toType->getName().c_str());
         emit_message(msg::ERROR, std::string(err), location);
     }
 

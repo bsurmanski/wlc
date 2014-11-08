@@ -166,7 +166,7 @@ int main(int argc, char^^ argv)
         SDL_Delay(32)
         SDL_Flip(surf)
 		
-        //testFunc()
+        testFunc()
         update()
     }
 

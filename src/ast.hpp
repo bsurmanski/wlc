@@ -820,7 +820,16 @@ struct IndexExpression : public PostfixExpression
     Expression *index;
     IndexExpression(Expression *l, Expression *i, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), index(i) {}
-    virtual ASTType *getType() { return NULL; } //TODO XXX
+    virtual ASTType *getType() {
+        if(lhs->getType()->getPointerElementTy()) {
+            return lhs->getType()->getPointerElementTy();
+        }
+
+        //TODO provide type if expression is const, and type is
+        // tuple or (?) struct
+
+        return NULL;
+    }
     virtual void accept(ASTVisitor *v);
 };
 
@@ -945,14 +954,13 @@ struct IdentifierExpression : public PrimaryExpression
 {
     virtual ~IdentifierExpression() {}
 
-    bool local; // whether this identifer is prefixed with a unary dot
     Identifier *id;
     bool isUserType() { return id->isUserType(); }
     bool isVariable() { return id->isVariable(); }
     bool isFunction() { return id->isFunction(); }
     virtual bool isLValue() { return id->isVariable(); }
     IdentifierExpression(Identifier *i, SourceLocation l = SourceLocation()) :
-        PrimaryExpression(l), id(i), local(false) {}
+        PrimaryExpression(l), id(i) {}
     Identifier *identifier() { return id; }
     std::string getName() { return id->getName(); }
     virtual IdentifierExpression *identifierExpression() { return this; }
@@ -962,8 +970,7 @@ struct IdentifierExpression : public PrimaryExpression
         if(id->isUserType()) return id->getDeclaredType();
         return NULL;
     }
-    void setLocal(bool b) { local = b; }
-    bool isLocal() { return local; }
+
     virtual bool isConstant() {
         return id->getDeclaration() &&
             id->getDeclaration()->isConstant();

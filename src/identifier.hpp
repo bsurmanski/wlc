@@ -71,6 +71,9 @@ struct Identifier
     bool isModule() { return kind == ID_MODULE; }
     bool isExpression() { return kind == ID_EXPRESSION; }
     bool isLabel() { return kind == ID_LABEL; }
+    bool isAlias() { return false; }
+    bool isValue() { return isFunction() || isVariable() || isExpression(); }
+    bool isType() { return isUserType() || isAlias(); } //XXX can alias value?
 
     bool isTypeMember();
     ASTType *getMemberOwner();

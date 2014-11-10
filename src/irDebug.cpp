@@ -409,8 +409,7 @@ llvm::DICompositeType IRDebug::createPrototype(ASTType *p)
 #endif
 }
 
-llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
-{
+llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f, Function *cgFunc) {
     //if(!f->diSubprogram)
     {
     llvm::DIDescriptor DIContext(currentFile());
@@ -426,7 +425,7 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f)
             f->loc.line,
             0, //flags
             false, //isoptimized
-            (Function*) f->cgValue);
+            cgFunc);
 
     //for(int i = 0; i < f->getType()->parameters.size(); i++)
     {

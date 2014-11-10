@@ -6,6 +6,7 @@
 #include <stack>
 
 class ASTVisitor {
+    //XXX have a stack of ASTNode*s
     std::stack<ASTScope*> scope;
     std::stack<FunctionDeclaration*> function;
 

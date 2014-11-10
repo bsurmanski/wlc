@@ -32,12 +32,12 @@ std::string getFilebase(std::string s)
 }
 #endif
 
-Package::Package(Package *par, std::string nm) : parent(par), scope(NULL), cgValue(NULL),
-    identifier(NULL)
+Package::Package(Package *sup, std::string nm)
+    : superPackage(sup), scope(NULL), identifier(NULL)
 {
     name = nm;
-    if(parent) {
-        identifier = parent->getScope()->getInScope(name);
+    if(superPackage) {
+        identifier = superPackage->getScope()->getInScope(name);
         identifier->addDeclaration(new PackageDeclaration(this, identifier,
                     SourceLocation(nm.c_str(), 1), DeclarationQualifier()), Identifier::ID_PACKAGE);
     }
@@ -206,6 +206,26 @@ ASTType *DotExpression::getType() {
     }
 
     return NULL;
+}
+
+Expression *DotExpression::lower() {
+    if(lhs->isType()) {
+        // lower 'sizeof' expression to constant int
+        if(rhs == "sizeof") {
+            return new IntExpression(ASTType::getLongTy(), lhs->getDeclaredType()->getSize());
+        }
+
+        if(rhs == "offsetof") {
+            ASTUserType *uty = lhs->getDeclaredType()->asUserType();
+            if(uty) {
+                emit_message(msg::UNIMPLEMENTED, "unimplemented 'offsetof' operator", loc);
+            } else {
+                emit_message(msg::ERROR, "invalid 'offsetof' on non-user type", loc);
+            }
+        }
+    }
+
+    return this;
 }
 
 ASTType *TupleExpression::getType() {

@@ -52,15 +52,15 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     ASTUserType *userty = ty->asUserType();
     UserTypeDeclaration *utdecl = userty->getDeclaration();
     if(!userty) {
-        emit_message(msg::FAILURE, "invalid user type", location);
+        emit_message(msg::FAILURE, "CODEGEN: invalid user type", location);
     }
 
     if(userty->identifier->isUndeclared()){ //XXX superfluous test
         Identifier *alt = userty->identifier->table->lookup(userty->identifier->getName());
-        emit_message(msg::WARNING, "type should be resolved by now", location);
+        emit_message(msg::WARNING, "CODEGEN: type should be resolved by now", location);
         userty->identifier = lookup(ty->getName());
         if(userty->identifier->isUndeclared()){
-            emit_message(msg::ERROR, "undeclared struct: " + userty->getName());
+            emit_message(msg::ERROR, "CODEGEN: undeclared struct: " + userty->getName());
             return NULL;
         }
     }
@@ -177,14 +177,14 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
 {
     ASTTupleType *tupty = dynamic_cast<ASTTupleType*>(ty);
     if(ty->kind != TYPE_TUPLE || !tupty) {
-        emit_message(msg::FAILURE, "invalid tuple type codegen", location);
+        emit_message(msg::FAILURE, "CODEGEN: invalid tuple type codegen", location);
         return NULL;
     }
 
     if(ty->cgType) return ty->cgType;
 
     if(!tupty->types.size()) {
-        emit_message(msg::FAILURE, "0-tuple found in codegen", location);
+        emit_message(msg::FAILURE, "CODEGEN: 0-tuple found in codegen", location);
         return NULL;
     }
 
@@ -1298,7 +1298,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTComp
 ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 {
     if(exp->type->kind == TYPE_DYNAMIC_ARRAY) {
-        emit_message(msg::ERROR, "cannot created unsized array. meaningless alloaction", exp->loc);
+        emit_message(msg::ERROR, "CODEGEN: cannot created unsized array. meaningless alloaction", exp->loc);
         return NULL;
     }
 
@@ -1909,7 +1909,9 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             lhs = codegenExpression(dexp->lhs);
 
             if(lhs->getType()->isPointer()) {
-                emit_message(msg::ERROR, "CODEGEN: invalid dot on pointer type", location);
+                lhs = getValueOf(lhs);
+                //TODO: 'this' for structs is a pointer; handle case
+                //emit_message(msg::ERROR, "CODEGEN: invalid dot on pointer type", location);
             }
 
             //TODO: allow indexing types other than userType and array?
@@ -2383,8 +2385,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 
 void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
 {
-    if(exp->expression)
-    {
+    if(exp->expression) {
         ASTValue *value = codegenExpression(exp->expression);
         retainObject(value); // retain return value
         ASTValue *v = promoteType(value, currentFunction.retVal->getType());
@@ -2543,7 +2544,7 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         if(userty->identifier->isUndeclared())
         {
             id = lookup(userty->identifier->getName());
-            if(id->isUndeclared()){
+            if(id->isUndeclared()) {
                 emit_message(msg::ERROR, "undeclared struct: " + id->getName(), vdecl->loc);
                 return;
             }
@@ -2648,7 +2649,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
 
 
         dwarfStopPoint(fdecl->loc);
-        unit->debug->createFunction(fdecl);
+        unit->debug->createFunction(fdecl, func);
         enterScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
         dwarfStopPoint(fdecl->loc);
 
@@ -2888,7 +2889,7 @@ void IRCodegenContext::codegenPackage(Package *p)
     {
         std::string err;
         IRTranslationUnit *unit = new IRTranslationUnit(this, (TranslationUnit*) p);
-        p->cgValue = 0;
+        //p->cgValue = 0;
         codegenTranslationUnit(unit);
 
         // XXX debug, output all modules

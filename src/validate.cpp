@@ -95,6 +95,11 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
         resolveType(ty->asArray()->arrayOf);
     }
 
+    if(ty->isUserType()) {
+        //XXX requried?
+        ((ASTUserType*)ty)->identifier = resolveIdentifier(ty->asUserType()->identifier);
+    }
+
     if(ty->kind == TYPE_UNKNOWN || ty->kind == TYPE_UNKNOWN_USER) {
         emit_message(msg::FATAL, "invalid type", location);
     }
@@ -378,13 +383,31 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
     if(!exp->function) {
         emit_message(msg::FAILURE, "invalid or missing function in call expression", exp->loc);
     } else {
-
         exp->function = exp->function->lower();
 
-        // this is a type declaration.
-        // we are calling a type. eg a constructor call
-        // of style MyStruct(1, 2 3)
-        if(exp->function->getDeclaredType()) {
+        // if lhs is dot expression, this is either method call or UFCS.
+        // Decide which, and push 'this' variable as function argument if required
+        //
+        // its unfortunate that we need to make a slight exception for dot expressions,
+        // but probably necessary.
+        if(exp->function->dotExpression()) {
+            DotExpression *dexpFunc = exp->function->dotExpression();
+        }
+
+
+        if(exp->function->isValue()) {
+            // dereference function pointer
+
+            if(exp->function->getType()->isPointer()) {
+                //exp->function = new UnaryExpression(tok::caret, exp->function, location);
+            } else if(!exp->function->getType()->isFunctionType()) {
+                emit_message(msg::ERROR, "attempt to call non-function type", location);
+            }
+        } else if(exp->function->isType()) {
+            // this is a type declaration.
+            // we are calling a type. eg a constructor call
+            // of style MyStruct(1, 2 3)
+
             ASTUserType *uty = exp->function->getDeclaredType()->asUserType();
             if(!uty) {
                 emit_message(msg::ERROR, "constructor syntax on non-user type '" +
@@ -394,15 +417,7 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
             //TODO: currently breaks because codegen needs to alloc 'this'
             //exp->function = new IdentifierExpression(uty->getConstructor()->getIdentifier(), location);
         } else {
-            // dereference function pointer
-
-            if(exp->function->getType()->isPointer()) {
-                //exp->function = new UnaryExpression(tok::caret, exp->function, location);
-            } else
-
-            if(!exp->function->getType()->isFunctionType()) {
-                emit_message(msg::ERROR, "attempt to call non-function type", location);
-            }
+            emit_message(msg::ERROR, "invalid function call", location);
         }
     }
 
@@ -437,7 +452,9 @@ void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp) {
 
     // resolve type of identifier if needed
     if(exp->id->getType()) //XXX temp?
+    {
         resolveType(exp->id->getType());
+    }
 
     if(exp->id->getDeclaredType())
         exp->id->astType = resolveType(exp->id->getDeclaredType());
@@ -491,46 +508,92 @@ void ValidationVisitor::visitTupleExpression(TupleExpression *exp) {
     }
 }
 
+/*
+ * Dot expression is either:
+ *
+ * a) a member lookup
+ * b) static member
+ * c) a scope specifier
+ * d) a method lookup (which must be followed by a call)
+ * e) a UFCS call
+ *
+ * (a), (b), and (c) are similar in function; so are (d) and (e)
+ *
+ * if LHS is a UserType variable (or pointer to), and RHS is a valid member, we have (a)
+ * if RHS is a static member, we have (b)
+ * else if RHS is a valid method name, we have (d)
+ * else if LHS is a package (or some scope token), we have (b)
+ * else if RHS is a valid function name in scope, and it's first parameter matches LHS's type, we have (e)
+ */
 void ValidationVisitor::visitDotExpression(DotExpression *exp) {
     if(!exp->lhs) {
         emit_message(msg::ERROR, "invalid base in dot expression", exp->loc);
     } else exp->lhs = exp->lhs->lower();
 
-    ASTType *lhstype = exp->lhs->getType();
-    if(!lhstype) {
+    if(exp->lhs->isValue()) {
+        ASTType *lhstype = exp->lhs->getType();
+
+        //TODO: check for UFCS
+        // dereference pointer types on dot expression
+        if(lhstype->isPointer()) {
+            exp->lhs = new UnaryExpression(tok::caret, exp->lhs, location);
+            lhstype = exp->lhs->getType();
+        }
+
+        // if user type or pointer to user type
+        if(lhstype->isUserType()) {
+            Identifier *rhsid = lhstype->getDeclaration()->lookup(exp->rhs);
+
+            if(!rhsid) {
+                // member not found in userType; check if this is a 'Uniform Function Call Syntax' thing
+                rhsid = getScope()->lookup(exp->rhs);
+
+                if(!rhsid || !rhsid->isFunction()) {
+                    // member is not a UFCS. member not found in scope, or found identifier is not a function
+                    emit_message(msg::ERROR, "member '" + exp->rhs + "' not found in user type '" + lhstype->getName() + "'", location);
+                }
+            }
+
+            //XXX hacky. in case rhs is userType, it's type can be
+            // unresolved before used
+            if(Declaration *rhsdecl = rhsid->getDeclaration()) {
+                resolveType(rhsdecl->getType());
+            }
+
+            if(rhsid->isUndeclared()) {
+                emit_message(msg::WARNING, "undeclared member identifier in validate", location);
+            }
+        } else if(lhstype->isArray()) {
+            if(exp->rhs != "size" && exp->rhs != "ptr") {
+                emit_message(msg::ERROR, "invalid property '" + exp->rhs + "' in array", location);
+            }
+        } else {
+            emit_message(msg::ERROR, "invalid dot expression on non-user type", location);
+        }
+
+    } else if(exp->lhs->isType()) {
         ASTType *declty = exp->lhs->getDeclaredType();
         if(!declty) {
             emit_message(msg::ERROR, "invalid lhs of dot expression", location);
         }
 
-        if(exp->rhs != "sizeof" && exp->rhs != "offsetof") {
-            emit_message(msg::ERROR, "invalid property '" + exp->rhs + "' in type '" + declty->getName() + "'", location);
-        }
-
-        return;
-    }
-
-    // dereference pointer types on dot expression
-    if(lhstype->isPointer()) {
-        exp->lhs = new UnaryExpression(tok::caret, exp->lhs, location);
-        lhstype = exp->lhs->getType();
-    }
-
-    if(lhstype->isArray()) {
-        if(exp->rhs != "sizeof" && exp->rhs != "size" && exp->rhs != "ptr") {
-            emit_message(msg::ERROR, "invalid property '" + exp->rhs + "' in array", location);
-        }
-    } else if(lhstype->isUserType()) {
-        if(!lhstype->getDeclaration()->lookup(exp->rhs)) {
-            emit_message(msg::ERROR, "member '" + exp->rhs + "' not found in user type '" + lhstype->getName() + "'", location);
+        if(exp->rhs == "sizeof" || exp->rhs == "offsetof") {
+            // i think we're fine
+        } else {
+            //TODO: look up static members / functions
+            emit_message(msg::UNIMPLEMENTED, "no static members or function lookup availible", location);
         }
     } else {
-        emit_message(msg::ERROR, "invalid dot expression on non-user type", location);
+        emit_message(msg::FAILURE, "unresolved dot expression", location);
     }
 }
 
 void ValidationVisitor::visitNewExpression(NewExpression *exp) {
     resolveType(exp->type);
+
+    if(exp->type->kind == TYPE_DYNAMIC_ARRAY) {
+        emit_message(msg::ERROR, "cannot create unsized array in 'new' expression", location);
+    }
 }
 
 void ValidationVisitor::visitIdOpExpression(IdOpExpression *exp) {

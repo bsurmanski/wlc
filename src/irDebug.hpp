@@ -57,7 +57,7 @@ class IRDebug
         llvm::DICompositeType createTupleType(ASTType *ty);
         llvm::DIType createType(ASTType *t);
         llvm::DICompositeType createPrototype(ASTType *p);
-        llvm::DISubprogram createFunction(FunctionDeclaration *f);
+        llvm::DISubprogram createFunction(FunctionDeclaration *f, llvm::Function *cgFunc);
         llvm::DIGlobalVariable createGlobal(VariableDeclaration *decl, ASTValue *val);
         llvm::Instruction *createVariable(std::string nm, ASTValue *v,
                 llvm::BasicBlock *bb, SourceLocation loc, int argn = 0);

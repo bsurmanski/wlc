@@ -1412,7 +1412,12 @@ Expression *ParseContext::parsePrimaryExpression() {
             return NULL;
         }
 
-        //XXX: let lower in validate? create new ASTNode 'PrefixDotExpression'?
+        //TODO: let lower in validate? create new ASTNode 'PrefixDotExpression'?
+        //
+        //XXX: lowering here makes 'this.func()' semantially equivilent to '.func()'
+        // this is incorrect in the case of UFCS where '.func()' would signify that the function
+        // is explicitly contained within 'this' or a superclass. 'this.func()' would still be vulnerable
+        // to UFCS
         Expression *thisExp = new IdentifierExpression(getScope()->lookup("this"), loc);
         return new DotExpression(thisExp, get().toString());
     }

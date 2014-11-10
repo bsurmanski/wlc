@@ -4,6 +4,8 @@
 #include "ast.hpp"
 #include "astVisitor.hpp"
 
+#include <stack>
+
 // can be removed?
 enum Validity {
     UNCHECKED,
@@ -24,6 +26,7 @@ class ValidationVisitor : public ASTVisitor {
 
     SourceLocation location;
     ASTScope *scope;
+    //std::stack<ASTNode *> trace;
 
     public:
     bool isValid() { return valid; }

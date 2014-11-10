@@ -18,8 +18,7 @@ void Package::accept(ASTVisitor *v) {
     v->visitScope(scope);
     v->pushScope(this->getScope());
     for(int i = 0; i < children.size(); i++)
-        if(children[i])
-            children[i]->accept(v);
+        if(children[i]) children[i]->accept(v);
     v->popScope();
 }
 
@@ -46,8 +45,7 @@ void FunctionDeclaration::accept(ASTVisitor *v) {
     v->visitFunctionDeclaration(this);
     v->pushScope(this->getScope());
     v->pushFunction(this);
-    if(body)
-        body->accept(v);
+    if(body) body->accept(v);
     v->popFunction();
     v->popScope();
 
@@ -64,8 +62,7 @@ void LabelDeclaration::accept(ASTVisitor *v){
 void VariableDeclaration::accept(ASTVisitor *v){
     Declaration::accept(v);
     v->visitVariableDeclaration(this);
-    if(value)
-        value->accept(v);
+    if(value) value->accept(v);
 }
 
 void TypeDeclaration::accept(ASTVisitor *v){
@@ -79,11 +76,9 @@ void UserTypeDeclaration::accept(ASTVisitor *v){
     v->visitUserTypeDeclaration(this);
     v->visitType(type);
 
-    if(constructor)
-        constructor->accept(v);
+    if(constructor) constructor->accept(v);
 
-    if(destructor)
-        destructor->accept(v);
+    if(destructor) destructor->accept(v);
 
     for(int i = 0; i < methods.size(); i++) {
         methods[i]->accept(v);
@@ -111,25 +106,21 @@ void PostfixExpression::accept(ASTVisitor *v) {
 
 void PostfixOpExpression::accept(ASTVisitor *v) {
     Expression::accept(v);
+    if(lhs) lhs->accept(v);
     v->visitPostfixOpExpression(this);
-    if(lhs)
-        lhs->accept(v);
 }
 
 void UnaryExpression::accept(ASTVisitor *v){
     Expression::accept(v);
+    if(lhs) lhs->accept(v);
     v->visitUnaryExpression(this);
-    if(lhs)
-        lhs->accept(v);
 }
 
 void BinaryExpression::accept(ASTVisitor *v){
     Expression::accept(v);
+    if(lhs) lhs->accept(v);
+    if(rhs) rhs->accept(v);
     v->visitBinaryExpression(this);
-    if(lhs)
-        lhs->accept(v);
-    if(rhs)
-        rhs->accept(v);
 }
 
 void PrimaryExpression::accept(ASTVisitor *v){
@@ -139,22 +130,20 @@ void PrimaryExpression::accept(ASTVisitor *v){
 
 void CallExpression::accept(ASTVisitor *v){
     PostfixExpression::accept(v);
-    v->visitCallExpression(this);
-    if(function)
-        function->accept(v);
+    if(function) function->accept(v);
 
     for(int i = 0; i < args.size(); i++) {
         args[i]->accept(v);
     }
+
+    v->visitCallExpression(this);
 }
 
 void IndexExpression::accept(ASTVisitor *v){
     PostfixExpression::accept(v);
+    if(lhs) lhs->accept(v);
+    if(index) index->accept(v);
     v->visitIndexExpression(this);
-    if(lhs)
-        lhs->accept(v);
-    if(index)
-        index->accept(v);
 }
 
 void IdentifierExpression::accept(ASTVisitor *v){
@@ -180,9 +169,8 @@ void ImportExpression::accept(ASTVisitor *v){
 
 void PackageExpression::accept(ASTVisitor *v){
     Expression::accept(v);
+    if(package) package->accept(v);
     v->visitPackageExpression(this);
-    if(package)
-        package->accept(v);
 }
 
 void CastExpression::accept(ASTVisitor *v){
@@ -202,17 +190,16 @@ void TypeExpression::accept(ASTVisitor *v){
 
 void TupleExpression::accept(ASTVisitor *v){
     Expression::accept(v);
-    v->visitTupleExpression(this);
     for(int i = 0; i < members.size(); i++)
         if(members[i])
             members[i]->accept(v);
+    v->visitTupleExpression(this);
 }
 
 void DotExpression::accept(ASTVisitor *v){
     PostfixExpression::accept(v);
+    if(lhs) lhs->accept(v);
     v->visitDotExpression(this);
-    if(lhs)
-        lhs->accept(v);
 }
 
 void NewExpression::accept(ASTVisitor *v){
@@ -222,9 +209,8 @@ void NewExpression::accept(ASTVisitor *v){
 
 void IdOpExpression::accept(ASTVisitor *v){
     Expression::accept(v);
+    if(expression) expression->accept(v);
     v->visitIdOpExpression(this);
-    if(expression)
-        expression->accept(v);
 }
 
 //
@@ -252,10 +238,9 @@ void LabelStatement::accept(ASTVisitor *v){
 
 void CaseStatement::accept(ASTVisitor *v){
     Statement::accept(v);
-    v->visitCaseStatement(this);
     for(int i = 0; i < values.size(); i++)
-        if(values[i])
-            values[i]->accept(v);
+        if(values[i]) values[i]->accept(v);
+    v->visitCaseStatement(this);
 }
 
 void GotoStatement::accept(ASTVisitor *v){
@@ -265,29 +250,26 @@ void GotoStatement::accept(ASTVisitor *v){
 
 void ReturnStatement::accept(ASTVisitor *v){
     Statement::accept(v);
+    if(expression) expression->accept(v);
     v->visitReturnStatement(this);
-    if(expression)
-        expression->accept(v);
 }
 
 void CompoundStatement::accept(ASTVisitor *v){
     Statement::accept(v);
-    v->visitCompoundStatement(this);
     v->pushScope(scope);
     for(int i = 0; i < statements.size(); i++)
-        if(statements[i])
-            statements[i]->accept(v);
+        if(statements[i]) statements[i]->accept(v);
     v->popScope();
+    v->visitCompoundStatement(this);
 }
 
 void BlockStatement::accept(ASTVisitor *v){
     Statement::accept(v);
     v->visitScope(scope);
-    v->visitBlockStatement(this);
     v->pushScope(scope);
-    if(body)
-        body->accept(v);
+    if(body) body->accept(v);
     v->popScope();
+    v->visitBlockStatement(this);
 }
 
 void ElseStatement::accept(ASTVisitor *v){
@@ -297,21 +279,17 @@ void ElseStatement::accept(ASTVisitor *v){
 
 void IfStatement::accept(ASTVisitor *v){
     BlockStatement::accept(v);
-    v->visitIfStatement(this);
     condition->accept(v);
-    if(elsebr)
-        elsebr->accept(v);
+    if(elsebr) elsebr->accept(v);
+    v->visitIfStatement(this);
 }
 
 void LoopStatement::accept(ASTVisitor *v){
     BlockStatement::accept(v);
+    if(condition) condition->accept(v);
+    if(update) update->accept(v);
+    if(elsebr) elsebr->accept(v);
     v->visitLoopStatement(this);
-    if(condition)
-        condition->accept(v);
-    if(update)
-        update->accept(v);
-    if(elsebr)
-        elsebr->accept(v);
 }
 
 void WhileStatement::accept(ASTVisitor *v){
@@ -321,14 +299,12 @@ void WhileStatement::accept(ASTVisitor *v){
 
 void ForStatement::accept(ASTVisitor *v){
     LoopStatement::accept(v);
+    if(decl) decl->accept(v);
     v->visitForStatement(this);
-    if(decl)
-        decl->accept(v);
 }
 
 void SwitchStatement::accept(ASTVisitor *v){
     BlockStatement::accept(v);
+    if(condition) condition->accept(v);
     v->visitSwitchStatement(this);
-    if(condition)
-        condition->accept(v);
 }

@@ -86,7 +86,33 @@ struct AST
 };
 
 struct ASTNode {
-    ASTNode() {}
+    private:
+    unsigned refcount;
+    ASTNode *parent;
+    SourceLocation location;
+
+    public:
+
+    ASTNode() : refcount(1), parent(0) {}
+    ASTNode(ASTNode *_parent, SourceLocation loc = SourceLocation()) :
+        refcount(1), parent(_parent), location(loc) {}
+
+    virtual ~ASTNode() {}
+
+    unsigned retain() {
+        refcount++;
+        return refcount;
+    }
+
+    unsigned release() {
+        refcount--;
+        if(refcount <= 0) {
+            delete this;
+            return 0;
+        }
+        return refcount;
+    }
+
     virtual std::string getMangledName() { return ""; }
     virtual std::string getName() { return ""; }
     virtual void accept(ASTVisitor *v) = 0;
@@ -107,12 +133,11 @@ struct ASTNode {
 struct Package : public ASTNode
 {
     ASTScope *scope;
-    Package *parent;
+    Package *superPackage;
     Identifier *identifier;
-    void *cgValue; // XXX opaque pointer to specific codegen information
     std::string name;
 
-    Package(Package *par=0, std::string nm="wl");
+    Package(Package *sup=0, std::string nm="wl");
 
     virtual ~Package() { if(scope) delete scope; }
 
@@ -123,27 +148,27 @@ struct Package : public ASTNode
             scope->setOwner(identifier);
         }
         return scope;
-    } //TODO: subscope of parent ?
+    } //TODO: subscope of super package?
 
     std::vector<Package*> children;
 
-    void setParent(Package *p)
+    void setSuperPackage(Package *p)
     {
         assert(false); // dont use this?XXX
-        //parent = p->getIdentifier();
+        //superPackage = p->getIdentifier();
     }
 
     void addPackage(Package *p) {
         // XXX add identifier in scope ?
-        //p->setParent(this);
+        //p->setSuperPackage(this);
         children.push_back(p);
         //Identifier *id = scope->get(p->getName());
     }
 
     virtual std::string getMangledName()
     {
-        if(parent)
-            return parent->getMangledName() + identifier->getName();
+        if(superPackage)
+            return superPackage->getMangledName() + identifier->getName();
         return identifier->getName();
     }
 
@@ -194,9 +219,10 @@ struct SwitchStatement;
 
 struct Statement : public ASTNode
 {
+    SourceLocation loc;
+
     Statement(SourceLocation l) : loc(l) {}
     virtual ~Statement(){}
-    SourceLocation loc;
     void setLocation(SourceLocation l) { loc = l; }
     SourceLocation getLocation() { return loc; }
     virtual void accept(ASTVisitor *v);
@@ -443,7 +469,6 @@ struct FunctionDeclaration : public Declaration
     int vtableIndex;
     ASTScope *scope;
     Statement *body;
-    void *cgValue;
 
     FunctionDeclaration *nextoverload; // linked list of overloaded function declarations
 
@@ -451,7 +476,7 @@ struct FunctionDeclaration : public Declaration
             bool varg,  ASTScope *sc, Statement *st, SourceLocation loc, DeclarationQualifier dqual) :
         Declaration(id, loc, dqual), owner(own), prototype(0), returnTy(ret), vararg(varg),
         parameters(params), scope(sc),
-        body(st), cgValue(NULL), nextoverload(0), vtableIndex(-1) {
+        body(st), nextoverload(0), vtableIndex(-1) {
             //if(scope)
             //    scope->setOwner(this);
         }
@@ -671,6 +696,10 @@ struct Expression : public Statement
     virtual ASTType *getType() { return NULL; }
     virtual ASTType *getDeclaredType() { return NULL; }
 
+    virtual bool isType() { return getDeclaredType(); }
+    virtual bool isValue() { return getType(); }
+    virtual bool isScope() { return false; } // do something with this
+
     Expression(SourceLocation l = SourceLocation()) : Statement(l) {}
     virtual UnaryExpression *unaryExpression() { return NULL; }
     virtual BinaryExpression *binaryExpression() { return NULL; }
@@ -852,12 +881,14 @@ struct DotExpression : public PostfixExpression
     virtual ~DotExpression() {}
     Expression *lhs;
     std::string rhs;
-    virtual bool isLValue() { return lhs->isLValue(); }
+    virtual bool isLValue() { return lhs->isLValue(); } //TODO: only LValue if RHS is member
     DotExpression(Expression *l, std::string r, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), rhs(r) {}
     virtual DotExpression *dotExpression() { return this; }
     virtual void accept(ASTVisitor *v);
     virtual ASTType *getType();
+
+    virtual Expression *lower();
 };
 
 struct UnaryExpression : public Expression
@@ -972,6 +1003,10 @@ struct IdentifierExpression : public PrimaryExpression
         if(id->isUserType()) return id->getDeclaredType();
         return NULL;
     }
+
+    virtual bool isType() { return id->isType(); }
+    virtual bool isValue() { return id->isValue(); }
+    virtual bool isScope() { return false; } // do something with this
 
     virtual bool isConstant() {
         return id->getDeclaration() &&

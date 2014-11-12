@@ -44,3 +44,38 @@ Expression* BinaryExpression::lower() {
     }
     return this;
 }
+
+Expression *DotExpression::lower() {
+    if(lhs->isType()) {
+        // lower 'sizeof' expression to constant int
+        if(rhs == "sizeof") {
+            return new IntExpression(ASTType::getLongTy(), lhs->getDeclaredType()->getSize());
+        }
+
+        if(rhs == "offsetof") {
+            ASTUserType *uty = lhs->getDeclaredType()->asUserType();
+            if(uty) {
+                emit_message(msg::UNIMPLEMENTED, "unimplemented 'offsetof' operator", loc);
+            } else {
+                emit_message(msg::ERROR, "invalid 'offsetof' on non-user type", loc);
+            }
+        }
+    }
+
+    return this;
+}
+
+Expression *CallExpression::lower() {
+    /*
+    if(function->dotExpression()) {
+        DotExpression *dexp = function->dotExpression();
+        Identifier *funcid = dexp->lhs->getType()->getDeclaration()->lookup(dexp->rhs);
+        if(!funcid) {
+            //TODO: lookup in callexpression scope for UFCS
+        }
+        function = new IdentifierExpression(funcid, dexp->loc);
+        args.push_front(dexp->lhs);
+    }*/
+
+    return this;
+}

@@ -51,6 +51,8 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitUnaryExpression(UnaryExpression *exp);
     virtual void visitBinaryExpression(BinaryExpression *exp);
     virtual void visitPrimaryExpression(PrimaryExpression *exp);
+    virtual Expression *resolveCallArgument(ASTFunctionType *fty, unsigned i, Expression *arg, Expression *def);
+    virtual void resolveCallArguments(Expression *func, std::list<Expression*>& args);
     virtual void visitCallExpression(CallExpression *exp);
     virtual void visitIndexExpression(IndexExpression *exp);
     virtual void visitIdentifierExpression(IdentifierExpression *exp);

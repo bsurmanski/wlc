@@ -83,6 +83,11 @@ int FunctionDeclaration::maxExpectedParameters() {
     return parameters.size();
 }
 
+Expression *FunctionDeclaration::getDefaultParameter(unsigned parami) {
+    if(parami >= parameters.size()) return NULL;
+    return parameters[parami]->value;
+}
+
 size_t UserTypeDeclaration::getAlign() const {
     size_t align = 0;
     VariableDeclaration *vd;
@@ -186,6 +191,50 @@ CONTINUE:;
     }
 }
 
+ASTType *BinaryExpression::getType() {
+    switch(op.kind){
+        case tok::equal:
+        case tok::colonequal:
+        case tok::plusequal:
+        case tok::minusequal:
+        case tok::starequal:
+        case tok::slashequal:
+        case tok::ampequal:
+        case tok::barequal:
+        case tok::caretequal:
+        case tok::percentequal:
+            return lhs->getType();
+        case tok::barbar:
+        case tok::kw_or:
+        case tok::ampamp:
+        case tok::kw_and:
+        case tok::bangequal:
+        case tok::equalequal:
+        case tok::less:
+        case tok::lessequal:
+        case tok::greater:
+        case tok::greaterequal:
+            return ASTType::getBoolTy();
+        case tok::plus:
+        case tok::minus:
+        case tok::lessless:
+        case tok::greatergreater:
+        case tok::star:
+        case tok::slash:
+        case tok::percent:
+        case tok::bar:
+        case tok::amp:
+            //TODO: resolve type
+            if(lhs->getType()->getPriority() > rhs->getType()->getPriority()) {
+                return lhs->getType();
+            } else {
+                return rhs->getType();
+            }
+        default: return NULL;
+    }
+return NULL;
+}
+
 
 //TODO XXX
 ASTType *DotExpression::getType() {
@@ -194,6 +243,15 @@ ASTType *DotExpression::getType() {
     }
 
     ASTType *lhstype = lhs->getType();
+
+    if(rhs == "ptr" && lhstype->isArray()) {
+        return lhstype->asArray()->arrayOf->getPointerTy();
+    }
+
+    if(rhs == "size" && lhstype->isArray()) {
+        return ASTType::getLongTy();
+    }
+
 
     //if type is pointer, implicit dereference on dot expression
     if(lhstype->asPointer()) {
@@ -208,25 +266,6 @@ ASTType *DotExpression::getType() {
     return NULL;
 }
 
-Expression *DotExpression::lower() {
-    if(lhs->isType()) {
-        // lower 'sizeof' expression to constant int
-        if(rhs == "sizeof") {
-            return new IntExpression(ASTType::getLongTy(), lhs->getDeclaredType()->getSize());
-        }
-
-        if(rhs == "offsetof") {
-            ASTUserType *uty = lhs->getDeclaredType()->asUserType();
-            if(uty) {
-                emit_message(msg::UNIMPLEMENTED, "unimplemented 'offsetof' operator", loc);
-            } else {
-                emit_message(msg::ERROR, "invalid 'offsetof' on non-user type", loc);
-            }
-        }
-    }
-
-    return this;
-}
 
 ASTType *TupleExpression::getType() {
     std::vector<ASTType*> tupty;

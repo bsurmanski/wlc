@@ -38,6 +38,8 @@ void emit_message(int level, std::string msg, SourceLocation loc)
     {
         case OUTPUT:
             break;
+        case DEBUGGING:
+            cerr << "debug: "; break;
         case WARNING:
             cerr << "warning: "; break;
         case ERROR:

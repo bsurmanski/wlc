@@ -1159,7 +1159,7 @@ Expression *ParseContext::parseNewExpression()
     assert(peek().is(tok::kw_new));
     ignore(); //ignore 'new'
     ASTType *t = parseType();
-    std::vector<Expression*> args;
+    std::list<Expression*> args;
 
     if(peek().is(tok::lparen)) {
         call = true;
@@ -1215,7 +1215,7 @@ Expression *ParseContext::parseTupleExpression()
     return new TupleExpression(members, loc);
 }
 
-void ParseContext::parseArgumentList(std::vector<Expression*> &args) {
+void ParseContext::parseArgumentList(std::list<Expression*> &args) {
     if(peek().isNot(tok::lparen)) {
         //error
     }
@@ -1241,7 +1241,7 @@ Expression *ParseContext::parsePostfixExpression(int prec)
     while((linePeek().getPostfixPrecidence()) > prec) {
         if(linePeek().is(tok::lparen)) // call
         {
-            std::vector<Expression*> args;
+            std::list<Expression*> args;
             parseArgumentList(args);
             exp = new CallExpression(exp, args, loc);
         } else if(linePeek().is(tok::lbracket)) //index/slice

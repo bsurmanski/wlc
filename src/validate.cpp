@@ -379,6 +379,105 @@ void ValidationVisitor::visitPrimaryExpression(PrimaryExpression *exp) {
 
 }
 
+Expression *ValidationVisitor::resolveCallArgument(ASTFunctionType *fty, unsigned i, Expression *arg, Expression *def) {
+    ASTType *argty = arg->getType();
+    ASTType *paramty  = fty->params[i];
+
+    if(fty->isVararg() && i >= fty->params.size()) {
+        return arg; // TODO: resolve to vararg type
+    } else if(argty && argty->is(paramty)) {
+        return arg;
+    } else if (argty && argty->coercesTo(paramty)) {
+        return new CastExpression(paramty, arg, arg->loc);
+    } else if(def) {
+        if(def->getType()->coercesTo(paramty)) {
+            return new CastExpression(paramty, def, arg->loc);
+        }
+    }
+
+    return NULL;
+
+}
+
+void ValidationVisitor::resolveCallArguments(Expression *func, std::list<Expression*>& funcargs) {
+    std::list<Expression*> resolvedArgs;
+
+    if(func->isValue()) {
+        // dereference function pointer
+
+        ASTFunctionType *fty = NULL;
+        FunctionDeclaration *fdecl = NULL;
+        if(func->getType()->isPointer()) {
+            fty = func->getType()->getPointerElementTy()->asFunctionType();
+            if(!fty) {
+                emit_message(msg::ERROR, "non-function pointer used in function pointer context", location);
+                return;
+            }
+            //func = new UnaryExpression(tok::caret, func, location);
+        } else {
+            fty = func->getType()->asFunctionType();
+
+            if(func->identifierExpression()) {
+                fdecl = func->identifierExpression()->getDeclaration()->functionDeclaration();
+            }
+
+            if(!fty) {
+                emit_message(msg::ERROR, "attempt to call non-function type", location);
+                return;
+            }
+        }
+
+        std::list<Expression*>::iterator args = funcargs.begin();
+
+        //TODO: while condition will not work on varargs
+        while(resolvedArgs.size() < fty->params.size()) {
+            Expression *arg = NULL;
+            Expression *defaultArg = NULL;
+            ASTType *argty = NULL;
+            ASTType *paramty = NULL;
+            //XXX below will break on varargs
+            paramty  = fty->params[resolvedArgs.size()];
+
+            if(args != funcargs.end()) {
+                arg = *args;
+                argty = arg->getType();
+            }
+
+            if(fdecl) {
+                defaultArg = fdecl->getDefaultParameter(resolvedArgs.size());
+            }
+
+            Expression *resolvedArg = resolveCallArgument(fty, resolvedArgs.size(), arg, defaultArg);
+
+            if(!resolvedArg) {
+                emit_message(msg::ERROR, "cannot resolve argument %d of function call; does not coerce to expected type '" + paramty->getName() + "'", func->loc);
+            }
+
+            resolvedArgs.push_back(resolvedArg);
+
+            args++;
+        }
+
+        funcargs = resolvedArgs;
+    } else if(func->isType()) {
+        // this is a type declaration.
+        // we are calling a type. eg a constructor call
+        // of style MyStruct(1, 2, 3)
+
+        ASTUserType *uty = func->getDeclaredType()->asUserType();
+        if(!uty) {
+            emit_message(msg::ERROR, "constructor syntax on non-user type '" +
+                    func->getDeclaredType()->getName() + "'", location);
+        }
+
+        //TODO: currently breaks because codegen needs to alloc 'this'
+        //func = new IdentifierExpression(uty->getConstructor()->getIdentifier(), location);
+    } else {
+        emit_message(msg::ERROR, "invalid function call", location);
+    }
+
+}
+
 void ValidationVisitor::visitCallExpression(CallExpression *exp) {
     if(!exp->function) {
         emit_message(msg::FAILURE, "invalid or missing function in call expression", exp->loc);
@@ -390,41 +489,32 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
         //
         // its unfortunate that we need to make a slight exception for dot expressions,
         // but probably necessary.
-        if(exp->function->dotExpression()) {
-            DotExpression *dexpFunc = exp->function->dotExpression();
+        DotExpression *dexp = exp->function->dotExpression();
+        if(dexp) {
+            if(dexp->isValue()) {
+                if(dexp->lhs->getType()->isStruct() && dexp->lhs->isLValue()) {
+                    exp->args.push_front(new UnaryExpression(tok::amp, dexp->lhs, location));
+                } else {
+                    exp->args.push_front(dexp->lhs);
+                }
+            } else { // UFCS
+                Identifier *fid = getScope()->lookup(dexp->rhs);
+                exp->function = new IdentifierExpression(fid, location);
+                exp->args.push_front(dexp->lhs);
+                emit_message(msg::DEBUGGING, "ufcs", location);
+            }
         }
 
+        resolveCallArguments(exp->function, exp->args);
 
-        if(exp->function->isValue()) {
-            // dereference function pointer
-
-            if(exp->function->getType()->isPointer()) {
-                //exp->function = new UnaryExpression(tok::caret, exp->function, location);
-            } else if(!exp->function->getType()->isFunctionType()) {
-                emit_message(msg::ERROR, "attempt to call non-function type", location);
-            }
-        } else if(exp->function->isType()) {
-            // this is a type declaration.
-            // we are calling a type. eg a constructor call
-            // of style MyStruct(1, 2 3)
-
-            ASTUserType *uty = exp->function->getDeclaredType()->asUserType();
-            if(!uty) {
-                emit_message(msg::ERROR, "constructor syntax on non-user type '" +
-                        exp->function->getDeclaredType()->getName() + "'", location);
-            }
-
-            //TODO: currently breaks because codegen needs to alloc 'this'
-            //exp->function = new IdentifierExpression(uty->getConstructor()->getIdentifier(), location);
-        } else {
-            emit_message(msg::ERROR, "invalid function call", location);
-        }
+        //TODO: resolve overload
     }
 
-
-    for(int i = 0; i < exp->args.size(); i++) {
-        if(!exp->args[i]) emit_message(msg::FAILURE, "invalid or missing argument in call expression", exp->loc);
-        else exp->args[i] = exp->args[i]->lower();
+    std::list<Expression*>::iterator it = exp->args.begin();
+    while(it != exp->args.end()) {
+        if(!*it) emit_message(msg::FAILURE, "invalid or missing argument in call expression", exp->loc);
+        else *it = (*it)->lower();
+        it++;
     }
 }
 
@@ -532,17 +622,26 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
 
     if(exp->lhs->isValue()) {
         ASTType *lhstype = exp->lhs->getType();
+        Identifier *rhsid = NULL;
 
         //TODO: check for UFCS
         // dereference pointer types on dot expression
-        if(lhstype->isPointer()) {
-            exp->lhs = new UnaryExpression(tok::caret, exp->lhs, location);
-            lhstype = exp->lhs->getType();
+        if(lhstype->isPointer() && lhstype->getPointerElementTy()->isStruct()) {
+            rhsid = lhstype->getPointerElementTy()->getDeclaration()->lookup(exp->rhs);
+            if(!rhsid) {
+                //TODO UFCS
+            } else if(rhsid->isVariable()) {
+                exp->lhs = new UnaryExpression(tok::caret, exp->lhs, location);
+                lhstype = exp->lhs->getType();
+            } else if(rhsid->isFunction()) {
+                // functions take pointer
+                return;
+            }
         }
 
         // if user type or pointer to user type
         if(lhstype->isUserType()) {
-            Identifier *rhsid = lhstype->getDeclaration()->lookup(exp->rhs);
+            rhsid = lhstype->getDeclaration()->lookup(exp->rhs);
 
             if(!rhsid) {
                 // member not found in userType; check if this is a 'Uniform Function Call Syntax' thing
@@ -590,6 +689,17 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
 
 void ValidationVisitor::visitNewExpression(NewExpression *exp) {
     resolveType(exp->type);
+
+    ASTUserType *uty = exp->type->asUserType();
+    if(uty && exp->call) {
+        exp->function = new IdentifierExpression(uty->getConstructor()->identifier, location);
+
+        //resolveCallArguments(exp->function, exp->args);
+    }
+
+    if(!exp->function && exp->args.size() > 0) {
+        emit_message(msg::ERROR, "unknown constructor call", location);
+    }
 
     if(exp->type->kind == TYPE_DYNAMIC_ARRAY) {
         emit_message(msg::ERROR, "cannot create unsized array in 'new' expression", location);

@@ -9,11 +9,12 @@ namespace msg
     enum msg_level
     {
         OUTPUT = 0, // simple output. not an issue
-        WARNING = 1, // warning message, but not a problem
-        ERROR = 2, // problem compiling. cannot finish
-        FAILURE = 3, // internal failure; unexpected behaviour on compiler's part
-        UNIMPLEMENTED = 4, // unimplemented feature. this shouldnt be happening...
-        FATAL = 5, // can not even continue. something really wrong happened
+        DEBUGGING = 1,
+        WARNING = 2, // warning message, but not a problem
+        ERROR = 3, // problem compiling. cannot finish
+        FAILURE = 4, // internal failure; unexpected behaviour on compiler's part
+        UNIMPLEMENTED = 5, // unimplemented feature. this shouldnt be happening...
+        FATAL = 6, // can not even continue. something really wrong happened
     };
 };
 

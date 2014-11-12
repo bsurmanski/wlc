@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include <list>
 #include <stack>
 #include <map>
 #include <stdlib.h>
@@ -485,6 +486,7 @@ struct FunctionDeclaration : public Declaration
     ASTType *getReturnType() { return returnTy; }
     bool isVararg() { return vararg; }
 
+    Expression *getDefaultParameter(unsigned parami);
 
     int getVTableIndex() { return vtableIndex; }
     void setVTableIndex(int vti) { vtableIndex = vti; }
@@ -748,10 +750,11 @@ struct NewExpression : public Expression
 {
     bool call;
     ASTType *type;
-    std::vector<Expression*> args;
+    Expression *function; // found in validation
+    std::list<Expression*> args;
     virtual ASTType *getType() { return type; }
-    NewExpression(ASTType *t, std::vector<Expression*> a, bool c, SourceLocation l = SourceLocation()) :
-        Expression(l), type(t), args(a), call(c) {}
+    NewExpression(ASTType *t, std::list<Expression*> a, bool c, SourceLocation l = SourceLocation()) :
+        Expression(l), type(t), args(a), call(c), function(0) {}
     virtual NewExpression *newExpression() { return this; }
     virtual void accept(ASTVisitor *v);
 };
@@ -824,9 +827,9 @@ struct CallExpression : public PostfixExpression
     virtual CallExpression *callExpression() { return this; }
 
     Expression *function;
-    std::vector<Expression *> args; //TODO: make special argument expression to allow for name arguments?
+    std::list<Expression *> args; //TODO: make special argument expression to allow for name arguments?
 
-    CallExpression(Expression *f, std::vector<Expression*> a, SourceLocation l = SourceLocation()) :
+    CallExpression(Expression *f, std::list<Expression*> a, SourceLocation l = SourceLocation()) :
         PostfixExpression(l), function(f), args(a) {}
 
     virtual ASTType *getType() {
@@ -840,6 +843,8 @@ struct CallExpression : public PostfixExpression
         return fty->getReturnType();
     }
     virtual void accept(ASTVisitor *v);
+
+    virtual Expression *lower();
 };
 
 struct IndexExpression : public PostfixExpression
@@ -933,45 +938,7 @@ struct BinaryExpression : public Expression
         Expression(lo), lhs(l), rhs(r), op(o) {}
     virtual void accept(ASTVisitor *v);
 
-    virtual ASTType *getType() {
-        switch(op.kind){
-            case tok::equal:
-            case tok::colonequal:
-            case tok::plusequal:
-            case tok::minusequal:
-            case tok::starequal:
-            case tok::slashequal:
-            case tok::ampequal:
-            case tok::barequal:
-            case tok::caretequal:
-            case tok::percentequal:
-                return lhs->getType();
-            case tok::barbar:
-            case tok::kw_or:
-            case tok::ampamp:
-            case tok::kw_and:
-            case tok::bangequal:
-            case tok::equalequal:
-            case tok::less:
-            case tok::lessequal:
-            case tok::greater:
-            case tok::greaterequal:
-                return ASTType::getBoolTy();
-            case tok::plus:
-            case tok::minus:
-            case tok::lessless:
-            case tok::greatergreater:
-            case tok::star:
-            case tok::slash:
-            case tok::percent:
-            case tok::bar:
-            case tok::amp:
-                //TODO: resolve type
-                return lhs->getType();
-        }
-	return NULL;
-    }
-
+    virtual ASTType *getType();
     virtual Expression *lower();
 };
 
@@ -995,6 +962,7 @@ struct IdentifierExpression : public PrimaryExpression
     IdentifierExpression(Identifier *i, SourceLocation l = SourceLocation()) :
         PrimaryExpression(l), id(i) {}
     Identifier *identifier() { return id; }
+    Declaration *getDeclaration() { return id->getDeclaration(); }
     std::string getName() { return id->getName(); }
     virtual IdentifierExpression *identifierExpression() { return this; }
     virtual void accept(ASTVisitor *v);

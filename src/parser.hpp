@@ -151,7 +151,7 @@ class ParseContext
     Expression *parseIdOpExpression();
     Expression *parseIdentifierExpression();
     Expression *parsePrimaryExpression();
-    void parseArgumentList(std::vector<Expression*> &args);
+    void parseArgumentList(std::list<Expression*> &args);
     Expression *parsePostfixExpression(int prec = 0);
     Expression *parseUnaryExpression(int prec = 0);
     Expression *parseBinaryExpression(int prec = 0);

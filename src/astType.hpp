@@ -599,6 +599,11 @@ struct ASTStaticArrayType : public ASTArrayType {
         if(ASTStaticArrayType *saty = dynamic_cast<ASTStaticArrayType*>(ty)) {
             return arrayOf->is(saty->arrayOf);
         }
+
+        if(arrayOf->getPointerTy()->is(ty)) {
+            return true;
+        }
+
         return false;
     }
 
@@ -617,6 +622,11 @@ struct ASTDynamicArrayType : public ASTArrayType {
         if(ASTDynamicArrayType *daty = dynamic_cast<ASTDynamicArrayType*>(ty)) {
             return arrayOf->is(daty->arrayOf);
         }
+
+        if(arrayOf->getPointerTy()->is(ty)) {
+            return true;
+        }
+
         return false;
     }
 

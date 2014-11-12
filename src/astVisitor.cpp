@@ -132,8 +132,10 @@ void CallExpression::accept(ASTVisitor *v){
     PostfixExpression::accept(v);
     if(function) function->accept(v);
 
-    for(int i = 0; i < args.size(); i++) {
-        args[i]->accept(v);
+    std::list<Expression*>::iterator it = args.begin();
+    while(it != args.end()) {
+        (*it)->accept(v);
+        it++;
     }
 
     v->visitCallExpression(this);

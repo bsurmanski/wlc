@@ -1377,20 +1377,39 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         }
 
         //TODO: call parent class constructor
+        if(exp->function) {
+            std::vector<ASTValue*> args;
+            args.push_back(val); // push 'this'
+            std::list<Expression*>::iterator it = exp->args.begin();
+
+            while(it != exp->args.end()) {
+                args.push_back(codegenExpression(*it));
+                it++;
+            }
+
+            codegenCall(codegenExpression(exp->function), args);
+        }
+        /*
         FunctionDeclaration *fdecl;
         if((fdecl = uty->getConstructor()) && exp->call){
             std::vector<ASTValue*> args;
 
-            for(int i = 0; i < exp->args.size(); i++) {
-                args.push_back(codegenExpression(exp->args[i]));
+            args.push_back(val); // push back owner
+
+            std::list<Expression*>::iterator it = exp->args.begin();
+
+            while(it != exp->args.end()) {
+                args.push_back(codegenExpression(*it));
+                it++;
             }
 
             ASTValue *func = codegenIdentifier(fdecl->identifier);
-            func->setOwner(val); // XXX MESSY!!! should happen in parser or validator
-            func = resolveOverload(func, args);
-            resolveArguments(func, args);
+            //func->setOwner(val); // XXX MESSY!!! should happen in parser or validator
+            //func = resolveOverload(func, args);
+            //resolveArguments(func, args);
             codegenCall(func, args);
         }
+        */
         //XXX temp below. set vtable of new class
         // TODO: also do if type is pointer to class (called through 'new')
 
@@ -1622,6 +1641,10 @@ ASTValue *IRCodegenContext::resolveOverload(ASTValue *func, std::vector<ASTValue
         return func;
     }
 
+    //XXX this should be done in validate now
+    return fval;
+
+    /*
     int bestScore = 0;
     FunctionValue *bestOverload = NULL;
     do {
@@ -1651,10 +1674,14 @@ NEXTOVERLOAD:;
         //TODO: test all overloads; also, recursive?
     } while((fval = fval->getNextOverload()));
 
-    return bestOverload;
+    return bestOverload; */
 }
 
 void IRCodegenContext::resolveArguments(ASTValue *func, std::vector<ASTValue*>& args) {
+    //XXX this should be done in validate now
+    return;
+
+    /*
     ASTFunctionType *astfty = NULL;
     FunctionDeclaration *fdecl = NULL;
     astfty = dynamic_cast<ASTFunctionType*>(func->getType());
@@ -1700,8 +1727,8 @@ void IRCodegenContext::resolveArguments(ASTValue *func, std::vector<ASTValue*>& 
             arg = codegenExpression(fdecl->parameters[parami]->value);
         } else {
             //TODO: check arguments before here
-            emit_message(msg::ERROR, "invalid function call found", location);
-            emit_message(msg::ERROR, "could not convert argument of type '" +
+            emit_message(msg::ERROR, "CG: invalid function call found", location);
+            emit_message(msg::ERROR, "CG: could not convert argument of type '" +
                     args[argi]->getType()->getName() + "' to parameter of type '" +
                     astfty->params[parami]->getName() + "'", location);
             return;
@@ -1731,6 +1758,7 @@ void IRCodegenContext::resolveArguments(ASTValue *func, std::vector<ASTValue*>& 
     for(int i = 0; i < callArgs.size(); i++) {
         args.push_back(callArgs[i]);
     }
+    */
 }
 
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
@@ -1766,8 +1794,10 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         func = getValueOf(func, false);
     }
 
-    for(int i = 0; i < exp->args.size(); i++) {
-        args.push_back(codegenExpression(exp->args[i]));
+    std::list<Expression*>::iterator it = exp->args.begin();
+    while(it != exp->args.end()) {
+        args.push_back(codegenExpression(*it));
+        it++;
     }
 
     func = resolveOverload(func, args);

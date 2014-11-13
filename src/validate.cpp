@@ -396,7 +396,6 @@ Expression *ValidationVisitor::resolveCallArgument(ASTFunctionType *fty, unsigne
     }
 
     return NULL;
-
 }
 
 void ValidationVisitor::resolveCallArguments(Expression *func, std::list<Expression*>& funcargs) {
@@ -460,6 +459,9 @@ void ValidationVisitor::resolveCallArguments(Expression *func, std::list<Express
 
         funcargs = resolvedArgs;
     } else if(func->isType()) {
+        //TODO: properly resolve arguments
+        //XXX: should this be in lowering?
+
         // this is a type declaration.
         // we are calling a type. eg a constructor call
         // of style MyStruct(1, 2, 3)
@@ -690,20 +692,29 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
 void ValidationVisitor::visitNewExpression(NewExpression *exp) {
     resolveType(exp->type);
 
+    //XXX a bit hacky. allocated value is passed around in AST
+    // as first argument
+    exp->args.push_front(new HeapAllocExpression(exp->type, exp->loc));
+
     ASTUserType *uty = exp->type->asUserType();
     if(uty && exp->call) {
         exp->function = new IdentifierExpression(uty->getConstructor()->identifier, location);
+        resolveType(exp->function->getType()); //XXX temp. some constructor args-type would not be defined.
 
-        //resolveCallArguments(exp->function, exp->args);
+        resolveCallArguments(exp->function, exp->args);
     }
 
-    if(!exp->function && exp->args.size() > 0) {
+    if(!exp->function && exp->args.size() > 1) {
         emit_message(msg::ERROR, "unknown constructor call", location);
     }
 
     if(exp->type->kind == TYPE_DYNAMIC_ARRAY) {
         emit_message(msg::ERROR, "cannot create unsized array in 'new' expression", location);
     }
+}
+
+void ValidationVisitor::visitAllocExpression(AllocExpression *exp) {
+    exp->type = resolveType(exp->type);
 }
 
 void ValidationVisitor::visitIdOpExpression(IdOpExpression *exp) {

@@ -689,6 +689,7 @@ struct UseExpression;
 struct TupleExpression;
 struct DotExpression;
 struct NewExpression;
+struct AllocExpression;
 
 struct Expression : public Statement
 {
@@ -724,6 +725,7 @@ struct Expression : public Statement
     virtual TupleExpression *tupleExpression() { return NULL; }
     virtual DotExpression *dotExpression() { return NULL; }
     virtual NewExpression *newExpression() { return NULL; }
+    virtual AllocExpression *allocExpression() { return NULL; }
 
     virtual Expression *lower() { return this; }
 
@@ -1042,6 +1044,38 @@ struct IntExpression : public NumericExpression {
     virtual int asInteger() {
             return value;
     }
+};
+
+/*
+ * used to represent memory allocated on stack or heap
+ *
+ * This expression is a bit weird because there isn't any explicit
+ * code equivilent. Essentially, this is generated so validation works
+ * nicer. For example: to validate the constructor call of a NewExpression,
+ * the code expects a value to represent the allocated value.
+ * Also, this provides a simple signifier for the codeGenerator.
+ */
+struct AllocExpression : public PrimaryExpression {
+    ASTType *type;
+    AllocExpression(ASTType *ty, SourceLocation l = SourceLocation()) :
+        PrimaryExpression(l), type(ty) {}
+
+    virtual ASTType *getType() { return type->getReferenceTy(); }
+
+    virtual bool isLValue() { return true; }
+    virtual bool isConstant() { return false; }
+    virtual AllocExpression *allocExpression() { return this; }
+
+    void accept(ASTVisitor *v);
+};
+
+struct HeapAllocExpression : public AllocExpression {
+    HeapAllocExpression(ASTType *ty, SourceLocation l = SourceLocation()) :
+        AllocExpression(ty, l) {}
+};
+
+//XXX Not used, but present for future use
+struct StackAllocExpression : public AllocExpression {
 };
 
 

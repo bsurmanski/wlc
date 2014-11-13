@@ -204,8 +204,21 @@ void DotExpression::accept(ASTVisitor *v){
     v->visitDotExpression(this);
 }
 
+void AllocExpression::accept(ASTVisitor *v) {
+    PrimaryExpression::accept(v);
+
+    v->visitAllocExpression(this);
+}
+
 void NewExpression::accept(ASTVisitor *v){
     Expression::accept(v);
+
+    std::list<Expression*>::iterator it = args.begin();
+    while(it != args.end()) {
+        (*it)->accept(v);
+        it++;
+    }
+
     v->visitNewExpression(this);
 }
 

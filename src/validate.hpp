@@ -66,6 +66,7 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitTupleExpression(TupleExpression *exp);
     virtual void visitDotExpression(DotExpression *exp);
     virtual void visitNewExpression(NewExpression *exp);
+    virtual void visitAllocExpression(AllocExpression *exp);
     virtual void visitIdOpExpression(IdOpExpression *exp);
 
     virtual void visitBreakStatement(BreakStatement *stmt);

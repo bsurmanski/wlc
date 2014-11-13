@@ -1276,6 +1276,8 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(UseExpression *uexp = exp->useExpression())
     {
         return NULL;
+    } else if(AllocExpression *aexp = exp->allocExpression()) {
+        return codegenAllocExpression(aexp);
     }
 
     emit_message(msg::FAILURE, "bad expression?", exp->loc);
@@ -1295,28 +1297,22 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTComp
     return new TupleValue(vals);
 }
 
-ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
-{
-    if(exp->type->kind == TYPE_DYNAMIC_ARRAY) {
-        emit_message(msg::ERROR, "CODEGEN: cannot created unsized array. meaningless alloaction", exp->loc);
-        return NULL;
-    }
-
+ASTValue *IRCodegenContext::codegenAllocExpression(AllocExpression *aexp) {
     Value *size = NULL;
 
     //XXX a bit messy here
     // manually calculate array size
     // TODO: only manually calculate size if exp->type->size is not constant
-    if(exp->type->isArray()) {
-        ASTStaticArrayType *arrayTy = dynamic_cast<ASTStaticArrayType*>(exp->type);
+    if(aexp->type->isArray()) {
+        ASTStaticArrayType *arrayTy = dynamic_cast<ASTStaticArrayType*>(aexp->type);
         ASTValue *sz = promoteType(codegenExpression(arrayTy->size), ASTType::getLongTy());
         sz = opMulValues(sz, getIntValue(ASTType::getLongTy(), arrayTy->arrayOf->getSize()));
         size = codegenValue(sz);
     } else {
-        size = ConstantInt::get(codegenType(ASTType::getULongTy()), exp->type->getSize());
+        size = ConstantInt::get(codegenType(ASTType::getULongTy()), aexp->type->getSize());
     }
 
-    ASTType *ty = exp->type;
+    ASTType *ty = aexp->type;
     vector<Value*> llargs;
     llargs.push_back(size);
     vector<Type*> llargty;
@@ -1326,23 +1322,23 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
     Function *mallocFunc = (Function*) module->getOrInsertFunction("malloc", fty);
     Value *value;
     value = ir->CreateCall(mallocFunc, llargs);
-    ASTValue *val = NULL;
 
-    if(exp->type->isArray()) {
-        ASTType *arrty = exp->type->getPointerElementTy();
+    ASTValue *val = NULL;
+    if(aexp->type->isArray()) {
+        ASTType *arrty = aexp->type->getPointerElementTy();
         ty = arrty->getArrayTy();
         Value *ptr = ir->CreateBitCast(value, codegenType(arrty)->getPointerTo());
-        ASTValue *sz = codegenExpression(dynamic_cast<ASTStaticArrayType*> (exp->type)->size);
+        ASTValue *sz = codegenExpression(dynamic_cast<ASTStaticArrayType*> (aexp->type)->size);
         sz = promoteType(sz, ASTType::getLongTy());
         value = ir->CreateAlloca(codegenType(ty));
         ir->CreateStore(ptr, ir->CreateStructGEP(value, 0));
         ir->CreateStore(codegenValue(sz), ir->CreateStructGEP(value, 1));
         //TODO: create a 'create array' function
     } else {
-        if(exp->type->isReference()) {
-            value = ir->CreateBitCast(value, codegenType(exp->type));
+        if(aexp->type->isReference()) {
+            value = ir->CreateBitCast(value, codegenType(aexp->type));
         } else {
-            value = ir->CreateBitCast(value, codegenType(exp->type)->getPointerTo());
+            value = ir->CreateBitCast(value, codegenType(aexp->type)->getPointerTo());
         }
     }
 
@@ -1354,10 +1350,34 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         val = new ASTBasicValue(ty, value, false, true);
     }
 
+    return val;
+}
+
+ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
+{
+    if(exp->type->kind == TYPE_DYNAMIC_ARRAY) {
+        emit_message(msg::ERROR, "CODEGEN: cannot created unsized array. meaningless alloaction", exp->loc);
+        return NULL;
+    }
+
+    ASTValue *val = NULL;
+    // XXX Silly mess. 'this' is passed as first arg
+    // (this is so validate correctly checks function type)
+    // but we want to store this and return it.
+    val = codegenExpression(exp->args.front());
+    exp->args.pop_front();
+    // XXX remove above once I'm doing something smarter
+
+    ASTType *ty = exp->type;
+    if(ty->isPointer() && ty->getPointerElementTy()->isStruct()) {
+        ty = ty->getPointerElementTy();
+    }
+
     if(ty->isUserType()) {
          // no default value, and allocated class. set VTable, in case
         ASTUserType *uty = ty->asUserType();
 
+        // if class, store vtable and refcount
         if(ty->isClass()) {
             ir->CreateStore(ConstantAggregateZero::get(codegenType(uty)->getPointerElementType()), codegenValue(val));
             ASTValue *vtable = getVTable(val);
@@ -1389,30 +1409,6 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 
             codegenCall(codegenExpression(exp->function), args);
         }
-        /*
-        FunctionDeclaration *fdecl;
-        if((fdecl = uty->getConstructor()) && exp->call){
-            std::vector<ASTValue*> args;
-
-            args.push_back(val); // push back owner
-
-            std::list<Expression*>::iterator it = exp->args.begin();
-
-            while(it != exp->args.end()) {
-                args.push_back(codegenExpression(*it));
-                it++;
-            }
-
-            ASTValue *func = codegenIdentifier(fdecl->identifier);
-            //func->setOwner(val); // XXX MESSY!!! should happen in parser or validator
-            //func = resolveOverload(func, args);
-            //resolveArguments(func, args);
-            codegenCall(func, args);
-        }
-        */
-        //XXX temp below. set vtable of new class
-        // TODO: also do if type is pointer to class (called through 'new')
-
     }
 
     return val;

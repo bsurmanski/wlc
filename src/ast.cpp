@@ -48,11 +48,7 @@ ASTFunctionType *FunctionDeclaration::getType() {
         std::vector<ASTType *> paramTy;
 
         if(owner) {
-            if(owner->isReference()) { // XXX hopefully this is only called after type resolution
             paramTy.push_back(owner);
-            } else {
-                paramTy.push_back(owner->getPointerTy()); //XXX bit messy
-            }
         }
 
         for(int i = 0; i < parameters.size(); i++) {

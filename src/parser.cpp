@@ -813,7 +813,8 @@ PARSEFUNC:
         ASTType *thisTy = NULL;
         // is a method
         if(owner){
-            thisTy = owner->getDeclaredType();
+            // referenceTy, so that structs pass around pointers
+            thisTy = owner->getDeclaredType()->getReferenceTy();
             Identifier *this_id = getScope()->getInScope("this");
             VariableDeclaration *this_decl = new VariableDeclaration(thisTy, this_id, NULL, loc, DeclarationQualifier());
             this_id->addDeclaration(this_decl, Identifier::ID_VARIABLE);
@@ -1166,7 +1167,9 @@ Expression *ParseContext::parseNewExpression()
         parseArgumentList(args);
     }
 
-    return new NewExpression(t, args, call, loc);
+    Expression *alloc = new HeapAllocExpression(t, loc);
+
+    return new NewExpression(t, alloc, args, call, loc);
 }
 
 Expression *ParseContext::parseExpression(int prec)

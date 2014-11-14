@@ -523,7 +523,6 @@ struct LabelDeclaration : public Declaration
 
 struct VariableDeclaration : public Declaration
 {
-    //Identifier *type;
     ASTType *type;
     Expression *value; // initial value
     VariableDeclaration(ASTType *ty, Identifier *nm, Expression *val, SourceLocation loc, DeclarationQualifier dqual)
@@ -748,17 +747,21 @@ struct TypeExpression : public Expression
     virtual void accept(ASTVisitor *v);
 };
 
+//XXX should NewExpression extend CallExpression?
 struct NewExpression : public Expression
 {
     bool call;
     ASTType *type;
+    Expression *alloc; // XXX validate this field
     Expression *function; // found in validation
     std::list<Expression*> args;
-    virtual ASTType *getType() { return type; }
-    NewExpression(ASTType *t, std::list<Expression*> a, bool c, SourceLocation l = SourceLocation()) :
-        Expression(l), type(t), args(a), call(c), function(0) {}
+    virtual ASTType *getType() { return alloc->getType(); }
+    NewExpression(ASTType *t, Expression *all, std::list<Expression*> a, bool c, SourceLocation l = SourceLocation()) :
+        Expression(l), type(t), alloc(all), args(a), call(c), function(0) {}
     virtual NewExpression *newExpression() { return this; }
     virtual void accept(ASTVisitor *v);
+
+    virtual Expression *lower();
 };
 
 struct IdOpExpression : public Expression {
@@ -825,6 +828,7 @@ struct PostfixExpression : public Expression
 
 struct CallExpression : public PostfixExpression
 {
+    bool isConstructor; //XXX a bit hacky
     virtual ~CallExpression() {}
     virtual CallExpression *callExpression() { return this; }
 
@@ -832,12 +836,17 @@ struct CallExpression : public PostfixExpression
     std::list<Expression *> args; //TODO: make special argument expression to allow for name arguments?
 
     CallExpression(Expression *f, std::list<Expression*> a, SourceLocation l = SourceLocation()) :
-        PostfixExpression(l), function(f), args(a) {}
+        PostfixExpression(l), function(f), args(a), isConstructor(false) {}
 
     virtual ASTType *getType() {
         // this is a constructor call
-        if(function->getDeclaredType()) {
-            return function->getDeclaredType();
+        if(isConstructor) {
+            // XXX this could be straight up wrong; double check when I'm not sleepy.
+            // would a constructor on pointer always be a struct?
+            if(args.front()->getType()->isPointer())
+                return args.front()->getType()->getPointerElementTy();
+            else
+                return args.front()->getType();
         }
 
         ASTFunctionType *fty = function->getType()->asFunctionType();
@@ -1061,7 +1070,6 @@ struct AllocExpression : public PrimaryExpression {
         PrimaryExpression(l), type(ty) {}
 
     virtual ASTType *getType() { return type->getReferenceTy(); }
-
     virtual bool isLValue() { return true; }
     virtual bool isConstant() { return false; }
     virtual AllocExpression *allocExpression() { return this; }
@@ -1076,6 +1084,8 @@ struct HeapAllocExpression : public AllocExpression {
 
 //XXX Not used, but present for future use
 struct StackAllocExpression : public AllocExpression {
+    StackAllocExpression(ASTType *ty, SourceLocation l = SourceLocation()) :
+        AllocExpression(ty, l) {}
 };
 
 

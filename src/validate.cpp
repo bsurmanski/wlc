@@ -380,8 +380,11 @@ void ValidationVisitor::visitPrimaryExpression(PrimaryExpression *exp) {
 }
 
 Expression *ValidationVisitor::resolveCallArgument(ASTFunctionType *fty, unsigned i, Expression *arg, Expression *def) {
-    ASTType *argty = arg->getType();
-    ASTType *paramty  = fty->params[i];
+    ASTType *argty = NULL;
+    ASTType *paramty = NULL;
+
+    if(arg) argty = arg->getType();
+    if(i < fty->params.size()) paramty = fty->params[i];
 
     if(fty->isVararg() && i >= fty->params.size()) {
         return arg; // TODO: resolve to vararg type
@@ -429,7 +432,8 @@ void ValidationVisitor::resolveCallArguments(Expression *func, std::list<Express
         std::list<Expression*>::iterator args = funcargs.begin();
 
         //TODO: while condition will not work on varargs
-        while(resolvedArgs.size() < fty->params.size()) {
+        while(resolvedArgs.size() < fty->params.size() ||
+                (fty->isVararg() && args != funcargs.end())) {
             Expression *arg = NULL;
             Expression *defaultArg = NULL;
             ASTType *argty = NULL;
@@ -457,8 +461,13 @@ void ValidationVisitor::resolveCallArguments(Expression *func, std::list<Express
             args++;
         }
 
+        if(args != funcargs.end()) {
+            emit_message(msg::ERROR, "too many arguments passed for function", location);
+        }
+
         funcargs = resolvedArgs;
     } else if(func->isType()) {
+        emit_message(msg::FAILURE, "call expression on type should be lowered by now", location);
         //TODO: properly resolve arguments
         //XXX: should this be in lowering?
 
@@ -486,6 +495,28 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
     } else {
         exp->function = exp->function->lower();
 
+        // would this be considered lowering?
+        // tried putting that there, but i think the
+        // lowering was not called... might need to look into that
+        //
+        // this is a call on a type. a stack constructor
+        // eg. MyStruct st = MyStruct(1, 2, 3)
+        if(exp->function->isType()) {
+            ASTUserType *uty = exp->function->getDeclaredType()->asUserType();
+            if(uty) {
+                if(!uty->getConstructor()) {
+                    emit_message(msg::ERROR, "missing constructor for type " + uty->getName(), exp->loc);
+                } else {
+                    // swap out function for constructor, and push an alloca'd struct as the passed arg
+                    exp->isConstructor = true;
+                    exp->function = new IdentifierExpression(uty->getConstructor()->getIdentifier(), exp->loc);
+                    exp->args.push_front(new StackAllocExpression(uty, exp->loc));
+                }
+            } else {
+                emit_message(msg::ERROR, "invalid call on type", exp->loc);
+            }
+        }
+
         // if lhs is dot expression, this is either method call or UFCS.
         // Decide which, and push 'this' variable as function argument if required
         //
@@ -494,8 +525,10 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
         DotExpression *dexp = exp->function->dotExpression();
         if(dexp) {
             if(dexp->isValue()) {
+                // this is so that structs literals are passed as 'this' as a pointer
                 if(dexp->lhs->getType()->isStruct() && dexp->lhs->isLValue()) {
                     exp->args.push_front(new UnaryExpression(tok::amp, dexp->lhs, location));
+                    //exp->args.push_front(dexp->lhs);
                 } else {
                     exp->args.push_front(dexp->lhs);
                 }
@@ -692,9 +725,8 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
 void ValidationVisitor::visitNewExpression(NewExpression *exp) {
     resolveType(exp->type);
 
-    //XXX a bit hacky. allocated value is passed around in AST
-    // as first argument
-    exp->args.push_front(new HeapAllocExpression(exp->type, exp->loc));
+    // push alloc as 'new' argument
+    exp->args.push_front(exp->alloc);
 
     ASTUserType *uty = exp->type->asUserType();
     if(uty && exp->call) {

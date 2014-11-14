@@ -1277,7 +1277,11 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     {
         return NULL;
     } else if(AllocExpression *aexp = exp->allocExpression()) {
-        return codegenAllocExpression(aexp);
+        if(HeapAllocExpression *haexp = dynamic_cast<HeapAllocExpression*>(aexp)) {
+            return codegenHeapAllocExpression(haexp);
+        } else if(StackAllocExpression *saexp = dynamic_cast<StackAllocExpression*>(aexp)) {
+            return codegenStackAllocExpression(saexp);
+        }
     }
 
     emit_message(msg::FAILURE, "bad expression?", exp->loc);
@@ -1297,7 +1301,7 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTComp
     return new TupleValue(vals);
 }
 
-ASTValue *IRCodegenContext::codegenAllocExpression(AllocExpression *aexp) {
+ASTValue *IRCodegenContext::codegenHeapAllocExpression(HeapAllocExpression *aexp) {
     Value *size = NULL;
 
     //XXX a bit messy here
@@ -1351,6 +1355,27 @@ ASTValue *IRCodegenContext::codegenAllocExpression(AllocExpression *aexp) {
     }
 
     return val;
+}
+
+ASTValue *IRCodegenContext::codegenStackAllocExpression(StackAllocExpression *aexp) {
+// XXX deal with arrays and weird other types?
+    ASTValue *ret = NULL;
+    ASTUserType *uty = aexp->type->asUserType();
+    Value *alloc = ir->CreateAlloca(codegenType(uty));
+
+    if(uty->isReference()) {
+        // allocate room for value on stack store in reference
+        Value *stackAlloca = ir->CreateAlloca(codegenType(uty)->getPointerElementType());
+        if(uty->isClass()) ir->CreateStore(ConstantAggregateZero::get(codegenType(uty)->getPointerElementType()), stackAlloca);
+        ir->CreateStore(stackAlloca, alloc);
+    }
+    //XXX below is a bit strange. "isReference?" is in the lvalue field of the BasicValue constructor.
+    // it doesnt work the other way around
+    ret = new ASTBasicValue(uty->getReferenceTy(), alloc, uty->isReference(), true);
+    ((ASTBasicValue*) ret)->setNoFree(true);
+    //XXX above should be lvalue
+
+    return ret;
 }
 
 ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
@@ -1639,122 +1664,11 @@ ASTValue *IRCodegenContext::resolveOverload(ASTValue *func, std::vector<ASTValue
 
     //XXX this should be done in validate now
     return fval;
-
-    /*
-    int bestScore = 0;
-    FunctionValue *bestOverload = NULL;
-    do {
-        ASTFunctionType *fty = (ASTFunctionType*) fval->getType();
-        FunctionDeclaration *fdecl = fval->getDeclaration();
-
-        // too few, or too many arguments
-        if(args.size() < fdecl->minExpectedParameters() || args.size() > fdecl->maxExpectedParameters()) {
-            continue;
-        }
-
-        int argi = 0;
-        int i = 0;
-        if(func->owner) i++;
-        for(; i < fty->params.size(); i++) { //TODO
-            if(args[argi]->getType()->coercesTo(fdecl->getType()->params[i])){
-                argi++;
-            } else if(fdecl->parameters[i]->value) {
-                //acceptible
-            } else {
-                goto NEXTOVERLOAD;
-            }
-        }
-
-        bestOverload = fval;
-NEXTOVERLOAD:;
-        //TODO: test all overloads; also, recursive?
-    } while((fval = fval->getNextOverload()));
-
-    return bestOverload; */
 }
 
 void IRCodegenContext::resolveArguments(ASTValue *func, std::vector<ASTValue*>& args) {
     //XXX this should be done in validate now
     return;
-
-    /*
-    ASTFunctionType *astfty = NULL;
-    FunctionDeclaration *fdecl = NULL;
-    astfty = dynamic_cast<ASTFunctionType*>(func->getType());
-    if(!astfty) {
-        emit_message(msg::ERROR, "invalid value used in function call context");
-        if(func->getType()){
-            emit_message(msg::ERROR, "value is of type \"" +
-                    func->getType()->getName() + "\"");
-        }
-        return;
-    }
-
-    if(FunctionValue * fvalue = dynamic_cast<FunctionValue*>(func)) {
-        fdecl = fvalue->getDeclaration();
-    }
-
-    std::vector<ASTValue *> callArgs; // arguments to call with (includes 'this', and default args)
-
-    int argi = 0; // the argument index (aka, the expression provided on call)
-    int parami = 0; // the parameter index (aka, the function variable defined in signature)
-
-    // this part is ugly...
-    // the func->owner type is pushed back as a pointer (for 'this'),
-    // but astfty->params specifies that it is a 'ASTUserType'. which is bad...
-    // TODO: make 'this' a reference type or something
-    if(func->owner) {
-        //promote type incase we are calling base class function
-        callArgs.push_back(promoteType(getAddressOf(func->owner), astfty->params[parami]));
-        parami++;
-    }
-
-    for(; parami < astfty->params.size() || (astfty->isVararg() && argi < args.size()); parami++) {
-        ASTValue *arg;
-
-        if(argi < args.size() && parami < astfty->params.size() &&
-                args[argi]->getType()->coercesTo(astfty->params[parami])){
-            arg = args[argi];
-            argi++;
-        } else if(astfty->isVararg()) {
-            arg = args[argi];
-            argi++;
-        } else if(fdecl && fdecl->parameters.size() < parami && fdecl->parameters[parami]->value) {
-            arg = codegenExpression(fdecl->parameters[parami]->value);
-        } else {
-            //TODO: check arguments before here
-            emit_message(msg::ERROR, "CG: invalid function call found", location);
-            emit_message(msg::ERROR, "CG: could not convert argument of type '" +
-                    args[argi]->getType()->getName() + "' to parameter of type '" +
-                    astfty->params[parami]->getName() + "'", location);
-            return;
-        }
-
-        if(parami < astfty->params.size()) {
-            arg = promoteType(arg, astfty->params[parami]);
-        } else if(fdecl->isVararg()) // coerce to standard vararg types
-        {
-            if(arg->getType()->isFloating())
-                arg = promoteType(arg, ASTType::getDoubleTy());
-            else if(arg->getType()->isInteger() && arg->getType()->isSigned() &&
-                    arg->getType()->getSize() < ASTType::getIntTy()->getSize())
-                arg = promoteType(arg, ASTType::getIntTy());
-            else if(arg->getType()->isInteger() &&
-                    arg->getType()->getSize() < ASTType::getIntTy()->getSize())
-                arg = promoteType(arg, ASTType::getUIntTy());
-        } else {
-            emit_message(msg::ERROR, "function call with too many arguments?");
-        }
-
-        callArgs.push_back(arg);
-    }
-
-    // copy callArgs back to args
-    args.clear();
-    for(int i = 0; i < callArgs.size(); i++) {
-        args.push_back(callArgs[i]);
-    }
-    */
 }
 
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
@@ -1767,26 +1681,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         return NULL;
     }
 
-    // if this is a type value, this is a non-malloc constructor.
-    // eg. MyStruct st = MyStruct(1,2,3)
-    if(func->isTypeValue()) {
-        ASTUserType *uty = func->asTypeValue()->getReferencedType()->asUserType();
-        func = codegenIdentifier(uty->getConstructor()->getIdentifier()); //XXX bit round about going through id
-        Value *tmpAlloca = ir->CreateAlloca(codegenType(uty));
-
-        if(uty->isReference()) {
-            // allocate room for value on stack store in reference
-            Value *stackAlloca = ir->CreateAlloca(codegenType(uty)->getPointerElementType());
-            if(uty->isClass()) ir->CreateStore(ConstantAggregateZero::get(codegenType(uty)->getPointerElementType()), stackAlloca);
-            ir->CreateStore(stackAlloca, tmpAlloca);
-        }
-        //XXX below is a bit strange. "isReference?" is in the lvalue field of the BasicValue constructor.
-        // it doesnt work the other way around
-        ret = new ASTBasicValue(uty->getReferenceTy(), tmpAlloca, uty->isReference(), true);
-        ((ASTBasicValue*) ret)->setNoFree(true);
-        args.push_back(ret); // push back reference to allocated userType, to be constructed
-        //XXX above should be lvalue
-    } else if(func->getType()->isPointer()){ // dereference function pointer
+    if(func->getType()->isPointer()){ // dereference function pointer
         func = getValueOf(func, false);
     }
 
@@ -1794,6 +1689,12 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
     while(it != exp->args.end()) {
         args.push_back(codegenExpression(*it));
         it++;
+    }
+
+    //XXX messy. Steal first argument as return, because this is a
+    // stack constructor (eg MyStruct st = MyStruct(1, 2, 3))
+    if(exp->isConstructor) {
+        ret = args[0];
     }
 
     func = resolveOverload(func, args);
@@ -2684,8 +2585,9 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
 
         Function::arg_iterator AI = func->arg_begin();
         if(fdecl->owner) {
+            // fdecl->owner is already as reference; if method of struct, 'this' is already a pointer
             AI->setName("this");
-            lookupInScope("this")->setValue(new ASTBasicValue(fdecl->owner->getReferenceTy(), AI, false, true));
+            lookupInScope("this")->setValue(new ASTBasicValue(fdecl->owner, AI, false, true));
             AI++;
         }
 

@@ -65,17 +65,10 @@ Expression *DotExpression::lower() {
     return this;
 }
 
-Expression *CallExpression::lower() {
-    /*
-    if(function->dotExpression()) {
-        DotExpression *dexp = function->dotExpression();
-        Identifier *funcid = dexp->lhs->getType()->getDeclaration()->lookup(dexp->rhs);
-        if(!funcid) {
-            //TODO: lookup in callexpression scope for UFCS
-        }
-        function = new IdentifierExpression(funcid, dexp->loc);
-        args.push_front(dexp->lhs);
-    }*/
+Expression *NewExpression ::lower() {
+    return this;
+}
 
+Expression *CallExpression::lower() {
     return this;
 }

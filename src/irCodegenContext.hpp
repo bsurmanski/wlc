@@ -274,7 +274,8 @@ class IRCodegenContext : public CodegenContext
     // expression
     ASTValue *codegenExpression(Expression *exp);
     ASTValue *codegenTupleExpression(TupleExpression *exp, ASTCompositeType *ty = 0);
-    ASTValue *codegenAllocExpression(AllocExpression *aexp);
+    ASTValue *codegenHeapAllocExpression(HeapAllocExpression *aexp);
+    ASTValue *codegenStackAllocExpression(StackAllocExpression *aexp);
 
     void codegenDelete(ASTValue *val);
     ASTValue *codegenNewExpression(NewExpression *exp);

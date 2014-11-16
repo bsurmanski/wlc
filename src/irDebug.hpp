@@ -16,7 +16,10 @@
 #include "irCodegenContext.hpp"
 #include "ast.hpp"
 
-#define CGSTR "wlc 0.21 - Aug 2014 (LD30)"
+#include <string>
+#include <map>
+
+#define CGSTR "wlc 0.22 - Oct 2014"
 #define PROJDIR "/home/brandon/PROJECTS/C/term/wlc"
 
 class IRCodegenContext;
@@ -29,6 +32,10 @@ class IRDebug
         llvm::DIBuilder di;
         llvm::DIFile diFile;
         llvm::DICompileUnit diUnit;
+
+        // map for complex types
+        // index is mangled name
+        std::map<std::string, llvm::DIType> typeMap;
 
         IRDebug(IRCodegenContext *c, IRTranslationUnit *u);
 
@@ -48,7 +55,7 @@ class IRDebug
         llvm::DIFile currentFile() { return diFile; }
         llvm::DIDescriptor currentScope();
         llvm::DIDescriptor createScope(llvm::DIDescriptor parent, SourceLocation loc);
-        llvm::DICompositeType createClassType(ASTType *ty);
+        llvm::DIType createClassType(ASTType *ty);
         llvm::DICompositeType createUserType(ASTType *ty);
         llvm::DICompositeType createStructType(ASTType *ty);
         llvm::DICompositeType createUnionType(ASTType *ty);

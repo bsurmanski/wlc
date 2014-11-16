@@ -255,12 +255,13 @@ llvm::DICompositeType IRDebug::createUnionType(ASTType *ty)
             );
 }
 
-llvm::DICompositeType IRDebug::createClassType(ASTType *ty)
+llvm::DIType IRDebug::createClassType(ASTType *ty)
 {
     assert(ty->isClass() && "expected struct for debug info generation");
     llvm::DIDescriptor DIContext(currentFile());
     ASTUserType *userty = (ASTUserType*) ty;
     vector<Value *> vec;
+
 
     vec.push_back(di.createMemberType(DIContext, "vtable", currentFile(),
                 userty->getDeclaration()->loc.line, 8 * 8, 8 * 8, 0, 0,
@@ -295,7 +296,7 @@ llvm::DICompositeType IRDebug::createClassType(ASTType *ty)
 
     DIArray arr = di.getOrCreateArray(vec);
 
-    return di.createStructType(DIContext, //TODO: defined scope
+    llvm::DICompositeType clty = di.createStructType(DIContext, //TODO: defined scope
             ty->getName(),
             currentFile(), //TODO: defined file
             userty->getDeclaration()->loc.line, //line num
@@ -305,6 +306,8 @@ llvm::DICompositeType IRDebug::createClassType(ASTType *ty)
             llvm::DIType(),
             arr
             );
+
+    return di.createPointerType(clty, 64, 64);
 }
 
 llvm::DIType IRDebug::createType(ASTType *ty)
@@ -354,16 +357,30 @@ llvm::DIType IRDebug::createType(ASTType *ty)
                 dity = di.createPointerType(createType(ty->getPointerElementTy()), 64, 64);
                 break;
             case TYPE_USER:
-                //XXX work around for cyclic codegen; probably wont even solve it...
-                //XXX BROKEN
-                if(true)
-                    dity = di.createBasicType("void", 8, 8, dwarf::DW_ATE_address);
-                else if(ty->isStruct())
+                if(typeMap.count(ty->getMangledName())) {
+                    return typeMap[ty->getMangledName()];
+                }
+
+                /*
+                 * forward declaration to prevent issues with recursive types
+                 */
+                typeMap[ty->getMangledName()] =
+                    di.createReplaceableForwardDecl(
+                            // seperate tag for union, class?
+                        llvm::dwarf::DW_TAG_structure_type,
+                        ty->getName(),
+                        currentScope(),
+                        currentFile(),
+                        ty->asUserType()->getDeclaration()->loc.line);
+
+                if(ty->isStruct())
                     dity = createStructType(ty);
                 else if(ty->isUnion())
                     dity = createUnionType(ty);
                 else if(ty->isClass())
                     dity = createClassType(ty);
+                else emit_message(msg::FAILURE, "debug builder - unknown user type");
+                typeMap[ty->getMangledName()] = dity;
                 break;
             case TYPE_ARRAY:
                 return createArrayType(ty);
@@ -393,8 +410,12 @@ llvm::DICompositeType IRDebug::createPrototype(ASTType *p)
     assert(astfty);
 
     vector<Value*> vec;
-
     vec.push_back(createType(astfty->ret));
+
+    if(astfty->owner) {
+        vec.push_back(createType(astfty->owner));
+    }
+
     for(int i = 0; i < astfty->params.size(); i++)
     {
         vec.push_back(createType(astfty->params[i]));
@@ -426,10 +447,6 @@ llvm::DISubprogram IRDebug::createFunction(FunctionDeclaration *f, Function *cgF
             0, //flags
             false, //isoptimized
             cgFunc);
-
-    //for(int i = 0; i < f->getType()->parameters.size(); i++)
-    {
-    }
     }
     return f->diSubprogram;
 }

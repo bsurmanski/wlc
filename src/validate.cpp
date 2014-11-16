@@ -387,7 +387,30 @@ Expression *ValidationVisitor::resolveCallArgument(ASTFunctionType *fty, unsigne
     if(i < fty->params.size()) paramty = fty->params[i];
 
     if(fty->isVararg() && i >= fty->params.size()) {
-        return arg; // TODO: resolve to vararg type
+        if(argty->isNumeric()) {
+            if(argty->isFloating()) {
+                return coerceTo(ASTType::getDoubleTy(), arg);
+            } else if(argty->isInteger() && argty->getSize() < 4) {
+                return coerceTo(ASTType::getIntTy(), arg);
+            } else {
+                return arg;
+            }
+        }
+
+        // arrays cannot directly convert to void^.
+        // strings (char[]) can convert to char^, so try void^: char^: arr
+        // This should only allow strings as varargs
+        if(argty->isArray() && argty->getPointerElementTy()->coercesTo(ASTType::getCharTy())) {
+            return coerceTo(ASTType::getVoidTy()->getPointerTy(),
+                    coerceTo(ASTType::getCharTy()->getPointerTy(), arg));
+        }
+
+        if(argty->coercesTo(ASTType::getVoidTy()->getPointerTy())) {
+            return coerceTo(ASTType::getVoidTy()->getPointerTy(), arg);
+        }
+
+        emit_message(msg::ERROR, "invalid argument passed as vararg argument", location);
+        return NULL;
     } else if(argty && argty->is(paramty)) {
         return arg;
     } else if (argty && argty->coercesTo(paramty)) {
@@ -431,7 +454,6 @@ void ValidationVisitor::resolveCallArguments(Expression *func, std::list<Express
 
         std::list<Expression*>::iterator args = funcargs.begin();
 
-        //TODO: while condition will not work on varargs
         while(resolvedArgs.size() < fty->params.size() ||
                 (fty->isVararg() && args != funcargs.end())) {
             Expression *arg = NULL;

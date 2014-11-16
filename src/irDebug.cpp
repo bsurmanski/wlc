@@ -363,10 +363,11 @@ llvm::DIType IRDebug::createType(ASTType *ty)
 
                 /*
                  * forward declaration to prevent issues with recursive types
+                 * TODO: tag with struct/class/union when appropriate
                  */
                 typeMap[ty->getMangledName()] =
                     di.createReplaceableForwardDecl(
-                            // seperate tag for union, class?
+                            // separate tag for union, class?
                         llvm::dwarf::DW_TAG_structure_type,
                         ty->getName(),
                         currentScope(),

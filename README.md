@@ -29,6 +29,25 @@ The current feature set rivals that of C, with some additional primitive types
 There is also a planned subset of OWL called WL, without object oriented
 features.
 
+## Why
+There are already many languages in existence, so why create a new one? No
+language I could find fits the niche I am looking for. I would like a compiled, low-level,
+object oriented language without a garbage collector. Currently, the languages
+that fit that niche is limited to C++ and Fortran. C++ is a powerful language,
+but it has many strange pitfalls. C++ was designed in a different time, and it's
+starting to show. 'Modern C++' attempts to reconcile this, but the problem is at
+that the core design is outdated and each new feature is patching up an
+existing feature. For example, the preprocessor, inherited from C, no longer
+makes sense within modern software engineering practices. Templates were then
+added and they solve the same fundamental problem. 
+
+OWL wishes to rethink what is required of an object-oriented system level
+programming language, while still remaining familiar, intuitive and powerful. 
+
+From a personal point of view, The design and implementation of OWL is an
+exercise intended to increase my understanding of how modern languages work and
+increase my knowledge of modern compiler tooling (specifically LLVM).
+
 ## The Name
 The name is mostly meaningless. I wanted a short 2-3 letter name that was simple
 and memorable. 

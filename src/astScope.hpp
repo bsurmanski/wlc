@@ -8,10 +8,10 @@
 #include "identifier.hpp"
 
 //typedef std::map<std::string, Identifier*>::iterator SymbolIterator;
-struct Package;
-struct TranslationUnit;
 class ASTVisitor;
 struct ASTScope;
+struct PackageDeclaration;
+struct ModuleDeclaration;
 
 // TODO: create specialized iterator, that can traverse dependent on variable type
 // iterates different declaration kinds
@@ -63,7 +63,7 @@ struct ASTScope
     std::vector<ASTScope*> siblings;
     std::map<std::string, Identifier *> symbols;
     std::map<std::string, bool> extensions;
-    Package *package;
+    PackageDeclaration *package;
 
     enum ScopeType
     {
@@ -109,7 +109,7 @@ struct ASTScope
     }
 
     void dump();
-    ASTScope(ASTScope *par = NULL, ScopeType st = Scope_Local, Package *pkg=0) :
+    ASTScope(ASTScope *par = NULL, ScopeType st = Scope_Local, PackageDeclaration *pkg=0) :
         package(pkg), parent(par), type(st), owner(0)
     {
         if(!par) addBuiltin();
@@ -118,8 +118,8 @@ struct ASTScope
 
     std::string getMangledName();
 
-    Package *getPackage() { return package; }
-    TranslationUnit *getUnit();
+    PackageDeclaration *getPackage() { return package; }
+    ModuleDeclaration *getModule();
 
     ScopeType getScopeType() { return type; }
     void addSibling(ASTScope *t);

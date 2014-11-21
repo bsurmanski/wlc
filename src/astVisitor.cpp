@@ -1,19 +1,11 @@
 #include "ast.hpp"
 #include "astVisitor.hpp"
 
-AST::AST(){
-    root = new Package;
-}
-
-AST::~AST() {
-    delete root;
-}
-
 void AST::accept(ASTVisitor *v) {
     getRootPackage()->accept(v);
 }
 
-void Package::accept(ASTVisitor *v) {
+void PackageDeclaration::accept(ASTVisitor *v) {
     v->visitPackage(this);
     v->visitScope(scope);
     v->pushScope(this->getScope());
@@ -22,9 +14,9 @@ void Package::accept(ASTVisitor *v) {
     v->popScope();
 }
 
-void TranslationUnit::accept(ASTVisitor *v) {
-    Package::accept(v);
-    v->visitTranslationUnit(this);
+void ModuleDeclaration::accept(ASTVisitor *v) {
+    PackageDeclaration::accept(v);
+    v->visitModule(this);
     for(ASTScope::iterator it = getScope()->begin(); it != getScope()->end(); it++){
         it->getDeclaration()->accept(v);
     }

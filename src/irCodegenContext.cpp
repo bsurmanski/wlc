@@ -23,11 +23,11 @@
 using namespace std;
 using namespace llvm;
 
-IRTranslationUnit::IRTranslationUnit(IRCodegenContext *c, TranslationUnit *u) :
-    context(c), unit(u) {
-    module = new Module("", context->context);
+IRTranslationUnit::IRTranslationUnit(IRCodegenContext *c, ModuleDeclaration *mod) :
+    context(c), mdecl(mod) {
+    llvmModule = new Module("", context->context);
     debug = new IRDebug(context, this);
-    scope = new IRScope(u->getScope(), debug->getCompileUnit());
+    scope = new IRScope(mdecl->getScope(), debug->getCompileUnit());
 }
 
 SourceLocation currentLoc;
@@ -78,7 +78,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     // will still need to populate the interface members though
     // XXX seems a bit messy
     if(ty->isInterface())
-        return codegenType(ast->getRuntimeUnit()->lookup("Interface")->getDeclaredType());
+        return codegenType(ast->getRuntimeModule()->lookup("Interface")->getDeclaredType());
 
 
     StructType *sty = StructType::create(context);
@@ -1148,7 +1148,7 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
 {
     if(id->isVariable())
     {
-        if(id->getScope()->getUnit() != unit->unit) // id not declared in current TU because imported
+        if(id->getScope()->getModule() != unit->mdecl) // id not declared in current TU because imported
         {
             if(unit->globals.count(id->getName()))
             {
@@ -2688,7 +2688,7 @@ void IRCodegenContext::codegenDeclaration(Declaration *decl)
     ///NOTE (for the most part) type declarations are not Codegen'd like values, accesible across Modules
 }
 
-void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc)
+void IRCodegenContext::codegenInclude(IRTranslationUnit *current, ModuleDeclaration *inc)
 {
     //XXX should be 'import'?
 }
@@ -2696,13 +2696,13 @@ void IRCodegenContext::codegenIncludeUnit(IRTranslationUnit *current, Translatio
 void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 {
     this->unit = u;
-    this->module = this->unit->module;
+    this->module = this->unit->llvmModule;
 
     enterScope(u->getScope());
 
-    for(int i = 0; i < unit->unit->importUnits.size(); i++) //TODO: import symbols.
+    for(int i = 0; i < unit->mdecl->importModules.size(); i++) //TODO: import symbols.
     {
-        codegenIncludeUnit(this->unit, unit->unit->importUnits[i]);
+        codegenInclude(this->unit, unit->mdecl->importModules[i]);
     }
 
     // alloc globals before codegen'ing functions
@@ -2813,20 +2813,20 @@ void printModule(Module *m, std::string filenm) {
 #error invalid LLVM version
 #endif
 
-void IRCodegenContext::codegenPackage(Package *p)
+void IRCodegenContext::codegenPackage(PackageDeclaration *p)
 {
-    if(p->isTranslationUnit()) // leaf in package tree
+    if(p->moduleDeclaration()) // leaf in package tree
     {
         std::string err;
-        IRTranslationUnit *unit = new IRTranslationUnit(this, (TranslationUnit*) p);
+        IRTranslationUnit *unit = new IRTranslationUnit(this, p->moduleDeclaration());
         //p->cgValue = 0;
         codegenTranslationUnit(unit);
 
         // XXX debug, output all modules
-        std::string outputll = config.tempName + "/" + unit->unit->getName() + ".ll";
-        printModule(unit->module, outputll);
+        std::string outputll = config.tempName + "/" + unit->mdecl->getName() + ".ll";
+        printModule(unit->llvmModule, outputll);
 
-        linker.linkInModule(unit->module, (unsigned) Linker::DestroySource, &err);
+        linker.linkInModule(unit->llvmModule, (unsigned) Linker::DestroySource, &err);
 
     } else // generate all leaves ...
     {

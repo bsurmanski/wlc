@@ -22,7 +22,7 @@ class Parser
 
     public:
         Parser() { ast = new AST(); }
-        void parseFile(TranslationUnit *u, std::string filenm, SourceLocation l = SourceLocation());
+        void parseFile(ModuleDeclaration *mod, std::string filenm, SourceLocation l = SourceLocation());
         void parseString(const char *str);
         AST *getAST() { return ast; }
 
@@ -43,13 +43,13 @@ class ParseContext
 {
     Lexer *lexer;
     Parser *parser;
-    Package *package;
-    TranslationUnit *unit;
+    PackageDeclaration *package;
+    ModuleDeclaration *module;
     std::stack<ASTScope*> scope;
     //std::stack<Lexer*> lexers;
 
     public:
-    ParseContext(Lexer *lex, Parser *parse, Package *p) : lexer(lex), parser(parse),
+    ParseContext(Lexer *lex, Parser *parse, PackageDeclaration *p) : lexer(lex), parser(parse),
         package(p) {}
     ~ParseContext() { }
 
@@ -108,7 +108,7 @@ class ParseContext
     //void unGet(Token tok) { lexer->unGet(tok); }
     bool eof() { return tqueue.empty() && lexer->eof(); }
 
-    Package *currentPackage() { return package; }
+    PackageDeclaration *currentPackage() { return package; }
     void pushScope(ASTScope* tbl) { scope.push(tbl); }
     ASTScope *popScope() { ASTScope *tbl = scope.top(); scope.pop(); return tbl;}
     ASTScope *getScope() { if(!scope.empty()) return scope.top(); return NULL; }
@@ -118,8 +118,8 @@ class ParseContext
     //Lexer *getLexer() { if(!lexers.empty()) return lexer.top(); return NULL; }
 
     public:
-    void parseTranslationUnit(TranslationUnit *u, const char *unitnm);
-    void parseTopLevel(TranslationUnit *unit);
+    void parseModule(ModuleDeclaration *u, const char *unitnm);
+    void parseTopLevel(ModuleDeclaration *unit);
     void pushRecover();
     void popRecover();
     void recover();
@@ -156,8 +156,6 @@ class ParseContext
     Expression *parseUnaryExpression(int prec = 0);
     Expression *parseBinaryExpression(int prec = 0);
     Expression *parseTupleExpression();
-
-    //void parseCImport(TranslationUnit *unit, std::string filenm, SourceLocation loc = SourceLocation());
 };
 
 #endif

@@ -129,11 +129,11 @@ struct IRScope
 class IRDebug;
 struct IRTranslationUnit
 {
-    TranslationUnit *unit;
+    ModuleDeclaration *mdecl;
     IRScope *scope;
     IRCodegenContext *context;
     IRDebug *debug;
-    llvm::Module *module;
+    llvm::Module *llvmModule;
 
 
     std::map<std::string, IRType> types;
@@ -142,7 +142,7 @@ struct IRTranslationUnit
 
     IRScope* getScope() { return scope; }
 
-    IRTranslationUnit(IRCodegenContext *c, TranslationUnit *u);
+    IRTranslationUnit(IRCodegenContext *c, ModuleDeclaration *mod);
 };
 
 class IRCodegenContext : public CodegenContext
@@ -319,8 +319,8 @@ class IRCodegenContext : public CodegenContext
 
     // codegen etc
     void codegenTranslationUnit(IRTranslationUnit *unit);
-    void codegenIncludeUnit(IRTranslationUnit *current, TranslationUnit *inc);
-    void codegenPackage(Package *p);
+    void codegenInclude(IRTranslationUnit *current, ModuleDeclaration *inc);
+    void codegenPackage(PackageDeclaration *p);
 };
 
 #endif

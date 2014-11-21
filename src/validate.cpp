@@ -149,11 +149,11 @@ ASTType *ValidationVisitor::commonType(ASTType *t1, ASTType *t2) {
     return NULL;
 }
 
-void ValidationVisitor::visitPackage(Package *pak) {
+void ValidationVisitor::visitPackage(PackageDeclaration *pak) {
     if(!pak->getScope()) valid = false;
 }
 
-void ValidationVisitor::visitTranslationUnit(TranslationUnit *tu) {
+void ValidationVisitor::visitModule(ModuleDeclaration *tu) {
     for(int i = 0; i < tu->imports.size(); i++) {
         if(!tu->imports[i]) {
             valid = false;

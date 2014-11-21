@@ -8,7 +8,7 @@
 #include "message.hpp"
 #include "sourceLocation.hpp"
 
-void parseCImport(TranslationUnit *unit,
+void parseCImport(ModuleDeclaration *mod,
         std::string filenm,
         SourceLocation loc);
 

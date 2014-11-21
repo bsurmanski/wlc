@@ -4,8 +4,6 @@
 #include <string>
 #include <stdio.h>
 
-struct TranslationUnit;
-
 struct SourceLocation
 {
     const char *filenm;

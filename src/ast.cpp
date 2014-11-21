@@ -32,6 +32,18 @@ std::string getFilebase(std::string s)
 }
 #endif
 
+AST::AST(){
+    root = new PackageDeclaration(NULL, NULL, SourceLocation(), DeclarationQualifier());
+    Identifier *id = root->getScope()->getInScope("__root");
+    id->addDeclaration(root, Identifier::ID_PACKAGE);
+    root->identifier = id; //XXX bit hacky
+}
+
+AST::~AST() {
+    delete root;
+}
+
+/*
 Package::Package(Package *sup, std::string nm)
     : superPackage(sup), scope(NULL), identifier(NULL)
 {
@@ -42,6 +54,7 @@ Package::Package(Package *sup, std::string nm)
                     SourceLocation(nm.c_str(), 1), DeclarationQualifier()), Identifier::ID_PACKAGE);
     }
 }
+*/
 
 ASTFunctionType *FunctionDeclaration::getType() {
     if(!prototype) {

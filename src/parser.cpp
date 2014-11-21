@@ -7,8 +7,6 @@
 #include <unistd.h>
 #endif
 
-//#include <clang-c/Index.h>
-
 #include <fstream>
 #include <vector>
 #include <iostream>
@@ -269,8 +267,8 @@ ASTType *ParseContext::parseType() {
     return parseModifiedType(type);
 }
 
-// parse top level expression and apply to translation unit
-void ParseContext::parseTopLevel(TranslationUnit *unit)
+// parse top level expression and apply to module
+void ParseContext::parseTopLevel(ModuleDeclaration *module)
 {
     Statement *stmt;
     Declaration *decl;
@@ -280,7 +278,7 @@ void ParseContext::parseTopLevel(TranslationUnit *unit)
         case tok::kw_import:
             //TODO: add to symbol table
             //TODO: find and import new translation unit
-            unit->imports.push_back(parseImport());
+            module->imports.push_back(parseImport());
             break;
 
         case tok::kw_use:
@@ -391,39 +389,42 @@ ImportExpression *ParseContext::parseImport()
 
     Expression *importExpression = parseExpression();
 
-    TranslationUnit *importedUnit = NULL;
+    ModuleDeclaration *importedModule = NULL;
     AST *ast = parser->getAST();
     //XXX deffer importing to end of TU parse? Would allow 'package' expression and subsequent imports to work as expected, I imagine
     if(StringExpression *sexp = dynamic_cast<StringExpression*>(importExpression))
     {
-        importedUnit = ast->getUnit(sexp->string);
-        if(!importedUnit) // This TU hasnt been loaded from file yet, DOIT
+        importedModule = ast->getModule(sexp->string);
+        if(!importedModule) // This TU hasnt been loaded from file yet, DOIT
         {
             std::string filenm = sexp->string;
-            importedUnit = new TranslationUnit(ast->getRootPackage(), sexp->string);  //TODO: identifier
-            ast->addUnit(sexp->string, importedUnit);
+            std::string modnm = getFilebase(filenm);
+            Identifier *m_id = ast->getRootPackage()->getScope()->get(modnm);
+            importedModule = new ModuleDeclaration(ast->getRootPackage(), m_id, sexp->string);
+            m_id->addDeclaration(importedModule, Identifier::ID_MODULE);
+            ast->addModule(sexp->string, importedModule);
 
             if(special)
             {
                 if(getScope()->extensionEnabled("importc") && parserType == "C")
                 {
-                    parseCImport(importedUnit, sexp->string, loc);
+                    parseCImport(importedModule, sexp->string, loc);
                 } else
                 {
                     emit_message(msg::ERROR, "unknown import type '" + parserType + "'", loc);
                 }
             } else
             {
-                parser->parseFile(importedUnit, sexp->string, loc);
+                parser->parseFile(importedModule, sexp->string, loc);
             }
         }
     }
 
-    cond_message(!importedUnit, msg::FAILURE, "failed to import translationUnit");
+    cond_message(!importedModule, msg::FAILURE, "failed to import module");
 
-    unit->importUnits.push_back(importedUnit); //TODO: check if in import list first
-    getScope()->addSibling(importedUnit->getScope());
-    return new ImportExpression(importExpression, importedUnit, loc);
+    module->importModules.push_back(importedModule); //TODO: check if in import list first
+    getScope()->addSibling(importedModule->getScope());
+    return new ImportExpression(importExpression, importedModule, loc);
 }
 
 Statement *ParseContext::parseStatement()
@@ -643,7 +644,7 @@ Declaration *ParseContext::parseDeclaration()
             baseId = getScope()->get(get().toString());
         } else if(kind == kw_class && id->getName() != "Object") { //TODO: inherits void
             static Identifier *objectId = NULL;
-            if(!objectId) objectId = getAST()->getRuntimeUnit()->lookup("Object");
+            if(!objectId) objectId = getAST()->getRuntimeModule()->lookup("Object");
             if(!objectId) {
                 emit_message(msg::FAILURE, "runtime package not found; could not find an 'Object' declaration");
             }
@@ -1471,17 +1472,17 @@ Expression *ParseContext::parseBinaryExpression(int prec)
     return lhs;
 }
 
-void ParseContext::parseTranslationUnit(TranslationUnit *unit, const char *unitnm)
+void ParseContext::parseModule(ModuleDeclaration *module, const char *unitnm)
 {
     //TranslationUnit *unit = parser->getAST()->getUnit(unitnm);
     //TranslationUnit *unit = new TranslationUnit(currentPackage()->getScope()->lookup(unitnm)); //TODO: identifier
-    this->unit = unit;
-    currentPackage()->addPackage(unit);
+    this->module = module;
+    currentPackage()->addPackage(module);
 
-    pushScope(unit->getScope());
+    pushScope(module->getScope());
     while(peek().isNot(tok::eof))
     {
-        parseTopLevel(unit); // modifies t-unit
+        parseTopLevel(module); // modifies module
     }
     popScope();
     assert_message(!getScope(), msg::FAILURE, "invalid scope stack!", peek().loc);
@@ -1544,7 +1545,7 @@ std::string findFile(std::string filenm) {
     return filenm; //cannot find
 }
 
-void Parser::parseFile(TranslationUnit *unit, std::string filenm, SourceLocation l)
+void Parser::parseFile(ModuleDeclaration *module, std::string filenm, SourceLocation l)
 {
     std::string absfile = findFile(filenm);
     ifstream stream(absfile.c_str());
@@ -1560,7 +1561,7 @@ void Parser::parseFile(TranslationUnit *unit, std::string filenm, SourceLocation
     Lexer *lexer = new StreamLexer(stream);
     lexer->setFilename(filenm.c_str());
     ParseContext context(lexer, this, ast->getRootPackage());
-    context.parseTranslationUnit(unit, filenm.c_str()); //TODO: identifier
+    context.parseModule(module, filenm.c_str()); //TODO: identifier
     delete lexer;
 
     //ast->getRootPackage()->addPackage("", unit);

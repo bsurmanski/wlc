@@ -23,8 +23,8 @@ class ASTVisitor {
         return fd;
     }
 
-    virtual void visitPackage(Package *pak) {}
-    virtual void visitTranslationUnit(TranslationUnit *tu) {}
+    virtual void visitPackage(PackageDeclaration *pak) {}
+    virtual void visitModule(ModuleDeclaration *mod) {}
 
     virtual void visitDeclaration(Declaration *decl){}
     virtual void visitExpression(Expression *exp){}

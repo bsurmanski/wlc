@@ -125,9 +125,9 @@ void ASTScope::remove(Identifier *id){
     symbols.erase(id->getName());
 }
 
-TranslationUnit *ASTScope::getUnit()
+ModuleDeclaration *ASTScope::getModule ()
 {
-    return dynamic_cast<TranslationUnit*>(package);
+    return package->moduleDeclaration();
 }
 
 std::string ASTScope::getMangledName()

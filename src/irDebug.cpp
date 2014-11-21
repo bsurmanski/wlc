@@ -8,13 +8,13 @@ using namespace std;
 using namespace llvm;
 
 IRDebug::IRDebug(IRCodegenContext *c, IRTranslationUnit *u) : context(c), unit(u),
-     di(*unit->module)
+     di(*unit->llvmModule)
 {
-    diUnit = di.createCompileUnit(dwarf::DW_LANG_hi_user, u->unit->filenm, PROJDIR, CGSTR, false, "", 0);
-    diFile = di.createFile(u->unit->filenm, PROJDIR);
+    diUnit = di.createCompileUnit(dwarf::DW_LANG_hi_user, u->mdecl->filenm, PROJDIR, CGSTR, false, "", 0);
+    diFile = di.createFile(u->mdecl->filenm, PROJDIR);
 }
 
-llvm::Module *IRDebug::getModule() { return (llvm::Module*) unit->module; }
+llvm::Module *IRDebug::getModule() { return (llvm::Module*) unit->llvmModule; }
 
 // added due to requirement debug info in LLVM 3.4
 void createIdentMetadata(llvm::Module *m)

@@ -43,18 +43,18 @@ SourceLocation SourceLocationFromCLocation(CXSourceLocation cxloc)
 
 struct StructVisitorArg
 {
-    TranslationUnit *unit;
+    ModuleDeclaration *module;
     std::vector<Declaration *> *members;
     ASTScope *scope;
 };
 
-ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype);
+ASTType *ASTTypeFromCType(ModuleDeclaration *module, CXType ctype);
 
 CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
 {
     StructVisitorArg *m = (StructVisitorArg*) svarg;
 
-    TranslationUnit *unit = m->unit;
+    ModuleDeclaration *module = m->module;
     std::vector<Declaration *> *members = m->members;
     ASTScope *scope = m->scope;
 
@@ -81,14 +81,14 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
 	}
 
         Identifier *id = scope->getInScope(name);
-        ASTType *ty = ASTTypeFromCType(unit, clang_getCursorType(cursor));
+        ASTType *ty = ASTTypeFromCType(module, clang_getCursorType(cursor));
         if(!ty) return CXChildVisit_Break;
         VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
         id->addDeclaration(vdecl, Identifier::ID_VARIABLE);
         members->push_back(vdecl);
     } else if(cursor.kind == CXCursor_UnionDecl || cursor.kind == CXCursor_StructDecl)
     {
-        ASTType *ty = ASTTypeFromCType(unit, clang_getCursorType(cursor));
+        ASTType *ty = ASTTypeFromCType(module, clang_getCursorType(cursor));
         if(!ty) return CXChildVisit_Break;
         Identifier *id = scope->get("___" + ty->getName()); // TODO: proper scope name
         VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
@@ -105,10 +105,10 @@ ERR:
     return CXChildVisit_Continue;
 }
 
-ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
+ASTType *ASTRecordTypeFromCType(ModuleDeclaration *module, CXType ctype)
 {
     vector<Declaration*> members;
-    ASTScope *tbl = new ASTScope(unit->getScope());
+    ASTScope *tbl = new ASTScope(module->getScope());
     CXString cxname = clang_getTypeSpelling(ctype);
     CXCursor typeDecl = clang_getTypeDeclaration(ctype);
     string name = clang_getCString(cxname);
@@ -122,14 +122,14 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
         name = name.substr(sunion.length());
     }
 
-    Identifier *id = unit->getScope()->lookup(name);
+    Identifier *id = module->getScope()->lookup(name);
 
     UserTypeDeclaration *utdecl = 0;
     if(!id || id->isUndeclared()) //TODO: should just use 'get' above?
     {
-        id = unit->getScope()->get(name);
+        id = module->getScope()->get(name);
 
-        StructVisitorArg svarg = { unit, &members, tbl };
+        StructVisitorArg svarg = { module, &members, tbl };
         clang_visitChildren(typeDecl, StructVisitor, &svarg);
 
         if(typeDecl.kind == CXCursor_StructDecl)
@@ -151,7 +151,7 @@ ASTType *ASTRecordTypeFromCType(TranslationUnit *unit, CXType ctype)
 }
 
 
-ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
+ASTType *ASTTypeFromCType(ModuleDeclaration *module, CXType ctype)
 {
     ASTType *ty = 0;
 
@@ -182,17 +182,17 @@ ASTType *ASTTypeFromCType(TranslationUnit *unit, CXType ctype)
             return ASTType::getDoubleTy();
         case CXType_Pointer:
         case CXType_VariableArray:
-            ty = ASTTypeFromCType(unit, clang_getPointeeType(ctype));
+            ty = ASTTypeFromCType(module, clang_getPointeeType(ctype));
             if(ty) return ty->getPointerTy();
             return NULL;
         case CXType_Record:
-            return ASTRecordTypeFromCType(unit, ctype);
+            return ASTRecordTypeFromCType(module, ctype);
         case CXType_Typedef:
-            return ASTTypeFromCType(unit, clang_getCanonicalType(ctype));
+            return ASTTypeFromCType(module, clang_getCanonicalType(ctype));
         case CXType_Enum:
             return ASTType::getULongTy();
         case CXType_ConstantArray:
-            return ASTTypeFromCType(unit,
+            return ASTTypeFromCType(module,
                     clang_getElementType(ctype))->getArrayTy(clang_getArraySize(ctype));
         case CXType_FunctionProto:
             return NULL; //TODO
@@ -226,9 +226,9 @@ const clang::MacroInfo *getCursorMacroInfo(CXCursor c)
 }
 
 static CXTranslationUnit *cxUnit = 0;
-CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
+CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
 {
-    TranslationUnit* unit = (TranslationUnit *) tUnit;
+    ModuleDeclaration* module = (ModuleDeclaration*) vMod;
 
     CXSourceLocation cxloc = clang_getCursorLocation(cursor);
     SourceLocation loc = SourceLocationFromCLocation(cxloc);
@@ -247,7 +247,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         for(int i = 0; i < nargs; i++)
         {
             ASTType *astArgTy =
-                    ASTTypeFromCType(unit,
+                    ASTTypeFromCType(module,
                             clang_getCanonicalType(clang_getArgType(fType, i)));
             if(!astArgTy) goto ERR;
 
@@ -255,11 +255,11 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
             parameters.push_back(new VariableDeclaration(astArgTy, NULL, NULL, loc, DeclarationQualifier()));
         }
 
-        ASTType *rType = ASTTypeFromCType(unit, clang_getResultType(fType));
+        ASTType *rType = ASTTypeFromCType(module, clang_getResultType(fType));
 
         if(!rType) goto ERR;
 
-        Identifier *id = unit->getScope()->get(name);
+        Identifier *id = module->getScope()->get(name);
 
         DeclarationQualifier dqual;
         dqual.decorated = false;
@@ -269,7 +269,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
 
         id->addDeclaration(fdecl, Identifier::ID_FUNCTION);
 
-        //unit->functions.push_back(fdecl);
+        //module->functions.push_back(fdecl);
 
     } else if(cursor.kind == CXCursor_VarDecl)
     {
@@ -277,17 +277,17 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
         CXString cxname = clang_getCursorSpelling(cursor);
         std::string name = clang_getCString(cxname);
 
-        ASTType *wlType = ASTTypeFromCType(unit, type);
+        ASTType *wlType = ASTTypeFromCType(module, type);
         if(!wlType) goto ERR;
 
-        Identifier *id = unit->getScope()->get(name);
+        Identifier *id = module->getScope()->get(name);
         CXLinkageKind linkage = clang_getCursorLinkage(cursor);
         DeclarationQualifier dqual;
         dqual.external = linkage == CXLinkage_External || linkage == CXLinkage_UniqueExternal;
         dqual.decorated = false;
         VariableDeclaration *vdecl = new VariableDeclaration(wlType, id, 0, loc, dqual);
         id->addDeclaration(vdecl, Identifier::ID_VARIABLE);
-        //unit->globals.push_back(vdecl);
+        //module->globals.push_back(vdecl);
 
     } else if(cursor.kind == CXCursor_MacroDefinition)
     {
@@ -301,7 +301,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
                 if(tok.getKind() == clang::tok::numeric_constant)
                 {
                     string name = string(clang_getCString(clang_getCursorSpelling(cursor)));
-                    Identifier *id = unit->getScope()->get(name);
+                    Identifier *id = module->getScope()->get(name);
                     if(id->getDeclaration())
                     {
                         printf("Macro redefines value, ");
@@ -311,15 +311,15 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
                     //VariableDeclaration *vdecl = new VariableDeclaration(ASTType::getDoubleTy(),
                     //        id, val, loc, false);
                     id->setExpression(val);
-                    //unit->globals.push_back(vdecl);
+                    //module->globals.push_back(vdecl);
                         //printf("MACRO: %s: %f\n", name.c_str(), val->floatValue);
                 } else goto MACRO_ERR;
             } else if(MI->getNumTokens() == 1 && MI->getReplacementToken(0).isAnyIdentifier()) { // identifier alias
                 string name = string(clang_getCString(clang_getCursorSpelling(cursor)));
                 string alias = string(MI->getReplacementToken(0).getIdentifierInfo()->getName().str());
 
-                Identifier *idName = unit->getScope()->get(name);
-                Identifier *idAlias = unit->getScope()->get(alias);
+                Identifier *idName = module->getScope()->get(name);
+                Identifier *idAlias = module->getScope()->get(alias);
                 if(idName->getDeclaration())
                 {
                     printf("Macro redefines value");
@@ -340,29 +340,28 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *tUnit)
     {
         CXString cxname = clang_getCursorSpelling(cursor);
         std::string name = clang_getCString(cxname);
-        Identifier *id = unit->getScope()->get(name);
+        Identifier *id = module->getScope()->get(name);
         int64_t val = clang_getEnumConstantDeclValue(cursor);
         NumericExpression *nval = new IntExpression(ASTType::getLongTy(), (uint64_t) val);
-
         id->setExpression(nval);
     } else if(cursor.kind == CXCursor_StructDecl)
     {
         // will generate struct ASTType
-        ASTTypeFromCType(unit, clang_getCursorType(cursor));
+        ASTTypeFromCType(module, clang_getCursorType(cursor));
     } else if(cursor.kind == CXCursor_TypedefDecl) {
         /*
         // XXX FROM OTHER ATTEMPT ON VULCAN
-        Identifier *id = unit->getScope()->get(clang_getCString(clang_getCursorSpelling(cursor)));
-        ASTType *typedefty = ASTTypeFromCType(unit, clang_getTypedefDeclUnderlyingType(cursor));
+        Identifier *id = module->getScope()->get(clang_getCString(clang_getCursorSpelling(cursor)));
+        ASTType *typedefty = ASTTypeFromCType(module, clang_getTypedefDeclUnderlyingType(cursor));
         id->setExpression(new TypeExpression(typedefty, loc));
         */
         goto ERR; //TODO
         CXString cxname = clang_getCursorSpelling(cursor);
         std::string name = clang_getCString(cxname);
         CXType ctype = clang_getTypedefDeclUnderlyingType(cursor);
-        ASTType *ty = ASTTypeFromCType(unit, ctype);
+        ASTType *ty = ASTTypeFromCType(module, ctype);
         if(!ty) goto ERR;
-        Identifier *id = unit->getScope()->get(name);
+        Identifier *id = module->getScope()->get(name);
         id->setKind(Identifier::ID_TYPE);
         id->setDeclaredType(ty);
     }
@@ -392,7 +391,7 @@ std::string getAbsoluteIncludePath(std::string file) {
 }
 #endif
 
-void parseCImport(TranslationUnit *unit,
+void parseCImport(ModuleDeclaration *module,
         std::string filenm,
         SourceLocation loc)
 {
@@ -424,7 +423,7 @@ void parseCImport(TranslationUnit *unit,
         "-v",
         0,
     };
-    //pushScope(unit->getScope());
+    //pushScope(module->getScope());
 
     CXIndex Idx = clang_createIndex(1,1);
     CXTranslationUnit Unit = clang_createTranslationUnitFromSourceFile(
@@ -437,9 +436,9 @@ void parseCImport(TranslationUnit *unit,
 
     cxUnit = &Unit;
 
-    clang_visitChildren(clang_getTranslationUnitCursor(Unit), CVisitor, unit);
+    clang_visitChildren(clang_getTranslationUnitCursor(Unit), CVisitor, module);
 
-    //currentPackage()->addPackage(unit);
+    //currentPackage()->addPackage(module);
 
     //popScope();
 

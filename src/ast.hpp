@@ -34,7 +34,6 @@ struct Statement;
 struct Declaration;
 struct Expression;
 struct DeclarationExpression;
-struct TranslationUnit;
 struct Identifier;
 struct LabelDeclaration;
 struct VariableDeclaration;
@@ -45,42 +44,43 @@ struct TypeDeclaration;
 
 //TODO: dowhile
 
-struct Package;
-struct TranslationUnit;
+struct PackageDeclaration;
+struct ModuleDeclaration;
 
 struct AST
 {
-    Package *root;
-    std::map<std::string, TranslationUnit*> units;
-    TranslationUnit *runtime;
+    PackageDeclaration *root;
+    std::map<std::string, ModuleDeclaration*> modules;
+    ModuleDeclaration *runtime;
 
     AST();
     ~AST();
-    Package *getRootPackage() { return root; }
-    TranslationUnit *getUnit(std::string str)
+    PackageDeclaration *getRootPackage() { return root; }
+    ModuleDeclaration *getModule(std::string str)
     {
         char APATH[PATH_MAX + 1];
         realpath(str.c_str(), APATH);
         std::string astr = std::string(str);
-        if(units.count(astr)) return units[astr];
+        if(modules.count(astr)) return modules[astr];
         return NULL;
     }
-    void addUnit(std::string str, TranslationUnit *u)
+    void addModule(std::string str, ModuleDeclaration *u)
     {
         char APATH[PATH_MAX + 1];
         realpath(str.c_str(), APATH);
         std::string astr = std::string(str);
-        assert(!units.count(astr) && "reimport of translation unit!");
-        units[str] = u;
+        assert(!modules.count(astr) && "reimport of module!");
+        modules[str] = u;
     }
 
-    void setRuntimeUnit(TranslationUnit *u)
+    void setRuntimeModule(ModuleDeclaration *u)
     {
-        units["/usr/local/include/wl/runtime.wl"] = u;
+        //XXX HARD CODED
+        modules["/usr/local/include/wl/runtime.wl"] = u;
         runtime = u;
     }
 
-    TranslationUnit *getRuntimeUnit() { return runtime; }
+    ModuleDeclaration *getRuntimeModule() { return runtime; }
 
     void accept(ASTVisitor *v);
     bool validate();
@@ -131,6 +131,7 @@ struct ASTNode {
     virtual ASTNode *lower() { return this; }
 };
 
+/*
 struct Package : public ASTNode
 {
     ASTScope *scope;
@@ -182,10 +183,11 @@ struct Package : public ASTNode
     virtual bool isTranslationUnit() { return false; }
 
     virtual void accept(ASTVisitor *v);
-};
+};*/
 
 // also Module
 //TODO: should TU and Package be seperate? or maybe merged?
+/*
 struct TranslationUnit : public Package
 {
     std::vector<ImportExpression*> imports; //TODO: aliased imports?
@@ -202,7 +204,7 @@ struct TranslationUnit : public Package
     virtual bool isTranslationUnit() { return true; }
     virtual void accept(ASTVisitor *v);
 };
-
+*/
 
 /***
  *
@@ -452,11 +454,75 @@ struct Declaration : public Statement
     virtual Declaration *lower() { return this; }
 };
 
+struct ModuleDeclaration;
 struct PackageDeclaration : public Declaration {
-    Package *package;
-    PackageDeclaration(Package *p, Identifier *id, SourceLocation l, DeclarationQualifier dqual) :
-        package(p), Declaration(id, l, dqual) {}
+    ASTScope *scope;
+    PackageDeclaration *parent;
+    std::string name;
+
+    PackageDeclaration(PackageDeclaration *p, Identifier *id, SourceLocation l, DeclarationQualifier dqual) :
+        parent(p), Declaration(id, l, dqual) {
+            scope = new ASTScope(NULL, ASTScope::Scope_Global, this);
+            scope->setOwner(identifier);
+            //TODO: subscope of super package?
+        }
     ASTType *getType() { return NULL; }
+
+    //Package(Package *sup=0, std::string nm="wl");
+
+    //virtual ~Package() { if(scope) delete scope; }
+
+    ASTScope *getScope() {
+        return scope;
+    }
+
+    std::vector<PackageDeclaration*> children;
+
+    void setSuperPackage(PackageDeclaration *p)
+    {
+        assert(false); // dont use this?XXX
+        //superPackage = p->getIdentifier();
+    }
+
+    void addPackage(PackageDeclaration *p) {
+        // XXX add identifier in scope ?
+        //p->setSuperPackage(this);
+        children.push_back(p);
+        //Identifier *id = scope->get(p->getName());
+    }
+
+    virtual std::string getMangledName()
+    {
+        if(parent)
+            return parent->getMangledName() + identifier->getName();
+        return identifier->getName();
+    }
+
+    virtual std::string getName() {
+        return identifier->getName();
+    }
+
+    Identifier *lookup(std::string str) { return getScope()->lookup(str); }
+
+    virtual ModuleDeclaration *moduleDeclaration() { return NULL; }
+
+    virtual void accept(ASTVisitor *v);
+};
+
+struct ModuleDeclaration : public PackageDeclaration {
+    std::vector<ImportExpression*> imports; //TODO: aliased imports?
+    std::vector<ModuleDeclaration*> importModules; //TODO: aliased imports?
+    std::map<std::string, bool> extensions;
+
+    std::string filenm;
+    bool expl; // explicitly requested for compile. eg, not included
+
+
+    ModuleDeclaration(PackageDeclaration *parent, Identifier *id, std::string fn = "") :
+        PackageDeclaration(parent, id, SourceLocation(filenm.c_str(), 1), DeclarationQualifier()), filenm(fn), expl(false) {}
+    ~ModuleDeclaration() { }
+    virtual ModuleDeclaration *moduleDeclaration() { return this; }
+    virtual void accept(ASTVisitor *v);
 };
 
 struct FunctionDeclaration : public Declaration
@@ -1123,10 +1189,10 @@ struct UseExpression : public TopLevelExpression
 struct ImportExpression : public TopLevelExpression
 {
     Expression *expression;
-    TranslationUnit *unit;
+    ModuleDeclaration *module;
     virtual ImportExpression *importExpression() { return this; }
-    ImportExpression(Expression *im, TranslationUnit *u, SourceLocation l = SourceLocation()) :
-        TopLevelExpression(l), expression(im), unit(u) { }
+    ImportExpression(Expression *im, ModuleDeclaration *mod, SourceLocation l = SourceLocation()) :
+        TopLevelExpression(l), expression(im), module(mod) { }
     virtual void accept(ASTVisitor *v);
     virtual ASTType *getType() { return NULL; } //TODO XXX
 };

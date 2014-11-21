@@ -110,24 +110,28 @@ void compile(WLConfig params)
         Parser parser;
         AST *ast = parser.getAST();
 
-        TranslationUnit *runtime = new TranslationUnit(ast->getRootPackage(), "runtime.wl");
-        ast->setRuntimeUnit(runtime);
+        Identifier *rt_id = ast->getRootPackage()->getScope()->getInScope("runtime");
+        ModuleDeclaration *runtime = new ModuleDeclaration(ast->getRootPackage(), rt_id, "runtime.wl");
+        rt_id->addDeclaration(runtime, Identifier::ID_MODULE);
+        ast->setRuntimeModule(runtime);
         parser.parseFile(runtime, "runtime.wl");
 
         for(int i = 0; i < params.files.size(); i++)
         {
-            if(!ast->getUnit(params.files[i])) // check if file already parsed
+            if(!ast->getModule(params.files[i])) // check if file already parsed
             {
-                TranslationUnit *unit = new TranslationUnit(ast->getRootPackage(), params.files[i]);
+                Identifier *mod_id = ast->getRootPackage()->getScope()->getInScope(params.files[i]); //TODO: file basename
+                ModuleDeclaration *module = new ModuleDeclaration(ast->getRootPackage(), mod_id, params.files[i]);
+                mod_id->addDeclaration(module, Identifier::ID_MODULE);
                 std::string filenm = params.files[i];
 
-                unit->expl = true;
-                ast->addUnit(params.files[i], unit);
-                parser.parseFile(unit, params.files[i]);
+                module->expl = true;
+                ast->addModule(params.files[i], module);
+                parser.parseFile(module, params.files[i]);
             } else
             {
-                TranslationUnit *u = ast->getUnit(params.files[i]);
-                u->expl = true;
+                ModuleDeclaration *mod = ast->getModule(params.files[i]);
+                mod->expl = true;
             }
         }
 
@@ -187,7 +191,7 @@ WLConfig parseCmd(int argc, char **argv)
                 break;
 #ifdef __APPLE__
             case 'f':
-                params.frameworks.push_back(optarg);   
+                params.frameworks.push_back(optarg);
                 break;
 #endif
             case '?':

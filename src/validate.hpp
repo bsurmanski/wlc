@@ -35,8 +35,8 @@ class ValidationVisitor : public ASTVisitor {
     ASTType *resolveType(ASTType *ty);
     Expression *coerceTo(ASTType *ty, Expression *exp);
     ASTType *commonType(ASTType *t1, ASTType *t2);
-    virtual void visitPackage(Package *pak);
-    virtual void visitTranslationUnit(TranslationUnit *tu);
+    virtual void visitPackage(PackageDeclaration *pak);
+    virtual void visitModule(ModuleDeclaration *mod);
 
     virtual void visitDeclaration(Declaration *decl);
     virtual void visitExpression(Expression *exp);

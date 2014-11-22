@@ -394,11 +394,11 @@ ImportExpression *ParseContext::parseImport()
     //XXX deffer importing to end of TU parse? Would allow 'package' expression and subsequent imports to work as expected, I imagine
     if(StringExpression *sexp = dynamic_cast<StringExpression*>(importExpression))
     {
-        importedModule = ast->getModule(sexp->string);
+        std::string filenm = sexp->string;
+        std::string modnm = getFilebase(filenm);
+        importedModule = ast->getModule(filenm);
         if(!importedModule) // This TU hasnt been loaded from file yet, DOIT
         {
-            std::string filenm = sexp->string;
-            std::string modnm = getFilebase(filenm);
             Identifier *m_id = ast->getRootPackage()->getScope()->get(modnm);
             importedModule = new ModuleDeclaration(ast->getRootPackage(), m_id, sexp->string);
             m_id->addDeclaration(importedModule, Identifier::ID_MODULE);
@@ -418,6 +418,9 @@ ImportExpression *ParseContext::parseImport()
                 parser->parseFile(importedModule, sexp->string, loc);
             }
         }
+
+        Identifier *local_mid = getScope()->getInScope(modnm);
+        local_mid->addDeclaration(importedModule, Identifier::ID_MODULE);
     }
 
     cond_message(!importedModule, msg::FAILURE, "failed to import module");
@@ -784,7 +787,7 @@ NEXT:
     }
 
     // this identifier has already been defined! if lparen is upcoming, this is a function, give it a free pass to allow for overloading
-    if(getScope()->contains(t_id.toString()) && peek().isNot(tok::lparen)){
+    if(getScope()->lookupInScope(t_id.toString()) && peek().isNot(tok::lparen)){
         emit_message(msg::ERROR,
             string("redeclaration of variable ") + string("'") + t_id.toString() + string("'"),
             t_id.loc);

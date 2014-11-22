@@ -80,9 +80,11 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
 		return CXChildVisit_Continue;
 	}
 
-        Identifier *id = scope->getInScope(name);
         ASTType *ty = ASTTypeFromCType(module, clang_getCursorType(cursor));
         if(!ty) return CXChildVisit_Break;
+
+        Identifier *id = scope->getInScope(name);
+
         VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
         id->addDeclaration(vdecl, Identifier::ID_VARIABLE);
         members->push_back(vdecl);
@@ -302,6 +304,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
                 {
                     string name = string(clang_getCString(clang_getCursorSpelling(cursor)));
                     Identifier *id = module->getScope()->get(name);
+
                     if(id->getDeclaration())
                     {
                         printf("Macro redefines value, ");
@@ -319,10 +322,23 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
                 string alias = string(MI->getReplacementToken(0).getIdentifierInfo()->getName().str());
 
                 Identifier *idName = module->getScope()->get(name);
-                Identifier *idAlias = module->getScope()->get(alias);
+
                 if(idName->getDeclaration())
                 {
                     printf("Macro redefines value");
+                    goto MACRO_ERR;
+                }
+
+                Identifier *idAlias = module->getScope()->lookup(alias);
+
+                if(!idAlias || idAlias->isUndeclared()) {
+                    // whatever we are aliasing does not exist (yet?)
+                    // in C, the thing should exist before the DEFINE.
+                    // This is half being lazy, and half so then broken
+                    // C parsing doesn't kill the whole compile
+                    module->getScope()->remove(idName);
+                    if(idAlias)
+                        module->getScope()->remove(idAlias);
                     goto MACRO_ERR;
                 }
 

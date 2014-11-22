@@ -18,7 +18,13 @@ void ModuleDeclaration::accept(ASTVisitor *v) {
     PackageDeclaration::accept(v);
     v->visitModule(this);
     for(ASTScope::iterator it = getScope()->begin(); it != getScope()->end(); it++){
-        it->getDeclaration()->accept(v);
+        if(it->getDeclaration()) {
+            it->getDeclaration()->accept(v);
+        } else if (it->getExpression()) {
+            //XXX TODO: validate expression
+        } else {
+            emit_message(msg::ERROR, "invalidate symbol in scope: " + it->getName());
+        }
     }
 }
 
@@ -33,13 +39,19 @@ void Declaration::accept(ASTVisitor *v) {
 
 void FunctionDeclaration::accept(ASTVisitor *v) {
     Declaration::accept(v);
-    v->visitScope(scope);
-    v->visitFunctionDeclaration(this);
-    v->pushScope(this->getScope());
-    v->pushFunction(this);
-    if(body) body->accept(v);
-    v->popFunction();
-    v->popScope();
+    if(scope) {
+        v->visitScope(scope);
+        v->visitFunctionDeclaration(this);
+        v->pushScope(this->getScope());
+        v->pushFunction(this);
+        if(body) body->accept(v);
+        v->popFunction();
+        v->popScope();
+    }
+
+    if(!scope && body) {
+        emit_message(msg::FAILURE, "function with scope and no body");
+    }
 
     if(nextoverload) {
         nextoverload->accept(v);

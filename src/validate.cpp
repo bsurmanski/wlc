@@ -153,9 +153,10 @@ void ValidationVisitor::visitPackage(PackageDeclaration *pak) {
     if(!pak->getScope()) valid = false;
 }
 
-void ValidationVisitor::visitModule(ModuleDeclaration *tu) {
-    for(int i = 0; i < tu->imports.size(); i++) {
-        if(!tu->imports[i]) {
+void ValidationVisitor::visitModule(ModuleDeclaration *mod) {
+    ASTScope::iterator it;
+    for(it = mod->importScope->begin(); it != mod->importScope->end(); it++) {
+        if(!it->getDeclaration()->moduleDeclaration()) {
             valid = false;
             emit_message(msg::ERROR, "invalid translation unit found, null import", location);
         }

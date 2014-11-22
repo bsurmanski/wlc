@@ -124,6 +124,7 @@ struct ASTNode {
     virtual TypeDeclaration *typeDeclaration() { return NULL; }
     virtual UserTypeDeclaration *userTypeDeclaration() { return NULL; }
     virtual ClassDeclaration *classDeclaration() { return NULL; }
+    virtual ModuleDeclaration *moduleDeclaration() { return NULL; }
 
     // lower complex operations to simpler, more atomic operations.
     // eg 'a += b' operation should lower to 'a = a + b'
@@ -510,8 +511,9 @@ struct PackageDeclaration : public Declaration {
 };
 
 struct ModuleDeclaration : public PackageDeclaration {
-    std::vector<ImportExpression*> imports; //TODO: aliased imports?
-    std::vector<ModuleDeclaration*> importModules; //TODO: aliased imports?
+    ASTScope* importScope;
+    //std::vector<ImportExpression*> imports; //TODO: aliased imports?
+    //std::vector<ModuleDeclaration*> importModules; //TODO: aliased imports?
     std::map<std::string, bool> extensions;
 
     std::string filenm;
@@ -519,7 +521,9 @@ struct ModuleDeclaration : public PackageDeclaration {
 
 
     ModuleDeclaration(PackageDeclaration *parent, Identifier *id, std::string fn = "") :
-        PackageDeclaration(parent, id, SourceLocation(filenm.c_str(), 1), DeclarationQualifier()), filenm(fn), expl(false) {}
+        PackageDeclaration(parent, id, SourceLocation(filenm.c_str(), 1), DeclarationQualifier()), filenm(fn), expl(false) {
+            importScope = new ASTScope(NULL, ASTScope::Scope_Global, this);
+        }
     ~ModuleDeclaration() { }
     virtual ModuleDeclaration *moduleDeclaration() { return this; }
     virtual void accept(ASTVisitor *v);

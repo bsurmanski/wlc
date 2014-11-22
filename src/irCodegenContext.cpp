@@ -2700,9 +2700,11 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 
     enterScope(u->getScope());
 
-    for(int i = 0; i < unit->mdecl->importModules.size(); i++) //TODO: import symbols.
+    ASTScope::iterator it;
+    for(it = unit->mdecl->importScope->begin(); it != unit->mdecl->importScope->end(); it++) //TODO: import symbols.
     {
-        codegenInclude(this->unit, unit->mdecl->importModules[i]);
+        Identifier *mod_id = *it;
+        codegenInclude(this->unit, mod_id->getDeclaration()->moduleDeclaration());
     }
 
     // alloc globals before codegen'ing functions

@@ -109,6 +109,7 @@ class ParseContext
     bool eof() { return tqueue.empty() && lexer->eof(); }
 
     PackageDeclaration *currentPackage() { return package; }
+    ModuleDeclaration *getModule() { return module; }
     void pushScope(ASTScope* tbl) { scope.push(tbl); }
     ASTScope *popScope() { ASTScope *tbl = scope.top(); scope.pop(); return tbl;}
     ASTScope *getScope() { if(!scope.empty()) return scope.top(); return NULL; }

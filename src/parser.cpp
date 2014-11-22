@@ -276,9 +276,10 @@ void ParseContext::parseTopLevel(ModuleDeclaration *module)
     switch(peek().kind)
     {
         case tok::kw_import:
-            //TODO: add to symbol table
             //TODO: find and import new translation unit
-            module->imports.push_back(parseImport());
+            //module->imports.push_back(parseImport());
+            parseImport();
+            //TODO: use the 'importExpression' returned from 'parseImport'
             break;
 
         case tok::kw_use:
@@ -399,7 +400,7 @@ ImportExpression *ParseContext::parseImport()
         importedModule = ast->getModule(filenm);
         if(!importedModule) // This TU hasnt been loaded from file yet, DOIT
         {
-            Identifier *m_id = ast->getRootPackage()->getScope()->get(modnm);
+            Identifier *m_id = getModule()->importScope->get(modnm);
             importedModule = new ModuleDeclaration(ast->getRootPackage(), m_id, sexp->string);
             m_id->addDeclaration(importedModule, Identifier::ID_MODULE);
             ast->addModule(sexp->string, importedModule);
@@ -419,13 +420,13 @@ ImportExpression *ParseContext::parseImport()
             }
         }
 
-        Identifier *local_mid = getScope()->getInScope(modnm);
-        local_mid->addDeclaration(importedModule, Identifier::ID_MODULE);
+        //Identifier *local_mid = getScope()->getInScope(modnm);
+        //local_mid->addDeclaration(importedModule, Identifier::ID_MODULE);
     }
 
     cond_message(!importedModule, msg::FAILURE, "failed to import module");
 
-    module->importModules.push_back(importedModule); //TODO: check if in import list first
+    //module->importModules.push_back(importedModule); //TODO: check if in import list first
     getScope()->addSibling(importedModule->getScope());
     return new ImportExpression(importExpression, importedModule, loc);
 }

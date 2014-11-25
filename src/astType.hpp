@@ -257,6 +257,7 @@ struct ASTType
     virtual ASTType *getPointerElementTy() const { return NULL; }
     bool isAggregate() { return kind == TYPE_USER; } //XXX kinda...
     bool isBool() { return kind == TYPE_BOOL; }
+    bool isVoid() { return kind == TYPE_VOID; }
     bool isInteger() { return kind == TYPE_BOOL || kind == TYPE_CHAR || kind == TYPE_SHORT ||
         kind == TYPE_INT || kind == TYPE_LONG ||
         kind == TYPE_UCHAR || kind == TYPE_USHORT || kind == TYPE_UINT || kind == TYPE_ULONG; }
@@ -272,6 +273,7 @@ struct ASTType
     bool isPointer() { return asPointer(); }
     bool isFunctionPointer() { return isPointer() && getPointerElementTy()->isFunctionType(); }
     bool isUserTypePointer() { return isPointer() && getPointerElementTy()->isUserType(); }
+    bool isVoidPointer() { return isPointer() && getPointerElementTy()->isVoid(); }
     bool isUserType() { return asUserType(); }
     bool isClass() { return asClass(); }
     bool isInterface() { return asInterface(); }
@@ -468,7 +470,8 @@ struct ASTUserType : public ASTCompositeType {
     virtual bool coercesTo(ASTType *ty) {
         return getDeclaration() == ty->getDeclaration() || //TODO: might not work...
                     (isClass() && ty->isClass() && extends(ty)) ||
-                    (isClass() && ty->isBool());
+                    (isClass() && ty->isBool()) ||
+                    (isClass() && ty->isVoidPointer());
     }
     virtual bool isResolved() { return getDeclaration(); }
 

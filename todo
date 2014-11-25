@@ -28,5 +28,3 @@ select tuple constant type dependant on context (eg [int, int] instead of [long,
     (problem noticed in function call parameter)
 
 make function arguments const
-
-fix constructor call arguments

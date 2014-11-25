@@ -1460,11 +1460,12 @@ void IRCodegenContext::codegenDelete(ASTValue *val) {
         ASTUserType *uty = val->getType()->asUserType();
         do {
             //TODO: make destructor virtual
+            //TODO: make destructor for struct type work
             FunctionDeclaration *dtor = uty->getDestructor();
             if(dtor) {
                 std::vector<ASTValue*> args;
                 ASTValue *func = codegenIdentifier(dtor->identifier);
-                func->setOwner(val); // XXX MESSY!!! should happen in parser or validator
+                args.push_back(promoteType(val, uty));
                 codegenCall(func, args);
             }
         } while((uty = dynamic_cast<ASTUserType*>(uty->getBaseType())));

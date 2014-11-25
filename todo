@@ -26,3 +26,5 @@ check for index void^
 
 select tuple constant type dependant on context (eg [int, int] instead of [long, long] if needed)
     (problem noticed in function call parameter)
+
+make function arguments const

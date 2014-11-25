@@ -270,6 +270,7 @@ struct ASTType
     virtual bool isReference() { return false; }
     virtual bool isUnknown() { return false; }
     bool isPointer() { return asPointer(); }
+    bool isFunctionPointer() { return isPointer() && getPointerElementTy()->isFunctionType(); }
     bool isUserType() { return asUserType(); }
     bool isClass() { return asClass(); }
     bool isInterface() { return asInterface(); }

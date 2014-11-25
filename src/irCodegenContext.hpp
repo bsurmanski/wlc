@@ -282,8 +282,6 @@ class IRCodegenContext : public CodegenContext
     ASTValue *codegenIdOpExpression(IdOpExpression *exp);
 
     ASTValue *codegenIdentifier(Identifier *id);
-    ASTValue *resolveOverload(ASTValue *func, std::vector<ASTValue *> args);
-    void resolveArguments(ASTValue *func, std::vector<ASTValue*>& args);
     ASTValue *codegenCall(ASTValue *func, std::vector<ASTValue *> args);
     ASTValue *codegenCallExpression(CallExpression *exp);
     ASTValue *codegenPostfixExpression(PostfixExpression *exp);

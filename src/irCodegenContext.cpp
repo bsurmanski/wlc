@@ -1282,6 +1282,9 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         } else if(StackAllocExpression *saexp = dynamic_cast<StackAllocExpression*>(aexp)) {
             return codegenStackAllocExpression(saexp);
         }
+    } else if(FunctionExpression *fexp = dynamic_cast<FunctionExpression*>(exp)) {
+        if(fexp->fpointer) return codegenExpression(fexp->fpointer);
+        if(fexp->overload) return new FunctionValue(fexp->overload);
     }
 
     emit_message(msg::FAILURE, "bad expression?", exp->loc);
@@ -1462,8 +1465,6 @@ void IRCodegenContext::codegenDelete(ASTValue *val) {
                 std::vector<ASTValue*> args;
                 ASTValue *func = codegenIdentifier(dtor->identifier);
                 func->setOwner(val); // XXX MESSY!!! should happen in parser or validator
-                func = resolveOverload(func, args);
-                resolveArguments(func, args);
                 codegenCall(func, args);
             }
         } while((uty = dynamic_cast<ASTUserType*>(uty->getBaseType())));
@@ -1654,33 +1655,17 @@ ASTValue *IRCodegenContext::codegenCall(ASTValue *func, std::vector<ASTValue *> 
     return new ASTBasicValue(rtype, value, false, rtype->isReference());
 }
 
-ASTValue *IRCodegenContext::resolveOverload(ASTValue *func, std::vector<ASTValue *> args) {
-    FunctionValue *fval = dynamic_cast<FunctionValue*>(func);
-    if(!fval || !fval->getNextOverload()) {
-        // either a function pointer or other derived function;
-        // no overloads
-        return func;
-    }
-
-    //XXX this should be done in validate now
-    return fval;
-}
-
-void IRCodegenContext::resolveArguments(ASTValue *func, std::vector<ASTValue*>& args) {
-    //XXX this should be done in validate now
-    return;
-}
-
 ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *ret = NULL;
     std::vector<ASTValue *> args; //provided arguments
-    ASTValue *func = codegenExpression(exp->function);
+    ASTValue *func = codegenExpression(exp->resolvedFunction);
     if(!func) {
         emit_message(msg::ERROR, "unknown expression used as function", exp->loc);
         return NULL;
     }
 
+    //XXX should not be needed? should be dereferenced in validate?
     if(func->getType()->isPointer()){ // dereference function pointer
         func = getValueOf(func, false);
     }
@@ -1697,11 +1682,8 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         ret = args[0];
     }
 
-    func = resolveOverload(func, args);
-    resolveArguments(func, args);
-
     if(!func) {
-        emit_message(msg::ERROR, "no valid function overload found for call", exp->loc);
+        emit_message(msg::ERROR, "CG: no valid function overload found for call", exp->loc);
         return NULL;
     }
 

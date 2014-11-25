@@ -7,10 +7,19 @@
 #include <stack>
 
 // can be removed?
+/*
 enum Validity {
     UNCHECKED,
     VALID,
     INVALID
+};*/
+
+// lower value is easier to reach
+enum OverloadValidity {
+    INVALID = 0,
+    COERCE_MATCH = 1, // match, but type coercion requried
+    DEFAULT_MATCH = 2, // match, but default parameter required
+    FULL_MATCH = 3, //match, all parameters are exact type
 };
 
 /*
@@ -51,8 +60,11 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitUnaryExpression(UnaryExpression *exp);
     virtual void visitBinaryExpression(BinaryExpression *exp);
     virtual void visitPrimaryExpression(PrimaryExpression *exp);
+    virtual OverloadValidity resolveOverloadValidity(std::list<Expression*> args, ASTNode *overload);
+    virtual ASTNode *resolveOverloadList(std::list<Expression*> args, std::list<ASTNode*>& overload);
+    virtual void buildOverloadList(Expression *func, std::list<ASTNode*>& overload);
     virtual Expression *resolveCallArgument(ASTFunctionType *fty, unsigned i, Expression *arg, Expression *def);
-    virtual void resolveCallArguments(Expression *func, std::list<Expression*>& args);
+    virtual void resolveCallArguments(FunctionExpression *func, std::list<Expression*>& args);
     virtual void visitCallExpression(CallExpression *exp);
     virtual void visitIndexExpression(IndexExpression *exp);
     virtual void visitIdentifierExpression(IdentifierExpression *exp);

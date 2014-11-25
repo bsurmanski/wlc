@@ -425,27 +425,24 @@ Expression *ValidationVisitor::resolveCallArgument(ASTFunctionType *fty, unsigne
     return NULL;
 }
 
-void ValidationVisitor::resolveCallArguments(Expression *func, std::list<Expression*>& funcargs) {
+void ValidationVisitor::resolveCallArguments(FunctionExpression *func, std::list<Expression*>& funcargs) {
     std::list<Expression*> resolvedArgs;
 
-    if(func->isValue()) {
+    if(func) {
         // dereference function pointer
 
         ASTFunctionType *fty = NULL;
         FunctionDeclaration *fdecl = NULL;
-        if(func->getType()->isPointer()) {
-            fty = func->getType()->getPointerElementTy()->asFunctionType();
+        if(func->fpointer) {
+            fty = func->fpointer->getType()->getPointerElementTy()->asFunctionType();
             if(!fty) {
                 emit_message(msg::ERROR, "non-function pointer used in function pointer context", location);
                 return;
             }
             //func = new UnaryExpression(tok::caret, func, location);
         } else {
-            fty = func->getType()->asFunctionType();
-
-            if(func->identifierExpression()) {
-                fdecl = func->identifierExpression()->getDeclaration()->functionDeclaration();
-            }
+            fty = func->overload->getType()->asFunctionType();
+            fdecl = func->overload;
 
             if(!fty) {
                 emit_message(msg::ERROR, "attempt to call non-function type", location);
@@ -509,7 +506,94 @@ void ValidationVisitor::resolveCallArguments(Expression *func, std::list<Express
     } else {
         emit_message(msg::ERROR, "invalid function call", location);
     }
+}
 
+OverloadValidity ValidationVisitor::resolveOverloadValidity(std::list<Expression*> args, ASTNode *overload) {
+    ASTFunctionType *fty = NULL;
+    FunctionDeclaration *fdecl = NULL;
+
+    OverloadValidity ret = OverloadValidity::FULL_MATCH;
+
+    if(overload->declaration()) {
+        fdecl = overload->declaration()->functionDeclaration();
+        fty = fdecl->getType();
+    } else if(overload->expression()) {
+        ASTType *expty = overload->expression()->getType();
+        if(expty) {
+            if(expty->isFunctionType()) {
+                fty = expty->asFunctionType();
+            }
+            if(expty->isFunctionPointer()) {
+                fty = expty->getPointerElementTy()->asFunctionType();
+            }
+        }
+    }
+
+    if(!fty) return OverloadValidity::INVALID;
+    if(fty->params.size() < args.size() && !fty->isVararg()) return OverloadValidity::INVALID;
+
+    std::list<Expression*>::iterator args_it = args.begin();
+    for(int i = 0; i < fty->params.size(); i++) {
+        if(args_it == args.end()) {
+            if(fdecl && fdecl->getDefaultParameter(i)) {
+                if(ret > OverloadValidity::DEFAULT_MATCH)
+                    ret = OverloadValidity::DEFAULT_MATCH;
+                continue;
+            } else {
+                return OverloadValidity::INVALID;
+            }
+        }
+
+        if((*args_it)->getType()->is(fty->params[i])) {
+            // do nothing
+            // break to it++
+        } else if((*args_it)->getType()->coercesTo(fty->params[i])) {
+            if(ret > OverloadValidity::COERCE_MATCH) ret = OverloadValidity::COERCE_MATCH;
+            // break to it++
+        }
+
+        args_it++;
+    }
+
+    return ret;
+}
+
+ASTNode *ValidationVisitor::resolveOverloadList(std::list<Expression*> args, std::list<ASTNode*>& overload) {
+    std::list<ASTNode*>::iterator it = overload.begin();
+
+    bool ambiguous = false; // if we get multiple resolutions of same validity
+    OverloadValidity validity = OverloadValidity::INVALID;
+    ASTNode *current = NULL;
+
+    while(it != overload.end()) {
+        OverloadValidity olval = resolveOverloadValidity(args, *it);
+        if(olval > validity) {
+            validity = olval;
+            current = *it;
+            ambiguous = false;
+        } else if(olval == validity) {
+            ambiguous = true;
+        }
+        it++;
+    }
+
+    if(ambiguous) return NULL;
+    return current;
+}
+
+void ValidationVisitor::buildOverloadList(Expression *func, std::list<ASTNode*>& overload) {
+    if(func->getType()->isFunctionPointer()) {
+        overload.push_back(func);
+    } else if(func->identifierExpression()) {
+        //TODO: find overloads
+        FunctionDeclaration *decl = func->identifierExpression()->getDeclaration()->functionDeclaration();
+        while(decl) {
+            overload.push_back(decl);
+            decl = decl->getNextOverload();
+        }
+    } else if(func->dotExpression()) {
+        emit_message(msg::ERROR, "dot expression should be lowered by now", location);
+    }
 }
 
 void ValidationVisitor::visitCallExpression(CallExpression *exp) {
@@ -555,6 +639,12 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
                 } else {
                     exp->args.push_front(dexp->lhs);
                 }
+
+                if(dexp->lhs->getType()->isUserType()) {
+                    Identifier *fid = dexp->lhs->getType()->asUserType()->getScope()->lookup(dexp->rhs);
+                    exp->function = new IdentifierExpression(fid, location);
+                }
+
             } else { // UFCS
                 Identifier *fid = getScope()->lookup(dexp->rhs);
                 exp->function = new IdentifierExpression(fid, location);
@@ -563,9 +653,22 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
             }
         }
 
-        resolveCallArguments(exp->function, exp->args);
+        std::list<ASTNode*> overloads;
+        buildOverloadList(exp->function, overloads);
+        ASTNode *callfunc = resolveOverloadList(exp->args, overloads);
+        if(!callfunc) {
+            emit_message(msg::ERROR, "no valid overload found", location);
+            return;
+        }
 
-        //TODO: resolve overload
+        exp->resolvedFunction = new FunctionExpression;
+        if(callfunc->expression()) {
+            exp->resolvedFunction->fpointer = callfunc->expression();
+        } else if(callfunc->declaration()) {
+            exp->resolvedFunction->overload = callfunc->declaration()->functionDeclaration();
+        }
+
+        resolveCallArguments(exp->resolvedFunction, exp->args);
     }
 
     std::list<Expression*>::iterator it = exp->args.begin();
@@ -687,6 +790,7 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
         if(lhstype->isPointer() && lhstype->getPointerElementTy()->isStruct()) {
             rhsid = lhstype->getPointerElementTy()->getDeclaration()->lookup(exp->rhs);
             if(!rhsid) {
+                emit_message(msg::UNIMPLEMENTED, "UFCS on struct pointer temporarily broken. Sorry", location);
                 //TODO UFCS
             } else if(rhsid->isVariable()) {
                 exp->lhs = new UnaryExpression(tok::caret, exp->lhs, location);
@@ -753,7 +857,11 @@ void ValidationVisitor::visitNewExpression(NewExpression *exp) {
 
     ASTUserType *uty = exp->type->asUserType();
     if(uty && exp->call) {
-        exp->function = new IdentifierExpression(uty->getConstructor()->identifier, location);
+        if(!uty->getConstructor()) {
+            emit_message(msg::ERROR, "invalid constructor call on type without constructor", location);
+            return;
+        }
+        exp->function = new FunctionExpression(uty->getConstructor(), location);
         resolveType(exp->function->getType()); //XXX temp. some constructor args-type would not be defined.
 
         resolveCallArguments(exp->function, exp->args);

@@ -275,6 +275,7 @@ void ParseContext::parseTopLevel(ModuleDeclaration *module)
     SourceLocation l = peek().getLocation();
     switch(peek().kind)
     {
+        //XXX also found in 'parseExpression'
         case tok::kw_import:
             //TODO: find and import new translation unit
             //module->imports.push_back(parseImport());

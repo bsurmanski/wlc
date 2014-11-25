@@ -118,6 +118,7 @@ struct ASTNode {
     virtual std::string getName() { return ""; }
     virtual void accept(ASTVisitor *v) = 0;
 
+    virtual Expression *expression() { return NULL; }
     virtual Declaration *declaration() { return NULL; }
     virtual FunctionDeclaration *functionDeclaration() { return NULL; }
     virtual VariableDeclaration *variableDeclaration() { return NULL; }
@@ -131,81 +132,6 @@ struct ASTNode {
     // by default do not lower anything
     virtual ASTNode *lower() { return this; }
 };
-
-/*
-struct Package : public ASTNode
-{
-    ASTScope *scope;
-    Package *superPackage;
-    Identifier *identifier;
-    std::string name;
-
-    Package(Package *sup=0, std::string nm="wl");
-
-    virtual ~Package() { if(scope) delete scope; }
-
-    Identifier *getIdentifier() { return identifier; }
-    ASTScope *getScope() {
-        if(!scope){
-            scope = new ASTScope(NULL, ASTScope::Scope_Global, this);
-            scope->setOwner(identifier);
-        }
-        return scope;
-    } //TODO: subscope of super package?
-
-    std::vector<Package*> children;
-
-    void setSuperPackage(Package *p)
-    {
-        assert(false); // dont use this?XXX
-        //superPackage = p->getIdentifier();
-    }
-
-    void addPackage(Package *p) {
-        // XXX add identifier in scope ?
-        //p->setSuperPackage(this);
-        children.push_back(p);
-        //Identifier *id = scope->get(p->getName());
-    }
-
-    virtual std::string getMangledName()
-    {
-        if(superPackage)
-            return superPackage->getMangledName() + identifier->getName();
-        return identifier->getName();
-    }
-
-    virtual std::string getName() {
-        return identifier->getName();
-    }
-
-    Identifier *lookup(std::string str) { return getScope()->lookup(str); }
-
-    virtual bool isTranslationUnit() { return false; }
-
-    virtual void accept(ASTVisitor *v);
-};*/
-
-// also Module
-//TODO: should TU and Package be seperate? or maybe merged?
-/*
-struct TranslationUnit : public Package
-{
-    std::vector<ImportExpression*> imports; //TODO: aliased imports?
-    std::vector<TranslationUnit*> importUnits; //TODO: aliased imports?
-    std::map<std::string, bool> extensions;
-
-    std::string filenm;
-    bool expl; // explicitly requested for compile. eg, not included
-
-
-    TranslationUnit(Package *parent, std::string fn = "") :
-        Package(parent, getFilebase(fn)), filenm(fn), expl(false) {}
-    ~TranslationUnit() { }
-    virtual bool isTranslationUnit() { return true; }
-    virtual void accept(ASTVisitor *v);
-};
-*/
 
 /***
  *
@@ -469,10 +395,6 @@ struct PackageDeclaration : public Declaration {
         }
     ASTType *getType() { return NULL; }
 
-    //Package(Package *sup=0, std::string nm="wl");
-
-    //virtual ~Package() { if(scope) delete scope; }
-
     ASTScope *getScope() {
         return scope;
     }
@@ -511,9 +433,7 @@ struct PackageDeclaration : public Declaration {
 };
 
 struct ModuleDeclaration : public PackageDeclaration {
-    ASTScope* importScope;
-    //std::vector<ImportExpression*> imports; //TODO: aliased imports?
-    //std::vector<ModuleDeclaration*> importModules; //TODO: aliased imports?
+    ASTScope* importScope; // TODO: aliased imports?
     std::map<std::string, bool> extensions;
 
     std::string filenm;
@@ -637,11 +557,6 @@ struct UserTypeDeclaration : public TypeDeclaration
         identifier->setDeclaredType(type);
         identifier->addDeclaration(this, Identifier::ID_USER);
     }
-
-    /*
-    UserTypeDeclaration(Identifier *id, ASTType *ty, SourceLocation loc, DeclarationQualifier dqual) :
-        TypeDeclaration(id, loc, dqual), type(ty), {}
-        */
 
     ASTScope *getScope() { return scope; }
     virtual Identifier *lookup(std::string member)
@@ -773,6 +688,8 @@ struct Expression : public Statement
     virtual bool isScope() { return false; } // do something with this
 
     Expression(SourceLocation l = SourceLocation()) : Statement(l) {}
+    virtual Expression *expression() { return this; }
+
     virtual UnaryExpression *unaryExpression() { return NULL; }
     virtual BinaryExpression *binaryExpression() { return NULL; }
     virtual PrimaryExpression *primaryExpression() { return NULL; }
@@ -818,16 +735,17 @@ struct TypeExpression : public Expression
 };
 
 //XXX should NewExpression extend CallExpression?
+struct FunctionExpression;
 struct NewExpression : public Expression
 {
     bool call;
     ASTType *type;
     Expression *alloc; // XXX validate this field
-    Expression *function; // found in validation
+    FunctionExpression *function; // found in validation
     std::list<Expression*> args;
     virtual ASTType *getType() { return alloc->getType(); }
     NewExpression(ASTType *t, Expression *all, std::list<Expression*> a, bool c, SourceLocation l = SourceLocation()) :
-        Expression(l), type(t), alloc(all), args(a), call(c), function(0) {}
+        Expression(l), type(t), alloc(all), args(a), call(c), function(NULL) {}
     virtual NewExpression *newExpression() { return this; }
     virtual void accept(ASTVisitor *v);
 
@@ -896,6 +814,24 @@ struct PostfixExpression : public Expression
     virtual void accept(ASTVisitor *v);
 };
 
+//XXX hacky
+// represents a function used in a function call.
+// either a function pointer, or a declaration from an overload
+struct FunctionExpression : public Expression {
+    FunctionDeclaration *overload;
+    Expression *fpointer;
+
+    ASTType *getType() {
+        if(overload) return overload->getType();
+        if(fpointer) return fpointer->getType();
+        return NULL;
+    }
+    FunctionExpression(SourceLocation loc = SourceLocation()) : Expression(loc), overload(NULL), fpointer(NULL) {}
+    FunctionExpression(FunctionDeclaration *ol, SourceLocation loc = SourceLocation()) : Expression(loc), overload(ol), fpointer(NULL) {}
+    FunctionExpression(Expression *fp, SourceLocation loc = SourceLocation()) : Expression(loc), overload(NULL), fpointer(fp) {}
+    bool isFunctionPointer() { return fpointer; }
+};
+
 struct CallExpression : public PostfixExpression
 {
     bool isConstructor; //XXX a bit hacky
@@ -903,10 +839,11 @@ struct CallExpression : public PostfixExpression
     virtual CallExpression *callExpression() { return this; }
 
     Expression *function;
+    FunctionExpression *resolvedFunction; //resolved in 'validate' pass
     std::list<Expression *> args; //TODO: make special argument expression to allow for name arguments?
 
     CallExpression(Expression *f, std::list<Expression*> a, SourceLocation l = SourceLocation()) :
-        PostfixExpression(l), function(f), args(a), isConstructor(false) {}
+        PostfixExpression(l), function(f), resolvedFunction(NULL), args(a), isConstructor(false) {}
 
     virtual ASTType *getType() {
         // this is a constructor call
@@ -938,12 +875,17 @@ struct IndexExpression : public PostfixExpression
     IndexExpression(Expression *l, Expression *i, SourceLocation lo = SourceLocation()) :
         PostfixExpression(lo), lhs(l), index(i) {}
     virtual ASTType *getType() {
-        if(lhs->getType()->getPointerElementTy()) {
-            return lhs->getType()->getPointerElementTy();
+        ASTType *lhsty = lhs->getType();
+        if(lhsty->getPointerElementTy()) {
+            return lhsty->getPointerElementTy();
         }
 
-        //TODO provide type if expression is const, and type is
-        // tuple or (?) struct
+        if(lhsty->isTuple()) {
+            int ind = index->asInteger();
+            return lhsty->asTuple()->getMemberType(ind);
+        }
+
+        //XXX provide type if expression is const and type is struct?
 
         return NULL;
     }

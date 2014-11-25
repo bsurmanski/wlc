@@ -24,8 +24,8 @@ int func(int i, int j) {
 int main(int argc, char^^ argv)
 {
     func(5)
-    func(10, 11);
-    OverloadClass cl = new OverloadClass()
+    func(10, 11)
+    OverloadClass cl = new OverloadClass
     cl.classy()
     cl.classy(5)
 }

@@ -467,7 +467,8 @@ struct ASTUserType : public ASTCompositeType {
 
     virtual bool coercesTo(ASTType *ty) {
         return getDeclaration() == ty->getDeclaration() || //TODO: might not work...
-                    (isClass() && ty->isClass() && extends(ty));
+                    (isClass() && ty->isClass() && extends(ty)) ||
+                    (isClass() && ty->isBool());
     }
     virtual bool isResolved() { return getDeclaration(); }
 

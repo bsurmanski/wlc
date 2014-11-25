@@ -635,13 +635,19 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
                 // this is so that structs literals are passed as 'this' as a pointer
                 if(dexp->lhs->getType()->isStruct() && dexp->lhs->isLValue()) {
                     exp->args.push_front(new UnaryExpression(tok::amp, dexp->lhs, location));
-                    //exp->args.push_front(dexp->lhs);
                 } else {
                     exp->args.push_front(dexp->lhs);
                 }
 
+                // lower dot expression from dotExpression to identifierExpression
                 if(dexp->lhs->getType()->isUserType()) {
                     Identifier *fid = dexp->lhs->getType()->asUserType()->getScope()->lookup(dexp->rhs);
+                    exp->function = new IdentifierExpression(fid, location);
+                } else if(dexp->lhs->getType()->isUserTypePointer()) {
+                    // also lower dot expression where LHS is pointer to user type
+                    // XXX should not do this if pointer to class?
+                    ASTUserType *uty = dexp->lhs->getType()->asPointer()->getPointerElementTy()->asUserType();
+                    Identifier *fid = uty->getScope()->lookup(dexp->rhs);
                     exp->function = new IdentifierExpression(fid, location);
                 }
 

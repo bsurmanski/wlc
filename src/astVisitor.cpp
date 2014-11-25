@@ -181,6 +181,7 @@ void PackageExpression::accept(ASTVisitor *v){
 
 void CastExpression::accept(ASTVisitor *v){
     Expression::accept(v);
+    if(expression) expression->accept(v);
     v->visitCastExpression(this);
 }
 

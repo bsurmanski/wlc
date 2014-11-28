@@ -1132,7 +1132,7 @@ ASTValue *IRCodegenContext::getArrayPointer(ASTValue *arr) {
         return new ASTBasicValue(elemty->getPointerTy(), llval, true);
     } else if(arr->getType()->kind == TYPE_ARRAY) {
         Value *llval = codegenLValue(arr);
-        return new ASTBasicValue(elemty->getPointerTy(), llval, true); //XXX static array ptr is immutable(?)
+        return new ASTBasicValue(elemty->getPointerTy(), llval); //XXX static array ptr is immutable(?)
     } else {
         emit_message(msg::ERROR, "invalid .ptr on non-array type");
         return NULL;

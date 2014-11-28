@@ -234,5 +234,6 @@ int main(int argc, char **argv)
     if(currentErrorLevel()) return -1; // failure to parse args
     compile(param);
     deinit(param);
+    if(currentErrorLevel() > msg::WARNING) return currentErrorLevel(); // failure to compile
     return 0;
 }

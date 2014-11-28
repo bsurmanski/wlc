@@ -462,14 +462,10 @@ void IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
         llval = ir->CreateStore(codegenValue(val), codegenLValue(dest));
     }
 
-    //ASTBasicValue *ret = new ASTBasicValue(dest->getType(), llval);
-
     // if storing a value that is stack allocated, this value should not be freed
     if(val->isNoFree() && dynamic_cast<ASTBasicValue*>(dest)) {
         ((ASTBasicValue*)dest)->setNoFree(true);
     }
-
-    //return dest;
 }
 
 ASTValue *IRCodegenContext::getStringValue(std::string str) {
@@ -1043,10 +1039,21 @@ ASTValue *IRCodegenContext::opIndexDArray(ASTValue *arr, ASTValue *idx) {
 }
 
 ASTValue *IRCodegenContext::opIndexSArray(ASTValue *arr, ASTValue *idx) {
+    /*
     ASTType *indexedType = arr->getType()->getPointerElementTy();
     std::vector<Value*> gep;
     gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
+    gep.push_back(codegenValue(idx));r
+    Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
+    return new ASTBasicValue(indexedType, val, true);
+    */
+
+    ASTType *indexedType = arr->getType()->getPointerElementTy();
+
+    std::vector<Value*> gep;
+    //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(codegenValue(idx));
+
     Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
     return new ASTBasicValue(indexedType, val, true);
 }
@@ -1075,9 +1082,18 @@ ASTValue *IRCodegenContext::opIndexTuple(ASTValue *tup, ASTValue *idx) {
             emit_message(msg::ERROR, "invalid tuple index");
             return NULL;
         }
-        ASTType *type = tupty->types[index];
-        Value *val = ir->CreateStructGEP(codegenLValue(tup), index);
-        return new ASTBasicValue(type, val, true);
+
+        if(TupleValue *tupval = dynamic_cast<TupleValue*>(tup)) {
+            // tuple is an immidiate. [1, 2, 3]
+            return tupval->values[index];
+        } else {
+            // tuple is likely a declaration; "[int, int] myvar"
+            ASTType *type = tupty->types[index];
+            Value *val = ir->CreateStructGEP(codegenLValue(tup), index);
+            return new ASTBasicValue(type, val, true);
+            //emit_message(msg::FAILURE, "tuple found that is not tuple value", location);
+        }
+
     } else
     {
         emit_message(msg::ERROR, "tuples can only be indexed with\
@@ -1115,11 +1131,8 @@ ASTValue *IRCodegenContext::getArrayPointer(ASTValue *arr) {
         Value *llval = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
         return new ASTBasicValue(elemty->getPointerTy(), llval, true);
     } else if(arr->getType()->kind == TYPE_ARRAY) {
-        std::vector<Value*> gep;
-        gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
-        gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
-        Value *llval = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
-        return new ASTBasicValue(elemty->getPointerTy(), llval, false); //XXX static array ptr is immutable(?)
+        Value *llval = codegenLValue(arr);
+        return new ASTBasicValue(elemty->getPointerTy(), llval, true); //XXX static array ptr is immutable(?)
     } else {
         emit_message(msg::ERROR, "invalid .ptr on non-array type");
         return NULL;
@@ -2509,9 +2522,20 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         Type *llty = codegenType(vty);
 
         AllocaInst *llvmDecl = ir->CreateAlloca(llty, 0, vdecl->getName());
-
         llvmDecl->setAlignment(8);
-        idValue = new ASTBasicValue(vty, llvmDecl, true, vty->isReference());
+
+        Value *llval = llvmDecl;
+
+        // static arrays are created in form of [i8x5].
+        // we want to convert value to pointer
+        if(vty->isSArray()) {
+            std::vector<Value*> gep;
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            llval = ir->CreateInBoundsGEP(llvmDecl, gep);
+        }
+
+        idValue = new ASTBasicValue(vty, llval, true, vty->isReference());
         idValue->setWeak(vdecl->isWeak());
 
         if(defaultValue) {
@@ -2528,14 +2552,13 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
                         storeValue(arrsz, getIntValue(ASTType::getLongTy(), len));
                     }
 
-                    //XXX this is quite ugly
-                    GlobalVariable *DGV = new GlobalVariable(*module, codegenType(defaultValue->getType()), true,
-                            GlobalValue::PrivateLinkage, (Constant*) codegenValue(defaultValue));
-                    ASTBasicValue GBV = ASTBasicValue(defaultValue->getType(), DGV, true);
                     for(int i = 0; i < len; i++) {
                         //TODO: replace with memcpy
-                        storeValue(opIndex(idValue, getIntValue(ASTType::getLongTy(), i)),
-                                   promoteType(opIndex(&GBV, getIntValue(ASTType::getLongTy(), i)), idValue->getType()->getPointerElementTy()));
+                        storeValue(
+                                opIndex(idValue, getIntValue(ASTType::getLongTy(), i)),
+                                promoteType(
+                                    opIndex(defaultValue, getIntValue(ASTType::getLongTy(), i)),
+                                    idValue->getType()->getPointerElementTy()));
 
                     }
                 } else {

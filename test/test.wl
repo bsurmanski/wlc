@@ -105,8 +105,9 @@ int main(int argc, char^^ argv)
     srand(100)
     randomize(back)
     randomize(surf)
+
     var title = "Life"
-    SDL_WM_SetCaption(title.ptr, null)
+    SDL_WM_SetCaption(title, null)
 
 
     var tuple = [1, 2, 3]

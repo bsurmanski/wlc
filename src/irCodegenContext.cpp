@@ -1212,8 +1212,10 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
         id->setValue(codegenExpression(id->getExpression()));
     } else if(id->isLabel())
     {
+        if(!id->getValue()) {
         id->setValue(new ASTBasicValue(NULL, BasicBlock::Create(context,
                         id->getName(), ir->GetInsertBlock()->getParent())));
+        }
     }
 
     return id->getValue();
@@ -2401,6 +2403,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         llvm::BasicBlock *BB = (llvm::BasicBlock*) lbl->value;
         if(!isTerminated())
             ir->CreateBr(BB);
+        setTerminated(false);
         ir->SetInsertPoint(BB);
     } else if(GotoStatement *gstmt = dynamic_cast<GotoStatement*>(stmt))
     {
@@ -2408,8 +2411,8 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         llvm::BasicBlock *BB = (llvm::BasicBlock*) lbl->value;
         ir->CreateBr(BB);
        // post GOTO block
-        BasicBlock *PG = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent());
-        ir->SetInsertPoint(PG);
+        //BasicBlock *PG = BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent());
+        //ir->SetInsertPoint(PG);
         //TODO: end scope?
         setTerminated(true);
     } else if(BreakStatement *bstmt = dynamic_cast<BreakStatement*>(stmt))

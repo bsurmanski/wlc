@@ -588,7 +588,7 @@ struct ASTArrayType : public ASTCompositeType {
     virtual bool isDynamic() = 0;
     virtual size_t length() = 0;
     ASTArrayType(ASTType *pto, ASTTypeEnum kind) : arrayOf(pto), ASTCompositeType(kind) {}
-    std::string getName() { return "array[" + arrayOf->getName() + "]"; }
+    std::string getName() { return arrayOf->getName() + "[]"; }
     std::string getMangledName() { return "a" + arrayOf->getMangledName(); }
 
     virtual ASTArrayType *asArray() { return this; }
@@ -614,6 +614,11 @@ struct ASTStaticArrayType : public ASTArrayType {
     }
 
     virtual ASTStaticArrayType *asSArray() { return this; }
+    std::string getName() {
+        std::stringstream ss;
+        ss << arrayOf->getName() << "[" << length() << "]";
+        return ss.str();
+    }
     //std::string getName() { return "Array[" + arrayOf->getName() + "]"; }
     //std::string getMangledName() { return "A" + arrayOf->getMangledName(); }
 };

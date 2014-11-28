@@ -18,8 +18,11 @@ char *realpath(const char *path, char *resolve);
 std::string getFilebase(std::string s);
 #else
 #include <unistd.h>
+#include <sys/stat.h>
 std::string getFilebase(std::string s);
 #endif
+
+unsigned getFileSize(std::string filenm);
 
 #include "astScope.hpp"
 #include "identifier.hpp"
@@ -1034,6 +1037,23 @@ struct StringExpression : public PrimaryExpression
         PrimaryExpression(l), string(str) {}
     virtual StringExpression *stringExpression() { return this; }
     virtual void accept(ASTVisitor *v);
+};
+
+struct PackExpression : public PrimaryExpression {
+    virtual ~PackExpression() {}
+    unsigned filesize;
+    std::string filename;
+
+    virtual ASTType *getType();
+
+    virtual bool isConstant() { return true; }
+    PackExpression(std::string filenm, SourceLocation l = SourceLocation()) :
+        PrimaryExpression(l), filename(filenm) {
+            filesize = getFileSize(filenm);
+        }
+    virtual PackExpression *packExpression() { return this; }
+    virtual void accept(ASTVisitor *v);
+    virtual Expression *lower();
 };
 
 struct NumericExpression : public PrimaryExpression

@@ -60,6 +60,7 @@ class ValidationVisitor : public ASTVisitor {
     virtual void visitUnaryExpression(UnaryExpression *exp);
     virtual void visitBinaryExpression(BinaryExpression *exp);
     virtual void visitPrimaryExpression(PrimaryExpression *exp);
+    virtual void visitPackExpression(PackExpression *exp);
     virtual OverloadValidity resolveOverloadValidity(std::list<Expression*> args, ASTNode *overload);
     virtual ASTNode *resolveOverloadList(std::list<Expression*> args, std::list<ASTNode*>& overload);
     virtual void buildOverloadList(Expression *func, std::list<ASTNode*>& overload);

@@ -92,6 +92,7 @@ KEYWORD(while)
 KEYWORD(switch)
 KEYWORD(case)
 KEYWORD(import)
+KEYWORD(pack)
 KEYWORD(include)
 KEYWORD(label)
 KEYWORD(package) /* declare package like Java, (package com.mysite.mypackage) */

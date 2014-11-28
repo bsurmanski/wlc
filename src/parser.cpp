@@ -495,6 +495,7 @@ Statement *ParseContext::parseStatement()
 
         case tok::kw_this:
         case tok::kw_import:
+        case tok::kw_pack:
         case tok::intNum:
         case tok::floatNum:
         case tok::kw_true:
@@ -1358,6 +1359,15 @@ Expression *ParseContext::parsePrimaryExpression() {
     if(peek().is(tok::charstring))
     {
         return new StringExpression(get().stringData(), loc);
+    }
+
+    if(peek().is(tok::kw_pack)) {
+        ignore();
+        if(peek().isNot(tok::charstring)) {
+            emit_message(msg::ERROR, "pack expression expects filename string following keyword", loc);
+            return NULL;
+        }
+        return new PackExpression(get().stringData(), loc);
     }
 
     if(peek().is(tok::lbracket))

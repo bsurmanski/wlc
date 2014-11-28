@@ -32,6 +32,14 @@ std::string getFilebase(std::string s)
 }
 #endif
 
+unsigned getFileSize(std::string filenm) {
+    struct stat st;
+    if(stat(filenm.c_str(), &st)) {
+        return 0;
+    }
+    return st.st_size;
+}
+
 AST::AST(){
     root = new PackageDeclaration(NULL, NULL, SourceLocation(), DeclarationQualifier());
     Identifier *id = root->getScope()->getInScope("__root");
@@ -284,23 +292,10 @@ ASTType *TupleExpression::getType() {
     return ASTType::getTupleTy(tupty);
 }
 
-/*
-FunctionDeclaration *UserTypeDeclaration::getDefaultConstructor(){
-    Identifier *id = getScope()->lookup("this");
-    FunctionDeclaration *fdecl = id->getDeclaration()->functionDeclaration();
-    while(fdecl) {
-        if(fdecl->getReturnType() == ASTType::getVoidTy() &&
-                fdecl->getType()->params.size() == 1 &&
-                fdecl->getType()->params[0]->asUserType() &&
-                !fdecl->getType()->isVararg()) {
-            return fdecl;
-        }
-        fdecl = fdecl->getNextOverload();
-    }
-    return NULL;
-}*/
-
-
 ASTType *StringExpression::getType() {
     return ASTType::getCharTy()->getArrayTy(string.length());
+}
+
+ASTType *PackExpression::getType() {
+    return ASTType::getCharTy()->getArrayTy(filesize);
 }

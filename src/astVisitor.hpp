@@ -42,6 +42,7 @@ class ASTVisitor {
     virtual void visitPostfixExpression(PostfixExpression *exp){}
     virtual void visitPostfixOpExpression(PostfixOpExpression *exp){}
     virtual void visitPrimaryExpression(PrimaryExpression *exp){}
+    virtual void visitPackExpression(PackExpression *exp){}
     virtual void visitCallExpression(CallExpression *exp){}
     virtual void visitIndexExpression(IndexExpression *exp){}
     virtual void visitIdentifierExpression(IdentifierExpression *exp){}

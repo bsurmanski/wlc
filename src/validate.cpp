@@ -380,6 +380,12 @@ void ValidationVisitor::visitPrimaryExpression(PrimaryExpression *exp) {
 
 }
 
+void ValidationVisitor::visitPackExpression(PackExpression *exp) {
+    if(exp->filesize <= 0) {
+        emit_message(msg::ERROR, "attempt to pack missing or empty file", location);
+    }
+}
+
 Expression *ValidationVisitor::resolveCallArgument(ASTFunctionType *fty, unsigned i, Expression *arg, Expression *def) {
     ASTType *argty = NULL;
     ASTType *paramty = NULL;

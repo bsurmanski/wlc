@@ -132,6 +132,11 @@ void PrimaryExpression::accept(ASTVisitor *v){
     v->visitPrimaryExpression(this);
 }
 
+void PackExpression::accept(ASTVisitor *v){
+    PrimaryExpression::accept(v);
+    v->visitPackExpression(this);
+}
+
 void CallExpression::accept(ASTVisitor *v){
     PostfixExpression::accept(v);
     if(function) function->accept(v);

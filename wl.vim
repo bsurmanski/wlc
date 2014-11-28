@@ -28,6 +28,7 @@ syn keyword wOperator and or not
 syn keyword wMemOperator new delete renew retain release
 syn keyword wDeclaration var this
 syn keyword wUse use
+syn keyword wPack pack 
 " reserved keywords
 syn keyword wReserve explicit decorated defer foreach asm once number let super
 
@@ -47,6 +48,7 @@ hi def link wOperator Operator
 hi def link wMemOperator Operator
 hi def link wDeclaration Keyword
 hi def link wUse Keyword
+hi def link wPack Keyword
 hi def link wReserve Error
 
 " Types

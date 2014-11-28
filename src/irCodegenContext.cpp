@@ -477,17 +477,15 @@ ASTValue *IRCodegenContext::getStringValue(std::string str) {
     GlobalVariable *GV = new GlobalVariable(*module, strConstant->getType(), true,
             GlobalValue::PrivateLinkage, strConstant);
 
+    // plus one for null
+    ASTType *strty = ASTType::getCharTy()->getArrayTy(str.length() + 1);
+
     vector<Value *> gep;
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-    Constant *val = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
+    Constant *ptr = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
 
-    //TODO: make this an ARRAY (when arrays are added), so that it has an associated length
-
-    // plus one for null
-    // XXX probably need to fix this, or else certain expressions will give invalid length
-    //ASTBasicValue *ret = new ASTBasicValue(ASTType::getCharTy()->getArrayTy(str.length()+1), val, true);
-    ASTBasicValue *ret = new ASTBasicValue(ASTType::getCharTy()->getPointerTy(), val);
+    ASTBasicValue *ret = new ASTBasicValue(strty, ptr, true);
     ret->setConstant(true);
     return ret;
 }
@@ -592,8 +590,12 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
         vals.push_back(val);
         types.push_back(val->getType());
 
-        if(!val->isLValue()) lvalue = false;
-        if(!val->isConstant()) isConst = false;
+        if(!val->isLValue()) {
+            lvalue = false;
+        }
+        if(!val->isConstant()) {
+            isConst = false;
+        }
     }
 
     Type *llty = codegenType(ty);
@@ -640,7 +642,7 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
         //XXX will fail on dynamic arrays
         Value *val = ir->CreateAlloca(llty);
         for(int i = 0; i < vals.size(); i++) {
-            ir->CreateStore(codegenValue(vals[i]), ir->CreateStructGEP(val, i));
+            ir->CreateStore(codegenValue(vals[i]), ir->CreateStructGEP(val, i)); //XXX const gep
         }
 
         return ir->CreateLoad(val);
@@ -1973,21 +1975,55 @@ ASTValue *IRCodegenContext::promoteTuple(ASTValue *val, ASTType *toType) {
 ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType) {
     if(val->getType()->kind == TYPE_ARRAY)
     {
+        ASTStaticArrayType *sarrty = val->getType()->asSArray();
         if(toType->kind == TYPE_POINTER)
         {
-            ASTArrayType *arrty = (ASTArrayType*) val->getType();
-            if(arrty->arrayOf != toType->getPointerElementTy())
+            if(sarrty->arrayOf != toType->getPointerElementTy())
             {
                 emit_message(msg::ERROR, "invalid convesion from array to invalid pointer type");
                 return NULL;
             }
             Value *ptr = codegenLValue(val);
-            ptr = ir->CreateBitCast(ptr, codegenType(toType));
-            return new ASTBasicValue(toType, ptr, false); //TODO: should be lvalue, but that causes it to load incorrectly
+
+            ASTBasicValue *ret = NULL;
+            if(val->isConstant()) {
+                //XXX make sure that ptr is constant
+                ptr = ConstantExpr::getPointerCast((Constant*) ptr, codegenType(toType));
+                ret = new ASTBasicValue(toType, ptr, false); //TODO: should be lvalue, but that causes it to load incorrectly
+                ret->setConstant(true);
+            } else {
+                ptr = ir->CreateBitCast(ptr, codegenType(toType));
+                ret = new ASTBasicValue(toType, ptr, false); //TODO: should be lvalue, but that causes it to load incorrectly
+            }
+            return ret;
+        } else if(toType->kind == TYPE_DYNAMIC_ARRAY) {
+            ASTArrayType *arrty = (ASTArrayType*) val->getType();
+            if(arrty->arrayOf != toType->getPointerElementTy())
+            {
+                emit_message(msg::ERROR, "CG: invalid convesion from array to incompatible array type");
+                return NULL;
+            }
+
+            // XXX will this work on non-constants? probably not...
+            Constant *ptr = ConstantExpr::getInBoundsGetElementPtr((Constant*) codegenLValue(val), ConstantInt::get(Type::getInt32Ty(context), 0));
+            Constant *sz = ConstantInt::get(codegenType(ASTType::getLongTy()), sarrty->length());
+
+            std::vector<Constant*> sarrMembers;
+            sarrMembers.push_back(ptr);
+            sarrMembers.push_back(sz);
+
+            Constant *toStruct = ConstantStruct::get((StructType*) codegenType(toType), sarrMembers);
+
+            ASTBasicValue *ret = new ASTBasicValue(toType, toStruct); //TODO: should be lvalue, but that causes it to load incorrectly
+            ret->setConstant(true);
+            return ret;
         }
     } else if(val->getType()->kind == TYPE_DYNAMIC_ARRAY)
     {
-
+        if(toType->kind == TYPE_POINTER) {
+            return indexValue(val, 0);
+        }
+        return NULL;
     }
 
     return val; //TODO

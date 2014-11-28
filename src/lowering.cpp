@@ -72,3 +72,16 @@ Expression *NewExpression ::lower() {
 Expression *CallExpression::lower() {
     return this;
 }
+
+Expression *PackExpression::lower() {
+    char *str = (char*) malloc(filesize);
+    FILE *file = fopen(filename.c_str(), "rb");
+    if(!file) {
+        emit_message(msg::FAILURE, "could not open file to pack", loc);
+    }
+    fread(str, 1, filesize, file);
+    fclose(file);
+    std::string cppstr = std::string(str, filesize);
+    free(str);
+    return new StringExpression(cppstr, loc);
+}

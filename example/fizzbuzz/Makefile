@@ -1,0 +1,2 @@
+all:
+	wlc main.wl

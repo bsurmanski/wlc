@@ -87,7 +87,7 @@ class ParseContext
     void ignore() { get(); }
 
     void dropLine() { // dumps entire line of input given an error (if line ends in binop, dump that too)
-        bool binOp = false;
+        //bool binOp = false;
         //while(!peek().followsNewline() && !binOp) {
         //    binOp = peek().isBinaryOp();
         //    ignore();

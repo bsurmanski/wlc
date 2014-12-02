@@ -111,8 +111,6 @@ ASTType *ParseContext::parseBasicType() {
  * exact variable length
  */
 ASTType *ParseContext::parseScalarType() {
-    ASTType *type = NULL;
-    bool ptr = false;
     Token t = peek();
 
     // basic keyword type
@@ -270,7 +268,6 @@ ASTType *ParseContext::parseType() {
 // parse top level expression and apply to module
 void ParseContext::parseTopLevel(ModuleDeclaration *module)
 {
-    Statement *stmt;
     Declaration *decl;
     SourceLocation l = peek().getLocation();
     switch(peek().kind)
@@ -434,8 +431,6 @@ ImportExpression *ParseContext::parseImport()
 
 Statement *ParseContext::parseStatement()
 {
-    int n = 1; //lookahead
-    int ad = 0; //array depth
     SourceLocation loc = peek().getLocation();
     ASTType *declType = NULL;
     Identifier *id = NULL;
@@ -897,13 +892,6 @@ PARSEFUNC:
     } else if(type->kind == TYPE_DYNAMIC) //XXX make isDynamic() function
     {
         emit_message(msg::ERROR, "dynamic type 'var' without initializer", idLoc);
-    }
-
-    if(ASTArrayType *aty = dynamic_cast<ASTArrayType*>(type))
-    {
-        Declaration *adecl = new VariableDeclaration(type, id, defaultValue, idLoc, dqual);
-        id->addDeclaration(adecl, Identifier::ID_VARIABLE);
-        return adecl;
     }
 
     Declaration *decl = new VariableDeclaration(type, id, defaultValue, idLoc, dqual);

@@ -94,8 +94,6 @@ int FunctionDeclaration::minExpectedParameters() {
 }
 
 int FunctionDeclaration::maxExpectedParameters() {
-    int n = 0;
-
     if(isVararg()) return 999; //arbitrarily large; shouldn't need more than 999 arguments, right?
     return parameters.size();
 }

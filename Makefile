@@ -61,7 +61,7 @@ endif
 
 CLANGLIBS:=$(foreach file, $(CLANGLIBS), $(llvm_prefix)/lib/$(file))
 
-CXXFLAGS=`llvm-config --cxxflags` -ggdb -O0 -frtti -UNDEBUG -DDEBUG -I/usr/local/include
+CXXFLAGS=`llvm-config --cxxflags` -ggdb -O0 -frtti -UNDEBUG -DDEBUG -I/usr/local/include -Wall -Wno-sign-compare -Wno-reorder
 LDFLAGS=`llvm-config --ldflags --libs` $(LLVMLDFLAGS)
 .PHONY: clean all install installsyntax
 

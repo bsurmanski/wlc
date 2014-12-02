@@ -66,6 +66,7 @@ struct ASTType
     ASTTypeEnum kind;
     ASTType *pointerTy;
     ASTType *dynamicArrayTy;
+    ASTType *constTy;
 
     struct Mod {
         bool isConst;
@@ -78,15 +79,12 @@ struct ASTType
 
     std::map<int, ASTType*> arrayTy;
 
-    void setTypeInfo(ASTTypeEnum en = TYPE_UNKNOWN)
-    {
-        if(en != TYPE_UNKNOWN) kind = en;
-    }
-
-    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0), dynamicArrayTy(0), cgType(0), mod()
+    ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0),
+        dynamicArrayTy(0), constTy(0), cgType(0), mod()
     {}
 
-    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL), dynamicArrayTy(0), cgType(NULL), mod()
+    ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL),
+        dynamicArrayTy(0), constTy(0), cgType(NULL), mod()
     {}
     virtual ~ASTType(){}
 
@@ -94,165 +92,26 @@ struct ASTType
 
     void accept(ASTVisitor *v);
     //virtual ~ASTType() { delete pointerTy; }
-    //ASTType *getUnqual();
+    virtual ASTType *getUnqual() { return this; }
     ASTType *getPointerTy();
     ASTType *getReferenceTy();
     ASTType *getArrayTy(Expression *sz);
     ASTType *getArrayTy(unsigned sz);
     ASTType *getArrayTy();
-    virtual UserTypeDeclaration *getDeclaration() const { return NULL; }
-    virtual size_t getSize()
-    {
-        switch(kind)
-        {
-            case TYPE_CHAR:
-            case TYPE_UCHAR:
-            case TYPE_BOOL: return 1;
-            case TYPE_USHORT:
-            case TYPE_SHORT: return 2;
-            case TYPE_UINT:
-            case TYPE_INT: return 4;
-            case TYPE_ULONG:
-            case TYPE_LONG: return 8;
-            case TYPE_POINTER: return 8;
-            case TYPE_FLOAT: return 4;
-            case TYPE_DOUBLE: return 8;
-            case TYPE_ARRAY:
-            case TYPE_DYNAMIC_ARRAY:
-            default: assert(false && "unimplemented getsize");
-        }
-    }
+    virtual UserTypeDeclaration *getDeclaration() const;
+    virtual size_t getSize();
 
     // conversion priority
-    unsigned getPriority()
-    {
-        switch(kind) {
-            case TYPE_USER:
-                return 0;
-            case TYPE_TUPLE:
-                return 1;
-            case TYPE_ARRAY:
-                return 2;
-            case TYPE_DYNAMIC_ARRAY:
-                return 3;
-            case TYPE_POINTER:
-                return 4;
-            case TYPE_BOOL:
-                return 5;
-            case TYPE_UCHAR:
-                return 6;
-            case TYPE_CHAR:
-                return 7;
-            case TYPE_USHORT:
-                return 8;
-            case TYPE_SHORT:
-                return 9;
-            case TYPE_UINT:
-                return 10;
-            case TYPE_INT:
-                return 11;
-            case TYPE_ULONG:
-                return 12;
-            case TYPE_LONG:
-                return 13;
-            case TYPE_FLOAT:
-                return 14;
-            case TYPE_DOUBLE:
-                return 15;
-	    default:
-		assert(false && "unknown type");
-        }
-	return 0;
-    }
+    unsigned getPriority();
 
-    virtual bool coercesTo(ASTType *ty) {
-        switch(kind) {
-            case TYPE_BOOL:
-            case TYPE_UCHAR:
-            case TYPE_CHAR:
-            case TYPE_USHORT:
-            case TYPE_SHORT:
-            case TYPE_UINT:
-            case TYPE_INT:
-            case TYPE_ULONG:
-            case TYPE_LONG:
-            case TYPE_FLOAT:
-            case TYPE_DOUBLE:
-                return ty->isNumeric();
-            default: break;
-        }
-	return false;
-    }
+    virtual bool coercesTo(ASTType *ty);
 
-    bool castsTo(ASTType *ty) const
-    {
-        return true;  //TODO
-    }
-
-    virtual size_t length()
-    {
-        return 1;
-    }
-
-    virtual size_t getAlign()
-    {
-
-        switch(kind)
-        {
-            case TYPE_CHAR:
-            case TYPE_UCHAR:
-            case TYPE_BOOL: return 1;
-            case TYPE_USHORT:
-            case TYPE_SHORT: return 2;
-            case TYPE_UINT:
-            case TYPE_INT: return 4;
-            case TYPE_ULONG:
-            case TYPE_LONG: return 8;
-            case TYPE_POINTER: return 8;
-            case TYPE_FLOAT: return 4;
-            case TYPE_DOUBLE: return 8;
-            default: assert(false && "unimplemented align");
-        }
-    };
-
-    virtual std::string getName()
-    {
-        switch(kind)
-        {
-            case TYPE_CHAR: return "char";
-            case TYPE_UCHAR: return "uchar";
-            case TYPE_BOOL: return "bool";
-            case TYPE_SHORT: return "short";
-            case TYPE_USHORT: return "ushort";
-            case TYPE_INT: return "int";
-            case TYPE_UINT: return "uint";
-            case TYPE_LONG: return "long";
-            case TYPE_ULONG: return "ulong";
-            case TYPE_FLOAT: return "float";
-            case TYPE_DOUBLE: return "double";
-            case TYPE_VOID: return "void";
-            default: assert(false && "unimplemented getname");
-        }
-    }
-
-    virtual std::string getMangledName()
-    {
-        switch(kind){
-            case TYPE_CHAR: return "s08";
-            case TYPE_UCHAR: return "u08";
-            case TYPE_BOOL: return "b08";
-            case TYPE_SHORT: return "s16";
-            case TYPE_USHORT: return "u16";
-            case TYPE_INT: return "s32";
-            case TYPE_UINT: return "u32";
-            case TYPE_LONG: return "s64";
-            case TYPE_ULONG: return "u64";
-            case TYPE_FLOAT: return "f32";
-            case TYPE_DOUBLE: return "f64";
-            case TYPE_VOID: return "v00";
-            default: assert(false && "unimplemented getname");
-        }
-    }
+    //TODO
+    bool castsTo(ASTType *ty) const { return true; }
+    virtual size_t length() { return 1; }
+    virtual size_t getAlign();
+    virtual std::string getName();
+    virtual std::string getMangledName();
 
     virtual ASTType *getPointerElementTy() const { return NULL; }
     bool isAggregate() { return kind == TYPE_USER; } //XXX kinda...
@@ -325,9 +184,14 @@ struct ASTType
 
     static ASTFunctionType *getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg=false);
     static ASTType *getVoidFunctionTy();
-
 };
 
+// type decorator; used for const/volatile
+struct ASTTypeDecorator : public ASTType {
+    ASTType *base;
+};
+
+// used for primative types
 struct ASTBasicType : public ASTType {
     ASTBasicType(ASTTypeEnum k) : ASTType(k) {}
 };

@@ -226,6 +226,9 @@ void Token::dump()
         #define PUNCTUATOR(X,Y) case tok::X: printf(#X); printf("\n"); break;
         #define KEYWORD(X) case tok::kw_##X: printf("kw_"); printf(#X); printf("\n"); break;
 #include "tokenkinds.def"
+        default:
+            emit_message(msg::WARNING, "cannot dump token", loc);
+            break;
     }
 }
 
@@ -250,6 +253,8 @@ std::string Token::getSpelling()
 #define KEYWORD(X) case kw_ ## X: return #X;
 #include "tokenkinds.def"
 
+        default:
+            emit_message(msg::FAILURE, "attempt to get spelling of invalid token", loc);
     }
 	return "";
 }

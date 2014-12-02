@@ -462,14 +462,12 @@ void ValidationVisitor::resolveCallArguments(FunctionExpression *func, std::list
                 (fty->isVararg() && args != funcargs.end())) {
             Expression *arg = NULL;
             Expression *defaultArg = NULL;
-            ASTType *argty = NULL;
             ASTType *paramty = NULL;
             //XXX below will break on varargs
             paramty  = fty->params[resolvedArgs.size()];
 
             if(args != funcargs.end()) {
                 arg = *args;
-                argty = arg->getType();
             }
 
             if(fdecl) {

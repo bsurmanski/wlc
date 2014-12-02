@@ -58,7 +58,8 @@ ASTType *ASTUserType::getMemberType(size_t i) {
 
 long ASTUserType::getMemberIndex(std::string member){
     UserTypeDeclaration *utd = getDeclaration();
-    return getDeclaration()->getMemberIndex(member);
+    if(!utd) return -1;
+    return utd->getMemberIndex(member);
 }
 
 long ASTUserType::getVTableIndex(std::string method){
@@ -143,6 +144,149 @@ size_t ASTTupleType::getAlign() {
 //
 // ASTType
 //
+
+UserTypeDeclaration *ASTType::getDeclaration() const {
+    return NULL;
+}
+
+size_t ASTType::getSize() {
+    switch(kind)
+    {
+        case TYPE_CHAR:
+        case TYPE_UCHAR:
+        case TYPE_BOOL: return 1;
+        case TYPE_USHORT:
+        case TYPE_SHORT: return 2;
+        case TYPE_UINT:
+        case TYPE_INT: return 4;
+        case TYPE_ULONG:
+        case TYPE_LONG: return 8;
+        case TYPE_POINTER: return 8;
+        case TYPE_FLOAT: return 4;
+        case TYPE_DOUBLE: return 8;
+        case TYPE_ARRAY:
+        case TYPE_DYNAMIC_ARRAY:
+        default: assert(false && "unimplemented getsize");
+    }
+}
+
+unsigned ASTType::getPriority() {
+    switch(kind) {
+        case TYPE_USER:
+            return 0;
+        case TYPE_TUPLE:
+            return 1;
+        case TYPE_ARRAY:
+            return 2;
+        case TYPE_DYNAMIC_ARRAY:
+            return 3;
+        case TYPE_POINTER:
+            return 4;
+        case TYPE_BOOL:
+            return 5;
+        case TYPE_UCHAR:
+            return 6;
+        case TYPE_CHAR:
+            return 7;
+        case TYPE_USHORT:
+            return 8;
+        case TYPE_SHORT:
+            return 9;
+        case TYPE_UINT:
+            return 10;
+        case TYPE_INT:
+            return 11;
+        case TYPE_ULONG:
+            return 12;
+        case TYPE_LONG:
+            return 13;
+        case TYPE_FLOAT:
+            return 14;
+        case TYPE_DOUBLE:
+            return 15;
+        default:
+            assert(false && "unknown type");
+    }
+    return 0;
+}
+
+bool ASTType::coercesTo(ASTType *ty) {
+    switch(kind) {
+        case TYPE_BOOL:
+        case TYPE_UCHAR:
+        case TYPE_CHAR:
+        case TYPE_USHORT:
+        case TYPE_SHORT:
+        case TYPE_UINT:
+        case TYPE_INT:
+        case TYPE_ULONG:
+        case TYPE_LONG:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+            return ty->isNumeric();
+        default: break;
+    }
+    return false;
+}
+
+size_t ASTType::getAlign() {
+
+    switch(kind)
+    {
+        case TYPE_CHAR:
+        case TYPE_UCHAR:
+        case TYPE_BOOL: return 1;
+        case TYPE_USHORT:
+        case TYPE_SHORT: return 2;
+        case TYPE_UINT:
+        case TYPE_INT: return 4;
+        case TYPE_ULONG:
+        case TYPE_LONG: return 8;
+        case TYPE_POINTER: return 8;
+        case TYPE_FLOAT: return 4;
+        case TYPE_DOUBLE: return 8;
+        default: assert(false && "unimplemented align");
+    }
+};
+
+std::string ASTType::getName()
+{
+    switch(kind)
+    {
+        case TYPE_CHAR: return "char";
+        case TYPE_UCHAR: return "uchar";
+        case TYPE_BOOL: return "bool";
+        case TYPE_SHORT: return "short";
+        case TYPE_USHORT: return "ushort";
+        case TYPE_INT: return "int";
+        case TYPE_UINT: return "uint";
+        case TYPE_LONG: return "long";
+        case TYPE_ULONG: return "ulong";
+        case TYPE_FLOAT: return "float";
+        case TYPE_DOUBLE: return "double";
+        case TYPE_VOID: return "void";
+        default: assert(false && "unimplemented getname");
+    }
+}
+
+    std::string ASTType::getMangledName() {
+        switch(kind){
+            case TYPE_CHAR: return "s08";
+            case TYPE_UCHAR: return "u08";
+            case TYPE_BOOL: return "b08";
+            case TYPE_SHORT: return "s16";
+            case TYPE_USHORT: return "u16";
+            case TYPE_INT: return "s32";
+            case TYPE_UINT: return "u32";
+            case TYPE_LONG: return "s64";
+            case TYPE_ULONG: return "u64";
+            case TYPE_FLOAT: return "f32";
+            case TYPE_DOUBLE: return "f64";
+            case TYPE_VOID: return "v00";
+            default: assert(false && "unimplemented getname");
+        }
+    }
+
 ASTType *ASTType::getPointerTy() {
     if(!pointerTy)
     {
@@ -282,7 +426,7 @@ ASTUserType *ASTUserType::asUnion() {
 }
 
 bool ASTUserType::is(ASTType *t) {
-    if(ASTUserType *uty = t->asUserType()) {
+    if(t->isUserType()) {
         return getDeclaration() == t->getDeclaration();
     }
     return false;

@@ -98,7 +98,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
         //members->push_back(vdecl);
     } else
     {
-ERR:
+//ERR:
 		char message[256];
 		sprintf(message, "unknown field in C record: %d, %s:%d", cursor.kind, loc.filenm, loc.line);
         emit_message(msg::FAILURE, message, loc);

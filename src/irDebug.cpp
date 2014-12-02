@@ -140,7 +140,7 @@ llvm::DICompositeType IRDebug::createUserType(ASTType *ty) //TODO: proper calcul
     llvm::DIDescriptor DIContext(currentFile());
     ASTUserType *userty = (ASTUserType*) ty;
     vector<Value *> vec;
-    int offset = 0;
+    //int offset = 0;
     for(int i = 0; i < userty->length(); i++)
     {
         VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(userty->getMember(i));

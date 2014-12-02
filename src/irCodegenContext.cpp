@@ -50,13 +50,11 @@ void IRCodegenContext::dwarfStopPoint(SourceLocation l)
 llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
 {
     ASTUserType *userty = ty->asUserType();
-    UserTypeDeclaration *utdecl = userty->getDeclaration();
     if(!userty) {
         emit_message(msg::FAILURE, "CODEGEN: invalid user type", location);
     }
 
     if(userty->identifier->isUndeclared()){ //XXX superfluous test
-        Identifier *alt = userty->identifier->table->lookup(userty->identifier->getName());
         emit_message(msg::WARNING, "CODEGEN: type should be resolved by now", location);
         userty->identifier = lookup(ty->getName());
         if(userty->identifier->isUndeclared()){
@@ -455,11 +453,11 @@ IRScope *IRCodegenContext::exitScope() {
 
 void IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 {
-    Value *llval = 0;
     if(dest->isReference()) {
-        llval = ir->CreateStore(codegenValue(val), codegenRefValue(dest));
+        // store return value if needed?
+        ir->CreateStore(codegenValue(val), codegenRefValue(dest));
     } else {
-        llval = ir->CreateStore(codegenValue(val), codegenLValue(dest));
+        ir->CreateStore(codegenValue(val), codegenLValue(dest));
     }
 
     // if storing a value that is stack allocated, this value should not be freed
@@ -564,7 +562,6 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
 
     std::vector<ASTValue*> vals;
     std::vector<ASTType*> types;
-    bool lvalue = true;
     bool isConst = true;
 
     // cannot simply allocate dynamic array type. create static array instead. Then it is
@@ -586,9 +583,6 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
         vals.push_back(val);
         types.push_back(val->getType());
 
-        if(!val->isLValue()) {
-            lvalue = false;
-        }
         if(!val->isConstant()) {
             isConst = false;
         }
@@ -596,7 +590,6 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
 
     Type *llty = codegenType(ty);
 
-    Value *ret;
     // tuple is a constant; can optimize tuple as constant global
     if(isConst)
     {
@@ -701,8 +694,6 @@ void IRCodegenContext::retainObject(ASTValue *val) {
 void IRCodegenContext::releaseObject(ASTValue *val) {
     //XXX error if not class?
     if(val->getType()->isClass()) {
-        ASTUserType *uty = val->getType()->asUserType();
-
         BasicBlock *beginBr = BasicBlock::Create(context, "decref", ir->GetInsertBlock()->getParent());
         BasicBlock *deconstructBr = BasicBlock::Create(context, "del", ir->GetInsertBlock()->getParent());
         BasicBlock *afterBr = BasicBlock::Create(context, "endref", ir->GetInsertBlock()->getParent());
@@ -1274,7 +1265,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(IdentifierExpression *iexp = exp->identifierExpression())
     {
         return codegenIdentifier(iexp->id);
-    } else if(ImportExpression *iexp = exp->importExpression())
+    } else if(exp->importExpression())
     {
         //TODO: should it return something? probably. Some sort of const package ptr or something...
         return NULL;
@@ -1290,8 +1281,9 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(IdOpExpression *dexp = dynamic_cast<IdOpExpression*>(exp))
     {
         return codegenIdOpExpression(dexp);
-    } else if(UseExpression *uexp = exp->useExpression())
+    } else if(exp->useExpression())
     {
+        // XXX do something with the UseExpression? make Use a Statement?
         return NULL;
     } else if(AllocExpression *aexp = exp->allocExpression()) {
         if(HeapAllocExpression *haexp = dynamic_cast<HeapAllocExpression*>(aexp)) {
@@ -1497,7 +1489,7 @@ void IRCodegenContext::codegenDelete(ASTValue *val) {
         FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()), llargty, false);
         Function *freeFunc = (Function*) module->getOrInsertFunction("free", fty);
 
-        Value *value = ir->CreateCall(freeFunc, llargs);
+        ir->CreateCall(freeFunc, llargs);
     }
 
     storeValue(val, new ASTBasicValue(val->getType(),
@@ -1618,8 +1610,6 @@ void IRCodegenContext::codegenSwitchStatement(SwitchStatement *stmt)
     BasicBlock *switch_end = BasicBlock::Create(context, "switch_end",
                                          ir->GetInsertBlock()->getParent());
 
-    BasicBlock *preSwitch = ir->GetInsertBlock();
-
     ASTValue *cond = codegenExpression(stmt->condition);
     SwitchInst *sinst = ir->CreateSwitch(codegenValue(cond), switch_default);
     //TODO: set cases
@@ -1720,7 +1710,6 @@ ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
     ASTValue *lhs = codegenExpression(exp->lhs); // expression after unary op: eg in !a, lhs=a
 
     ASTValue *val;
-    Value *llval = 0;
     switch(exp->op) {
         case tok::plusplus:
             if(!lhs->isLValue()) {
@@ -1794,7 +1783,6 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         ASTValue *old;
         ASTValue *val;
         ASTValue *lhs = codegenExpression(e->lhs);
-        Value *llval = 0;
 
         switch(e->op)
         {
@@ -1886,7 +1874,6 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     emit_message(msg::FATAL, "dot exp on array, not actually an array?", dexp->loc);
                     return NULL;
                 }
-                ASTType *ty = arrty->getPointerElementTy();
 
                 if(dexp->rhs == "ptr")
                 {
@@ -2415,8 +2402,9 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         //ir->SetInsertPoint(PG);
         //TODO: end scope?
         setTerminated(true);
-    } else if(BreakStatement *bstmt = dynamic_cast<BreakStatement*>(stmt))
+    } else if(dynamic_cast<BreakStatement*>(stmt))
     {
+        //XXX do something with BreakStatement?
         BasicBlock *br = getScope()->getBreak();
         if(!br){
             emit_message(msg::ERROR, "break doesnt make sense here!", stmt->loc);
@@ -2424,8 +2412,9 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         }
         ir->CreateBr(br);
         ir->SetInsertPoint(BasicBlock::Create(context, "", ir->GetInsertBlock()->getParent()));
-    } else if(ContinueStatement *cstmt = dynamic_cast<ContinueStatement*>(stmt))
+    } else if(dynamic_cast<ContinueStatement*>(stmt))
     {
+        //XXX do something with continueStatement?
         BasicBlock *cont = getScope()->getContinue();
         if(!cont){
             emit_message(msg::ERROR, "continue doesnt make sense here!", stmt->loc);
@@ -2446,7 +2435,6 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         exitScope();
     } else if(BlockStatement *bstmt = stmt->blockStatement())
     {
-        ASTValue *value = NULL;
         enterScope(new IRScope(bstmt->scope, unit->debug->createScope(getScope()->debug, bstmt->loc)));
         if(IfStatement *istmt = stmt->ifStatement())
         {

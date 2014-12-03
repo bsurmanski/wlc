@@ -1,4 +1,4 @@
-program:
+all:
 	wlc main.wl -o program
 
 ll:

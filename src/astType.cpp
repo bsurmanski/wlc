@@ -1,5 +1,6 @@
 #include "ast.hpp"
 #include "message.hpp"
+#include "astVisitor.hpp"
 
 //
 // UserType
@@ -145,6 +146,18 @@ size_t ASTTupleType::getAlign() {
 // ASTType
 //
 
+ASTTypeEnum ASTType::getKind() const {
+    return kind;
+}
+
+bool ASTType::isResolved() {
+    return true;
+}
+
+ASTType *ASTType::getUnqual() {
+    return this;
+}
+
 UserTypeDeclaration *ASTType::getDeclaration() const {
     return NULL;
 }
@@ -227,6 +240,15 @@ bool ASTType::coercesTo(ASTType *ty) {
         default: break;
     }
     return false;
+}
+
+//TODO
+bool ASTType::castsTo(ASTType *ty) const {
+    return true;
+}
+
+size_t ASTType::length() {
+    return 1;
 }
 
 size_t ASTType::getAlign() {
@@ -334,6 +356,16 @@ ASTType *ASTType::getArrayTy(Expression *sz) {
     return aty;
 }
 
+ASTType *ASTType::getConstTy() {
+    if(isConst()) return this;
+
+    if(!constTy) {
+        constTy = new ASTConstDecorator(this);
+    }
+
+    return constTy;
+}
+
 // declare all of the static ASTType instances, and their getter methods
 #if 0
 #define DECLTY(TY,NM) ASTType *ASTType::NM = 0; ASTType *ASTType::get##NM() { \
@@ -390,8 +422,22 @@ ASTType *ASTType::getVoidFunctionTy() {
     return getFunctionTy(getVoidTy(), std::vector<ASTType*>());
 }
 
+//TODO: use const char?
+ASTType *ASTType::getStringTy(Expression *sz) {
+    //ASTType *cchar = ASTType::getCharTy()->getConstTy();
+    ASTType *cchar = ASTType::getCharTy();
+    return cchar->getArrayTy(sz);
+}
+
+//TODO: use const char?
+ASTType *ASTType::getStringTy(unsigned sz) {
+    //ASTType *cchar = ASTType::getCharTy()->getConstTy();
+    ASTType *cchar = ASTType::getCharTy();
+    return cchar->getArrayTy(sz);
+}
+
 void ASTType::accept(ASTVisitor *v) {
-    //v->visitType(this);
+    v->visitType(this);
     //TODO subtypes, etc
 }
 

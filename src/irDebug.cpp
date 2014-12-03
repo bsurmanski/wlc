@@ -93,10 +93,10 @@ llvm::DICompositeType IRDebug::createArrayType(ASTType *ty)
 
 llvm::DICompositeType IRDebug::createTupleType(ASTType *ty)
 {
-
-    assert(ty->kind == TYPE_TUPLE && "expected struct");
     llvm::DIDescriptor DIContext(currentFile());
-    ASTTupleType *tupty = dynamic_cast<ASTTupleType*>(ty);
+    ASTTupleType *tupty = ty->asTuple();
+    assert(tupty && "expected tuple");
+
     vector<Value *> vec;
     int offset = 0;
     for(int i = 0; i < tupty->types.size(); i++)
@@ -315,7 +315,7 @@ llvm::DIType IRDebug::createType(ASTType *ty)
     //if(!ty->diType)
     {
         llvm::DIType dity;
-        switch(ty->kind)
+        switch(ty->getKind())
         {
             case TYPE_BOOL:
                 dity = di.createBasicType("bool", 8, 8, dwarf::DW_ATE_boolean);

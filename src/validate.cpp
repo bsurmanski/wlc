@@ -477,7 +477,9 @@ void ValidationVisitor::resolveCallArguments(FunctionExpression *func, std::list
             Expression *resolvedArg = resolveCallArgument(fty, resolvedArgs.size(), arg, defaultArg);
 
             if(!resolvedArg) {
-                emit_message(msg::ERROR, "cannot resolve argument %d of function call; does not coerce to expected type '" + paramty->getName() + "'", func->loc);
+                std::stringstream ss;
+                ss << "cannot resolve argument " <<  resolvedArgs.size() << " of function call. cannot convert argument of type '" << arg->getType()->getName() << "'" << "to '" << paramty->getName() << "'";
+                emit_message(msg::ERROR, ss.str(), func->loc);
             }
 
             resolvedArgs.push_back(resolvedArg);
@@ -681,11 +683,14 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
         resolveCallArguments(exp->resolvedFunction, exp->args);
     }
 
-    std::list<Expression*>::iterator it = exp->args.begin();
-    while(it != exp->args.end()) {
-        if(!*it) emit_message(msg::FAILURE, "invalid or missing argument in call expression", exp->loc);
-        else *it = (*it)->lower();
-        it++;
+    // only lower arguments if we don't already have an error
+    if(currentErrorLevel() < msg::ERROR) {
+        std::list<Expression*>::iterator it = exp->args.begin();
+        while(it != exp->args.end()) {
+            if(!*it) emit_message(msg::FAILURE, "invalid or missing argument in call expression", exp->loc);
+            else *it = (*it)->lower();
+            it++;
+        }
     }
 }
 

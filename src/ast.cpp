@@ -291,9 +291,9 @@ ASTType *TupleExpression::getType() {
 }
 
 ASTType *StringExpression::getType() {
-    return ASTType::getCharTy()->getArrayTy(string.length());
+    return ASTType::getStringTy(string.length());
 }
 
 ASTType *PackExpression::getType() {
-    return ASTType::getCharTy()->getArrayTy(filesize);
+    return ASTType::getStringTy(filesize);
 }

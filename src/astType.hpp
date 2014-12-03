@@ -68,67 +68,44 @@ struct ASTType
     ASTType *dynamicArrayTy;
     ASTType *constTy;
 
-    struct Mod {
-        bool isConst;
-        bool isRef;
-        Mod() : isConst(false), isRef(false) {}
-    } mod;
-
     llvm::Type *cgType; //TODO: should not have llvm in here!
     llvm::DIType diType; //TODO: whatever, prototype
 
     std::map<int, ASTType*> arrayTy;
 
     ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0),
-        dynamicArrayTy(0), constTy(0), cgType(0), mod()
+        dynamicArrayTy(0), constTy(0), cgType(0)
     {}
 
     ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL),
-        dynamicArrayTy(0), constTy(0), cgType(NULL), mod()
+        dynamicArrayTy(0), constTy(0), cgType(NULL)
     {}
+
     virtual ~ASTType(){}
-
-    virtual bool isResolved(){ return true; }
-
-    void accept(ASTVisitor *v);
     //virtual ~ASTType() { delete pointerTy; }
-    virtual ASTType *getUnqual() { return this; }
+
+    ASTTypeEnum getKind() const;
+    void accept(ASTVisitor *v);
     ASTType *getPointerTy();
     ASTType *getReferenceTy();
     ASTType *getArrayTy(Expression *sz);
     ASTType *getArrayTy(unsigned sz);
     ASTType *getArrayTy();
-    virtual UserTypeDeclaration *getDeclaration() const;
-    virtual size_t getSize();
+    ASTType *getConstTy();
 
-    // conversion priority
-    unsigned getPriority();
-
-    virtual bool coercesTo(ASTType *ty);
-
-    //TODO
-    bool castsTo(ASTType *ty) const { return true; }
-    virtual size_t length() { return 1; }
-    virtual size_t getAlign();
-    virtual std::string getName();
-    virtual std::string getMangledName();
-
-    virtual ASTType *getPointerElementTy() const { return NULL; }
-    bool isAggregate() { return kind == TYPE_USER; } //XXX kinda...
-    bool isBool() { return kind == TYPE_BOOL; }
-    bool isVoid() { return kind == TYPE_VOID; }
-    bool isInteger() { return kind == TYPE_BOOL || kind == TYPE_CHAR || kind == TYPE_SHORT ||
-        kind == TYPE_INT || kind == TYPE_LONG ||
-        kind == TYPE_UCHAR || kind == TYPE_USHORT || kind == TYPE_UINT || kind == TYPE_ULONG; }
-    bool isSigned() { return kind == TYPE_CHAR || kind == TYPE_SHORT ||
-        kind == TYPE_INT || kind == TYPE_LONG; }
-    bool isFloating() { return kind == TYPE_FLOAT || kind == TYPE_DOUBLE; }
+    bool isAggregate() { return getKind() == TYPE_USER; } //XXX kinda...
+    bool isBool() { return getKind() == TYPE_BOOL; }
+    bool isVoid() { return getKind() == TYPE_VOID; }
+    bool isInteger() { return getKind() == TYPE_BOOL || getKind() == TYPE_CHAR || getKind() == TYPE_SHORT ||
+        getKind() == TYPE_INT || getKind() == TYPE_LONG ||
+        getKind() == TYPE_UCHAR || getKind() == TYPE_USHORT || getKind() == TYPE_UINT || getKind() == TYPE_ULONG; }
+    bool isSigned() { return getKind() == TYPE_CHAR || getKind() == TYPE_SHORT ||
+        getKind() == TYPE_INT || getKind() == TYPE_LONG; }
+    bool isFloating() { return getKind() == TYPE_FLOAT || getKind() == TYPE_DOUBLE; }
     bool isNumeric() { return isFloating() || isInteger(); }
-    bool isVector() { return kind == TYPE_VEC; }
-    //bool isArray() { return kind == TYPE_ARRAY || kind == TYPE_DYNAMIC_ARRAY; }
+    bool isVector() { return getKind() == TYPE_VEC; }
+    //bool isArray() { return getKind() == TYPE_ARRAY || getKind() == TYPE_DYNAMIC_ARRAY; }
     bool isComposite() { return asCompositeType(); }
-    virtual bool isReference() { return false; }
-    virtual bool isUnknown() { return false; }
     bool isPointer() { return asPointer(); }
     bool isFunctionPointer() { return isPointer() && getPointerElementTy()->isFunctionType(); }
     bool isUserTypePointer() { return isPointer() && getPointerElementTy()->isUserType(); }
@@ -143,6 +120,23 @@ struct ASTType
     bool isArray() { return asArray(); }
     bool isDArray() { return asDArray(); }
     bool isSArray() { return asSArray(); }
+
+    virtual bool isResolved();
+    virtual ASTType *getUnqual();
+    virtual unsigned getPriority(); // conversion priority
+    virtual UserTypeDeclaration *getDeclaration() const;
+    virtual size_t getSize(); // in bytes
+    virtual bool coercesTo(ASTType *ty);
+    virtual bool castsTo(ASTType *ty) const;
+    virtual size_t length(); // length in elements; for arrays, usertypes
+    virtual size_t getAlign();
+    virtual std::string getName();
+    virtual std::string getMangledName();
+
+    virtual bool isConst() { return false; }
+    virtual ASTType *getPointerElementTy() const { return NULL; }
+    virtual bool isReference() { return false; }
+    virtual bool isUnknown() { return false; }
 
     virtual ASTFunctionType *asFunctionType() { return NULL; }
     virtual ASTCompositeType *asCompositeType() { return NULL; }
@@ -184,11 +178,21 @@ struct ASTType
 
     static ASTFunctionType *getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg=false);
     static ASTType *getVoidFunctionTy();
+
+    static ASTType *getStringTy(Expression *sz);
+    static ASTType *getStringTy(unsigned sz);
 };
 
 // type decorator; used for const/volatile
 struct ASTTypeDecorator : public ASTType {
     ASTType *base;
+
+    ASTTypeDecorator(ASTType *_base) : base(_base) {}
+};
+
+struct ASTConstDecorator : public ASTTypeDecorator {
+    ASTConstDecorator(ASTType *base) : ASTTypeDecorator(base) {}
+    virtual bool isConst() { return true; }
 };
 
 // used for primative types

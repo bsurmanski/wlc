@@ -1,4 +1,7 @@
 #include "ast.hpp"
+#include "validate.hpp"
+#include "sema.hpp"
+
 
 #if defined WIN32
 char *realpath(const char *path, char *resolve) {
@@ -40,6 +43,10 @@ unsigned getFileSize(std::string filenm) {
     return st.st_size;
 }
 
+//
+// AST
+//
+
 AST::AST(){
     root = new PackageDeclaration(NULL, NULL, SourceLocation(), DeclarationQualifier());
     Identifier *id = root->getScope()->getInScope("__root");
@@ -51,18 +58,18 @@ AST::~AST() {
     delete root;
 }
 
-/*
-Package::Package(Package *sup, std::string nm)
-    : superPackage(sup), scope(NULL), identifier(NULL)
-{
-    name = nm;
-    if(superPackage) {
-        identifier = superPackage->getScope()->getInScope(name);
-        identifier->addDeclaration(new PackageDeclaration(this, identifier,
-                    SourceLocation(nm.c_str(), 1), DeclarationQualifier()), Identifier::ID_PACKAGE);
+bool AST::validate() {
+    ValidationVisitor validate;
+    Sema sema;
+    PackageDeclaration *pdecl = getRootPackage();
+
+    pdecl->accept(&validate);
+    if(validate.isValid()) {
+        pdecl->accept(&sema);
+        return sema.isValid();
     }
+    return false;
 }
-*/
 
 ASTFunctionType *FunctionDeclaration::getType() {
     if(!prototype) {
@@ -204,6 +211,24 @@ void ClassDeclaration::populateVTable() {
 CONTINUE:;
         }
     }
+}
+
+Expression *Expression::coerceTo(ASTType *ty) {
+    ASTType *expty = getType();
+
+    if(expty->is(ty)) {
+        return this;
+    }
+
+    if(expty->coercesTo(ty)) {
+        //TODO: note in AST that this is implicit
+        return new CastExpression(ty, this, loc);
+    }
+
+    emit_message(msg::ERROR, "attempt to coerce expression of type '" + expty->getName() +
+            "' to incompatible type '" + ty->getName() + "'", loc);
+
+    return NULL;
 }
 
 ASTType *BinaryExpression::getType() {

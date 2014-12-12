@@ -722,6 +722,8 @@ struct Expression : public Statement
 
     virtual void accept(ASTVisitor *v);
 
+    Expression *coerceTo(ASTType *ty);
+
     virtual int asInteger() {
         emit_message(msg::ERROR, "this value cannot be converted to integer", loc);
         return 0;

@@ -15,6 +15,7 @@ obj
 *.sum
 core.*
 tags
+.tags
 cscope.out
 build/
 

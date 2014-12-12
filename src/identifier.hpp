@@ -73,7 +73,10 @@ struct Identifier
     bool isLabel() { return kind == ID_LABEL; }
     bool isAlias() { return false; }
     bool isValue() { return isFunction() || isVariable() || isExpression(); }
-    bool isType() { return isUserType() || isAlias(); } //XXX can alias value?
+
+    //XXX can alias value?
+    // "kind == ID_TYPE" is here for importc typedef
+    bool isType() { return isUserType() || isAlias() || kind == ID_TYPE; }
 
     bool isTypeMember();
     ASTType *getMemberOwner();

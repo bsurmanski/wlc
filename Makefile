@@ -71,7 +71,7 @@ clean:
 	rm -rf build
 
 wlc: $(OBJ)
-	-ctags -R -o .git/tags
+	-ctags -R -o .tags
 	g++ $(OBJ) $(CLANGLIBS) $(CXXFLAGS) $(LDFLAGS) -o wlc
 
 build/%.o: src/%.cpp

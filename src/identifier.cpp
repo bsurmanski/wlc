@@ -43,6 +43,9 @@ ASTType *Identifier::getType()
 
 ASTType *Identifier::getDeclaredType()
 {
+    //XXX special case for c typedef
+    if(kind == ID_TYPE) return astType;
+
     //TODO: class
     if(kind != ID_USER && kind != ID_UNKNOWN) {
         if(kind == ID_EXPRESSION && expression && expression->typeExpression()) {

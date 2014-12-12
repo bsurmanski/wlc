@@ -48,7 +48,7 @@ struct StructVisitorArg
     ASTScope *scope;
 };
 
-ASTType *ASTTypeFromCType(ModuleDeclaration *module, CXType ctype);
+ASTType *ASTTypeFromCType(ModuleDeclaration *module, CXType ctype, SourceLocation loc);
 
 CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
 {
@@ -80,7 +80,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
 		return CXChildVisit_Continue;
 	}
 
-        ASTType *ty = ASTTypeFromCType(module, clang_getCursorType(cursor));
+        ASTType *ty = ASTTypeFromCType(module, clang_getCursorType(cursor), loc);
         if(!ty) return CXChildVisit_Break;
 
         Identifier *id = scope->getInScope(name);
@@ -90,7 +90,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
         members->push_back(vdecl);
     } else if(cursor.kind == CXCursor_UnionDecl || cursor.kind == CXCursor_StructDecl)
     {
-        ASTType *ty = ASTTypeFromCType(module, clang_getCursorType(cursor));
+        ASTType *ty = ASTTypeFromCType(module, clang_getCursorType(cursor), loc);
         if(!ty) return CXChildVisit_Break;
         Identifier *id = scope->get("___" + ty->getName()); // TODO: proper scope name
         VariableDeclaration *vdecl = new VariableDeclaration(ty, id, 0, loc, dqual);
@@ -107,7 +107,7 @@ CXChildVisitResult StructVisitor(CXCursor cursor, CXCursor parent, void *svarg)
     return CXChildVisit_Continue;
 }
 
-ASTType *ASTRecordTypeFromCType(ModuleDeclaration *module, CXType ctype)
+ASTType *ASTRecordTypeFromCType(ModuleDeclaration *module, CXType ctype, SourceLocation loc)
 {
     vector<Declaration*> members;
     ASTScope *tbl = new ASTScope(module->getScope());
@@ -134,12 +134,17 @@ ASTType *ASTRecordTypeFromCType(ModuleDeclaration *module, CXType ctype)
         StructVisitorArg svarg = { module, &members, tbl };
         clang_visitChildren(typeDecl, StructVisitor, &svarg);
 
+        // Although id is undeclared above, id could be declared while visiting typedecl children
+        // XXX this is not quite right, since redeclaration will be opaque.
+        // happens if a struct contains a reference to its own type
+        if(!id->isUndeclared()) return id->getDeclaredType();
+
         if(typeDecl.kind == CXCursor_StructDecl)
         {
             //TODO: correct source loc
-            utdecl = new StructDeclaration(id, tbl, SourceLocation(), DeclarationQualifier());
+            utdecl = new StructDeclaration(id, tbl, loc, DeclarationQualifier());
         } else {// is union
-            utdecl = new UnionDeclaration(id, tbl, SourceLocation(), DeclarationQualifier());
+            utdecl = new UnionDeclaration(id, tbl, loc, DeclarationQualifier());
         }
 
         for(int i = 0; i < members.size(); i++) {
@@ -153,16 +158,55 @@ ASTType *ASTRecordTypeFromCType(ModuleDeclaration *module, CXType ctype)
 }
 
 
-ASTType *ASTTypeFromCType(ModuleDeclaration *module, CXType ctype)
+ASTType *ASTUnexposedTypeFromCType(ModuleDeclaration *module, CXType ctype, SourceLocation loc) {
+    ASTScope *tbl = new ASTScope(module->getScope());
+    CXString cxname = clang_getTypeSpelling(ctype);
+    string name = clang_getCString(cxname);
+    CXCursor typeDecl = clang_getTypeDeclaration(ctype);
+
+    string sstruct = "struct ";
+    string sunion = "union ";
+    if(name.compare(0, sstruct.length(), sstruct) == 0) //remove 'struct' keyword
+    {
+        name = name.substr(sstruct.length());
+    } else if(name.compare(0, sunion.length(), sunion) == 0) //remove 'union' keyword
+    {
+        name = name.substr(sunion.length());
+    }
+
+    Identifier *id = module->getScope()->lookup(name);
+
+    UserTypeDeclaration *utdecl = 0;
+    //TODO: should just use 'get' above?
+    if(!id || id->isUndeclared())
+    {
+        id = module->getScope()->get(name);
+
+        if(typeDecl.kind == CXCursor_StructDecl)
+        {
+            //TODO: correct source loc
+            utdecl = new StructDeclaration(id, tbl, loc, DeclarationQualifier());
+        } else {// is union
+            utdecl = new UnionDeclaration(id, tbl, loc, DeclarationQualifier());
+        }
+
+        return utdecl->getDeclaredType();
+    }
+
+    return id->getDeclaredType();
+}
+
+ASTType *ASTTypeFromCType(ModuleDeclaration *module, CXType ctype, SourceLocation loc)
 {
     ASTType *ty = 0;
+
 
     switch(ctype.kind)
     {
         case CXType_Void:
             return ASTType::getVoidTy();
         case CXType_Unexposed: //TODO: create a specific type for unexposed?
-            return ASTType::getVoidTy()->getPointerTy();
+            return ASTUnexposedTypeFromCType(module, ctype, loc);
         case CXType_Bool: return ASTType::getBoolTy();
         case CXType_Char_U:
         case CXType_UChar: return ASTType::getUCharTy();
@@ -184,18 +228,19 @@ ASTType *ASTTypeFromCType(ModuleDeclaration *module, CXType ctype)
             return ASTType::getDoubleTy();
         case CXType_Pointer:
         case CXType_VariableArray:
-            ty = ASTTypeFromCType(module, clang_getPointeeType(ctype));
+            ty = ASTTypeFromCType(module, clang_getPointeeType(ctype), loc);
             if(ty) return ty->getPointerTy();
             return NULL;
         case CXType_Record:
-            return ASTRecordTypeFromCType(module, ctype);
+            return ASTRecordTypeFromCType(module, ctype, loc);
         case CXType_Typedef:
-            return ASTTypeFromCType(module, clang_getCanonicalType(ctype));
+            return ASTTypeFromCType(module, clang_getCanonicalType(ctype), loc);
         case CXType_Enum:
             return ASTType::getULongTy();
         case CXType_ConstantArray:
-            return ASTTypeFromCType(module,
-                    clang_getElementType(ctype))->getArrayTy(clang_getArraySize(ctype));
+            ty = ASTTypeFromCType(module,
+                    clang_getElementType(ctype), loc);
+            return ty->getArrayTy(clang_getArraySize(ctype));
         case CXType_FunctionProto:
             return NULL; //TODO
         default:
@@ -246,18 +291,16 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
         vector<ASTType*> params;
         vector<VariableDeclaration*> parameters;
 
-        for(int i = 0; i < nargs; i++)
-        {
-            ASTType *astArgTy =
-                    ASTTypeFromCType(module,
-                            clang_getCanonicalType(clang_getArgType(fType, i)));
+        for(int i = 0; i < nargs; i++) {
+            CXType canonicalTy =  clang_getCanonicalType(clang_getArgType(fType, i));
+            ASTType *astArgTy = ASTTypeFromCType(module, canonicalTy, loc);
             if(!astArgTy) goto ERR;
 
             params.push_back(astArgTy);
             parameters.push_back(new VariableDeclaration(astArgTy, NULL, NULL, loc, DeclarationQualifier()));
         }
 
-        ASTType *rType = ASTTypeFromCType(module, clang_getResultType(fType));
+        ASTType *rType = ASTTypeFromCType(module, clang_getResultType(fType), loc);
 
         if(!rType) goto ERR;
 
@@ -279,7 +322,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
         CXString cxname = clang_getCursorSpelling(cursor);
         std::string name = clang_getCString(cxname);
 
-        ASTType *wlType = ASTTypeFromCType(module, type);
+        ASTType *wlType = ASTTypeFromCType(module, type, loc);
         if(!wlType) goto ERR;
 
         Identifier *id = module->getScope()->get(name);
@@ -363,7 +406,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
     } else if(cursor.kind == CXCursor_StructDecl)
     {
         // will generate struct ASTType
-        ASTTypeFromCType(module, clang_getCursorType(cursor));
+        ASTTypeFromCType(module, clang_getCursorType(cursor), loc);
     } else if(cursor.kind == CXCursor_TypedefDecl) {
         /*
         // XXX FROM OTHER ATTEMPT ON VULCAN
@@ -371,13 +414,14 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
         ASTType *typedefty = ASTTypeFromCType(module, clang_getTypedefDeclUnderlyingType(cursor));
         id->setExpression(new TypeExpression(typedefty, loc));
         */
-        goto ERR; //TODO
+        //goto ERR; //TODO
         CXString cxname = clang_getCursorSpelling(cursor);
         std::string name = clang_getCString(cxname);
         CXType ctype = clang_getTypedefDeclUnderlyingType(cursor);
-        ASTType *ty = ASTTypeFromCType(module, ctype);
+        ASTType *ty = ASTTypeFromCType(module, ctype, loc);
         if(!ty) goto ERR;
         Identifier *id = module->getScope()->get(name);
+        if(!id->isUndeclared()) goto ERR;
         id->setKind(Identifier::ID_TYPE);
         id->setDeclaredType(ty);
     }

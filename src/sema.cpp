@@ -33,7 +33,7 @@ ASTType *Sema::commonType(ASTType *t1, ASTType *t2) {
         if(t2->extends(t1)) return t1;
 
         if(t1->isUserType() != t2->isUserType()) {
-            emit_message(msg::ERROR, "attempt to cast user type to non-user type", location);
+            emit_message(msg::ERROR, "attempt to cast user type to non-user type", currentLocation());
         }
     }
 
@@ -109,7 +109,7 @@ Expression *Sema::resolveCallArgument(ASTFunctionType *fty, unsigned i, Expressi
             return arg->coerceTo(ASTType::getVoidTy()->getPointerTy());
         }
 
-        emit_message(msg::ERROR, "invalid argument passed as vararg argument", location);
+        emit_message(msg::ERROR, "invalid argument passed as vararg argument", currentLocation());
         return NULL;
     } else if(argty && argty->is(paramty)) {
         return arg;
@@ -135,16 +135,16 @@ void Sema::resolveCallArguments(FunctionExpression *func, std::list<Expression*>
         if(func->fpointer) {
             fty = func->fpointer->getType()->getPointerElementTy()->asFunctionType();
             if(!fty) {
-                emit_message(msg::ERROR, "non-function pointer used in function pointer context", location);
+                emit_message(msg::ERROR, "non-function pointer used in function pointer context", currentLocation());
                 return;
             }
-            //func = new UnaryExpression(tok::caret, func, location);
+            //func = new UnaryExpression(tok::caret, func, currentLocation());
         } else {
             fty = func->overload->getType()->asFunctionType();
             fdecl = func->overload;
 
             if(!fty) {
-                emit_message(msg::ERROR, "attempt to call non-function type", location);
+                emit_message(msg::ERROR, "attempt to call non-function type", currentLocation());
                 return;
             }
         }
@@ -181,12 +181,12 @@ void Sema::resolveCallArguments(FunctionExpression *func, std::list<Expression*>
         }
 
         if(args != funcargs.end()) {
-            emit_message(msg::ERROR, "too many arguments passed for function", location);
+            emit_message(msg::ERROR, "too many arguments passed for function", currentLocation());
         }
 
         funcargs = resolvedArgs;
     } else if(func->isType()) {
-        emit_message(msg::FAILURE, "call expression on type should be lowered by now", location);
+        emit_message(msg::FAILURE, "call expression on type should be lowered by now", currentLocation());
         //TODO: properly resolve arguments
         //XXX: should this be in lowering?
 
@@ -197,13 +197,13 @@ void Sema::resolveCallArguments(FunctionExpression *func, std::list<Expression*>
         ASTUserType *uty = func->getDeclaredType()->asUserType();
         if(!uty) {
             emit_message(msg::ERROR, "constructor syntax on non-user type '" +
-                    func->getDeclaredType()->getName() + "'", location);
+                    func->getDeclaredType()->getName() + "'", currentLocation());
         }
 
         //TODO: currently breaks because codegen needs to alloc 'this'
-        //func = new IdentifierExpression(uty->getConstructor()->getIdentifier(), location);
+        //func = new IdentifierExpression(uty->getConstructor()->getIdentifier(), currentLocation());
     } else {
-        emit_message(msg::ERROR, "invalid function call", location);
+        emit_message(msg::ERROR, "invalid function call", currentLocation());
     }
 }
 
@@ -291,7 +291,7 @@ void Sema::buildOverloadList(Expression *func, std::list<ASTNode*>& overload) {
             decl = decl->getNextOverload();
         }
     } else if(func->dotExpression()) {
-        emit_message(msg::ERROR, "dot expression should be lowered by now", location);
+        emit_message(msg::FAILURE, "dot expression should be lowered by now", currentLocation());
     }
 }
 
@@ -333,7 +333,7 @@ void Sema::visitCallExpression(CallExpression *exp) {
             if(dexp->isValue()) {
                 // this is so that structs literals are passed as 'this' as a pointer
                 if(dexp->lhs->getType()->isStruct() && dexp->lhs->isLValue()) {
-                    exp->args.push_front(new UnaryExpression(tok::amp, dexp->lhs, location));
+                    exp->args.push_front(new UnaryExpression(tok::amp, dexp->lhs, currentLocation()));
                 } else {
                     exp->args.push_front(dexp->lhs);
                 }
@@ -341,20 +341,20 @@ void Sema::visitCallExpression(CallExpression *exp) {
                 // lower dot expression from dotExpression to identifierExpression
                 if(dexp->lhs->getType()->isUserType()) {
                     Identifier *fid = dexp->lhs->getType()->asUserType()->getScope()->lookup(dexp->rhs);
-                    exp->function = new IdentifierExpression(fid, location);
+                    exp->function = new IdentifierExpression(fid, currentLocation());
                 } else if(dexp->lhs->getType()->isUserTypePointer()) {
                     // also lower dot expression where LHS is pointer to user type
                     // XXX should not do this if pointer to class?
                     ASTUserType *uty = dexp->lhs->getType()->asPointer()->getPointerElementTy()->asUserType();
                     Identifier *fid = uty->getScope()->lookup(dexp->rhs);
-                    exp->function = new IdentifierExpression(fid, location);
+                    exp->function = new IdentifierExpression(fid, currentLocation());
                 }
 
             } else { // UFCS
                 Identifier *fid = getScope()->lookup(dexp->rhs);
-                exp->function = new IdentifierExpression(fid, location);
+                exp->function = new IdentifierExpression(fid, currentLocation());
                 exp->args.push_front(dexp->lhs);
-                emit_message(msg::DEBUGGING, "ufcs", location);
+                emit_message(msg::DEBUGGING, "ufcs", currentLocation());
             }
         }
 
@@ -362,7 +362,7 @@ void Sema::visitCallExpression(CallExpression *exp) {
         buildOverloadList(exp->function, overloads);
         ASTNode *callfunc = resolveOverloadList(exp->args, overloads);
         if(!callfunc) {
-            emit_message(msg::ERROR, "no valid overload found", location);
+            emit_message(msg::ERROR, "no valid overload found", currentLocation());
             return;
         }
 
@@ -430,10 +430,7 @@ void Sema::visitDotExpression(DotExpression *exp) {
         // dereference pointer types on dot expression
         if(lhstype->isPointer() && lhstype->getPointerElementTy()->isStruct()) {
             rhsid = lhstype->getPointerElementTy()->getDeclaration()->lookup(exp->rhs);
-            if(rhsid->isVariable()) {
-                exp->lhs = new UnaryExpression(tok::caret, exp->lhs, location);
-                lhstype = exp->lhs->getType();
-            } else if(rhsid->isFunction()) {
+            if(rhsid->isFunction()) {
                 // functions take pointer
                 return;
             }
@@ -447,7 +444,7 @@ void Sema::visitNewExpression(NewExpression *exp) {
 
     ASTUserType *uty = exp->type->asUserType();
     if(uty && exp->call) {
-        exp->function = new FunctionExpression(uty->getConstructor(), location);
+        exp->function = new FunctionExpression(uty->getConstructor(), currentLocation());
         //resolveType(exp->function->getType()); //XXX temp. some constructor args-type would not be defined.
 
         resolveCallArguments(exp->function, exp->args);

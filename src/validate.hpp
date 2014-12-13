@@ -17,8 +17,6 @@
  */
 class ValidationVisitor : public ASTVisitor {
     bool valid;
-
-    SourceLocation location;
     ASTScope *scope;
     //std::stack<ASTNode *> trace;
 

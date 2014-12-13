@@ -23,7 +23,7 @@ void init()
     glBindTexture(GL_TEXTURE_2D, tex)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, surf.w, surf.h, 
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, surf.w, surf.h,
         0, GL_RGB, GL_UNSIGNED_BYTE, surf.pixels)
     SDL_FreeSurface(surf)
 

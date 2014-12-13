@@ -16,7 +16,6 @@ enum OverloadValidity {
 class Sema : public ASTVisitor {
     bool valid;
 
-    SourceLocation location;
     ASTScope *scope;
 
     public:

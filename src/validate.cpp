@@ -46,11 +46,11 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
             userty->identifier = resolveIdentifier(userty->identifier);
 
             if(!ty->getDeclaration()) {
-                emit_message(msg::FAILURE, "undeclared user type", location);
+                emit_message(msg::FAILURE, "undeclared user type", currentLocation());
                 return NULL;
             }
 
-            location = ty->getDeclaration()->loc;
+            //location = ty->getDeclaration()->loc;
             //userty->getScope()->accept(this);
         }
     }
@@ -74,7 +74,7 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
     if(ty->isTuple()) {
         ASTTupleType *tupty = ty->asTuple();
         if(!tupty->types.size()) {
-            emit_message(msg::ERROR, "invalid 0-tuple", location);
+            emit_message(msg::ERROR, "invalid 0-tuple", currentLocation());
         }
 
         for(int i = 0; i < tupty->types.size(); i++) {
@@ -92,7 +92,7 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
     }
 
     if(ty->kind == TYPE_UNKNOWN || ty->kind == TYPE_UNKNOWN_USER) {
-        emit_message(msg::FATAL, "invalid type", location);
+        emit_message(msg::FATAL, "invalid type", currentLocation());
     }
 
     return ty;
@@ -100,7 +100,7 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
 
 void ValidationVisitor::visitPackage(PackageDeclaration *pak) {
     if(!pak->getScope()) {
-        emit_message(msg::ERROR, "package is missing scope", location);
+        emit_message(msg::ERROR, "package is missing scope", currentLocation());
         valid = false;
     }
 }
@@ -110,27 +110,27 @@ void ValidationVisitor::visitModule(ModuleDeclaration *mod) {
     for(it = mod->importScope->begin(); it != mod->importScope->end(); it++) {
         if(!it->getDeclaration()->moduleDeclaration()) {
             valid = false;
-            emit_message(msg::ERROR, "invalid translation unit found, null import", location);
+            emit_message(msg::ERROR, "invalid translation unit found, null import", currentLocation());
         }
     }
 }
 
 void ValidationVisitor::visitDeclaration(Declaration *decl) {
-    location = decl->loc;
+    ASTVisitor::visitDeclaration(decl);
 
     if(!decl->identifier) {
         valid = false;
-        emit_message(msg::ERROR, "null identifier in declaration", location);
+        emit_message(msg::ERROR, "null identifier in declaration", currentLocation());
     }
 
     if(decl->identifier->isUndeclared()) {
         valid = false;
-        emit_message(msg::ERROR, "inconsistant AST, undeclared identifier in definition", location);
+        emit_message(msg::ERROR, "inconsistant AST, undeclared identifier in definition", currentLocation());
     }
 
     if(decl->qualifier.weak && !decl->getType()->isClass()) {
         valid = false;
-        emit_message(msg::ERROR, "weak qualifier only applies to class type variables", location);
+        emit_message(msg::ERROR, "weak qualifier only applies to class type variables", currentLocation());
     }
 }
 
@@ -138,12 +138,12 @@ void ValidationVisitor::visitFunctionDeclaration(FunctionDeclaration *decl) {
     //TODO: validate prototype
     if(!decl->getType()) {
         valid = false;
-        emit_message(msg::ERROR, "function declaration missing prototype", location);
+        emit_message(msg::ERROR, "function declaration missing prototype", currentLocation());
     }
 
     if(!decl->getScope() && decl->body) {
         valid = false;
-        emit_message(msg::ERROR, "function has body without scope", location);
+        emit_message(msg::ERROR, "function has body without scope", currentLocation());
     }
 
     resolveType(decl->getType());
@@ -154,7 +154,7 @@ void ValidationVisitor::visitVariableDeclaration(VariableDeclaration *decl) {
         if(!decl->value) {
             valid = false;
             emit_message(msg::ERROR,
-                    "dynamically typed variables must have valid initializer", location);
+                    "dynamically typed variables must have valid initializer", currentLocation());
         }
 
         decl->type = decl->value->getType();
@@ -167,14 +167,14 @@ void ValidationVisitor::visitVariableDeclaration(VariableDeclaration *decl) {
 void ValidationVisitor::visitTypeDeclaration(TypeDeclaration *decl) {
     if(!decl->getDeclaredType()) {
         valid = false;
-        emit_message(msg::ERROR, "invalid type declaration", location);
+        emit_message(msg::ERROR, "invalid type declaration", currentLocation());
     }
 }
 
 void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
     if(!decl->type->isResolved()) {
         valid = false;
-        emit_message(msg::ERROR, "unresolved user type declaration", location);
+        emit_message(msg::ERROR, "unresolved user type declaration", currentLocation());
     }
 
 	ClassDeclaration *cldecl = decl->classDeclaration();
@@ -182,9 +182,9 @@ void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
         if(cldecl->base) {
             cldecl->base = resolveIdentifier(cldecl->base);
             if(!cldecl->base->isClass() && !cldecl->base->isStruct()) {
-                emit_message(msg::ERROR, "expected class type in base specifier", location);
+                emit_message(msg::ERROR, "expected class type in base specifier", currentLocation());
                 if(cldecl->base->isInterface()) {
-                    emit_message(msg::ERROR, "interfaces are specified implicitly", location);
+                    emit_message(msg::ERROR, "interfaces are specified implicitly", currentLocation());
                 }
             }
         }
@@ -217,41 +217,41 @@ void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp) {
     //TODO: insert coersion cast
     if(!exp->lhs) {
         valid = false;
-        emit_message(msg::ERROR, "unary operator is missing expression", location);
+        emit_message(msg::ERROR, "unary operator is missing expression", currentLocation());
     }
 
     if(exp->op == tok::dot && !exp->lhs->identifierExpression()) {
         valid = false;
-        emit_message(msg::ERROR, "unary dot operator expects identifier following dot", location);
+        emit_message(msg::ERROR, "unary dot operator expects identifier following dot", currentLocation());
     }
 
     if(!getUnaryPrecidence((tok::TokenKind) exp->op)) {
-        emit_message(msg::FAILURE, "unary expression found without unary operation", location);
+        emit_message(msg::FAILURE, "unary expression found without unary operation", currentLocation());
     }
 
     switch(exp->op) {
         case tok::plusplus:
             if(!exp->lhs->isLValue()) {
-                emit_message(msg::ERROR, "++ operator expects LValue", location);
+                emit_message(msg::ERROR, "++ operator expects LValue", currentLocation());
             }
 
             if(!exp->lhs->getType()->isNumeric() && !exp->lhs->getType()->isPointer()) {
-                emit_message(msg::ERROR, "++ operator is only valid on numeric expressions", location);
+                emit_message(msg::ERROR, "++ operator is only valid on numeric expressions", currentLocation());
             }
             break;
         case tok::minusminus:
             if(!exp->lhs->isLValue()) {
-                emit_message(msg::ERROR, "-- operator expects LValue", location);
+                emit_message(msg::ERROR, "-- operator expects LValue", currentLocation());
             }
 
             if(!exp->lhs->getType()->isNumeric() && !exp->lhs->getType()->isPointer()) {
-                emit_message(msg::ERROR, "-- operator is only valid on numeric expressions", location);
+                emit_message(msg::ERROR, "-- operator is only valid on numeric expressions", currentLocation());
             }
             break;
         case tok::plus:
         case tok::minus:
             if(!exp->lhs->getType()->isNumeric()) {
-                emit_message(msg::ERROR, "unary +- is only valid on numeric expressions", location);
+                emit_message(msg::ERROR, "unary +- is only valid on numeric expressions", currentLocation());
             }
             break;
         case tok::bang:
@@ -260,16 +260,16 @@ void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp) {
             }
             break;
         case tok::tilde:
-            emit_message(msg::UNIMPLEMENTED, "unimplemented unary operator '~'", location);
+            emit_message(msg::UNIMPLEMENTED, "unimplemented unary operator '~'", currentLocation());
             break;
         case tok::caret:
             if(!exp->lhs->getType()->isPointer()) {
-                emit_message(msg::ERROR, "attempt to dereference non-pointer type", location);
+                emit_message(msg::ERROR, "attempt to dereference non-pointer type", currentLocation());
             }
             break;
         case tok::amp:
             if(!exp->lhs->isLValue()) {
-                emit_message(msg::ERROR, "& operator expects LValue", location);
+                emit_message(msg::ERROR, "& operator expects LValue", currentLocation());
             }
             break;
     }
@@ -279,33 +279,33 @@ void ValidationVisitor::visitBinaryExpression(BinaryExpression *exp) {
     //TODO: insert coersion cast
     if(!exp->lhs) {
         valid = false;
-        emit_message(msg::ERROR, "binary operator is missing left hand expression", location);
+        emit_message(msg::ERROR, "binary operator is missing left hand expression", currentLocation());
     }
 
     if(!exp->rhs) {
         valid = false;
-        emit_message(msg::ERROR, "binary operator is missing right hand expression", location);
+        emit_message(msg::ERROR, "binary operator is missing right hand expression", currentLocation());
     }
 
     if(!exp->op.getBinaryPrecidence()) {
-        emit_message(msg::FAILURE, "invalid operator found in binary expression", location);
+        emit_message(msg::FAILURE, "invalid operator found in binary expression", currentLocation());
     }
 
     // should never happen
     if(exp->op.kind == tok::colon) {
-        emit_message(msg::FAILURE, "cast found as binary expression", location);
+        emit_message(msg::FAILURE, "cast found as binary expression", currentLocation());
     }
 
     // should never happen
     if(exp->op.kind == tok::dot) {
-        emit_message(msg::FAILURE, "dot found as binary expression", location);
+        emit_message(msg::FAILURE, "dot found as binary expression", currentLocation());
     }
 
 }
 
 void ValidationVisitor::visitPackExpression(PackExpression *exp) {
     if(exp->filesize <= 0) {
-        emit_message(msg::ERROR, "attempt to pack missing or empty file", location);
+        emit_message(msg::ERROR, "attempt to pack missing or empty file", currentLocation());
     }
 }
 
@@ -345,7 +345,7 @@ void ValidationVisitor::visitIdentifierExpression(IdentifierExpression *exp) {
     exp->id = resolveIdentifier(exp->id);
 
     if(exp->id->isUndeclared()){
-        emit_message(msg::ERROR, "identifier is expected to be resolved at this point", location);
+        emit_message(msg::ERROR, "identifier is expected to be resolved at this point", currentLocation());
     }
 
     // resolve type of identifier if needed
@@ -365,12 +365,12 @@ void ValidationVisitor::visitNumericExpression(NumericExpression *exp) {
 void ValidationVisitor::visitImportExpression(ImportExpression *exp) {
     if(!exp->expression) {
         valid = false;
-        emit_message(msg::ERROR, "import expression expects following expression", location);
+        emit_message(msg::ERROR, "import expression expects following expression", currentLocation());
     }
 
     if(!dynamic_cast<StringExpression*>(exp->expression)) {
         valid = false;
-        emit_message(msg::ERROR, "import expression expects following expression to be package string", location);
+        emit_message(msg::ERROR, "import expression expects following expression to be package string", currentLocation());
     }
 }
 
@@ -418,10 +418,12 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
         if(lhstype->isPointer() && lhstype->getPointerElementTy()->isStruct()) {
             rhsid = lhstype->getPointerElementTy()->getDeclaration()->lookup(exp->rhs);
             if(!rhsid) {
-                emit_message(msg::UNIMPLEMENTED, "UFCS on struct pointer temporarily broken. Sorry", location);
+                emit_message(msg::UNIMPLEMENTED, "UFCS on struct pointer temporarily broken. Sorry", currentLocation());
                 //TODO UFCS
             } else if(rhsid->isVariable()) {
-
+                //XXX this should be in sema
+                exp->lhs = new UnaryExpression(tok::caret, exp->lhs, currentLocation());
+                lhstype = exp->lhs->getType();
             } else if(rhsid->isFunction()) {
                 // functions take pointer
                 return;
@@ -438,7 +440,7 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
 
                 if(!rhsid || !rhsid->isFunction()) {
                     // member is not a UFCS. member not found in scope, or found identifier is not a function
-                    emit_message(msg::ERROR, "member '" + exp->rhs + "' not found in user type '" + lhstype->getName() + "'", location);
+                    emit_message(msg::ERROR, "member '" + exp->rhs + "' not found in user type '" + lhstype->getName() + "'", currentLocation());
                 }
             }
 
@@ -449,30 +451,30 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
             }
 
             if(rhsid->isUndeclared()) {
-                emit_message(msg::WARNING, "undeclared member identifier in validate", location);
+                emit_message(msg::WARNING, "undeclared member identifier in validate", currentLocation());
             }
         } else if(lhstype->isArray()) {
             if(exp->rhs != "size" && exp->rhs != "ptr") {
-                emit_message(msg::ERROR, "invalid property '" + exp->rhs + "' in array", location);
+                emit_message(msg::ERROR, "invalid property '" + exp->rhs + "' in array", currentLocation());
             }
         } else {
-            emit_message(msg::ERROR, "invalid dot expression on non-user type", location);
+            emit_message(msg::ERROR, "invalid dot expression on non-user type", currentLocation());
         }
 
     } else if(exp->lhs->isType()) {
         ASTType *declty = exp->lhs->getDeclaredType();
         if(!declty) {
-            emit_message(msg::ERROR, "invalid lhs of dot expression", location);
+            emit_message(msg::ERROR, "invalid lhs of dot expression", currentLocation());
         }
 
         if(exp->rhs == "sizeof" || exp->rhs == "offsetof") {
             // i think we're fine
         } else {
             //TODO: look up static members / functions
-            emit_message(msg::UNIMPLEMENTED, "no static members or function lookup availible", location);
+            emit_message(msg::UNIMPLEMENTED, "no static members or function lookup availible", currentLocation());
         }
     } else {
-        emit_message(msg::FAILURE, "unresolved dot expression", location);
+        emit_message(msg::FAILURE, "unresolved dot expression", currentLocation());
     }
 }
 
@@ -482,17 +484,17 @@ void ValidationVisitor::visitNewExpression(NewExpression *exp) {
     ASTUserType *uty = exp->type->asUserType();
     if(uty && exp->call) {
         if(!uty->getConstructor()) {
-            emit_message(msg::ERROR, "invalid constructor call on type without constructor", location);
+            emit_message(msg::ERROR, "invalid constructor call on type without constructor", currentLocation());
             return;
         }
     }
 
     if(!exp->function && exp->args.size() > 1) {
-        emit_message(msg::ERROR, "unknown constructor call", location);
+        emit_message(msg::ERROR, "unknown constructor call", currentLocation());
     }
 
     if(exp->type->kind == TYPE_DYNAMIC_ARRAY) {
-        emit_message(msg::ERROR, "cannot create unsized array in 'new' expression", location);
+        emit_message(msg::ERROR, "cannot create unsized array in 'new' expression", currentLocation());
     }
 }
 
@@ -503,7 +505,7 @@ void ValidationVisitor::visitAllocExpression(AllocExpression *exp) {
 void ValidationVisitor::visitLabelStatement(LabelStatement *stmt) {
     if(!stmt->identifier) {
         valid = false;
-        emit_message(msg::ERROR, "label statement expects following identifier", location);
+        emit_message(msg::ERROR, "label statement expects following identifier", currentLocation());
     }
 }
 
@@ -544,7 +546,7 @@ void ValidationVisitor::visitBlockStatement(BlockStatement *stmt) {
 #ifdef DEBUG
     if(!stmt->getScope() && stmt->body) {
         valid = false;
-        emit_message(msg::ERROR, "null scope in block statement", location);
+        emit_message(msg::ERROR, "null scope in block statement", currentLocation());
     }
 #endif
 }
@@ -552,18 +554,18 @@ void ValidationVisitor::visitBlockStatement(BlockStatement *stmt) {
 void ValidationVisitor::visitElseStatement(ElseStatement *stmt) {
     if(!stmt->body) {
         valid = false;
-        emit_message(msg::ERROR, "else statement missing body statement", location);
+        emit_message(msg::ERROR, "else statement missing body statement", currentLocation());
     }
 }
 
 void ValidationVisitor::visitIfStatement(IfStatement *stmt) {
     if(!stmt->body) {
         valid = false;
-        emit_message(msg::ERROR, "if statement missing body statement", location);
+        emit_message(msg::ERROR, "if statement missing body statement", currentLocation());
     }
 
     if(!stmt->condition) {
-        emit_message(msg::ERROR, "if statement missing condition", location);
+        emit_message(msg::ERROR, "if statement missing condition", currentLocation());
     } else {
         stmt->condition = stmt->condition->coerceTo(ASTType::getBoolTy());
     }
@@ -580,7 +582,7 @@ void ValidationVisitor::visitLoopStatement(LoopStatement *stmt) {
 void ValidationVisitor::visitSwitchStatement(SwitchStatement *stmt) {
     if(!stmt->condition) {
         valid = false;
-        emit_message(msg::ERROR, "switch statement missing condition", location);
+        emit_message(msg::ERROR, "switch statement missing condition", currentLocation());
     }
 }
 
@@ -607,7 +609,7 @@ void ValidationVisitor::visitScope(ASTScope *sc){
         if(id->isUndeclared()) {
             id = sc->resolveIdentifier(id);
 			if (!id || id->isUndeclared()) {
-				emit_message(msg::ERROR, "could not resolve symbol in scope: " + id->getName(), location);
+				emit_message(msg::ERROR, "could not resolve symbol in scope: " + id->getName(), currentLocation());
 			}
         }
 

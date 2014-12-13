@@ -9,11 +9,13 @@ class ASTVisitor {
     //XXX have a stack of ASTNode*s
     std::stack<ASTScope*> scope;
     std::stack<FunctionDeclaration*> function;
+    SourceLocation location;
 
     public:
     ASTScope *getScope() { return scope.top(); }
     void pushScope(ASTScope *sc) { scope.push(sc); }
     ASTScope *popScope() { ASTScope *sc = scope.top(); scope.pop(); return sc; }
+    SourceLocation currentLocation() { return location; }
 
     FunctionDeclaration *getFunction() { return function.top(); }
     void pushFunction(FunctionDeclaration *fdecl) { function.push(fdecl); }
@@ -26,9 +28,9 @@ class ASTVisitor {
     virtual void visitPackage(PackageDeclaration *pak) {}
     virtual void visitModule(ModuleDeclaration *mod) {}
 
-    virtual void visitDeclaration(Declaration *decl){}
-    virtual void visitExpression(Expression *exp){}
-    virtual void visitStatement(Statement *stmt){}
+    virtual void visitDeclaration(Declaration *decl){ location = decl->loc; }
+    virtual void visitExpression(Expression *exp){ location = exp->loc; }
+    virtual void visitStatement(Statement *stmt){ location = stmt->loc; }
     //virtual void visitType(ASTType *ty){}
 
     virtual void visitFunctionDeclaration(FunctionDeclaration *decl){}

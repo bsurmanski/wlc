@@ -1,5 +1,5 @@
 tdirs="all construct gltest libvec postdecl switch vararg\
-    array crossimport importc logic_exp retain weak cast delete interface\
+    array coerce crossimport importc logic_exp retain weak cast delete interface\
     overload stack tuple class funcptr labels pack struct union"
 
 for dir in $tdirs; do

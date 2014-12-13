@@ -142,6 +142,35 @@ size_t ASTTupleType::getAlign() {
     return max;
 }
 
+bool ASTTupleType::coercesTo(ASTType *ty) {
+    if(ASTTupleType *otup = ty->asTuple()) {
+        if(length() != otup->length()) return false;
+        for(int i = 0; i < length(); i++) {
+            // TODO: allow tuple coercion if one tuple contains
+            // base pointer to other class?
+            // eg [int, SomeClass] -> [int, BaseClass]
+            if(!getMemberType(i)->is(otup->getMemberType(i))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+    if(ASTStaticArrayType *sarr = ty->asSArray()) {
+        if(length() != sarr->length()) return false;
+        for(int i = 0; i < length(); i++) {
+            // TODO: allow tuple coercion if one tuple contains
+            // base pointer to other class?
+            // eg [int, SomeClass] -> [int, BaseClass]
+            if(!getMemberType(i)->is(sarr->getMemberType(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
 //
 // ASTType
 //
@@ -489,4 +518,20 @@ bool ASTUserType::extends(ASTType *t) {
 
 bool ASTUserType::isReference() {
     return dynamic_cast<ClassDeclaration*>(identifier->getDeclaration());
+}
+
+bool ASTStaticArrayType::coercesTo(ASTType *ty) {
+    if(ASTStaticArrayType *saty = dynamic_cast<ASTStaticArrayType*>(ty)) {
+        return arrayOf->is(saty->arrayOf);
+    }
+
+    if(ASTDynamicArrayType *daty = dynamic_cast<ASTDynamicArrayType*>(ty)) {
+        return arrayOf->is(daty->arrayOf);
+    }
+
+    if(arrayOf->getPointerTy()->is(ty)) {
+        return true;
+    }
+
+    return false;
 }

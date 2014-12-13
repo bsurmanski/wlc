@@ -773,9 +773,17 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
         ASTType *mtype = id->getType();
         gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
                                     index));
+
         Value *llval;
-        llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
-        llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
+        if(mtype->isSArray()) {
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
+                                        0));
+            llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+        } else {
+            llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+            llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
+        }
+
         ASTBasicValue *ret = new ASTBasicValue(mtype, llval, true, mtype->isReference());
         ret->setOwner(val);
         ret->setWeak(id->getDeclaration()->isWeak());
@@ -2158,14 +2166,12 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
     }
 
     if(lhs->isConstant()) {
-        emit_message(msg::ERROR, "cannot assign to constant value", location);
+        emit_message(msg::ERROR, "CG: cannot assign to constant value", location);
         return NULL;
     }
 
-    //ASTValue *vlhs = codegenExpression(lhs);
-    //ASTValue *vrhs = codegenExpression(rhs);
-
     //if(vrhs->type != vlhs->type)
+    /*
     {
         rhs = promoteType(rhs, lhs->getType());
         if(rhs->getType()->coercesTo(lhs->getType()) || (convert && rhs->getType()->castsTo(lhs->getType())))
@@ -2178,7 +2184,7 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
                     "' to type '" + lhs->getType()->getName() + "'", location);
             return NULL;
         }
-    }
+    }*/
 
     if(!lhs->isWeak()) {
         if(lhs->getType()->isClass()) {

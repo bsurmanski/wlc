@@ -399,21 +399,7 @@ struct ASTTupleType : public ASTCompositeType {
         return false;
     }
 
-    virtual bool coercesTo(ASTType *ty) {
-        ASTTupleType *otup = ty->asTuple();
-        if(!otup || length() != otup->length()) return false;
-
-        for(int i = 0; i < length(); i++) {
-            // TODO: allow tuple coercion if one tuple contains
-            // base pointer to other class?
-            // eg [int, SomeClass] -> [int, BaseClass]
-            if(!getMemberType(i)->is(otup->getMemberType(i))) {
-                return false;
-            }
-        }
-
-        return true;
-    }
+    virtual bool coercesTo(ASTType *ty);
 
     ASTTupleType(std::vector<ASTType*> t) : ASTCompositeType(TYPE_TUPLE), types(t) {}
 };
@@ -469,17 +455,7 @@ struct ASTStaticArrayType : public ASTArrayType {
     virtual bool isDynamic() { return false; }
     virtual size_t length();
     ASTStaticArrayType(ASTType *pto, Expression *sz) : ASTArrayType(pto, TYPE_ARRAY), size(sz){}
-    virtual bool coercesTo(ASTType *ty) {
-        if(ASTStaticArrayType *saty = dynamic_cast<ASTStaticArrayType*>(ty)) {
-            return arrayOf->is(saty->arrayOf);
-        }
-
-        if(arrayOf->getPointerTy()->is(ty)) {
-            return true;
-        }
-
-        return false;
-    }
+    virtual bool coercesTo(ASTType *ty);
 
     virtual ASTStaticArrayType *asSArray() { return this; }
     std::string getName() {

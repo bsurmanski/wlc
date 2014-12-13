@@ -300,7 +300,6 @@ void ValidationVisitor::visitBinaryExpression(BinaryExpression *exp) {
     if(exp->op.kind == tok::dot) {
         emit_message(msg::FAILURE, "dot found as binary expression", currentLocation());
     }
-
 }
 
 void ValidationVisitor::visitPackExpression(PackExpression *exp) {
@@ -325,6 +324,14 @@ void ValidationVisitor::visitCallExpression(CallExpression *exp) {
                 emit_message(msg::ERROR, "invalid call on type", exp->loc);
             } else if(!uty->getConstructor()) {
                 emit_message(msg::ERROR, "missing constructor for type " + uty->getName(), exp->loc);
+            } else {
+                /*
+                exp->isConstructor = true;
+                exp->function = new IdentifierExpression(uty->getConstructor()->getIdentifier(), exp->loc);
+                Expression *this_exp = new StackAllocExpression(uty, exp->loc);
+                if(uty->isStruct()) this_exp = new UnaryExpression(tok::amp, this_exp, currentLocation());
+                exp->args.push_front(this_exp);
+                */
             }
         }
     }

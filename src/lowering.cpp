@@ -70,6 +70,10 @@ Expression *NewExpression ::lower() {
 }
 
 Expression *CallExpression::lower() {
+    if(function->isType()) {
+        ASTUserType *uty = function->getDeclaredType()->asUserType();
+        return new NewExpression(uty, new StackAllocExpression(uty, loc), args, true, loc);
+    }
     return this;
 }
 

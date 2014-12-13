@@ -21,63 +21,6 @@ Sema::Sema() : ASTVisitor() {
     valid = true;
 }
 
-/**
- * get the type which both t1 and t2 may promote to
- */
-ASTType *Sema::commonType(ASTType *t1, ASTType *t2) {
-    if(t1->is(t2)) return t1;
-
-
-    if(t1->isUserType() || t2->isUserType()) {
-        if(t1->extends(t2)) return t2;
-        if(t2->extends(t1)) return t1;
-
-        if(t1->isUserType() != t2->isUserType()) {
-            emit_message(msg::ERROR, "attempt to cast user type to non-user type", currentLocation());
-        }
-    }
-
-    if(t1->isNumeric() && t2->isNumeric()) {
-        if(t1->getPriority() > t2->getPriority()) return t1;
-        else return t2;
-    }
-
-    return NULL;
-}
-
-void Sema::visitFunctionDeclaration(FunctionDeclaration *decl) {
-    if(decl->body)
-        decl->body = decl->body->lower();
-}
-
-void Sema::visitVariableDeclaration(VariableDeclaration *decl) {
-    if(decl->value) decl->value = decl->value->lower();
-}
-
-void Sema::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
-    //XXX lower constructor and destructor?
-    for(int i = 0; i < decl->methods.size(); i++) {
-        decl->methods[i] = dynamic_cast<FunctionDeclaration*>(decl->methods[i]->lower());
-    }
-
-    for(int i = 0; i < decl->members.size(); i++) {
-        decl->members[i] = decl->members[i]->lower();
-    }
-
-    decl->scope->accept(this);
-}
-
-void Sema::visitUnaryExpression(UnaryExpression *exp) {
-    //TODO: insert coersion cast
-    exp->lhs = exp->lhs->lower();
-}
-
-void Sema::visitBinaryExpression(BinaryExpression *exp) {
-    //TODO: insert coersion cast
-    exp->lhs = exp->lhs->lower();
-    exp->rhs = exp->rhs->lower();
-}
-
 Expression *Sema::resolveCallArgument(ASTFunctionType *fty, unsigned i, Expression *arg, Expression *def) {
     ASTType *argty = NULL;
     ASTType *paramty = NULL;
@@ -187,21 +130,6 @@ void Sema::resolveCallArguments(FunctionExpression *func, std::list<Expression*>
         funcargs = resolvedArgs;
     } else if(func->isType()) {
         emit_message(msg::FAILURE, "call expression on type should be lowered by now", currentLocation());
-        //TODO: properly resolve arguments
-        //XXX: should this be in lowering?
-
-        // this is a type declaration.
-        // we are calling a type. eg a constructor call
-        // of style MyStruct(1, 2, 3)
-
-        ASTUserType *uty = func->getDeclaredType()->asUserType();
-        if(!uty) {
-            emit_message(msg::ERROR, "constructor syntax on non-user type '" +
-                    func->getDeclaredType()->getName() + "'", currentLocation());
-        }
-
-        //TODO: currently breaks because codegen needs to alloc 'this'
-        //func = new IdentifierExpression(uty->getConstructor()->getIdentifier(), currentLocation());
     } else {
         emit_message(msg::ERROR, "invalid function call", currentLocation());
     }
@@ -301,28 +229,6 @@ void Sema::visitCallExpression(CallExpression *exp) {
     } else {
         exp->function = exp->function->lower();
 
-        // would this be considered lowering?
-        // tried putting that there, but i think the
-        // lowering was not called... might need to look into that
-        //
-        // this is a call on a type. a stack constructor
-        // eg. MyStruct st = MyStruct(1, 2, 3)
-        if(exp->function->isType()) {
-            ASTUserType *uty = exp->function->getDeclaredType()->asUserType();
-            if(uty) {
-                if(!uty->getConstructor()) {
-                    emit_message(msg::ERROR, "missing constructor for type " + uty->getName(), exp->loc);
-                } else {
-                    // swap out function for constructor, and push an alloca'd struct as the passed arg
-                    exp->isConstructor = true;
-                    exp->function = new IdentifierExpression(uty->getConstructor()->getIdentifier(), exp->loc);
-                    exp->args.push_front(new StackAllocExpression(uty, exp->loc));
-                }
-            } else {
-                emit_message(msg::ERROR, "invalid call on type", exp->loc);
-            }
-        }
-
         // if lhs is dot expression, this is either method call or UFCS.
         // Decide which, and push 'this' variable as function argument if required
         //
@@ -387,57 +293,6 @@ void Sema::visitCallExpression(CallExpression *exp) {
     }
 }
 
-void Sema::visitIndexExpression(IndexExpression *exp) {
-    exp->lhs = exp->lhs->lower();
-    exp->index = exp->index->lower();
-}
-
-void Sema::visitCastExpression(CastExpression *exp) {
-    exp->expression = exp->expression->lower();
-}
-
-void Sema::visitTupleExpression(TupleExpression *exp) {
-    for(int i = 0; i < exp->members.size(); i++) {
-        exp->members[i] = exp->members[i]->lower();
-    }
-}
-
-/*
- * Dot expression is either:
- *
- * a) a member lookup
- * b) static member
- * c) a scope specifier
- * d) a method lookup (which must be followed by a call)
- * e) a UFCS call
- *
- * (a), (b), and (c) are similar in function; so are (d) and (e)
- *
- * if LHS is a UserType variable (or pointer to), and RHS is a valid member, we have (a)
- * if RHS is a static member, we have (b)
- * else if RHS is a valid method name, we have (d)
- * else if LHS is a package (or some scope token), we have (b)
- * else if RHS is a valid function name in scope, and it's first parameter matches LHS's type, we have (e)
- */
-void Sema::visitDotExpression(DotExpression *exp) {
-    exp->lhs = exp->lhs->lower();
-
-    if(exp->lhs->isValue()) {
-        ASTType *lhstype = exp->lhs->getType();
-        Identifier *rhsid = NULL;
-
-        //TODO: check for UFCS
-        // dereference pointer types on dot expression
-        if(lhstype->isPointer() && lhstype->getPointerElementTy()->isStruct()) {
-            rhsid = lhstype->getPointerElementTy()->getDeclaration()->lookup(exp->rhs);
-            if(rhsid->isFunction()) {
-                // functions take pointer
-                return;
-            }
-        }
-    }
-}
-
 void Sema::visitNewExpression(NewExpression *exp) {
     // push alloc as 'new' argument
     exp->args.push_front(exp->alloc);
@@ -445,57 +300,16 @@ void Sema::visitNewExpression(NewExpression *exp) {
     ASTUserType *uty = exp->type->asUserType();
     if(uty && exp->call) {
         exp->function = new FunctionExpression(uty->getConstructor(), currentLocation());
-        //resolveType(exp->function->getType()); //XXX temp. some constructor args-type would not be defined.
-
         resolveCallArguments(exp->function, exp->args);
     }
 }
 
-void Sema::visitCompoundStatement(CompoundStatement *stmt) {
-    for(int i = 0; i < stmt->statements.size(); i++) {
-        stmt->statements[i] = stmt->statements[i]->lower();
-    }
-}
-
-void Sema::visitBlockStatement(BlockStatement *stmt) {
-    if(stmt->body) {
-        stmt->body = stmt->body->lower();
-    }
-}
-
 void Sema::visitIfStatement(IfStatement *stmt) {
-    stmt->condition = stmt->condition->lower();
     stmt->condition = stmt->condition->coerceTo(ASTType::getBoolTy());
-
-    if(stmt->elsebr) {
-        stmt->elsebr = dynamic_cast<ElseStatement*>(stmt->elsebr->lower());
-    }
 }
 
-void Sema::visitLoopStatement(LoopStatement *stmt) {
-    stmt->condition = stmt->condition->lower();
-
-    if(stmt->update) {
-        stmt->update = stmt->update->lower();
-    }
-
-    if(stmt->elsebr) {
-        stmt->elsebr = dynamic_cast<ElseStatement*>(stmt->elsebr->lower());
-    }
-}
-
-void Sema::visitForStatement(ForStatement *stmt) {
-    if(stmt->decl) {
-        stmt->decl = stmt->decl->lower();
-    }
-}
-
-void Sema::visitSwitchStatement(SwitchStatement *stmt) {
-    stmt->condition = stmt->condition->lower();
-}
-
-void Sema::visitReturnStatement(ReturnStatement *stmt) {
-    if(stmt->expression) {
-        stmt->expression = stmt->expression->lower();
+void Sema::visitBinaryExpression(BinaryExpression *bexp) {
+    if(bexp->op.kind == tok::equal) {
+        bexp->rhs = bexp->rhs->coerceTo(bexp->lhs->getType());
     }
 }

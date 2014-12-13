@@ -22,31 +22,13 @@ class Sema : public ASTVisitor {
     bool isValid() { return valid; }
     Sema();
 
-    ASTType *commonType(ASTType *a, ASTType *b);
-
-    virtual void visitFunctionDeclaration(FunctionDeclaration *decl);
-    virtual void visitVariableDeclaration(VariableDeclaration *decl);
-    virtual void visitUserTypeDeclaration(UserTypeDeclaration *decl);
-
-    virtual void visitUnaryExpression(UnaryExpression *exp);
-    virtual void visitBinaryExpression(BinaryExpression *exp);
     virtual OverloadValidity resolveOverloadValidity(std::list<Expression*> args, ASTNode *overload);
     virtual ASTNode *resolveOverloadList(std::list<Expression*> args, std::list<ASTNode*>& overload);
     virtual void buildOverloadList(Expression *func, std::list<ASTNode*>& overload);
     virtual Expression *resolveCallArgument(ASTFunctionType *fty, unsigned i, Expression *arg, Expression *def);
     virtual void resolveCallArguments(FunctionExpression *func, std::list<Expression*>& args);
     virtual void visitCallExpression(CallExpression *exp);
-    virtual void visitIndexExpression(IndexExpression *exp);
-    virtual void visitCastExpression(CastExpression *exp);
-    virtual void visitTupleExpression(TupleExpression *exp);
-    virtual void visitDotExpression(DotExpression *exp);
     virtual void visitNewExpression(NewExpression *exp);
-    virtual void visitReturnStatement(ReturnStatement *stmt);
-
-    virtual void visitCompoundStatement(CompoundStatement *exp);
-    virtual void visitBlockStatement(BlockStatement *exp);
     virtual void visitIfStatement(IfStatement *exp);
-    virtual void visitLoopStatement(LoopStatement *exp);
-    virtual void visitForStatement(ForStatement *exp);
-    virtual void visitSwitchStatement(SwitchStatement *exp);
+    virtual void visitBinaryExpression(BinaryExpression *bexp);
 };

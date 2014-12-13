@@ -677,6 +677,7 @@ struct TupleExpression;
 struct DotExpression;
 struct NewExpression;
 struct AllocExpression;
+struct FunctionExpression;
 
 struct Expression : public Statement
 {
@@ -715,6 +716,7 @@ struct Expression : public Statement
     virtual DotExpression *dotExpression() { return NULL; }
     virtual NewExpression *newExpression() { return NULL; }
     virtual AllocExpression *allocExpression() { return NULL; }
+    FunctionExpression *functionExpression() { return NULL; }
 
     virtual Expression *lower() { return this; }
 
@@ -748,7 +750,10 @@ struct NewExpression : public Expression
     Expression *alloc; // XXX validate this field
     FunctionExpression *function; // found in validation
     std::list<Expression*> args;
-    virtual ASTType *getType() { return alloc->getType(); }
+    virtual ASTType *getType() {
+        if(alloc->getType()->isPointer() && alloc->getType()->getPointerElementTy()->isArray()) return alloc->getType()->getPointerElementTy(); //XXX this seems silly
+        return alloc->getType();
+    }
     NewExpression(ASTType *t, Expression *all, std::list<Expression*> a, bool c, SourceLocation l = SourceLocation()) :
         Expression(l), type(t), alloc(all), args(a), call(c), function(NULL) {}
     virtual NewExpression *newExpression() { return this; }
@@ -834,6 +839,7 @@ struct FunctionExpression : public Expression {
     FunctionExpression(SourceLocation loc = SourceLocation()) : Expression(loc), overload(NULL), fpointer(NULL) {}
     FunctionExpression(FunctionDeclaration *ol, SourceLocation loc = SourceLocation()) : Expression(loc), overload(ol), fpointer(NULL) {}
     FunctionExpression(Expression *fp, SourceLocation loc = SourceLocation()) : Expression(loc), overload(NULL), fpointer(fp) {}
+    FunctionExpression *functionExpression() { return this; }
     bool isFunctionPointer() { return fpointer; }
 };
 
@@ -859,6 +865,10 @@ struct CallExpression : public PostfixExpression
                 return args.front()->getType()->getPointerElementTy();
             else
                 return args.front()->getType();
+        }
+
+        if(!function->getType()) {
+            return function->getDeclaredType();
         }
 
         ASTFunctionType *fty = function->getType()->asFunctionType();

@@ -1,6 +1,7 @@
 #include "ast.hpp"
 #include "validate.hpp"
 #include "sema.hpp"
+#include "lower.hpp"
 
 
 #if defined WIN32
@@ -60,13 +61,17 @@ AST::~AST() {
 
 bool AST::validate() {
     ValidationVisitor validate;
+    Lower lowering;
     Sema sema;
     PackageDeclaration *pdecl = getRootPackage();
 
     pdecl->accept(&validate);
     if(validate.isValid()) {
-        pdecl->accept(&sema);
-        return sema.isValid();
+        pdecl->accept(&lowering);
+        if(lowering.isValid()) {
+            pdecl->accept(&sema);
+            return sema.isValid();
+        }
     }
     return false;
 }
@@ -224,6 +229,20 @@ Expression *Expression::coerceTo(ASTType *ty) {
         //TODO: note in AST that this is implicit
         return new CastExpression(ty, this, loc);
     }
+
+    if(isConstant()) {
+        if(ASTTupleType *tupty = expty->asTuple()) {
+            if(ASTStaticArrayType *sarr = ty->asSArray()) {
+                if(sarr->length() != tupty->length()) goto ERR;
+                for(int i = 0; i < tupty->length(); i++) {
+                    if(!tupty->getMemberType(i)->coercesTo(sarr->getMemberType(i))) goto ERR;
+                }
+
+                return new CastExpression(ty, this, loc);
+            }
+        }
+    }
+ERR:
 
     emit_message(msg::ERROR, "attempt to coerce expression of type '" + expty->getName() +
             "' to incompatible type '" + ty->getName() + "'", loc);

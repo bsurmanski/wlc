@@ -5,6 +5,7 @@
 #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 5
 #define LLVM_35
 #include <llvm/IR/Verifier.h>
+#include <llvm/IR/Intrinsics.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Linker/Linker.h>
@@ -450,9 +451,41 @@ IRScope *IRCodegenContext::exitScope() {
     return sc;
 }
 
+/*
+void IRCodegenContext::copyMemory(ASTValue *dest, ASTValue *src, ASTValue *sz) {
+    std::vector<Type*> argty;
+    argty.push_back(Type::getInt8Ty(context)->getPointerTo()); //dst
+    argty.push_back(Type::getInt8Ty(context)->getPointerTo()); //src
+    argty.push_back(Type::getInt64Ty(context)); //sz
+    argty.push_back(Type::getInt32Ty(context)); // align
+    argty.push_back(Type::getInt1Ty(context)); // volatile
+    Function *memcpy_intr = Intrinsic::getDeclaration(module, Intrinsic::memcpy, argty);
+
+    std::vector<Value*> vals;
+    // XXX populate vals
+    ir->CreateCall(memcpy_intr, vals);
+} */
 
 void IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 {
+    if(dest->getType()->isSArray()) {
+        if(!val->getType()->is(dest->getType())) {
+            emit_message(msg::ERROR, "CG: array store must be same type", location);
+        }
+
+        /*
+        unsigned len = dest->getType()->length();
+        for(int i = 0; i < len; i++) {
+            storeValue(
+                    opIndex(dest, getIntValue(ASTType::getLongTy(), i)),
+                    opIndex(val, getIntValue(ASTType::getLongTy(), i)));
+        }
+
+        //XXX use memcpy?
+        return;
+        */
+    }
+
     if(dest->isReference()) {
         // store return value if needed?
         ir->CreateStore(codegenValue(val), codegenRefValue(dest));
@@ -467,19 +500,23 @@ void IRCodegenContext::storeValue(ASTValue *dest, ASTValue *val)
 }
 
 ASTValue *IRCodegenContext::getStringValue(std::string str) {
+    // plus one for null
+    ASTType *strty = ASTType::getStringTy(str.length() + 1);
+
     Constant *strConstant = ConstantDataArray::getString(context, str);
     GlobalVariable *GV = new GlobalVariable(*module, strConstant->getType(), true,
             GlobalValue::PrivateLinkage, strConstant);
 
-    // plus one for null
-    ASTType *strty = ASTType::getStringTy(str.length() + 1);
+    //XXX string dedup?
+    /*
 
     vector<Value *> gep;
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     Constant *ptr = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
+    */
 
-    ASTBasicValue *ret = new ASTBasicValue(strty, ptr, true);
+    ASTBasicValue *ret = new ASTBasicValue(strty, GV, true);
     ret->setConstant(true);
     return ret;
 }
@@ -591,8 +628,7 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
     Type *llty = codegenType(ty);
 
     // tuple is a constant; can optimize tuple as constant global
-    if(isConst)
-    {
+    if(isConst) {
         std::vector<Constant*> llvals;
         for(int i = 0; i < vals.size(); i++)
         {
@@ -600,6 +636,7 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
         }
 
         Constant *llconst = NULL;
+        // create constant global value for array. fetch pointer
         if(dynamic_cast<ASTArrayType*>(ty)) {
             llconst = ConstantArray::get((ArrayType*)llty, llvals);
         } else {
@@ -615,8 +652,10 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
             std::vector<Constant*> gep;
             gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
             gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+            llconst = ConstantExpr::getGetElementPtr(GV, gep);
+
             std::vector<Constant*> vals;
-            vals.push_back(ConstantExpr::getGetElementPtr(GV, gep));
+            vals.push_back(llconst);
             vals.push_back(ConstantInt::get(codegenType(ASTType::getLongTy()), tuple->values.size()));
             Constant *st = ConstantStruct::get((StructType*) codegenType(dyarrayTy), vals);
             //GlobalVariable *DGV = new GlobalVariable(*module, codegenType(dyarrayTy), true,
@@ -1050,9 +1089,12 @@ ASTValue *IRCodegenContext::opIndexSArray(ASTValue *arr, ASTValue *idx) {
     ASTType *indexedType = arr->getType()->getPointerElementTy();
 
     std::vector<Value*> gep;
-    //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(codegenValue(idx));
 
+    Value *TEST = codegenLValue(arr);
+    TEST->dump();
+    printf("\n\n");
     Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
     return new ASTBasicValue(indexedType, val, true);
 }
@@ -1130,8 +1172,11 @@ ASTValue *IRCodegenContext::getArrayPointer(ASTValue *arr) {
         Value *llval = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
         return new ASTBasicValue(elemty->getPointerTy(), llval, true);
     } else if(arr->getType()->getKind() == TYPE_ARRAY) {
-        Value *llval = codegenLValue(arr);
-        return new ASTBasicValue(elemty->getPointerTy(), llval); //XXX static array ptr is immutable(?)
+        std::vector<Value*> gep;
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+        Value *ptr = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
+        return new ASTBasicValue(elemty->getPointerTy(), ptr); //XXX static array ptr is immutable(?)
     } else {
         emit_message(msg::ERROR, "invalid .ptr on non-array type");
         return NULL;
@@ -2015,7 +2060,8 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType) {
             }
 
             // XXX will this work on non-constants? probably not...
-            Constant *ptr = ConstantExpr::getInBoundsGetElementPtr((Constant*) codegenLValue(val), ConstantInt::get(Type::getInt32Ty(context), 0));
+            Constant *ptr = (Constant*) codegenValue(getArrayPointer(val));
+            //Constant *ptr = ConstantExpr::getInBoundsGetElementPtr((Constant*) codegenLValue(val), ConstantInt::get(Type::getInt32Ty(context), 0));
             Constant *sz = ConstantInt::get(codegenType(ASTType::getLongTy()), sarrty->length());
 
             std::vector<Constant*> sarrMembers;
@@ -2523,6 +2569,7 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
 
         Value *llval = llvmDecl;
 
+        /*
         // static arrays are created in form of [i8x5].
         // we want to convert value to pointer
         if(vty->isSArray()) {
@@ -2531,6 +2578,7 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
             gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
             llval = ir->CreateInBoundsGEP(llvmDecl, gep);
         }
+        */
 
         idValue = new ASTBasicValue(vty, llval, true, vty->isReference());
         idValue->setWeak(vdecl->isWeak());

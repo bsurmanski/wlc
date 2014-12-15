@@ -338,19 +338,19 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
     {
         const clang::MacroInfo *MI = getCursorMacroInfo(cursor);
         if(!MI) goto MACRO_ERR;
+
+        string name = string(clang_getCString(clang_getCursorSpelling(cursor)));
         if(MI->isObjectLike())
         {
             if(MI->getNumTokens() == 1 && MI->getReplacementToken(0).isLiteral()) // literal value
             {
                 clang::Token tok = MI->getReplacementToken(0);
-                if(tok.getKind() == clang::tok::numeric_constant)
-                {
-                    string name = string(clang_getCString(clang_getCursorSpelling(cursor)));
+                if(tok.getKind() == clang::tok::numeric_constant) {
                     Identifier *id = module->getScope()->get(name);
 
                     if(id->getDeclaration())
                     {
-                        printf("Macro redefines value, ");
+                        emit_message(msg::WARNING, "Macro literal object \"" + name + "\" redefines value");
                         goto MACRO_ERR;
                     }
                     NumericExpression *val = new FloatExpression(ASTType::getDoubleTy(), atof(tok.getLiteralData()));
@@ -359,16 +359,18 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
                     id->setExpression(val);
                     //module->globals.push_back(vdecl);
                         //printf("MACRO: %s: %f\n", name.c_str(), val->floatValue);
-                } else goto MACRO_ERR;
+                } else {
+                    emit_message(msg::WARNING, "Macro literal object \"" + name + "\" is not numeric constant");
+                    goto MACRO_ERR;
+                }
             } else if(MI->getNumTokens() == 1 && MI->getReplacementToken(0).isAnyIdentifier()) { // identifier alias
-                string name = string(clang_getCString(clang_getCursorSpelling(cursor)));
                 string alias = string(MI->getReplacementToken(0).getIdentifierInfo()->getName().str());
 
                 Identifier *idName = module->getScope()->get(name);
 
                 if(idName->getDeclaration())
                 {
-                    printf("Macro redefines value");
+                    emit_message(msg::WARNING, "Macro identifier object \"" + name + "\" redefines value");
                     goto MACRO_ERR;
                 }
 
@@ -382,6 +384,8 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
                     module->getScope()->remove(idName);
                     if(idAlias)
                         module->getScope()->remove(idAlias);
+
+                    emit_message(msg::WARNING, "Macro identifier object \"" + name + "\" references non-existant identifier");
                     goto MACRO_ERR;
                 }
 
@@ -389,9 +393,13 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
                 idName->setExpression(val);
             } else
             {
+                emit_message(msg::WARNING, "Macro object \"" + name + "\" is too complex");
                 goto MACRO_ERR;
             }
-        } else goto MACRO_ERR;
+        } else {
+            emit_message(msg::WARNING, "Macro \"" + name + "\" is not an object macro");
+            goto MACRO_ERR;
+        }
     } else if(cursor.kind == CXCursor_EnumDecl)
     {
         return CXChildVisit_Recurse;
@@ -408,13 +416,6 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
         // will generate struct ASTType
         ASTTypeFromCType(module, clang_getCursorType(cursor), loc);
     } else if(cursor.kind == CXCursor_TypedefDecl) {
-        /*
-        // XXX FROM OTHER ATTEMPT ON VULCAN
-        Identifier *id = module->getScope()->get(clang_getCString(clang_getCursorSpelling(cursor)));
-        ASTType *typedefty = ASTTypeFromCType(module, clang_getTypedefDeclUnderlyingType(cursor));
-        id->setExpression(new TypeExpression(typedefty, loc));
-        */
-        //goto ERR; //TODO
         CXString cxname = clang_getCursorSpelling(cursor);
         std::string name = clang_getCString(cxname);
         CXType ctype = clang_getTypedefDeclUnderlyingType(cursor);

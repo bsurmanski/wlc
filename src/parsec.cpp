@@ -366,6 +366,11 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
             } else if(MI->getNumTokens() == 1 && MI->getReplacementToken(0).isAnyIdentifier()) { // identifier alias
                 string alias = string(MI->getReplacementToken(0).getIdentifierInfo()->getName().str());
 
+                if(name == alias) {
+                    emit_message(msg::WARNING, "macro identifier object \"" + name + "\" is self referencial");
+                    goto MACRO_ERR;
+                }
+
                 Identifier *idName = module->getScope()->get(name);
 
                 if(idName->getDeclaration())

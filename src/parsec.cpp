@@ -376,19 +376,6 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
 
                 Identifier *idAlias = module->getScope()->lookup(alias);
 
-                if(!idAlias || idAlias->isUndeclared()) {
-                    // whatever we are aliasing does not exist (yet?)
-                    // in C, the thing should exist before the DEFINE.
-                    // This is half being lazy, and half so then broken
-                    // C parsing doesn't kill the whole compile
-                    module->getScope()->remove(idName);
-                    if(idAlias)
-                        module->getScope()->remove(idAlias);
-
-                    emit_message(msg::WARNING, "Macro identifier object \"" + name + "\" references non-existant identifier");
-                    goto MACRO_ERR;
-                }
-
                 IdentifierExpression *val = new IdentifierExpression(idAlias);
                 idName->setExpression(val);
             } else

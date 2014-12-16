@@ -496,10 +496,6 @@ void ValidationVisitor::visitNewExpression(NewExpression *exp) {
         }
     }
 
-    if(!exp->function && exp->args.size() > 1) {
-        emit_message(msg::ERROR, "unknown constructor call", currentLocation());
-    }
-
     if(exp->type->kind == TYPE_DYNAMIC_ARRAY) {
         emit_message(msg::ERROR, "cannot create unsized array in 'new' expression", currentLocation());
     }

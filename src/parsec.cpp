@@ -280,8 +280,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
     CXSourceLocation cxloc = clang_getCursorLocation(cursor);
     SourceLocation loc = SourceLocationFromCLocation(cxloc);
 
-    if(cursor.kind == CXCursor_FunctionDecl)
-    {
+    if(cursor.kind == CXCursor_FunctionDecl) {
         CXString cxname = clang_getCursorSpelling(cursor);
         std::string name = clang_getCString(cxname);
 
@@ -291,6 +290,15 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
         vector<ASTType*> params;
         vector<VariableDeclaration*> parameters;
 
+
+        ASTType *rType = ASTTypeFromCType(module, clang_getResultType(fType), loc);
+
+        if(!rType) goto ERR;
+
+        Identifier *id = module->getScope()->get(name);
+
+        if(!id->isUndeclared()) goto CONTINUE;
+
         for(int i = 0; i < nargs; i++) {
             CXType canonicalTy =  clang_getCanonicalType(clang_getArgType(fType, i));
             ASTType *astArgTy = ASTTypeFromCType(module, canonicalTy, loc);
@@ -299,12 +307,6 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
             params.push_back(astArgTy);
             parameters.push_back(new VariableDeclaration(astArgTy, NULL, NULL, loc, DeclarationQualifier()));
         }
-
-        ASTType *rType = ASTTypeFromCType(module, clang_getResultType(fType), loc);
-
-        if(!rType) goto ERR;
-
-        Identifier *id = module->getScope()->get(name);
 
         DeclarationQualifier dqual;
         dqual.decorated = false;
@@ -326,6 +328,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
         if(!wlType) goto ERR;
 
         Identifier *id = module->getScope()->get(name);
+        if(!id->isUndeclared()) goto CONTINUE;
         CXLinkageKind linkage = clang_getCursorLinkage(cursor);
         DeclarationQualifier dqual;
         dqual.external = linkage == CXLinkage_External || linkage == CXLinkage_UniqueExternal;
@@ -348,8 +351,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
                 if(tok.getKind() == clang::tok::numeric_constant) {
                     Identifier *id = module->getScope()->get(name);
 
-                    if(id->getDeclaration())
-                    {
+                    if(id->getDeclaration()) {
                         emit_message(msg::WARNING, "Macro literal object \"" + name + "\" redefines value");
                         goto MACRO_ERR;
                     }
@@ -379,7 +381,7 @@ CXChildVisitResult CVisitor(CXCursor cursor, CXCursor parent, void *vMod)
                     goto MACRO_ERR;
                 }
 
-                Identifier *idAlias = module->getScope()->lookup(alias);
+                Identifier *idAlias = module->getScope()->get(alias);
 
                 IdentifierExpression *val = new IdentifierExpression(idAlias);
                 idName->setExpression(val);
@@ -427,6 +429,7 @@ MACRO_ERR:
 ERR:
     emit_message(msg::WARNING, "failed to convert symbol to WL typing: " +
             string(clang_getCString(clang_getCursorSpelling(cursor))));
+CONTINUE:
     return CXChildVisit_Continue;
 }
 
@@ -476,7 +479,6 @@ void parseCImport(ModuleDeclaration *module,
         "-v",
         0,
     };
-    //pushScope(module->getScope());
 
     CXIndex Idx = clang_createIndex(1,1);
     CXTranslationUnit Unit = clang_createTranslationUnitFromSourceFile(
@@ -491,11 +493,7 @@ void parseCImport(ModuleDeclaration *module,
 
     clang_visitChildren(clang_getTranslationUnitCursor(Unit), CVisitor, module);
 
-    //currentPackage()->addPackage(module);
-
-    //popScope();
-
-    // restore stderr if we changed it earlier (if there was no error opening stderr.log
+    // restore stderr if we changed it earlier (if there was no error opening stderr.log)
     if(nerr > 0) {
         fflush(stderr);
         dup2(oerr, ofilenm);

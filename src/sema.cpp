@@ -300,7 +300,12 @@ void Sema::visitNewExpression(NewExpression *exp) {
     ASTUserType *uty = exp->type->asUserType();
     if(uty && exp->call) {
         exp->function = new FunctionExpression(uty->getConstructor(), currentLocation());
+
         resolveCallArguments(exp->function, exp->args);
+    }
+
+    if(!exp->function && exp->args.size() > 1) {
+        emit_message(msg::ERROR, "unknown constructor call", currentLocation());
     }
 }
 

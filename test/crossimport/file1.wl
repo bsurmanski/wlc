@@ -1,5 +1,7 @@
-use "importc"
-import(C) "/usr/include/stdlib.h"
+//use "importc"
+//import(C) "/usr/include/stdlib.h"
+
+undecorated void^ malloc(long l);
 
 struct MyStruct
 {

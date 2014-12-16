@@ -41,6 +41,15 @@ ASTType *Identifier::getType()
     return NULL;
 }
 
+Declaration *Identifier::getDeclaration() {
+    if(kind == ID_EXPRESSION) {
+        if(IdentifierExpression *iexp = expression->identifierExpression()) {
+            return iexp->getDeclaration();
+        }
+    }
+    return declaration;
+}
+
 ASTType *Identifier::getDeclaredType()
 {
     //XXX special case for c typedef

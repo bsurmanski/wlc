@@ -2,7 +2,7 @@ import "file1.wl"
 
 struct OtherStruct
 {
-    MyStruct ^sillyStruct    
+    MyStruct ^sillyStruct
 }
 
 void add5(MyStruct ^s)

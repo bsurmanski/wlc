@@ -373,8 +373,7 @@ ImportExpression *ParseContext::parseImport()
 
     bool special = false;
     std::string parserType;
-    if(peek().is(tok::lparen)) // special import
-    {
+    if(peek().is(tok::lparen)) { // special import
         ignore(); // ignore (
         special = true;
         if(peek().isNot(tok::identifier)){
@@ -391,40 +390,43 @@ ImportExpression *ParseContext::parseImport()
     ModuleDeclaration *importedModule = NULL;
     AST *ast = parser->getAST();
     //XXX deffer importing to end of TU parse? Would allow 'package' expression and subsequent imports to work as expected, I imagine
-    if(StringExpression *sexp = dynamic_cast<StringExpression*>(importExpression))
-    {
+    if(StringExpression *sexp = dynamic_cast<StringExpression*>(importExpression)) {
         std::string filenm = sexp->string;
         std::string modnm = getFilebase(filenm);
         importedModule = ast->getModule(filenm);
-        if(!importedModule) // This TU hasnt been loaded from file yet, DOIT
-        {
+        if(!importedModule) { // This TU hasnt been loaded from file yet, DOIT
             Identifier *m_id = getModule()->importScope->get(modnm);
-            importedModule = new ModuleDeclaration(ast->getRootPackage(), m_id, sexp->string);
-            m_id->addDeclaration(importedModule, Identifier::ID_MODULE);
-            ast->addModule(sexp->string, importedModule);
 
-            if(special)
-            {
-                if(getScope()->extensionEnabled("importc") && parserType == "C")
-                {
+            if(special) {
+                if(getScope()->extensionEnabled("importc") && parserType == "C") {
+                    static ModuleDeclaration *CModule = NULL;
+                    if(!CModule) {
+                        Identifier *c_id = getModule()->importScope->get("__C");
+                        CModule = new ModuleDeclaration(ast->getRootPackage(), c_id, "__C");
+                        c_id->addDeclaration(CModule, Identifier::ID_MODULE);
+                    }
+                    importedModule = CModule;
+                    m_id->addDeclaration(importedModule, Identifier::ID_MODULE);
+                    ast->addModule(sexp->string, importedModule);
                     parseCImport(importedModule, sexp->string, loc);
-                } else
-                {
+                } else {
                     emit_message(msg::ERROR, "unknown import type '" + parserType + "'", loc);
                 }
-            } else
-            {
+            } else {
+                importedModule = new ModuleDeclaration(ast->getRootPackage(), m_id, sexp->string);
+                m_id->addDeclaration(importedModule, Identifier::ID_MODULE);
+                ast->addModule(sexp->string, importedModule);
                 parser->parseFile(importedModule, sexp->string, loc);
             }
         }
 
+        //XXX add a local identifier to refer to module
         //Identifier *local_mid = getScope()->getInScope(modnm);
         //local_mid->addDeclaration(importedModule, Identifier::ID_MODULE);
     }
 
     cond_message(!importedModule, msg::FAILURE, "failed to import module");
 
-    //module->importModules.push_back(importedModule); //TODO: check if in import list first
     getScope()->addSibling(importedModule->getScope());
     return new ImportExpression(importExpression, importedModule, loc);
 }

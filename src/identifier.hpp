@@ -47,7 +47,7 @@ struct Identifier
     Identifier(ASTScope *ta, std::string s, IDType t = ID_UNKNOWN);
     void addDeclaration(Declaration *decl, IDType t = ID_UNKNOWN);
     void setKind(IDType t) { kind = t; }
-    Declaration *getDeclaration() { return declaration; }
+    Declaration *getDeclaration();
     void setExpression(Expression *e) { expression = e; kind = ID_EXPRESSION; }
     Expression *getExpression() { return expression; }
     std::string getName() { return name; }

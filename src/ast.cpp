@@ -66,14 +66,13 @@ bool AST::validate() {
     PackageDeclaration *pdecl = getRootPackage();
 
     pdecl->accept(&validate);
-    if(validate.isValid()) {
+    if(currentErrorLevel() < msg::ERROR) {
         pdecl->accept(&lowering);
-        if(lowering.isValid()) {
+        if(currentErrorLevel() < msg::ERROR) {
             pdecl->accept(&sema);
-            return sema.isValid();
         }
     }
-    return false;
+    return currentErrorLevel() < msg::ERROR;
 }
 
 ASTFunctionType *FunctionDeclaration::getType() {

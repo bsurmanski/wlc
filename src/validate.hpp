@@ -16,12 +16,10 @@
  * TODO: perhaps create a pass for validation without lowering?
  */
 class ValidationVisitor : public ASTVisitor {
-    bool valid;
     ASTScope *scope;
     //std::stack<ASTNode *> trace;
 
     public:
-    bool isValid() { return valid; }
     ValidationVisitor();
     Identifier *resolveIdentifier(Identifier *id);
     ASTType *resolveType(ASTType *ty);

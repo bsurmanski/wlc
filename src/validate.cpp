@@ -19,7 +19,6 @@ using namespace std;
 //
 
 ValidationVisitor::ValidationVisitor() : ASTVisitor() {
-    valid = true;
 }
 
 Identifier *ValidationVisitor::resolveIdentifier(Identifier *id) {
@@ -28,7 +27,6 @@ Identifier *ValidationVisitor::resolveIdentifier(Identifier *id) {
     }
 
     if(id->isUndeclared()) {
-        valid = false;
         emit_message(msg::ERROR, string("undeclared identifier '") + id->getName()
                 + string("' in scope"));
     }
@@ -101,7 +99,6 @@ ASTType *ValidationVisitor::resolveType(ASTType *ty) {
 void ValidationVisitor::visitPackage(PackageDeclaration *pak) {
     if(!pak->getScope()) {
         emit_message(msg::ERROR, "package is missing scope", currentLocation());
-        valid = false;
     }
 }
 
@@ -109,7 +106,6 @@ void ValidationVisitor::visitModule(ModuleDeclaration *mod) {
     ASTScope::iterator it;
     for(it = mod->importScope->begin(); it != mod->importScope->end(); it++) {
         if(!it->getDeclaration()->moduleDeclaration()) {
-            valid = false;
             emit_message(msg::ERROR, "invalid translation unit found, null import", currentLocation());
         }
     }
@@ -119,17 +115,14 @@ void ValidationVisitor::visitDeclaration(Declaration *decl) {
     ASTVisitor::visitDeclaration(decl);
 
     if(!decl->identifier) {
-        valid = false;
         emit_message(msg::ERROR, "null identifier in declaration", currentLocation());
     }
 
     if(decl->identifier->isUndeclared()) {
-        valid = false;
         emit_message(msg::ERROR, "inconsistant AST, undeclared identifier in definition", currentLocation());
     }
 
     if(decl->qualifier.weak && !decl->getType()->isClass()) {
-        valid = false;
         emit_message(msg::ERROR, "weak qualifier only applies to class type variables", currentLocation());
     }
 }
@@ -137,12 +130,10 @@ void ValidationVisitor::visitDeclaration(Declaration *decl) {
 void ValidationVisitor::visitFunctionDeclaration(FunctionDeclaration *decl) {
     //TODO: validate prototype
     if(!decl->getType()) {
-        valid = false;
         emit_message(msg::ERROR, "function declaration missing prototype", currentLocation());
     }
 
     if(!decl->getScope() && decl->body) {
-        valid = false;
         emit_message(msg::ERROR, "function has body without scope", currentLocation());
     }
 
@@ -152,7 +143,6 @@ void ValidationVisitor::visitFunctionDeclaration(FunctionDeclaration *decl) {
 void ValidationVisitor::visitVariableDeclaration(VariableDeclaration *decl) {
     if(decl->getType()->kind == TYPE_DYNAMIC) {
         if(!decl->value) {
-            valid = false;
             emit_message(msg::ERROR,
                     "dynamically typed variables must have valid initializer", currentLocation());
         }
@@ -166,14 +156,12 @@ void ValidationVisitor::visitVariableDeclaration(VariableDeclaration *decl) {
 
 void ValidationVisitor::visitTypeDeclaration(TypeDeclaration *decl) {
     if(!decl->getDeclaredType()) {
-        valid = false;
         emit_message(msg::ERROR, "invalid type declaration", currentLocation());
     }
 }
 
 void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
     if(!decl->type->isResolved()) {
-        valid = false;
         emit_message(msg::ERROR, "unresolved user type declaration", currentLocation());
     }
 
@@ -216,12 +204,10 @@ void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
 void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp) {
     //TODO: insert coersion cast
     if(!exp->lhs) {
-        valid = false;
         emit_message(msg::ERROR, "unary operator is missing expression", currentLocation());
     }
 
     if(exp->op == tok::dot && !exp->lhs->identifierExpression()) {
-        valid = false;
         emit_message(msg::ERROR, "unary dot operator expects identifier following dot", currentLocation());
     }
 
@@ -278,12 +264,10 @@ void ValidationVisitor::visitUnaryExpression(UnaryExpression *exp) {
 void ValidationVisitor::visitBinaryExpression(BinaryExpression *exp) {
     //TODO: insert coersion cast
     if(!exp->lhs) {
-        valid = false;
         emit_message(msg::ERROR, "binary operator is missing left hand expression", currentLocation());
     }
 
     if(!exp->rhs) {
-        valid = false;
         emit_message(msg::ERROR, "binary operator is missing right hand expression", currentLocation());
     }
 
@@ -371,12 +355,10 @@ void ValidationVisitor::visitNumericExpression(NumericExpression *exp) {
 
 void ValidationVisitor::visitImportExpression(ImportExpression *exp) {
     if(!exp->expression) {
-        valid = false;
         emit_message(msg::ERROR, "import expression expects following expression", currentLocation());
     }
 
     if(!dynamic_cast<StringExpression*>(exp->expression)) {
-        valid = false;
         emit_message(msg::ERROR, "import expression expects following expression to be package string", currentLocation());
     }
 }
@@ -507,7 +489,6 @@ void ValidationVisitor::visitAllocExpression(AllocExpression *exp) {
 
 void ValidationVisitor::visitLabelStatement(LabelStatement *stmt) {
     if(!stmt->identifier) {
-        valid = false;
         emit_message(msg::ERROR, "label statement expects following identifier", currentLocation());
     }
 }
@@ -515,10 +496,8 @@ void ValidationVisitor::visitLabelStatement(LabelStatement *stmt) {
 void ValidationVisitor::visitCaseStatement(CaseStatement *stmt) {
     for(int i = 0; i < stmt->values.size(); i++) {
         if(!stmt->values[i]) {
-            valid = false;
             emit_message(msg::ERROR, "invalid case value in case statement", stmt->loc);
         } else if(!stmt->values[i]->isConstant()) {
-            valid = false;
             emit_message(msg::ERROR, "case value must be constant", stmt->values[i]->loc);
         }
     }
@@ -526,20 +505,17 @@ void ValidationVisitor::visitCaseStatement(CaseStatement *stmt) {
 
 void ValidationVisitor::visitGotoStatement(GotoStatement *stmt) {
     if(!stmt->identifier) {
-        valid = false;
         emit_message(msg::ERROR, "goto statement expects following identifier", stmt->loc);
     }
 }
 
 void ValidationVisitor::visitCompoundStatement(CompoundStatement *stmt) {
     if(!stmt->getScope() && stmt->statements.size()) {
-        valid = false;
         emit_message(msg::ERROR, "compound statement is missing scope", stmt->loc);
     }
 
     for(int i = 0; i < stmt->statements.size(); i++) {
         if(!stmt->statements[i]) {
-            valid = false;
             emit_message(msg::ERROR, "null statement in compound statement", stmt->loc);
         }
     }
@@ -548,7 +524,6 @@ void ValidationVisitor::visitCompoundStatement(CompoundStatement *stmt) {
 void ValidationVisitor::visitBlockStatement(BlockStatement *stmt) {
 #ifdef DEBUG
     if(!stmt->getScope() && stmt->body) {
-        valid = false;
         emit_message(msg::ERROR, "null scope in block statement", currentLocation());
     }
 #endif
@@ -556,14 +531,12 @@ void ValidationVisitor::visitBlockStatement(BlockStatement *stmt) {
 
 void ValidationVisitor::visitElseStatement(ElseStatement *stmt) {
     if(!stmt->body) {
-        valid = false;
         emit_message(msg::ERROR, "else statement missing body statement", currentLocation());
     }
 }
 
 void ValidationVisitor::visitIfStatement(IfStatement *stmt) {
     if(!stmt->body) {
-        valid = false;
         emit_message(msg::ERROR, "if statement missing body statement", currentLocation());
     }
 
@@ -584,7 +557,6 @@ void ValidationVisitor::visitLoopStatement(LoopStatement *stmt) {
 
 void ValidationVisitor::visitSwitchStatement(SwitchStatement *stmt) {
     if(!stmt->condition) {
-        valid = false;
         emit_message(msg::ERROR, "switch statement missing condition", currentLocation());
     }
 }
@@ -592,7 +564,6 @@ void ValidationVisitor::visitSwitchStatement(SwitchStatement *stmt) {
 void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt) {
     if(stmt->expression) {
         if(!stmt->expression->getType()->coercesTo(getFunction()->getReturnType())) {
-            valid = false;
             emit_message(msg::ERROR, "returned value can not be converted to return type", stmt->loc);
         } else if(!stmt->expression->getType()->is(getFunction()->getReturnType())) {
             stmt->expression = stmt->expression->coerceTo(getFunction()->getReturnType());

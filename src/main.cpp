@@ -137,7 +137,7 @@ void compile(WLConfig params)
 
         if(!ast->validate()){
             emit_message(msg::ERROR, "invalid AST");
-        }
+        } else {
 
         IRCodegenContext cg;
         std::string outputo = cg.codegenAST(ast, params);
@@ -145,6 +145,7 @@ void compile(WLConfig params)
         // TODO: check if codegen succeeded before attempting to link
         if(params.link && currentErrorLevel() < msg::ERROR)
             link(params, outputo);
+        }
     } else
     {
         emit_message(msg::FATAL, "no input files");

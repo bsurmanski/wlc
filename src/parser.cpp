@@ -1166,9 +1166,9 @@ Expression *ParseContext::parseNewExpression()
         parseArgumentList(args);
     }
 
-    Expression *alloc = new HeapAllocExpression(t, loc);
+    //Expression *alloc = new HeapAllocExpression(t, loc);
 
-    return new NewExpression(t, alloc, args, call, loc);
+    return new NewExpression(t, NewExpression::HEAP, args, call, loc);
 }
 
 Expression *ParseContext::parseExpression(int prec)

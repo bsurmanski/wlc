@@ -1077,24 +1077,12 @@ ASTValue *IRCodegenContext::opIndexDArray(ASTValue *arr, ASTValue *idx) {
 }
 
 ASTValue *IRCodegenContext::opIndexSArray(ASTValue *arr, ASTValue *idx) {
-    /*
-    ASTType *indexedType = arr->getType()->getPointerElementTy();
-    std::vector<Value*> gep;
-    gep.push_back(codegenValue(getIntValue(ASTType::getIntTy(), 0)));
-    gep.push_back(codegenValue(idx));r
-    Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
-    return new ASTBasicValue(indexedType, val, true);
-    */
-
     ASTType *indexedType = arr->getType()->getPointerElementTy();
 
     std::vector<Value*> gep;
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(codegenValue(idx));
 
-    Value *TEST = codegenLValue(arr);
-    TEST->dump();
-    printf("\n\n");
     Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
     return new ASTBasicValue(indexedType, val, true);
 }
@@ -1366,22 +1354,24 @@ ASTValue *IRCodegenContext::codegenTupleExpression(TupleExpression *exp, ASTComp
     return new TupleValue(vals);
 }
 
-ASTValue *IRCodegenContext::codegenHeapAllocExpression(HeapAllocExpression *aexp) {
-    Value *size = NULL;
+ASTValue *IRCodegenContext::codegenHeapAlloc(ASTType *ty) {
+    Value *asz = NULL; //array size
+    Value *size = NULL; //size in bytes (amount to alloc)
 
     //XXX a bit messy here
     // manually calculate array size
     // TODO: only manually calculate size if exp->type->size is not constant
-    if(aexp->type->isArray()) {
-        ASTStaticArrayType *arrayTy = dynamic_cast<ASTStaticArrayType*>(aexp->type);
+    if(ty->isArray()) {
+        ASTStaticArrayType *arrayTy = dynamic_cast<ASTStaticArrayType*>(ty);
         ASTValue *sz = promoteType(codegenExpression(arrayTy->size), ASTType::getLongTy());
+        asz = codegenValue(sz);
         sz = opMulValues(sz, getIntValue(ASTType::getLongTy(), arrayTy->arrayOf->getSize()));
         size = codegenValue(sz);
     } else {
-        size = ConstantInt::get(codegenType(ASTType::getULongTy()), aexp->type->getSize());
+        asz = ConstantInt::get(codegenType(ASTType::getULongTy()), ty->length());
+        size = ConstantInt::get(codegenType(ASTType::getULongTy()), ty->getSize());
     }
 
-    ASTType *ty = aexp->type;
     vector<Value*> llargs;
     llargs.push_back(size);
     vector<Type*> llargty;
@@ -1393,21 +1383,19 @@ ASTValue *IRCodegenContext::codegenHeapAllocExpression(HeapAllocExpression *aexp
     value = ir->CreateCall(mallocFunc, llargs);
 
     ASTValue *val = NULL;
-    if(aexp->type->isArray()) {
-        ASTType *arrty = aexp->type->getPointerElementTy();
+    if(ty->isArray()) {
+        ASTType *arrty = ty->getPointerElementTy();
         ty = arrty->getArrayTy();
         Value *ptr = ir->CreateBitCast(value, codegenType(arrty)->getPointerTo());
-        ASTValue *sz = codegenExpression(dynamic_cast<ASTStaticArrayType*> (aexp->type)->size);
-        sz = promoteType(sz, ASTType::getLongTy());
         value = ir->CreateAlloca(codegenType(ty));
         ir->CreateStore(ptr, ir->CreateStructGEP(value, 0));
-        ir->CreateStore(codegenValue(sz), ir->CreateStructGEP(value, 1));
+        ir->CreateStore(asz, ir->CreateStructGEP(value, 1));
         //TODO: create a 'create array' function
     } else {
-        if(aexp->type->isReference()) {
-            value = ir->CreateBitCast(value, codegenType(aexp->type));
+        if(ty->isReference()) {
+            value = ir->CreateBitCast(value, codegenType(ty));
         } else {
-            value = ir->CreateBitCast(value, codegenType(aexp->type)->getPointerTo());
+            value = ir->CreateBitCast(value, codegenType(ty)->getPointerTo());
         }
     }
 
@@ -1422,10 +1410,10 @@ ASTValue *IRCodegenContext::codegenHeapAllocExpression(HeapAllocExpression *aexp
     return val;
 }
 
-ASTValue *IRCodegenContext::codegenStackAllocExpression(StackAllocExpression *aexp) {
+ASTValue *IRCodegenContext::codegenStackAlloc(ASTType *ty) {
 // XXX deal with arrays and weird other types?
     ASTValue *ret = NULL;
-    ASTUserType *uty = aexp->type->asUserType();
+    ASTUserType *uty = ty->asUserType();
     Value *alloc = ir->CreateAlloca(codegenType(uty));
 
     if(uty->isReference()) {
@@ -1434,13 +1422,19 @@ ASTValue *IRCodegenContext::codegenStackAllocExpression(StackAllocExpression *ae
         if(uty->isClass()) ir->CreateStore(ConstantAggregateZero::get(codegenType(uty)->getPointerElementType()), stackAlloca);
         ir->CreateStore(stackAlloca, alloc);
     }
-    //XXX below is a bit strange. "isReference?" is in the lvalue field of the BasicValue constructor.
-    // it doesnt work the other way around
-    ret = new ASTBasicValue(uty->getReferenceTy(), alloc, uty->isReference(), true);
+
+    ret = new ASTBasicValue(uty, alloc, true, uty->isReference());
     ((ASTBasicValue*) ret)->setNoFree(true);
-    //XXX above should be lvalue
 
     return ret;
+}
+
+ASTValue *IRCodegenContext::codegenHeapAllocExpression(HeapAllocExpression *aexp) {
+    return codegenHeapAlloc(aexp->type);
+}
+
+ASTValue *IRCodegenContext::codegenStackAllocExpression(StackAllocExpression *aexp) {
+    return codegenStackAlloc(aexp->type);
 }
 
 ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
@@ -1450,13 +1444,16 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         return NULL;
     }
 
-    ASTValue *val = NULL;
-    // XXX Silly mess. 'this' is passed as first arg
-    // (this is so validate correctly checks function type)
-    // but we want to store this and return it.
-    val = codegenExpression(exp->args.front());
-    exp->args.pop_front();
-    // XXX remove above once I'm doing something smarter
+    ASTValue *ret = NULL;
+    ASTValue *this_val = NULL;
+
+    if(exp->alloc == NewExpression::STACK) {
+        ret = codegenStackAlloc(exp->type);
+        this_val = getAddressOf(ret);
+    } else { // heap alloc
+        ret = codegenHeapAlloc(exp->type);
+        this_val = ret;
+    }
 
     ASTType *ty = exp->type;
     if(ty->isPointer() && ty->getPointerElementTy()->isStruct()) {
@@ -1469,8 +1466,8 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
 
         // if class, store vtable and refcount
         if(ty->isClass()) {
-            ir->CreateStore(ConstantAggregateZero::get(codegenType(uty)->getPointerElementType()), codegenValue(val));
-            ASTValue *vtable = getVTable(val);
+            ir->CreateStore(ConstantAggregateZero::get(codegenType(uty)->getPointerElementType()), codegenValue(this_val));
+            ASTValue *vtable = getVTable(this_val);
 
             codegenType(uty); // XXX to create typeinfo. So we are able to load it below... hacky
 
@@ -1489,7 +1486,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         //TODO: call parent class constructor
         if(exp->function) {
             std::vector<ASTValue*> args;
-            args.push_back(val); // push 'this'
+            args.push_back(this_val); // push 'this'
             std::list<Expression*>::iterator it = exp->args.begin();
 
             while(it != exp->args.end()) {
@@ -1501,7 +1498,7 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
         }
     }
 
-    return val;
+    return ret;
 }
 
 

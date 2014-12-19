@@ -677,6 +677,8 @@ struct TupleExpression;
 struct DotExpression;
 struct NewExpression;
 struct AllocExpression;
+struct HeapAllocExpression;
+struct StackAllocExpression;
 struct FunctionExpression;
 
 struct Expression : public Statement
@@ -716,6 +718,8 @@ struct Expression : public Statement
     virtual DotExpression *dotExpression() { return NULL; }
     virtual NewExpression *newExpression() { return NULL; }
     virtual AllocExpression *allocExpression() { return NULL; }
+    virtual HeapAllocExpression *heapAllocExpression() { return NULL; }
+    virtual StackAllocExpression *stackAllocExpression() { return NULL; }
     FunctionExpression *functionExpression() { return NULL; }
 
     virtual Expression *lower() { return this; }
@@ -741,20 +745,38 @@ struct TypeExpression : public Expression
     virtual void accept(ASTVisitor *v);
 };
 
+// used for semantic analysis of New Expression arguments
+// this expression is a placeholder for the new allocation
+struct DummyExpression : public Expression {
+    ASTType *type;
+    DummyExpression(ASTType *t) : type(t) {}
+    virtual ASTType *getType() { return type; }
+};
+
 //XXX should NewExpression extend CallExpression?
 struct FunctionExpression;
 struct NewExpression : public Expression
 {
+    enum Alloc {
+        STACK,
+        HEAP
+    };
+
+    Alloc alloc;
     bool call;
     ASTType *type;
-    Expression *alloc; // XXX validate this field
+
+    //Expression *alloc; // XXX validate this field
     FunctionExpression *function; // found in validation
     std::list<Expression*> args;
     virtual ASTType *getType() {
-        if(alloc->getType()->isPointer() && alloc->getType()->getPointerElementTy()->isArray()) return alloc->getType()->getPointerElementTy(); //XXX this seems silly
-        return alloc->getType();
+        if(type->isArray()) return type; //XXX bit silly?
+        if(alloc == STACK) return type;
+
+        //else heap alloc
+        return type->getReferenceTy();
     }
-    NewExpression(ASTType *t, Expression *all, std::list<Expression*> a, bool c, SourceLocation l = SourceLocation()) :
+    NewExpression(ASTType *t, Alloc all, std::list<Expression*> a, bool c, SourceLocation l = SourceLocation()) :
         Expression(l), type(t), alloc(all), args(a), call(c), function(NULL) {}
     virtual NewExpression *newExpression() { return this; }
     virtual void accept(ASTVisitor *v);
@@ -1124,12 +1146,14 @@ struct AllocExpression : public PrimaryExpression {
 struct HeapAllocExpression : public AllocExpression {
     HeapAllocExpression(ASTType *ty, SourceLocation l = SourceLocation()) :
         AllocExpression(ty, l) {}
+    HeapAllocExpression *heapAllocExpression() { return this; }
 };
 
-//XXX Not used, but present for future use
 struct StackAllocExpression : public AllocExpression {
+    virtual ASTType *getType() { return type; }
     StackAllocExpression(ASTType *ty, SourceLocation l = SourceLocation()) :
         AllocExpression(ty, l) {}
+    StackAllocExpression *stackAllocExpression() { return this; }
 };
 
 

@@ -272,6 +272,9 @@ class IRCodegenContext : public CodegenContext
     // arr.size
     ASTValue *getArraySize(ASTValue *a);
 
+    ASTValue *codegenHeapAlloc(ASTType *ty);
+    ASTValue *codegenStackAlloc(ASTType *ty);
+
     // expression
     ASTValue *codegenExpression(Expression *exp);
     ASTValue *codegenTupleExpression(TupleExpression *exp, ASTCompositeType *ty = 0);

@@ -295,18 +295,22 @@ void Sema::visitCallExpression(CallExpression *exp) {
 
 void Sema::visitNewExpression(NewExpression *exp) {
     // push alloc as 'new' argument
-    exp->args.push_front(exp->alloc);
+
+    //XXX kinda messy
+    exp->args.push_front(new DummyExpression(exp->type->getReferenceTy()));
 
     ASTUserType *uty = exp->type->asUserType();
     if(uty && exp->call) {
         exp->function = new FunctionExpression(uty->getConstructor(), currentLocation());
-
         resolveCallArguments(exp->function, exp->args);
     }
 
     if(!exp->function && exp->args.size() > 1) {
         emit_message(msg::ERROR, "unknown constructor call", currentLocation());
     }
+
+    //XXX pop 'this'. CG will be responsible to push it again
+    exp->args.pop_front();
 }
 
 void Sema::visitIfStatement(IfStatement *stmt) {

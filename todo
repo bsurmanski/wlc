@@ -1,16 +1,10 @@
 static members in structs/classes
 
-array 'new' should only manually calculate array size if size expression is not static (eg calc for new int[i+5])
-
 set member class types and arrays to zero
-
-null all class-typed members before constructor
 
 ? recursive types (types that contain references to each other) crash things
 
 rearange class members largest to smallest (for packing efficiency)
-
-import(C), correctly parse 'typedef'
 
 warn of invalid use of local if function member
 

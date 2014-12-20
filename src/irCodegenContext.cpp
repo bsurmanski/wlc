@@ -435,9 +435,10 @@ IRScope *IRCodegenContext::endScope() {
         ASTScope::iterator it = scope->begin();
         for(; it != scope->end(); it++) {
             Identifier *id = *it;
-            if(id->isVariable() && id->getType()->isClass() && !id->getDeclaration()->isWeak()) {
-                if(id->getName() != "this") //XXX messy. dont release 'this'
+            if(id->isVariable() && id->getType()->isReleasable() && !id->getDeclaration()->isWeak()) {
+                if(id->getName() != "this") { //XXX messy. dont release 'this'
                     releaseObject(codegenIdentifier(id));
+                }
             }
         }
     }
@@ -2213,29 +2214,13 @@ ASTValue *IRCodegenContext::codegenAssign(ASTValue *lhs, ASTValue *rhs, bool con
         return NULL;
     }
 
-    //if(vrhs->type != vlhs->type)
-    /*
-    {
-        rhs = promoteType(rhs, lhs->getType());
-        if(rhs->getType()->coercesTo(lhs->getType()) || (convert && rhs->getType()->castsTo(lhs->getType())))
-        {
-            rhs = promoteType(rhs, lhs->getType());
-        }
-        else
-        {
-            emit_message(msg::ERROR, "cannot assign value of type '" + rhs->getType()->getName() +
-                    "' to type '" + lhs->getType()->getName() + "'", location);
-            return NULL;
-        }
-    }*/
-
     if(!lhs->isWeak()) {
-        if(lhs->getType()->isClass()) {
+        if(lhs->getType()->isReleasable()) {
             releaseObject(lhs);
         }
 
         // check for LValue is because we can't retain 'null'
-        if(rhs->getType()->isClass() && rhs->isLValue()) {
+        if(rhs->getType()->isRetainable()) {
             retainObject(rhs);
         }
     }
@@ -2566,17 +2551,6 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
 
         Value *llval = llvmDecl;
 
-        /*
-        // static arrays are created in form of [i8x5].
-        // we want to convert value to pointer
-        if(vty->isSArray()) {
-            std::vector<Value*> gep;
-            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-            llval = ir->CreateInBoundsGEP(llvmDecl, gep);
-        }
-        */
-
         idValue = new ASTBasicValue(vty, llval, true, vty->isReference());
         idValue->setWeak(vdecl->isWeak());
 
@@ -2608,12 +2582,12 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
                     storeValue(idValue, defaultValue);
                 }
             } else {
-                //TODO: promote type is borkd
+                //TODO: should not need promoteType. defaultValue should be coerced in validate
                 defaultValue = promoteType(defaultValue, vty);
                 storeValue(idValue, defaultValue);
             }
 
-            if(vty->isClass() && !idValue->isWeak()) {
+            if(vty->isRetainable() && !idValue->isWeak()) {
                 retainObject(defaultValue);
             }
 

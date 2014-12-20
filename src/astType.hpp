@@ -120,6 +120,8 @@ struct ASTType
     bool isArray() { return asArray(); }
     bool isDArray() { return asDArray(); }
     bool isSArray() { return asSArray(); }
+    bool isRetainable() { return isClass(); }
+    bool isReleasable() { return isClass(); }
 
     virtual bool isResolved();
     virtual ASTType *getUnqual();

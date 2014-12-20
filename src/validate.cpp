@@ -407,8 +407,14 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
         if(lhstype->isPointer() && lhstype->getPointerElementTy()->isStruct()) {
             rhsid = lhstype->getPointerElementTy()->getDeclaration()->lookup(exp->rhs);
             if(!rhsid) {
-                emit_message(msg::UNIMPLEMENTED, "UFCS on struct pointer temporarily broken. Sorry", currentLocation());
-                //TODO UFCS
+                //looks like ufcs
+                //TODO: unify test test with below stuff
+                Identifier *ufcs_id = getScope()->lookup(exp->rhs);
+                ufcs_id = resolveIdentifier(ufcs_id);
+                if(!ufcs_id->isFunction()) {
+                    emit_message(msg::ERROR, "member '" + exp->rhs + "' not found in user type '" + lhstype->getName() + "'", currentLocation());
+                }
+                return;
             } else if(rhsid->isVariable()) {
                 //XXX this should be in sema
                 exp->lhs = new UnaryExpression(tok::caret, exp->lhs, currentLocation());

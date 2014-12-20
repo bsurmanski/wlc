@@ -19,7 +19,7 @@
 #include <string>
 #include <map>
 
-#define CGSTR "wlc 0.22 - Oct 2014"
+#define CGSTR "wlc 0.22 - Dec 2014"
 #define PROJDIR "/home/brandon/PROJECTS/C/term/wlc"
 
 class IRCodegenContext;

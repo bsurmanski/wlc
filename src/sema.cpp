@@ -99,8 +99,14 @@ void Sema::resolveCallArguments(FunctionExpression *func, std::list<Expression*>
             Expression *arg = NULL;
             Expression *defaultArg = NULL;
             ASTType *paramty = NULL;
-            //XXX below will break on varargs
-            paramty  = fty->params[resolvedArgs.size()];
+            
+			//XXX below will break on varargs
+			if (!fty->isVararg()) {
+				paramty = fty->params[resolvedArgs.size()];
+			}
+			else {
+				paramty = (*args)->getType();
+			}
 
             if(args != funcargs.end()) {
                 arg = *args;

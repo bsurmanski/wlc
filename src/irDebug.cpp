@@ -498,7 +498,6 @@ llvm::Instruction *IRDebug::createVariable(std::string nm, ASTValue *v, BasicBlo
 		false);
 #endif
 
-
 #if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR >= 6
     Instruction *idinst = di.insertDeclare((llvm::Value*) v->value, div, DIExpression(), bb);
 #else // 3.5 or lower

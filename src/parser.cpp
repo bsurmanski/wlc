@@ -784,6 +784,7 @@ NEXT:
     if(t_id.isNot(tok::identifier)){
         emit_message(msg::ERROR,
             "expected identifier following type (declaration)", t_id.loc);
+		
         dropLine();
         return NULL;
     }

@@ -728,7 +728,9 @@ struct Expression : public Statement
 
     virtual void accept(ASTVisitor *v);
 
-    Expression *coerceTo(ASTType *ty);
+    virtual Expression *coerceTo(ASTType *ty);
+
+    virtual bool coercesTo(ASTType *ty) { return getType()->coercesTo(ty); }
 
     virtual int asInteger() {
         emit_message(msg::ERROR, "this value cannot be converted to integer", loc);
@@ -819,7 +821,9 @@ struct TupleExpression : public Expression
         return true;
     }
 
-    virtual ASTType *getType();
+    virtual bool coercesTo(ASTType *ty);
+
+    virtual ASTTupleType *getType();
     TupleExpression(std::vector<Expression*> e, SourceLocation l = SourceLocation()) :
         Expression(l), members(e) {}
     virtual TupleExpression *tupleExpression() { return this; }

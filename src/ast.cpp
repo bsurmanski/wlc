@@ -224,24 +224,10 @@ Expression *Expression::coerceTo(ASTType *ty) {
         return this;
     }
 
-    if(expty->coercesTo(ty)) {
+    if(coercesTo(ty)) {
         //TODO: note in AST that this is implicit
         return new CastExpression(ty, this, loc);
     }
-
-    if(isConstant()) {
-        if(ASTTupleType *tupty = expty->asTuple()) {
-            if(ASTStaticArrayType *sarr = ty->asSArray()) {
-                if(sarr->length() != tupty->length()) goto ERR;
-                for(int i = 0; i < tupty->length(); i++) {
-                    if(!tupty->getMemberType(i)->coercesTo(sarr->getMemberType(i))) goto ERR;
-                }
-
-                return new CastExpression(ty, this, loc);
-            }
-        }
-    }
-ERR:
 
     emit_message(msg::ERROR, "attempt to coerce expression of type '" + expty->getName() +
             "' to incompatible type '" + ty->getName() + "'", loc);
@@ -325,12 +311,37 @@ ASTType *DotExpression::getType() {
 }
 
 
-ASTType *TupleExpression::getType() {
+ASTTupleType *TupleExpression::getType() {
     std::vector<ASTType*> tupty;
     for(int i = 0; i < members.size(); i++) {
         tupty.push_back(members[i]->getType());
     }
     return ASTType::getTupleTy(tupty);
+}
+
+bool TupleExpression::coercesTo(ASTType *ty) {
+    ASTType *this_ty = getType();
+
+    if(getType()->coercesTo(ty)) return true;
+    if(isConstant()) {
+        if(ASTTupleType *tupty = ty->asTuple()) {
+            if(tupty->length() != this_ty->length()) return false;
+            for(int i = 0; i < members.size(); i++) {
+                if(!members[i]->coercesTo(tupty->getMemberType(i))) return false;
+            }
+            return true;
+        }
+
+        // duplicate of above, but for static array destination
+        if(ASTStaticArrayType *sarr = ty->asSArray()) {
+            if(sarr->length() != this_ty->length()) return false;
+            for(int i = 0; i < members.size(); i++) {
+                if(!members[i]->coercesTo(sarr->getMemberType(i))) return false;
+            }
+            return true;
+        }
+    }
+    return false;
 }
 
 ASTType *StringExpression::getType() {

@@ -176,7 +176,7 @@ struct ASTType
 #undef DECLTY
 
     static ASTType *DynamicTy; static ASTType *getDynamicTy();
-    static ASTType *getTupleTy(std::vector<ASTType *> t);
+    static ASTTupleType *getTupleTy(std::vector<ASTType *> t);
 
     static ASTFunctionType *getFunctionTy(ASTType *ret, std::vector<ASTType *> param, bool vararg=false);
     static ASTType *getVoidFunctionTy();

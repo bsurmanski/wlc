@@ -1,3 +1,4 @@
+// declare printf to be used below
 undecorated int printf(char^ fmt, ...);
 
 /*

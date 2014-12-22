@@ -569,7 +569,7 @@ void ValidationVisitor::visitSwitchStatement(SwitchStatement *stmt) {
 
 void ValidationVisitor::visitReturnStatement(ReturnStatement *stmt) {
     if(stmt->expression) {
-        if(!stmt->expression->getType()->coercesTo(getFunction()->getReturnType())) {
+        if(!stmt->expression->coercesTo(getFunction()->getReturnType())) {
             emit_message(msg::ERROR, "returned value can not be converted to return type", stmt->loc);
         } else if(!stmt->expression->getType()->is(getFunction()->getReturnType())) {
             stmt->expression = stmt->expression->coerceTo(getFunction()->getReturnType());

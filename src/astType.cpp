@@ -435,7 +435,7 @@ std::vector<ASTType *> ASTType::typeCache;
 
 ASTType *ASTType::DynamicTy = 0;
 
-ASTType *ASTType::getTupleTy(std::vector<ASTType *> t)
+ASTTupleType *ASTType::getTupleTy(std::vector<ASTType *> t)
 {
     // TODO: type cache
     return new ASTTupleType(t);

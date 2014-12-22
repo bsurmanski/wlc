@@ -104,7 +104,7 @@ struct Token
     };
 
     Token() : kind(tok::none), iData(0) {}
-    Token(TokenKind k) : kind(k), iData(0) {}
+	Token(TokenKind k) : kind(k), iData(0) { }
     Token(TokenKind k, std::string st);
     Token(TokenKind k, double data);
     Token(const Token &other);

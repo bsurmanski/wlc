@@ -5,6 +5,8 @@
 
 
 #if defined WIN32
+#include<Windows.h>
+#undef ERROR
 char *realpath(const char *path, char *resolve) {
 	return _fullpath(resolve, path, PATH_MAX);
 }
@@ -12,6 +14,24 @@ std::string getFilebase(std::string s)
 {
 	std::tr2::sys::path filepath(s);
 	return basename(filepath);
+}
+
+unsigned getFileSize(std::string filenm) {
+	HANDLE hFile = CreateFile(filenm.c_str(), GENERIC_READ,
+		FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hFile == INVALID_HANDLE_VALUE)
+		return -1; // error condition, could call GetLastError to find out more
+
+	LARGE_INTEGER size;
+	if (!GetFileSizeEx(hFile, &size))
+	{
+		CloseHandle(hFile);
+		return -1; // error condition, could call GetLastError to find out more
+	}
+
+	CloseHandle(hFile);
+	return size.QuadPart;
 }
 #elif defined __APPLE__
 #include <libgen.h>
@@ -26,6 +46,15 @@ std::string getFilebase(std::string s)
 	free(buf);
 	return ret;
 }
+
+unsigned getFileSize(std::string filenm) {
+	struct stat st;
+	if(stat(filenm.c_str(), &st)) {
+		return 0;
+	}
+	return st.st_size;
+}
+
 #else //linux
 std::string getFilebase(std::string s)
 {
@@ -34,15 +63,17 @@ std::string getFilebase(std::string s)
 		s = s.substr(0, lastDot);
 	return basename(s.c_str());
 }
-#endif
 
 unsigned getFileSize(std::string filenm) {
-    struct stat st;
-    if(stat(filenm.c_str(), &st)) {
-        return 0;
-    }
-    return st.st_size;
+	struct stat st;
+	if (stat(filenm.c_str(), &st)) {
+		return 0;
+	}
+	return st.st_size;
 }
+
+#endif
+
 
 //
 // AST

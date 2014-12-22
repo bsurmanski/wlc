@@ -84,12 +84,16 @@
     <ClCompile Include="..\src\identifier.cpp" />
     <ClCompile Include="..\src\irCodegenContext.cpp" />
     <ClCompile Include="..\src\irDebug.cpp" />
-    <ClCompile Include="..\src\lexer.cpp" />
+    <ClCompile Include="..\src\lexer.cpp">
+      <PreprocessToFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreprocessToFile>
+    </ClCompile>
+    <ClCompile Include="..\src\lower.cpp" />
     <ClCompile Include="..\src\lowering.cpp" />
     <ClCompile Include="..\src\main.cpp" />
     <ClCompile Include="..\src\message.cpp" />
     <ClCompile Include="..\src\parsec.cpp" />
     <ClCompile Include="..\src\parser.cpp" />
+    <ClCompile Include="..\src\sema.cpp" />
     <ClCompile Include="..\src\token.cpp" />
     <ClCompile Include="..\src\validate.cpp" />
     <ClCompile Include="..\src\win_getopt.cpp" />
@@ -135,9 +139,11 @@
     <ClInclude Include="..\src\irDebug.hpp" />
     <ClInclude Include="..\src\irValue.hpp" />
     <ClInclude Include="..\src\lexer.hpp" />
+    <ClInclude Include="..\src\lower.hpp" />
     <ClInclude Include="..\src\message.hpp" />
     <ClInclude Include="..\src\parsec.hpp" />
     <ClInclude Include="..\src\parser.hpp" />
+    <ClInclude Include="..\src\sema.hpp" />
     <ClInclude Include="..\src\sourceLocation.hpp" />
     <ClInclude Include="..\src\streamLexer.hpp" />
     <ClInclude Include="..\src\token.hpp" />

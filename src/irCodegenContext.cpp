@@ -2592,9 +2592,11 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
             }
 
 			//TODO: fix debug information for variable creation
+#ifndef WIN32
             Instruction *vinst = unit->debug->createVariable(vdecl->getName(),
                     idValue, ir->GetInsertBlock(), vdecl->loc);
             vinst->setDebugLoc(llvm::DebugLoc::get(vdecl->loc.line, vdecl->loc.ch, diScope()));
+#endif
             //TODO: maybe create a LValue field in CGValue?
         } else if(vty->isClass()) {
             // store null to class if no value
@@ -2645,9 +2647,11 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
             AI->setName("this");
             ASTValue *thisval = new ASTBasicValue(fdecl->owner, AI, false, true);
             lookupInScope("this")->setValue(thisval);
+#ifndef WIN32 // currently broken on windows
             Instruction *ainst = unit->debug->createVariable("this",
                                                       thisval, ir->GetInsertBlock(), fdecl->loc, 1);
             ainst->setDebugLoc(llvm::DebugLoc::get(fdecl->loc.line, fdecl->loc.ch, diScope()));
+#endif
             AI++;
         }
 
@@ -2678,9 +2682,11 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
             //register debug params
             //XXX hacky with Instruction, and setDebugLoc manually
 			//TODO: fix createVariable for function parameter. (errors because we are ignoring 'this' right now)
-            Instruction *ainst = unit->debug->createVariable(fdecl->parameters[idx]->getName(),
+#ifndef WIN32
+			Instruction *ainst = unit->debug->createVariable(fdecl->parameters[idx]->getName(),
                                                       alloca, ir->GetInsertBlock(), fdecl->loc, idx+1);
             ainst->setDebugLoc(llvm::DebugLoc::get(fdecl->loc.line, fdecl->loc.ch, diScope()));
+#endif
             //TODO: register value to scope
 
             // retain class parameters (retain after assigning the passed value above)

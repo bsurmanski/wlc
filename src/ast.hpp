@@ -338,6 +338,7 @@ struct DeclarationQualifier
     bool implicit;
     bool weak;
     bool isConst;
+    bool isStatic;
 
     DeclarationQualifier() {
         external = false;
@@ -345,6 +346,7 @@ struct DeclarationQualifier
         implicit = false;
         weak = false;
         isConst = false;
+        isStatic = false;
     }
 };
 
@@ -370,6 +372,7 @@ struct Declaration : public Statement
     bool isExternal() { return qualifier.external; }
     bool isWeak() { return qualifier.weak; }
     bool isConstant() { return qualifier.isConst; }
+    bool isStatic() { return qualifier.isStatic; }
     virtual ASTType *getType() = 0;
 
     Identifier *getIdentifier() { return identifier; }

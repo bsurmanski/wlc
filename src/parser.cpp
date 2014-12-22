@@ -471,6 +471,7 @@ Statement *ParseContext::parseStatement()
         case tok::kw_undecorated:
         case tok::kw_const:
         case tok::kw_weak:
+        case tok::kw_static:
         case tok::kw_union:
         case tok::kw_class:
         case tok::kw_struct:
@@ -595,6 +596,12 @@ DeclarationQualifier ParseContext::parseDeclarationQualifier()
         }
         if(peek().is(tok::kw_const)) {
             dq.isConst = true;
+            ignore();
+            continue;
+        }
+
+        if(peek().is(tok::kw_static)) {
+            dq.isStatic = true;
             ignore();
             continue;
         }
@@ -784,7 +791,7 @@ NEXT:
     if(t_id.isNot(tok::identifier)){
         emit_message(msg::ERROR,
             "expected identifier following type (declaration)", t_id.loc);
-		
+
         dropLine();
         return NULL;
     }

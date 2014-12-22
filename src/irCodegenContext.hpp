@@ -209,6 +209,8 @@ class IRCodegenContext : public CodegenContext
     void dwarfStopPoint(int ln);
     void dwarfStopPoint(SourceLocation l);
 
+    ASTValue *codegenGlobal(VariableDeclaration *vdecl);
+
     ASTValue *indexValue(ASTValue *val, int i);
 
     ASTValue *loadValue(ASTValue *val);

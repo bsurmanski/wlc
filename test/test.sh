@@ -1,6 +1,6 @@
 tdirs="all construct gltest libvec postdecl switch vararg\
     array coerce crossimport importc logic_exp retain weak cast delete interface\
-    overload stack tuple class funcptr labels pack struct union ufcs"
+    overload stack tuple class funcptr labels pack struct static union ufcs"
 
 for dir in $tdirs; do
     cd $dir

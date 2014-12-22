@@ -1731,7 +1731,10 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 
     std::list<Expression*>::iterator it = exp->args.begin();
     while(it != exp->args.end()) {
-        args.push_back(codegenExpression(*it));
+        ASTValue *argval = codegenExpression(*it);
+        if(!argval)
+            emit_message(msg::ERROR, "CG: null value for argument", exp->loc);
+        args.push_back(argval);
         it++;
     }
 
@@ -2542,6 +2545,9 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         defaultValue = promoteType(defaultValue, vty);
         idValue = new ASTBasicValue(vty, codegenValue(defaultValue), false);
         idValue->setConstant(true);
+    } else if(vdecl->isStatic()) {
+        // create as global
+        idValue = (ASTBasicValue*) codegenGlobal(vdecl);
     } else {
 
         Type *llty = codegenType(vty);
@@ -2757,6 +2763,72 @@ void IRCodegenContext::codegenInclude(IRTranslationUnit *current, ModuleDeclarat
     //XXX should be 'import'?
 }
 
+ASTValue *IRCodegenContext::codegenGlobal(VariableDeclaration *vdecl) {
+    Identifier *id = vdecl->getIdentifier();
+    ASTType *idTy = id->getType();
+
+    //TODO: correct type for global storage (esspecially pointers?)
+    ASTValue *idValue = 0;
+    if(vdecl->value)
+        idValue = codegenExpression(vdecl->value);
+
+    if(idTy->getKind() == TYPE_DYNAMIC)
+    {
+        emit_message(msg::WARNING, "CG: dynamic type", location);
+        if(!idValue)
+            emit_message(msg::FAILURE,
+                    "attempt to codegen dynamically typed \
+                    variable without properly assigned value", vdecl->loc);
+        idTy = idValue->getType();
+        vdecl->type = idTy;
+    }
+
+    llvm::Constant* gValue;
+    if(vdecl->qualifier.external)
+    {
+        gValue = NULL;
+    } else if(vdecl->value)
+    {
+        if(!vdecl->value->isConstant()) {
+            emit_message(msg::ERROR, "CG: global value initializer must be constant", vdecl->value->loc);
+        }
+
+        ASTValue *defaultValue = codegenExpression(vdecl->value);
+        gValue = (llvm::Constant*) codegenValue(promoteType(defaultValue, idTy));
+    } else
+    {
+        gValue = (llvm::Constant*) llvm::Constant::getNullValue(codegenType(idTy));
+    }
+
+    GlobalVariable *llvmval = NULL;
+    if(!vdecl->isStatic()) {
+        llvmval = (GlobalVariable*)
+                module->getOrInsertGlobal(id->getName(), codegenType(idTy));
+
+        GlobalValue::LinkageTypes linkage = vdecl->qualifier.external ?
+            GlobalValue::ExternalLinkage : GlobalValue::ExternalLinkage;
+        llvmval->setLinkage(linkage);
+        llvmval->setInitializer(gValue);
+    } else {
+        llvmval = new GlobalVariable(*module, codegenType(vdecl->getType()), vdecl->isConstant(),
+                GlobalValue::InternalLinkage, gValue);
+    }
+
+    ASTBasicValue *globalValue = NULL;
+    dwarfStopPoint(vdecl->loc);
+    if(vdecl->isConstant()) {
+        globalValue = new ASTBasicValue(idTy, gValue);
+        globalValue->setConstant(true);
+        //TODO create global debug
+    } else {
+        globalValue = new ASTBasicValue(idTy, llvmval, true, idTy->isReference());
+        if(!vdecl->isStatic())
+            unit->debug->createGlobal(vdecl, globalValue);
+    }
+
+    return globalValue;
+}
+
 void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
 {
     this->unit = u;
@@ -2774,71 +2846,14 @@ void IRCodegenContext::codegenTranslationUnit(IRTranslationUnit *u)
     // alloc globals before codegen'ing functions
     // iterate over globals
     ASTScope::iterator end = unit->getScope()->end();
-    for(ASTScope::iterator it = unit->getScope()->begin(); it != end; it++)
-    {
+    for(ASTScope::iterator it = unit->getScope()->begin(); it != end; it++) {
         Identifier *id = *it;
         VariableDeclaration *vdecl = id->getDeclaration()->variableDeclaration();
-        if(id->isVariable())
-        {
-            ASTType *idTy = id->getType();
-
-            //TODO: correct type for global storage (esspecially pointers?)
-            ASTValue *idValue = 0;
-            if(vdecl->value)
-                idValue = codegenExpression(vdecl->value);
-
-            if(idTy->getKind() == TYPE_DYNAMIC)
-            {
-                emit_message(msg::WARNING, "CG: dynamic type", location);
-                if(!idValue)
-                    emit_message(msg::FAILURE,
-                            "attempt to codegen dynamically typed \
-                            variable without properly assigned value", vdecl->loc);
-                idTy = idValue->getType();
-                vdecl->type = idTy;
-            }
-
-            llvm::Constant* gValue;
-            if(vdecl->qualifier.external)
-            {
-                gValue = NULL;
-            } else if(vdecl->value)
-            {
-                if(!vdecl->value->isConstant()) {
-                    emit_message(msg::ERROR, "global value initializer must be constant", vdecl->value->loc);
-                }
-
-                ASTValue *defaultValue = codegenExpression(vdecl->value);
-                gValue = (llvm::Constant*) codegenValue(promoteType(defaultValue, idTy));
-            } else
-            {
-                gValue = (llvm::Constant*) llvm::Constant::getNullValue(codegenType(idTy));
-            }
-
-            GlobalVariable *llvmval = (GlobalVariable*)
-                    module->getOrInsertGlobal(id->getName(), codegenType(idTy));
-
-            GlobalValue::LinkageTypes linkage = vdecl->qualifier.external ?
-                GlobalValue::ExternalLinkage : GlobalValue::ExternalLinkage;
-            llvmval->setLinkage(linkage);
-            llvmval->setInitializer(gValue);
-
-            dwarfStopPoint(vdecl->loc);
-            if(vdecl->qualifier.isConst) {
-                ASTBasicValue *cvalue = new ASTBasicValue(idTy, gValue);
-                cvalue->setConstant(true);
-                id->setValue(cvalue);
-                //TODO create global debug
-            } else {
-                ASTValue *gv = new ASTBasicValue(idTy, llvmval, true, idTy->isReference());
-                id->setValue(gv);
-
-                unit->debug->createGlobal(vdecl, gv);
-            }
-
-        } else if(id->isFunction())
-        {
-            //TODO: declare func?
+        if(id->isVariable()) {
+            ASTValue *gval = codegenGlobal(vdecl);
+            id->setValue(gval);
+        } else if (id->isFunction()) {
+            //declare function?
         }
     }
 

@@ -152,6 +152,9 @@ void ValidationVisitor::visitVariableDeclaration(VariableDeclaration *decl) {
 
     resolveType(decl->getType());
 
+    if(decl->qualifier.isStatic && decl->value && !decl->value->isConstant()) {
+        emit_message(msg::ERROR, "static variable may only have constant initial value", currentLocation());
+    }
 }
 
 void ValidationVisitor::visitTypeDeclaration(TypeDeclaration *decl) {

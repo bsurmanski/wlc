@@ -736,6 +736,8 @@ struct Expression : public Statement
         emit_message(msg::ERROR, "this value cannot be converted to integer", loc);
         return 0;
     }
+
+    virtual std::string asString() { return ""; }
 };
 
 struct TypeExpression : public Expression
@@ -745,6 +747,10 @@ struct TypeExpression : public Expression
     virtual TypeExpression *typeExpression() { return this; }
     virtual ASTType *getDeclaredType() { return type; }
     virtual void accept(ASTVisitor *v);
+
+    virtual std::string asString() {
+        return type->getName();
+    }
 };
 
 // used for semantic analysis of New Expression arguments
@@ -784,24 +790,30 @@ struct NewExpression : public Expression
     virtual void accept(ASTVisitor *v);
 
     virtual Expression *lower();
-};
 
-struct IdOpExpression : public Expression {
-    IdentifierExpression *expression;
-    enum Type {
-        Delete,
-        Retain,
-        Release
-    };
+    virtual std::string asString() {
+        std::stringstream str;
+        if(alloc == STACK) {
+            str << type->getName();
+        } else { //HEAP
+            str << "new " << type->getName();
+        }
 
-    Type type;
+        if(call) {
+            str << "(";
 
-    IdOpExpression(IdentifierExpression *e, Type t, SourceLocation l = SourceLocation()) :
-        Expression(l), expression(e), type(t) {}
-    virtual void accept(ASTVisitor *v);
-    bool isDelete() { return type == Delete; }
-    bool isRetain() { return type == Retain; }
-    bool isRelease() { return type == Release; }
+            std::list<Expression*>::iterator it = args.begin();
+            while(it != args.end()) {
+                str << (*it)->asString();
+                it++;
+                if(it != args.end()) str << ", ";
+            }
+
+            str << ")";
+        }
+
+        return str.str();
+    }
 };
 
 struct TupleExpression : public Expression
@@ -828,6 +840,16 @@ struct TupleExpression : public Expression
         Expression(l), members(e) {}
     virtual TupleExpression *tupleExpression() { return this; }
     virtual void accept(ASTVisitor *v);
+
+    virtual std::string asString() {
+        std::stringstream str;
+        str << "[";
+        for(int i = 0; i < members.size(); i++) {
+            str << members[i]->asString();
+        }
+        str << "]";
+        return str.str();
+    }
 };
 
 struct CastExpression : public Expression
@@ -839,6 +861,10 @@ struct CastExpression : public Expression
     CastExpression(ASTType *ty, Expression *exp, SourceLocation l = SourceLocation()) :
         Expression(l), type(ty), expression(exp){}
     virtual void accept(ASTVisitor *v);
+
+    virtual std::string asString() {
+        return type->getName() + ": " + expression->asString();
+    }
 };
 
 // should be pure virtual
@@ -867,6 +893,11 @@ struct FunctionExpression : public Expression {
     FunctionExpression(Expression *fp, SourceLocation loc = SourceLocation()) : Expression(loc), overload(NULL), fpointer(fp) {}
     FunctionExpression *functionExpression() { return this; }
     bool isFunctionPointer() { return fpointer; }
+
+    virtual std::string asString() {
+        //XXX
+        return "";
+    }
 };
 
 struct CallExpression : public PostfixExpression
@@ -904,6 +935,21 @@ struct CallExpression : public PostfixExpression
     virtual void accept(ASTVisitor *v);
 
     virtual Expression *lower();
+
+    virtual std::string asString() {
+        std::stringstream str;
+        str << function->asString() << "(";
+
+        std::list<Expression*>::iterator it = args.begin();
+        while(it != args.end()) {
+            str << (*it)->asString();
+            it++;
+            if(it != args.end()) str << ", ";
+        }
+
+        str << ")";
+        return str.str();
+    }
 };
 
 struct IndexExpression : public PostfixExpression
@@ -931,6 +977,10 @@ struct IndexExpression : public PostfixExpression
         return NULL;
     }
     virtual void accept(ASTVisitor *v);
+
+    virtual std::string asString() {
+        return lhs->asString() + "[" + index->asString() + "]";
+    }
 };
 
 struct PostfixOpExpression : public PostfixExpression
@@ -958,6 +1008,10 @@ struct DotExpression : public PostfixExpression
     virtual ASTType *getType();
 
     virtual Expression *lower();
+
+    virtual std::string asString() {
+        return lhs->asString() + "." + rhs;
+    }
 };
 
 struct UnaryExpression : public Expression
@@ -989,6 +1043,15 @@ struct UnaryExpression : public Expression
         }
 	return NULL;
     }
+
+    virtual std::string asString() {
+        Operator o((tok::TokenKind) op);
+        if(o.isPostfixOp()) {
+            return lhs->asString() + o.asString();
+        } else {
+            return o.asString() + lhs->asString();
+        }
+    }
 };
 
 struct BinaryExpression : public Expression
@@ -1004,6 +1067,8 @@ struct BinaryExpression : public Expression
 
     virtual ASTType *getType();
     virtual Expression *lower();
+
+    virtual std::string asString() { return lhs->asString() + " " + op.asString() +  " " + rhs->asString(); }
 };
 
 struct PrimaryExpression : public Expression
@@ -1059,6 +1124,43 @@ struct IdentifierExpression : public PrimaryExpression
         }
         return 0;
     }
+
+    virtual std::string asString() { return id->getName(); }
+};
+
+struct IdOpExpression : public Expression {
+    IdentifierExpression *expression;
+    enum Type {
+        Delete,
+        Retain,
+        Release
+    };
+
+    Type type;
+
+    IdOpExpression(IdentifierExpression *e, Type t, SourceLocation l = SourceLocation()) :
+        Expression(l), expression(e), type(t) {}
+    virtual void accept(ASTVisitor *v);
+    bool isDelete() { return type == Delete; }
+    bool isRetain() { return type == Retain; }
+    bool isRelease() { return type == Release; }
+
+    virtual std::string asString() {
+        std::stringstream str;
+        switch(type) {
+            case Delete:
+                str << "delete";
+                break;
+            case Retain:
+                str << "retain";
+                break;
+            case Release:
+                str << "release";
+                break;
+        }
+        str << expression->asString();
+        return str.str();
+    }
 };
 
 //struct TypeExpression : public Expression
@@ -1075,6 +1177,9 @@ struct StringExpression : public PrimaryExpression
         PrimaryExpression(l), string(str) {}
     virtual StringExpression *stringExpression() { return this; }
     virtual void accept(ASTVisitor *v);
+
+    //XXX need to escape string?
+    virtual std::string asString() { return "\"" + string + "\""; }
 };
 
 struct PackExpression : public PrimaryExpression {
@@ -1201,6 +1306,8 @@ struct ImportExpression : public TopLevelExpression
         TopLevelExpression(l), expression(im), module(mod) { }
     virtual void accept(ASTVisitor *v);
     virtual ASTType *getType() { return NULL; } //TODO XXX
+
+    virtual std::string asString() { return "import " + expression->asString(); }
 };
 
 struct IncludeExpression : public TopLevelExpression

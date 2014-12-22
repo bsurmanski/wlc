@@ -41,6 +41,81 @@ bool Operator::isLogicalOp() {
     return ::isLogicalOp(kind);
 }
 
+std::string Operator::asString() {
+    switch(kind) {
+        // unary
+        case preinc:
+            return "++";
+        case predec:
+            return "--";
+        case positive:
+            return "+";
+        case negative:
+        case negate:
+            return "-";
+        case bitflip:
+            return "~";
+        case derefrence:
+            return "^";
+        case addressOf:
+            return "&";
+
+        // postfix
+        case call:
+            return "()";
+        case index:
+            return "[]";
+        case postinc:
+            return "++";
+        case postdec:
+            return "--";
+        case member:
+            return ".";
+
+        // binary
+        case add:
+            return "+";
+        case sub:
+            return "-";
+        case mul:
+            return "*";
+        case pow:
+            return "**";
+        case div:
+            return "/";
+        case bor:
+            return "|";
+        case band:
+            return "&";
+        case bxor:
+            return "^";
+        case lor:
+            return "or";
+        case land:
+            return "and";
+        case mod:
+            return "%";
+
+        // comparison
+        case less:
+            return "<";
+        case lessequal:
+            return "<=";
+        case greater:
+            return ">";
+        case greaterequal:
+            return ">=";
+        case equal:
+            return "=";
+        case notequal:
+            return "!=";
+
+        default:
+            return "";
+    }
+    return "";
+}
+
 
 bool isCompoundAssignOp(tok::TokenKind tkind) {
     switch(tkind)

@@ -99,7 +99,7 @@ void Sema::resolveCallArguments(FunctionExpression *func, std::list<Expression*>
             Expression *arg = NULL;
             Expression *defaultArg = NULL;
             ASTType *paramty = NULL;
-            
+
 			//XXX below will break on varargs
 			if (!fty->isVararg()) {
 				paramty = fty->params[resolvedArgs.size()];
@@ -274,7 +274,7 @@ void Sema::visitCallExpression(CallExpression *exp) {
         buildOverloadList(exp->function, overloads);
         ASTNode *callfunc = resolveOverloadList(exp->args, overloads);
         if(!callfunc) {
-            emit_message(msg::ERROR, "no valid overload found", currentLocation());
+            emit_message(msg::ERROR, "no valid overload found for function '" + exp->function->asString() + "'", currentLocation());
             return;
         }
 

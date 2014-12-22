@@ -73,6 +73,7 @@ struct Operator {
     bool isAssignOp();
     bool isLogicalOp();
     bool isCompoundAssignOp();
+    std::string asString();
 };
 
 using namespace tok;

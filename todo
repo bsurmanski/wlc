@@ -8,8 +8,6 @@ rearange class members largest to smallest (for packing efficiency)
 
 warn of invalid use of local if function member
 
-functions accept extra parameters (which are then ignored)
-
 allocating class on stack does not set vtable
 
 "[int, int]^ tup; tup++" breaks things (eg, passing tuple by reference)

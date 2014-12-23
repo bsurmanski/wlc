@@ -13,7 +13,7 @@ hi def link wlImport Include
 hi def link wlImportId Identifier
 
 syn keyword wExternal module
-syn keyword wScopeDecl package
+syn keyword wScopeDecl package static
 syn keyword wAssert assert
 syn keyword wConditional if else switch
 syn keyword wBranch goto break continue
@@ -28,7 +28,7 @@ syn keyword wOperator and or not
 syn keyword wMemOperator new delete renew retain release
 syn keyword wDeclaration var this
 syn keyword wUse use
-syn keyword wPack pack 
+syn keyword wPack pack
 " reserved keywords
 syn keyword wReserve explicit decorated defer foreach asm once number let super
 

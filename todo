@@ -1,5 +1,3 @@
-static members in structs/classes
-
 set member class types and arrays to zero
 
 ? recursive types (types that contain references to each other) crash things
@@ -24,3 +22,5 @@ make function arguments const
 exceptions?
 
 exception if stackAlloc class has refcount > 1 on scope end
+
+static class members should require a 'dot'

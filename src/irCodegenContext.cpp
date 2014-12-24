@@ -820,8 +820,12 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
                                         0));
             llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
         } else {
-            llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
-            llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
+            if(id->getDeclaration()->isStatic()) {
+                return id->getValue();
+            } else {
+                llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+                llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
+            }
         }
 
         ASTBasicValue *ret = new ASTBasicValue(mtype, llval, true, mtype->isReference());
@@ -1227,7 +1231,7 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
                 // OR static look up, if static member
                 return getMember(getThis(), id->getName());
             } else if(!id->getValue()){
-                emit_message(msg::ERROR, "identifier not found in scope. did you mean '." + id->getName() + "'?");
+                emit_message(msg::ERROR, "CG: identifier not found in scope. did you mean '." + id->getName() + "'?");
             }
         }
 
@@ -2735,6 +2739,12 @@ void IRCodegenContext::codegenUserTypeDeclaration(UserTypeDeclaration *utdecl) {
     //define type interface. define functions in type
 
     ASTScope::iterator end = utdecl->getScope()->end();
+    for(ASTScope::iterator it = utdecl->getScope()->begin(); it != end; it++) {
+        if(it->getDeclaration()->variableDeclaration() && it->getDeclaration()->isStatic()) {
+            codegenDeclaration(it->getDeclaration());
+        }
+    }
+
     for(ASTScope::iterator it = utdecl->getScope()->begin(); it != end; it++) {
         if(it->getDeclaration()->functionDeclaration()) {
             codegenDeclaration(it->getDeclaration());

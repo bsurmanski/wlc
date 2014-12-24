@@ -5,9 +5,8 @@ struct MyStruct {
     int j
 
     void dostuff(int r) {
-        static int i = 0;
-        printf("%d\n", i)
-        i = r;
+        printf("%d\n", .i)
+        .i = r;
     }
 }
 

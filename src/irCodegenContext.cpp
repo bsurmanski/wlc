@@ -2734,6 +2734,14 @@ void IRCodegenContext::codegenUserTypeDeclaration(UserTypeDeclaration *utdecl) {
     //TODO: should this be near codegen type?
     //define type interface. define functions in type
 
+    ASTScope::iterator end = utdecl->getScope()->end();
+    for(ASTScope::iterator it = utdecl->getScope()->begin(); it != end; it++) {
+        if(it->getDeclaration()->functionDeclaration()) {
+            codegenDeclaration(it->getDeclaration());
+        }
+    }
+
+    /*
     for(int i = 0; i < utdecl->methods.size(); i++) {
             codegenDeclaration(utdecl->methods[i]);
     }
@@ -2741,6 +2749,7 @@ void IRCodegenContext::codegenUserTypeDeclaration(UserTypeDeclaration *utdecl) {
     for(int i = 0; i < utdecl->staticMembers.size(); i++) {
             codegenDeclaration(utdecl->staticMembers[i]);
     }
+    */
 }
 
 
@@ -2814,6 +2823,7 @@ ASTValue *IRCodegenContext::codegenGlobal(VariableDeclaration *vdecl) {
     } else {
         llvmval = new GlobalVariable(*module, codegenType(vdecl->getType()), vdecl->isConstant(),
                 GlobalValue::InternalLinkage, gValue);
+        llvmval->setName(id->getMangledName());
     }
 
     ASTBasicValue *globalValue = NULL;

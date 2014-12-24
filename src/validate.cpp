@@ -201,6 +201,10 @@ void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
         if(!decl->members[i]) emit_message(msg::ERROR, "invalid member found in user type declaration", decl->loc);
     }
 
+    for(int i = 0; i < decl->staticMembers.size(); i++) {
+        if(!decl->staticMembers[i]) emit_message(msg::ERROR, "invalid static member found in user type declaration", decl->loc);
+    }
+
     decl->scope->accept(this);
 }
 

@@ -22,7 +22,7 @@ int main(int argc, char^^ argv) {
     func(1)
     func(2)
     MyStruct st
-    st.dostuff(1)
-    st.dostuff(2)
+    st.dostuff(5)
+    st.dostuff(6)
     return 0
 }

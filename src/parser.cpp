@@ -725,7 +725,11 @@ Declaration *ParseContext::parseDeclaration()
                     if(kind == kw_interface) {
                         emit_message(msg::ERROR, "interfaces cannot contain variable members, methods only", loc);
                     } else {
-                        sdecl->addMember(d);
+                        if(d->isStatic()) {
+                            sdecl->addStaticMember(d);
+                        } else {
+                            sdecl->addMember(d);
+                        }
                     }
                 }
 

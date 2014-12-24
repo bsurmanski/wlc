@@ -553,6 +553,7 @@ struct UserTypeDeclaration : public TypeDeclaration
     FunctionDeclaration *constructor; // linked list of overloadeded constructors; also in 'methods'
     FunctionDeclaration *destructor; // destructor (should only be one); also in 'methods'
     std::vector<FunctionDeclaration*> methods; //locally declared methods; does not include methods defined in parent
+    std::vector<Declaration*> staticMembers; // these are seperate so that it is easier to work with.
     std::vector<Declaration*> members;
 
     UserTypeDeclaration(Identifier *id, ASTScope *sc, SourceLocation loc, DeclarationQualifier dqual) :
@@ -582,6 +583,9 @@ struct UserTypeDeclaration : public TypeDeclaration
     }
     void addMember(Declaration *decl) {
         members.push_back(decl);
+    }
+    void addStaticMember(Declaration *decl) {
+        staticMembers.push_back(decl);
     }
     void addConstructor(FunctionDeclaration *fdecl) {
         if(!constructor) {

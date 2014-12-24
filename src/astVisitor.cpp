@@ -91,6 +91,10 @@ void UserTypeDeclaration::accept(ASTVisitor *v){
     for(int i = 0; i < members.size(); i++) {
         members[i]->accept(v);
     }
+
+    for(int i = 0; i < staticMembers.size(); i++) {
+        staticMembers[i]->accept(v);
+    }
 }
 
 //

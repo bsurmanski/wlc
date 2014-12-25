@@ -96,7 +96,6 @@ void Identifier::setValue(ASTValue *val)
 std::string Identifier::getMangledName() {
     if(!isMangled) {
         mangled = table->getMangledName() + "$" + getName();
-        printf("mangled: %s\n", mangled.c_str());
         isMangled = true;
     }
     return mangled;

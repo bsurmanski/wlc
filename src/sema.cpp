@@ -278,7 +278,7 @@ void Sema::visitCallExpression(CallExpression *exp) {
             return;
         }
 
-        exp->resolvedFunction = new FunctionExpression;
+        exp->resolvedFunction = new FunctionExpression(exp->loc);
         if(callfunc->expression()) {
             exp->resolvedFunction->fpointer = callfunc->expression();
         } else if(callfunc->declaration()) {

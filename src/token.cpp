@@ -230,7 +230,7 @@ int getPostfixPrecidence(tok::TokenKind tkind)
         case tok::plusplus:
         case tok::minusminus:
         case tok::dot:
-            return 13;
+            return 14;
         default:
             return 0;
     }
@@ -248,7 +248,7 @@ int getUnaryPrecidence(tok::TokenKind tkind)
         case tok::tilde:
         case tok::caret:
         case tok::amp:
-            return 12;
+            return 13;
         default:
             return 0;
     }

@@ -867,7 +867,13 @@ struct CastExpression : public Expression
     virtual CastExpression *castExpression() { return this; }
     CastExpression(ASTType *ty, Expression *exp, SourceLocation l = SourceLocation()) :
         Expression(l), type(ty), expression(exp){}
+
+    virtual bool isConstant() {
+        return expression->isConstant();
+    }
+
     virtual void accept(ASTVisitor *v);
+
 
     virtual std::string asString() {
         return type->getName() + ": " + expression->asString();

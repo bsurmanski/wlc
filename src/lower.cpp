@@ -27,7 +27,9 @@ void Lower::visitFunctionDeclaration(FunctionDeclaration *decl) {
 }
 
 void Lower::visitVariableDeclaration(VariableDeclaration *decl) {
-    if(decl->value) decl->value = decl->value->lower();
+    if(decl->value) {
+        decl->value = decl->value->lower();
+    }
 }
 
 void Lower::visitUserTypeDeclaration(UserTypeDeclaration *decl) {

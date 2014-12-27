@@ -109,6 +109,8 @@ std::string Operator::asString() {
             return "=";
         case notequal:
             return "!=";
+        case equalequal:
+            return "==";
 
         default:
             return "";

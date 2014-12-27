@@ -259,6 +259,13 @@ struct ASTFunctionType : public ASTCompositeType {
 
     virtual ASTFunctionType *functionType() { return this; }
 
+    virtual bool coercesTo(ASTType *t) {
+        //XXX second clause: if ty is pointer to function.
+        // might need to be double checked
+        return t->is(this) ||
+            (t->isPointer() && t->getPointerElementTy()->is(this));
+    }
+
     virtual bool is(ASTType *t) {
         if(ASTFunctionType *oth = dynamic_cast<ASTFunctionType*>(t)) {
             if(!getReturnType()->is(oth->getReturnType()) ||

@@ -269,31 +269,6 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
     llvm::Type *llvmty = NULL;
     if(ty->cgType) return (Type*) ty->cgType;
 
-    // XXX: type resolution is below; should be in some other pass, not codegen
-    if(ty->getKind() == TYPE_UNKNOWN || ty->getKind() == TYPE_UNKNOWN_USER)
-    {
-        emit_message(msg::WARNING, "type resolution in codegen", location);
-        Identifier* id = lookup(ty->getName());
-        Declaration* decl = id->getDeclaration();
-        if(TypeDeclaration* tdecl = dynamic_cast<TypeDeclaration*>(decl))
-        {
-            ty = tdecl->getDeclaredType();
-            if(!tdecl->getDeclaredType())
-            {
-                emit_message(msg::FATAL, "error, invalid type", location);
-            }
-        } else {
-            emit_message(msg::FATAL, "error, invalid type", location);
-            return NULL;
-        }
-        //TODO
-        if(id->isUndeclared()) {
-            emit_message(msg::ERROR, string("undeclared type'") +
-                    id->getName() + string("' in scope"), location);
-            return NULL;
-        }
-    }
-
     ASTType *tmp;
     switch(ty->getKind())
     {
@@ -1863,8 +1838,10 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             // if left hand side represents a type
             if(ASTType *declty = dexp->lhs->getDeclaredType())
             {
+                //XXX todo: get rid of this
                 if(dexp->rhs == "sizeof")
                 {
+                    emit_message(msg::WARNING, "'sizeof' should be lowered before CG", dexp->loc);
                     return new ASTBasicValue(ASTType::getULongTy(),
                             ConstantInt::get(Type::getInt64Ty(context),
                                 declty->getSize()));
@@ -1874,6 +1851,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                             "offsetof attribute not yet implemented", dexp->loc);
                 }
                 //TODO: static members
+                //TODO: this should be lowered before CG
                 emit_message(msg::ERROR, "unknown attribute '" + dexp->rhs + "' of struct '" +
                         declty->getName() + "'", dexp->loc);
                 return NULL;
@@ -1933,8 +1911,10 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     return NULL;
                 }
 
+                //XXX REMOVE
                 if(dexp->rhs == "ptr")
                 {
+                    emit_message(msg::FAILURE, "CG: .ptr should be codegen'd elsewhere");
                     return getArrayPointer(lhs);
                 }
 

@@ -162,7 +162,7 @@ int main(int argc, char^^ argv)
     while(!spc) 
     {
         SDL_PumpEvents();
-        int8^ keystate = SDL_GetKeyState(null)
+        uint8^ keystate = SDL_GetKeyState(null)
         spc = keystate[SDLK_SPACE]
         SDL_Delay(32)
         SDL_Flip(surf)

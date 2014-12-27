@@ -24,3 +24,10 @@ exceptions?
 exception if stackAlloc class has refcount > 1 on scope end
 
 static class members should require a 'dot'
+
+""""
+    the following compiles, but fails in llvm linking:
+
+    Block[] blocks
+    block.ptr = malloc(Block.sizeof)
+""""

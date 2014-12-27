@@ -21,6 +21,14 @@ Sema::Sema() : ASTVisitor() {
     valid = true;
 }
 
+void Sema::visitVariableDeclaration(VariableDeclaration *decl) {
+    if(decl->value) {
+        if(!decl->value->getType()->is(decl->getType())) {
+            decl->value = decl->value->coerceTo(decl->getType());
+        }
+    }
+}
+
 Expression *Sema::resolveCallArgument(ASTFunctionType *fty, unsigned i, Expression *arg, Expression *def) {
     ASTType *argty = NULL;
     ASTType *paramty = NULL;

@@ -874,6 +874,10 @@ struct CastExpression : public Expression
 
     virtual void accept(ASTVisitor *v);
 
+    virtual int asInteger() {
+        return expression->asInteger();
+    }
+
 
     virtual std::string asString() {
         return type->getName() + ": " + expression->asString();
@@ -1231,6 +1235,12 @@ struct FloatExpression : public NumericExpression {
     double value;
     FloatExpression(ASTType *ty, double val, SourceLocation l = SourceLocation()) : NumericExpression(ty, l), value(val) {}
     virtual FloatExpression *floatExpression() { return this; }
+
+    virtual std::string asString() {
+        std::stringstream ss;
+        ss << value;
+        return ss.str();
+    }
 };
 
 struct IntExpression : public NumericExpression {
@@ -1240,6 +1250,12 @@ struct IntExpression : public NumericExpression {
 
     virtual int asInteger() {
             return value;
+    }
+
+    virtual std::string asString() {
+        std::stringstream ss;
+        ss << value;
+        return ss.str();
     }
 };
 

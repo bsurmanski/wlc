@@ -354,24 +354,20 @@ bool TupleExpression::coercesTo(ASTType *ty) {
     ASTType *this_ty = getType();
 
     if(getType()->coercesTo(ty)) return true;
-    if(isConstant()) {
-        if(ASTTupleType *tupty = ty->asTuple()) {
-            if(tupty->length() != this_ty->length()) return false;
-            for(int i = 0; i < members.size(); i++) {
-                if(!members[i]->coercesTo(tupty->getMemberType(i))) return false;
-            }
-            return true;
-        }
 
-        // duplicate of above, but for static array destination
-        if(ASTStaticArrayType *sarr = ty->asSArray()) {
-            if(sarr->length() != this_ty->length()) return false;
-            for(int i = 0; i < members.size(); i++) {
-                if(!members[i]->coercesTo(sarr->getMemberType(i))) return false;
-            }
-            return true;
+    // if coercing to composite type, and all members will coerce to respective type, we are fine
+    if(ASTCompositeType *cty = ty->asCompositeType()) {
+        if(cty->isClass()) return false;
+        if((cty->isTuple() || cty->isSArray()) &&
+                cty->length() != this_ty->length()) {
+            return false;
         }
+        for(int i = 0; i < members.size(); i++) {
+            if(!members[i]->coercesTo(cty->getMemberType(i))) return false;
+        }
+        return true;
     }
+
     return false;
 }
 

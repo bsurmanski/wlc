@@ -27,6 +27,7 @@ class Sema : public ASTVisitor {
     virtual void buildOverloadList(Expression *func, std::list<ASTNode*>& overload);
     virtual Expression *resolveCallArgument(ASTFunctionType *fty, unsigned i, Expression *arg, Expression *def);
     virtual void resolveCallArguments(FunctionExpression *func, std::list<Expression*>& args);
+    virtual void visitVariableDeclaration(VariableDeclaration *vd);
     virtual void visitCallExpression(CallExpression *exp);
     virtual void visitNewExpression(NewExpression *exp);
     virtual void visitIfStatement(IfStatement *exp);

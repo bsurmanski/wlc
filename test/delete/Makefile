@@ -1,5 +1,5 @@
 all:
-	wlc main.wl
+	wlc main.wl -o program
 
 ll:
 	wlc main.wl -S

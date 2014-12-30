@@ -5,5 +5,5 @@ ll:
 	wlc main.wl -S
 
 clean:
-	rm -f output.ll 
+	rm -f output.ll
 	rm -f program

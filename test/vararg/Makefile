@@ -1,2 +1,2 @@
 all:
-	wlc main.wl
+	wlc main.wl -o program

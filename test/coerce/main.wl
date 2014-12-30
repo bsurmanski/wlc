@@ -1,3 +1,5 @@
+// test tuple->array, and int->float coercion
+
 void main() {
     float f = 5
     float[4] arr

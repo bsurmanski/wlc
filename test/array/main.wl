@@ -24,7 +24,6 @@ int main(int argc, char^^ argv)
     i[0] = 11;
     i[1] = 55;
     double x = sinf(3.1415926);
-    printf("ptr: %x\n", i.ptr);
     printf("size: %d\n", i.size);
     printf("i[0]: %d\n", i[0]);
     printf("i[1]: %d\n", i[1]);
@@ -33,6 +32,8 @@ int main(int argc, char^^ argv)
     arr = new int[10]
 
     int[] funcvals = [3,2,1]
+    //int[5] funcvals2 = [1, 2, 3, 4, 5]
+    int[5] funcvals2
 
     for(int j = 0; j < funcvals.size; j++) {
         printf("FUNCVAL[j] = %d\n", funcvals[j])

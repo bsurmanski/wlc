@@ -7,54 +7,39 @@ int main(int argc, char^^ argv)
 {
     MyClass cl = new MyClass
     MySpecialClass scl = new MySpecialClass
-    SomeFace face = cl
-    cl.a = 5
-    scl.svar = 11
-    scl.a = 2
-    scl.b = 11
-    scl.printCall();
-    int i = vcall(scl)
-    int j = vcall(cl)
-    printf("out %d\n", i);
-    printf("out %d\n", j);
-    cl.weirdFunc()
-    someStruct s
-    s.myfunc()
+    SomeFace face1 = cl
+    SomeFace face2 = scl
+    face1.func1()
+    face1.func2()
+    face2.func1()
+    face2.func2()
+    cl.func1()
     return 0
 }
 
-MyClass weirdFunc(MyClass f) return f
-
-int vcall(MyClass myclass) return myclass.myFunction(5,6);
-
 class MySpecialClass : MyClass
 {
-    char svar
-
-    void printCall() {
-        printf("stuff\n");
+    void func1() {
+        printf("MySpecialClass func1\n")
     }
 
-    int myFunction(int v1, int v2) {
-        return v1 + v2 + .svar
+    void func2() {
+        printf("TODO: retrieve virtual base methods in interface cast")
     }
 }
 
 class MyClass
 {
-    int a
-    int b
+    void func1() {
+        printf("MyClass func1\n")
+    }
 
-    int myFunction(int a, int b) {
-        return a + b
+    void func2() {
+        printf("MyClass func2\n")
     }
 }
 
-struct someStruct {
-    int i;
-    int myfunc() return .i
-}
-
 interface SomeFace {
-    void myFunc();
+    void func1();
+    void func2();
 }

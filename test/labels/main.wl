@@ -1,8 +1,15 @@
+undecorated int printf(char^ fmt, ...);
 
 int main(int argc, char^^ argv){
-    label mylabel
+
+    int i = 0
+
     goto mylabel
-    //goto myotherlabel
-    //label myotherlabel
+    printf("this should not print\n")
+    label mylabel
+    printf("%d\n", i)
+    i++
+    if(i < 3) goto mylabel
+
     return 0
 }

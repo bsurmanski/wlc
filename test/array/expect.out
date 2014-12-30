@@ -1,0 +1,12 @@
+static const array size: 5
+size: 2
+i[0]: 11
+i[1]: 55
+sin(PI): 0.000000
+FUNCVAL[j] = 3
+FUNCVAL[j] = 2
+FUNCVAL[j] = 1
+VALS[0] (1?) = 1
+Should print 5 2 3 4: 5 2 3 4 
+should print 1 2 3 twice: 1 2 3 1 2 3 
+should be 60: 60

@@ -30,12 +30,16 @@ int main(int argc, char^^ argv)
 
 //int vcall(MyClass myclass) return myclass.myFunction(5,6);
 
+void doPrint(MyClass cl) {
+    cl.printCall()
+}
+
 class MySpecialClass : MyClass
 {
     char svar
 
     void printCall() {
-        printf("stuff\n");
+        printf("SpecialPrint\n");
     }
 
     void printCall(int i) {
@@ -58,6 +62,10 @@ class MyClass
 
     int myFunction(int a, int b) {
         return a + b
+    }
+
+    void printCall() {
+        printf("print\n");
     }
 
     this() {

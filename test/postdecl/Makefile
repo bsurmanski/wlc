@@ -1,2 +1,2 @@
 all:
-	wlc postdecl.wl
+	wlc main.wl -o program

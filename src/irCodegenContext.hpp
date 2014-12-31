@@ -172,6 +172,9 @@ class IRCodegenContext : public CodegenContext
     bool isTerminated() { return terminated; }
     void setTerminated(bool b) { terminated = b; }
 
+    llvm::Function *getLLVMMalloc();
+    llvm::Function *getLLVMMemcpy();
+
     // codegen type
     llvm::Type *codegenArrayType(ASTType *ty);
     llvm::Type *codegenUserType(ASTType *ty);
@@ -181,6 +184,10 @@ class IRCodegenContext : public CodegenContext
     llvm::Type *codegenTupleType(ASTType *ty);
     llvm::Type *codegenFunctionType(ASTType *ty);
     llvm::Type *codegenType(ASTType *ty);
+
+    // interface
+    ASTValue *codegenInterfaceVTable(InterfaceVTable *vt);
+    ASTValue *getInterfaceSelf(ASTValue *iface);
 
     // codegen value
     llvm::Value *codegenMethod(MethodValue *method);

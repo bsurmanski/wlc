@@ -308,6 +308,7 @@ struct ASTUserType : public ASTCompositeType {
 
     virtual std::string getName() { return identifier->getName(); }
     virtual std::string getMangledName() {
+        /*
         if(isClass())
             return "UC" + identifier->getMangledName();
         if(isUnion())
@@ -316,6 +317,8 @@ struct ASTUserType : public ASTCompositeType {
             return "UI" + identifier->getMangledName();
         if(isStruct())
             return "US" + identifier->getMangledName();
+            */
+        return identifier->getMangledName();
 	assert(false && "unknown user type");
 	return "";
     }
@@ -348,7 +351,8 @@ struct ASTUserType : public ASTCompositeType {
         return getDeclaration() == ty->getDeclaration() || //TODO: might not work...
                     (isClass() && ty->isClass() && extends(ty)) ||
                     (isClass() && ty->isBool()) ||
-                    (isClass() && ty->isVoidPointer());
+                    (isClass() && ty->isVoidPointer()) ||
+                    (ty->isInterface()); //NOTE: assume we can coerce to interface, double check in sema when putting together vtable
     }
     virtual bool isResolved() { return getDeclaration(); }
 

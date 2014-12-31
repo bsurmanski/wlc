@@ -21,14 +21,6 @@ Sema::Sema() : ASTVisitor() {
     valid = true;
 }
 
-void Sema::visitVariableDeclaration(VariableDeclaration *decl) {
-    if(decl->value) {
-        if(!decl->value->getType()->is(decl->getType())) {
-            decl->value = decl->value->coerceTo(decl->getType());
-        }
-    }
-}
-
 Expression *Sema::resolveCallArgument(ASTFunctionType *fty, unsigned i, Expression *arg, Expression *def) {
     ASTType *argty = NULL;
     ASTType *paramty = NULL;
@@ -252,7 +244,11 @@ void Sema::visitCallExpression(CallExpression *exp) {
         if(dexp) {
             if(dexp->isValue()) {
                 // this is so that structs literals are passed as 'this' as a pointer
-                if(dexp->lhs->getType()->isStruct() && dexp->lhs->isLValue()) {
+                if(dexp->lhs->getType()->isInterface()) {
+                    //exp->args.push_front(dexp->lhs);
+                    exp->args.push_front(new DotPtrExpression(dexp->lhs, currentLocation()));
+                } else if(dexp->lhs->getType()->isStruct() && dexp->lhs->isLValue()) {
+                    // get 'this' pointer for stack struct
                     exp->args.push_front(new UnaryExpression(tok::amp, dexp->lhs, currentLocation()));
                 } else {
                     exp->args.push_front(dexp->lhs);
@@ -325,6 +321,40 @@ void Sema::visitNewExpression(NewExpression *exp) {
 
     //XXX pop 'this'. CG will be responsible to push it again
     exp->args.pop_front();
+}
+
+void Sema::visitCastExpression(CastExpression *exp) {
+    if(exp->type->isInterface()) {
+        InterfaceDeclaration *iDecl = exp->type->getDeclaration()->interfaceDeclaration();
+        UserTypeDeclaration *srcDecl = exp->expression->getType()->getDeclaration()->userTypeDeclaration();
+        // check to see if value can be converted to interface
+        if(!srcDecl) {
+            emit_message(msg::ERROR, "only user types may be cast to interfaces", exp->loc);
+        } else if(!iDecl->vtables.count(srcDecl->getMangledName())) {
+            InterfaceVTable *vtable = new InterfaceVTable(iDecl, srcDecl);
+
+            // if mangled name is not in iDecl vtable list, validate that type will cast to this interface
+            // if mangled name is in iDecl vtable list, we already checked this
+            for(int i = 0; i < iDecl->methods.size(); i++) {
+                //XXX should look in vtable instead of methods
+                // because parent class methods will not be considered for iface, as is
+                for(int j = 0; j < srcDecl->methods.size(); j++) {
+                    if(srcDecl->methods[j]->getName() == iDecl->methods[i]->getName()) {
+                        vtable->addFunction(srcDecl->methods[i]);
+                        //XXX make better test to match function parameters
+                        goto CONTINUE;
+                    }
+                }
+                // if we reach here, the method was not found; otherwise we should jump over with goto
+                emit_message(msg::ERROR, "attempt to cast '" + srcDecl->getName() + "' to interface '" +
+                        iDecl->getName() + "'; missing method '" + iDecl->methods[i]->getName() + "'", exp->loc);
+CONTINUE:
+                continue;
+            }
+
+            iDecl->setVTable(srcDecl->getMangledName(), vtable);
+        }
+    }
 }
 
 void Sema::visitIfStatement(IfStatement *stmt) {

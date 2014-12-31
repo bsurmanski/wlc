@@ -59,6 +59,7 @@ class IRDebug
         llvm::DICompositeType createUserType(ASTType *ty);
         llvm::DICompositeType createStructType(ASTType *ty);
         llvm::DICompositeType createUnionType(ASTType *ty);
+        llvm::DICompositeType createInterfaceType(ASTType *ty);
         llvm::DICompositeType createDynamicArrayType(ASTType *ty);
         llvm::DICompositeType createArrayType(ASTType *ty);
         llvm::DICompositeType createTupleType(ASTType *ty);

@@ -44,6 +44,7 @@ struct FunctionDeclaration;
 struct ImportExpression;
 struct PackageExpression;
 struct TypeDeclaration;
+struct InterfaceDeclaration;
 
 //TODO: dowhile
 
@@ -128,6 +129,7 @@ struct ASTNode {
     virtual TypeDeclaration *typeDeclaration() { return NULL; }
     virtual UserTypeDeclaration *userTypeDeclaration() { return NULL; }
     virtual ClassDeclaration *classDeclaration() { return NULL; }
+    virtual InterfaceDeclaration *interfaceDeclaration() { return NULL; }
     virtual ModuleDeclaration *moduleDeclaration() { return NULL; }
 
     // lower complex operations to simpler, more atomic operations.
@@ -627,7 +629,22 @@ struct ClassDeclaration : public UserTypeDeclaration {
     virtual ClassDeclaration *classDeclaration() { return this; }
 };
 
+// used to represent a vtable for a given class that conforms to an interface
+struct InterfaceVTable {
+    InterfaceDeclaration *interface;
+    UserTypeDeclaration *sourceType;
+    std::vector<FunctionDeclaration*> vtable;
+    ASTValue *cgvalue;
+
+    InterfaceVTable(InterfaceDeclaration *id, UserTypeDeclaration *cd) : interface(id), sourceType(cd), cgvalue(NULL) {}
+
+    void addFunction(FunctionDeclaration* fd) { vtable.push_back(fd); }
+    void setValue(ASTValue *v) { cgvalue = v; }
+    ASTValue *getValue() { return cgvalue; }
+};
+
 struct InterfaceDeclaration : public UserTypeDeclaration {
+    std::map<std::string, InterfaceVTable*> vtables; //vtables of conforming structs and classes; used in CG
     InterfaceDeclaration(Identifier *id, ASTScope *sc, SourceLocation loc, DeclarationQualifier dqual) :
         UserTypeDeclaration(id, sc, loc, dqual) {}
     virtual size_t getSize() const { return 0; } //TODO?
@@ -635,6 +652,17 @@ struct InterfaceDeclaration : public UserTypeDeclaration {
         emit_message(msg::FAILURE, "member index is meaningless for interface");
         return 0;
     }
+
+    void setVTable(std::string srcMangledName, InterfaceVTable *vt) {
+        vtables[srcMangledName] = vt;
+    }
+
+    InterfaceVTable *getVTable(std::string srcMangledName) {
+        if(vtables.count(srcMangledName)) return vtables[srcMangledName];
+        return NULL;
+    }
+
+    virtual InterfaceDeclaration *interfaceDeclaration() { return this; }
 };
 
 struct StructDeclaration : public UserTypeDeclaration {
@@ -745,6 +773,16 @@ struct Expression : public Statement
     }
 
     virtual std::string asString() { return ""; }
+};
+
+// "value.ptr"
+// created during lowering, because this is created only for arrays and interfaces
+struct DotPtrExpression : public Expression {
+    Expression *lhs; // must be array or interface expression
+    DotPtrExpression(Expression *val, SourceLocation l = SourceLocation()) : Expression(l), lhs(val) {}
+    virtual ASTType *getType() {
+        return ASTType::getVoidTy()->getPointerTy();
+    }
 };
 
 struct TypeExpression : public Expression
@@ -1130,11 +1168,8 @@ struct IdentifierExpression : public PrimaryExpression
     virtual int asInteger() {
         if(isConstant()) {
             VariableDeclaration *vdecl = id->getDeclaration()->variableDeclaration();
-            if(vdecl && vdecl->value && vdecl->value->intExpression()) {
+            if(vdecl && vdecl->value) {
                 return vdecl->value->asInteger();
-            } else {
-                std::string err = "cannot convert constant of type " + vdecl->value->getType()->getName() + " to static int";
-                emit_message(msg::ERROR, err, loc);
             }
         } else {
             emit_message(msg::ERROR, "attempt to convert non-const identifier to int", loc);

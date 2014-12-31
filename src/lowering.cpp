@@ -62,6 +62,10 @@ Expression *DotExpression::lower() {
         }
     }
 
+    if(rhs == "ptr" && (lhs->getType()->isArray() || lhs->getType()->isInterface())) {
+        return new DotPtrExpression(lhs, lhs->loc);
+    }
+
     return this;
 }
 

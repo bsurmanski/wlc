@@ -310,6 +310,51 @@ llvm::DIType IRDebug::createClassType(ASTType *ty)
     return di.createPointerType(clty, 64, 64);
 }
 
+llvm::DICompositeType IRDebug::createInterfaceType(ASTType *ty) {
+    assert(ty->isInterface() && "expected interface for debug info generation");
+    llvm::DIDescriptor DIContext(currentFile());
+    ASTUserType *userty = (ASTUserType*) ty;
+    vector<Value *> vec;
+    /*
+    int offset = 0;
+    for(int i = 0; i < userty->length(); i++)
+    {
+        VariableDeclaration *vdecl = dynamic_cast<VariableDeclaration*>(userty->getMember(i));
+        assert(vdecl);
+        unsigned size = vdecl->getType()->getSize();
+        unsigned align = vdecl->getType()->getAlign();
+        if(offset % align)
+            offset += (align - (offset % align));
+        vec.push_back(di.createMemberType(
+                    DIContext,
+                    vdecl->getName(),
+                    currentFile(),
+                    userty->getMember(i)->loc.line,
+                    size * 8,
+                    align * 8,
+                    offset * 8,
+                    0,
+                    createType(vdecl->getType())));
+        offset += vdecl->getType()->getSize();
+        //TODO: members
+    }
+    */
+
+    DIArray arr = di.getOrCreateArray(vec);
+
+    //TODO: correctly create interface debug info
+    return di.createStructType(DIContext, //TODO: defined scope
+            ty->getName(),
+            currentFile(), //TODO: defined file
+            userty->getDeclaration()->loc.line, //line num
+            ty->getSize() * 8,
+            ty->getAlign() * 8,
+            0, // flags
+            llvm::DIType(),
+            arr
+            );
+}
+
 llvm::DIType IRDebug::createType(ASTType *ty)
 {
     //if(!ty->diType)
@@ -380,6 +425,8 @@ llvm::DIType IRDebug::createType(ASTType *ty)
                     dity = createUnionType(ty);
                 else if(ty->isClass())
                     dity = createClassType(ty);
+                else if(ty->isInterface())
+                    dity = createInterfaceType(ty);
                 else emit_message(msg::FAILURE, "debug builder - unknown user type");
                 typeMap[ty->getMangledName()] = dity;
                 break;

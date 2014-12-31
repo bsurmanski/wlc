@@ -29,6 +29,11 @@ void Lower::visitFunctionDeclaration(FunctionDeclaration *decl) {
 void Lower::visitVariableDeclaration(VariableDeclaration *decl) {
     if(decl->value) {
         decl->value = decl->value->lower();
+        //XXX if statement is work around:
+        // otherwise, on variable declaration of statically-sized arrays with tuple decl, wlc segfault
+        // eg: "int[3] vals = [1, 2, 3]"
+        if(!decl->value->getType()->isTuple())
+            decl->value = decl->value->coerceTo(decl->getType());
     }
 }
 

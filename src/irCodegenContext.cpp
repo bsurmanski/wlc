@@ -48,6 +48,72 @@ void IRCodegenContext::dwarfStopPoint(SourceLocation l)
     ir->SetCurrentDebugLocation(loc);
 }
 
+llvm::Function *IRCodegenContext::getLLVMMalloc() {
+    vector<Type*> llargty;
+    llargty.push_back(codegenType(ASTType::getULongTy()));
+    FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()->getPointerTy()),
+                llargty, false);
+    Function *mallocFunc = (Function*) module->getOrInsertFunction("malloc", fty);
+
+    return mallocFunc;
+}
+
+llvm::Function *IRCodegenContext::getLLVMMemcpy() {
+    vector<Type*> llargty;
+    llargty.push_back(codegenType(ASTType::getVoidTy()->getPointerTy()));
+    llargty.push_back(codegenType(ASTType::getVoidTy()->getPointerTy()));
+    llargty.push_back(codegenType(ASTType::getULongTy()));
+    FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()->getPointerTy()),
+                llargty, false);
+    Function *memcpyFunc = (Function*) module->getOrInsertFunction("memcpy", fty);
+
+    return memcpyFunc;
+}
+
+/*
+ * interface
+ */
+
+ASTValue *IRCodegenContext::codegenInterfaceVTable(InterfaceVTable *vt) {
+    if(vt->cgvalue) return vt->cgvalue;
+
+    std::vector<Constant *> members; // type info constant members
+    std::vector<Constant *> arrayList;
+    ASTType *vfty = ASTType::getVoidFunctionTy()->getPointerTy();
+
+    for(int i = 0; i < vt->vtable.size(); i++){
+        FunctionDeclaration *fdecl = vt->vtable[i];
+        if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
+        FunctionType *fty = (FunctionType*) codegenType(fdecl->getType());
+        Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
+
+        arrayList.push_back((Function*)
+                ir->CreatePointerCast(func, codegenType(vfty)));
+    }
+
+    ArrayType *vtableTy = ArrayType::get(codegenType(vfty), vt->vtable.size());
+    Constant *vtable = ConstantArray::get(
+                vtableTy,
+                arrayList
+                );
+
+    members.push_back(vtable);
+
+    GlobalVariable *gv = new GlobalVariable(*module, vtableTy, true, GlobalValue::PrivateLinkage, vtable);
+    gv->setName("InterfaceVT_" + vt->interface->getMangledName() + "$" + vt->sourceType->getMangledName());
+    vt->cgvalue = new ASTBasicValue(vfty, gv, true);
+    return vt->cgvalue;
+}
+
+ASTValue *IRCodegenContext::getInterfaceSelf(ASTValue *iface) {
+    assert(iface->getType()->isInterface());
+    Value *v = codegenLValue(iface);
+
+    std::vector<Value *> gep;
+    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+    return new ASTBasicValue(ASTType::getVoidTy()->getPointerTy(), ir->CreateGEP(v, gep), true);
+}
+
 llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
 {
     ASTUserType *userty = ty->asUserType();
@@ -64,25 +130,42 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         }
     }
 
-    if(StructType *sty = module->getTypeByName(ty->getName())) {
+    if(StructType *sty = module->getTypeByName(ty->getMangledName())) {
         return sty;
     }
 
-    if(unit->types.count(ty->getName())) {
-        Type *llty = unit->types[ty->getName()];
+    if(unit->types.count(ty->getMangledName())) {
+        Type *llty = unit->types[ty->getMangledName()];
         return llty;
     }
 
     // if interface create an interface struct
     // will still need to populate the interface members though
     // XXX seems a bit messy
-    if(ty->isInterface())
-        return codegenType(ast->getRuntimeModule()->lookup("Interface")->getDeclaredType());
+    if(ty->isInterface()) {
+        InterfaceDeclaration *idecl = ty->getDeclaration()->interfaceDeclaration();
+
+        std::map<std::string, InterfaceVTable*>::iterator it = idecl->vtables.begin();
+        while(it != idecl->vtables.end()) {
+            //codegen interface vtable
+            InterfaceVTable *vt = it->second;
+            codegenInterfaceVTable(vt);
+            printf("codegen'ing iface %s\n", vt->sourceType->getName().c_str());
+            it++;
+        }
+
+        vector<Type*> members;
+        members.push_back(codegenType(ASTType::getVoidTy()->getPointerTy())); //*this*
+        members.push_back(codegenType(ASTType::getVoidFunctionTy()->getPointerTy())); //*vtable*
+        StructType *sty = StructType::create(context, ty->getMangledName());
+        sty->setBody(members);
+        return sty; //XXX create debug info
+    }
 
 
     StructType *sty = StructType::create(context);
-    sty->setName(ty->getName());
-    unit->types[ty->getName()] = IRType(ty, sty);
+    sty->setName(ty->getMangledName());
+    unit->types[ty->getMangledName()] = IRType(ty, sty);
 
     std::vector<Type*> structVec;
 
@@ -484,13 +567,6 @@ ASTValue *IRCodegenContext::getStringValue(std::string str) {
             GlobalValue::PrivateLinkage, strConstant);
 
     //XXX string dedup?
-    /*
-
-    vector<Value *> gep;
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-    Constant *ptr = ConstantExpr::getInBoundsGetElementPtr(GV, gep);
-    */
 
     ASTBasicValue *ret = new ASTBasicValue(strty, GV, true);
     ret->setConstant(true);
@@ -634,9 +710,10 @@ llvm::Value *IRCodegenContext::codegenTuple(TupleValue *tuple, ASTType *target) 
             vals.push_back(llconst);
             vals.push_back(ConstantInt::get(codegenType(ASTType::getLongTy()), tuple->values.size()));
             Constant *st = ConstantStruct::get((StructType*) codegenType(dyarrayTy), vals);
-            //GlobalVariable *DGV = new GlobalVariable(*module, codegenType(dyarrayTy), true,
-            //        GlobalValue::PrivateLinkage, st);
             return st;
+        } else {
+            //GlobalVariable *DGV = new GlobalVariable(*module, codegenType(ty), true,
+            //        GlobalValue::PrivateLinkage, llconst);
         }
 
         return llconst;
@@ -1177,9 +1254,9 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
     {
         if(id->getScope()->getModule() != unit->mdecl) // id not declared in current TU because imported
         {
-            if(unit->globals.count(id->getName()))
+            if(unit->globals.count(id->getMangledName()))
             {
-                return unit->globals[id->getName()];
+                return unit->globals[id->getMangledName()];
             } else if(id->getDeclaration()->qualifier.isConst) {
                 VariableDeclaration *vdecl = (VariableDeclaration*) id->getDeclaration();
                 ASTBasicValue *val = dynamic_cast<ASTBasicValue*>(promoteType(codegenExpression(vdecl->value), vdecl->getType()));
@@ -1192,7 +1269,7 @@ ASTValue *IRCodegenContext::codegenIdentifier(Identifier *id)
                         codegenType(id->getType()));
                 assert(GV);
                 IRValue irval = IRValue(new ASTBasicValue(id->getType(), GV, true), GV);
-                unit->globals[id->getName()] = irval;
+                unit->globals[id->getMangledName()] = irval;
                 return irval;
             }
             emit_message(msg::FAILURE, "failed to codegen identifier");
@@ -1315,9 +1392,15 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
     } else if(FunctionExpression *fexp = dynamic_cast<FunctionExpression*>(exp)) {
         if(fexp->fpointer) return codegenExpression(fexp->fpointer);
         if(fexp->overload) return new FunctionValue(fexp->overload);
+    } else if(DotPtrExpression *dpexp = dynamic_cast<DotPtrExpression*>(exp)) {
+        if(dpexp->lhs->getType()->isArray()) {
+            return getArrayPointer(codegenExpression(dpexp->lhs));
+        } else if(dpexp->lhs->getType()->isInterface()) {
+            return getInterfaceSelf(codegenExpression(dpexp->lhs));
+        }
     }
 
-    emit_message(msg::FAILURE, "bad expression?", exp->loc);
+    emit_message(msg::FAILURE, "CG: bad expression?", exp->loc);
     return NULL; //TODO
 }
 
@@ -1354,13 +1437,7 @@ ASTValue *IRCodegenContext::codegenHeapAlloc(ASTType *ty) {
 
     vector<Value*> llargs;
     llargs.push_back(size);
-    vector<Type*> llargty;
-    llargty.push_back(codegenType(ASTType::getULongTy()));
-    FunctionType *fty = FunctionType::get(codegenType(ASTType::getVoidTy()->getPointerTy()),
-                llargty, false);
-    Function *mallocFunc = (Function*) module->getOrInsertFunction("malloc", fty);
-    Value *value;
-    value = ir->CreateCall(mallocFunc, llargs);
+    Value *value = ir->CreateCall(getLLVMMalloc(), llargs);
 
     ASTValue *val = NULL;
     if(ty->isArray()) {
@@ -1705,6 +1782,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 
     //XXX should not be needed? should be dereferenced in validate?
     if(func->getType()->isPointer()){ // dereference function pointer
+        emit_message(msg::WARNING, "function pointer should be dereferenced in validate?", exp->loc);
         func = getValueOf(func, false);
     }
 
@@ -2132,6 +2210,24 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType, bool isE
                     ret = new ASTBasicValue(toType,
                             ir->CreatePointerCast(codegenLValue(val),
                                 codegenType(toType)), false, true);
+                } else if(val->getType()->isClass() && toType->isInterface()) {
+                    Value *ptr = ir->CreatePointerCast(codegenValue(val), codegenType(ASTType::getVoidTy()->getPointerTy()));
+                    InterfaceDeclaration *idecl = toType->getDeclaration()->interfaceDeclaration();
+                    InterfaceVTable *ivt = idecl->getVTable(val->getType()->getMangledName());
+                    ASTValue *vtable = codegenInterfaceVTable(ivt);
+
+                    Value *interface = ir->CreateAlloca(codegenType(toType));
+
+                    std::vector<Value*> gep;
+                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
+                    Value *ifstruct = ir->CreateInBoundsGEP(interface, gep);
+
+                    ir->CreateStore(ptr, ir->CreateStructGEP(ifstruct, 0));
+                    ir->CreateStore(ir->CreatePointerCast(codegenLValue(vtable),
+                                codegenType(ASTType::getVoidFunctionTy()->getPointerTy())),
+                            ir->CreateStructGEP(ifstruct, 1));
+
+                    ret = new ASTBasicValue(toType, interface, true);
                 }
             }
         }
@@ -2804,7 +2900,7 @@ ASTValue *IRCodegenContext::codegenGlobal(VariableDeclaration *vdecl) {
     GlobalVariable *llvmval = NULL;
     if(!vdecl->isStatic()) {
         llvmval = (GlobalVariable*)
-                module->getOrInsertGlobal(id->getName(), codegenType(idTy));
+                module->getOrInsertGlobal(id->getMangledName(), codegenType(idTy));
 
         GlobalValue::LinkageTypes linkage = vdecl->qualifier.external ?
             GlobalValue::ExternalLinkage : GlobalValue::ExternalLinkage;

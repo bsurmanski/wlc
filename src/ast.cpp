@@ -33,7 +33,9 @@ unsigned getFileSize(std::string filenm) {
 	CloseHandle(hFile);
 	return size.QuadPart;
 }
+
 #elif defined __APPLE__
+
 #include <libgen.h>
 std::string getFilebase(std::string s)
 {
@@ -56,6 +58,7 @@ unsigned getFileSize(std::string filenm) {
 }
 
 #else //linux
+
 std::string getFilebase(std::string s)
 {
 	size_t lastDot = s.find_last_of(".");

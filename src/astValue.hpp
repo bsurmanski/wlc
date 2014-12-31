@@ -98,6 +98,7 @@ struct TupleValue : public ASTValue
     }
 
     void setType(ASTCompositeType *ty) {
+        assert(ty);
         type = ty;
     }
 
@@ -113,6 +114,7 @@ struct TupleValue : public ASTValue
         type = (ASTTupleType*) ASTType::getTupleTy(tupty);
         return type;
     }
+
     virtual bool isReference() { return false; }
 };
 

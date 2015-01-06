@@ -270,7 +270,6 @@ void Sema::visitCallExpression(CallExpression *exp) {
                 Identifier *fid = getScope()->lookup(dexp->rhs);
                 exp->function = new IdentifierExpression(fid, currentLocation());
                 exp->args.push_front(dexp->lhs);
-                //emit_message(msg::DEBUGGING, "ufcs", currentLocation());
             }
         }
 

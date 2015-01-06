@@ -503,7 +503,8 @@ struct FunctionDeclaration : public Declaration
     }
 
     virtual void accept(ASTVisitor *v);
-    bool isOverloaded() { return nextoverload; }
+    bool isOverloaded() { return nextoverload; } //XXX will not work for last overload in list; but it should only be used on first overload anyways
+    bool isVirtual() { return owner && owner->isClass(); }
     FunctionDeclaration *getNextOverload() { return nextoverload; }
 
     // perhaps a bit of a silly way to do it

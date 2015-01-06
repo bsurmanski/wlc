@@ -46,6 +46,10 @@ Expression* BinaryExpression::lower() {
 }
 
 Expression *DotExpression::lower() {
+    if(rhs == "ptr" && (lhs->getType()->isArray() || lhs->getType()->isInterface())) {
+        return new DotPtrExpression(lhs, lhs->loc);
+    }
+
     if(lhs->isType()) {
         // lower 'sizeof' expression to constant int
         if(rhs == "sizeof") {
@@ -62,10 +66,6 @@ Expression *DotExpression::lower() {
         }
     }
 
-    if(rhs == "ptr" && (lhs->getType()->isArray() || lhs->getType()->isInterface())) {
-        return new DotPtrExpression(lhs, lhs->loc);
-    }
-
     return this;
 }
 
@@ -74,10 +74,12 @@ Expression *NewExpression ::lower() {
 }
 
 Expression *CallExpression::lower() {
+    // stack allocation constructor
     if(function->isType()) {
         ASTUserType *uty = function->getDeclaredType()->asUserType();
         return new NewExpression(uty, NewExpression::STACK, args, true, loc);
     }
+
     return this;
 }
 

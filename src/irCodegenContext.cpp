@@ -624,11 +624,9 @@ llvm::Value *IRCodegenContext::codegenMethod(MethodValue *method) {
     ASTUserType *userty = method->getInstance()->getType()->asUserType();
     if(!userty) emit_message(msg::ERROR, "virtual function lookup only valid for class", location);
 
-    //TODO: function index
     ASTValue *vtable = getVTable(method->getInstance());
 
     std::vector<Value *> gep;
-    //gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), method->getDeclaration()->getVTableIndex()));
     Value *llval = ir->CreateLoad(ir->CreateGEP(codegenValue(vtable), gep));
 
@@ -1390,8 +1388,14 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
             return codegenStackAllocExpression(saexp);
         }
     } else if(FunctionExpression *fexp = dynamic_cast<FunctionExpression*>(exp)) {
+        emit_message(msg::WARNING, "CG: FunctionExpression should be handled by call CG");
         if(fexp->fpointer) return codegenExpression(fexp->fpointer);
-        if(fexp->overload) return new FunctionValue(fexp->overload);
+        if(fexp->overload) {
+            if(fexp->overload->isVirtual()) {
+                printf("VIRTUAL FUNC\n");
+            }
+            return new FunctionValue(fexp->overload);
+        }
     } else if(DotPtrExpression *dpexp = dynamic_cast<DotPtrExpression*>(exp)) {
         if(dpexp->lhs->getType()->isArray()) {
             return getArrayPointer(codegenExpression(dpexp->lhs));
@@ -1753,13 +1757,14 @@ ASTValue *IRCodegenContext::codegenCall(ASTValue *func, std::vector<ASTValue *> 
 
     ASTFunctionType *astfty = dynamic_cast<ASTFunctionType*>(func->getType());
     if(!astfty) {
-        emit_message(msg::ERROR, "invalid value used in function call context");
+        emit_message(msg::ERROR, "CG: invalid value used in function call context");
         if(func->getType()){
-            emit_message(msg::ERROR, "value is of type \"" +
+            emit_message(msg::ERROR, "CG: value is of type \"" +
                     func->getType()->getName() + "\"");
         }
         return NULL;
     }
+
     ASTType *rtype = astfty->getReturnType();
 
     for(int i = 0; i < args.size(); i++) {
@@ -1774,31 +1779,46 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *ret = NULL;
     std::vector<ASTValue *> args; //provided arguments
-    ASTValue *func = codegenExpression(exp->resolvedFunction);
-    if(!func) {
-        emit_message(msg::ERROR, "unknown expression used as function", exp->loc);
-        return NULL;
-    }
+    //ASTValue *func = codegenExpression(exp->resolvedFunction);
 
-    //XXX should not be needed? should be dereferenced in validate?
-    if(func->getType()->isPointer()){ // dereference function pointer
-        emit_message(msg::WARNING, "function pointer should be dereferenced in validate?", exp->loc);
-        func = getValueOf(func, false);
+    if(!exp->resolvedFunction) {
+        emit_message(msg::ERROR, "CG: unknown expression used as function", exp->loc);
+        return NULL;
     }
 
     std::list<Expression*>::iterator it = exp->args.begin();
     while(it != exp->args.end()) {
         ASTValue *argval = codegenExpression(*it);
-        if(!argval)
-            emit_message(msg::ERROR, "CG: null value for argument", exp->loc);
+        if(!argval) emit_message(msg::ERROR, "CG: null value for argument", exp->loc);
         args.push_back(argval);
         it++;
     }
 
-    //XXX messy. Steal first argument as return, because this is a
-    // stack constructor (eg MyStruct st = MyStruct(1, 2, 3))
-    if(exp->isConstructor) {
-        ret = args[0];
+    ASTValue *func = NULL;
+    if(exp->resolvedFunction->fpointer) {
+        func = codegenExpression(exp->resolvedFunction->fpointer);
+    } else {
+        assert(exp->resolvedFunction->overload);
+
+        FunctionDeclaration *oload = exp->resolvedFunction->overload;
+
+        // if function is virtual, we need to load the proper value from the vtable
+        // of the first argument ('this')
+        if(oload->isVirtual()) {
+            ASTValue *vtable = getVTable(args[0]);
+            std::vector<Value *> gep;
+            gep.push_back(ConstantInt::get(Type::getInt32Ty(context), oload->getVTableIndex()));
+            Value *llval = ir->CreateLoad(ir->CreateGEP(codegenValue(vtable), gep));
+            func = new ASTBasicValue(oload->getType(), ir->CreatePointerCast(llval, codegenType(oload->getType())->getPointerTo()));
+        } else {
+            func = new FunctionValue(oload);
+        }
+    }
+
+    //XXX should not be needed? should be dereferenced in validate?
+    if(func->getType()->isPointer()){ // dereference function pointer
+        emit_message(msg::WARNING, "CG: function pointer should be dereferenced in validate?", exp->loc);
+        func = getValueOf(func, false);
     }
 
     if(!func) {
@@ -1806,12 +1826,14 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         return NULL;
     }
 
-    // XXX bit messy; distinction used to return constructed value for type constructor
-    if(!ret) {
+    //XXX messy. Steal first argument as return, because this is a
+    // stack constructor (eg MyStruct st = MyStruct(1, 2, 3))
+    if(exp->isConstructor) {
+        ret = args[0];
+        codegenCall(func, args);
+    } else {
         ret = codegenCall(func, args);
         ((ASTBasicValue*) ret)->setNoFree(true);
-    } else {
-        codegenCall(func, args);
     }
     return ret;
 }
@@ -1916,21 +1938,8 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
             // if left hand side represents a type
             if(ASTType *declty = dexp->lhs->getDeclaredType())
             {
-                //XXX todo: get rid of this
-                if(dexp->rhs == "sizeof")
-                {
-                    emit_message(msg::WARNING, "'sizeof' should be lowered before CG", dexp->loc);
-                    return new ASTBasicValue(ASTType::getULongTy(),
-                            ConstantInt::get(Type::getInt64Ty(context),
-                                declty->getSize()));
-                } else if(dexp->rhs == "offsetof")
-                {
-                    emit_message(msg::UNIMPLEMENTED,
-                            "offsetof attribute not yet implemented", dexp->loc);
-                }
-                //TODO: static members
                 //TODO: this should be lowered before CG
-                emit_message(msg::ERROR, "unknown attribute '" + dexp->rhs + "' of struct '" +
+                emit_message(msg::ERROR, "CG: unknown attribute '" + dexp->rhs + "' of struct '" +
                         declty->getName() + "'", dexp->loc);
                 return NULL;
             }
@@ -1945,11 +1954,11 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
 
             //TODO: allow indexing types other than userType and array?
             if(!lhs->getType()->asUserType() && !lhs->getType()->isArray()) {
-                emit_message(msg::ERROR, "can only index struct or array type", dexp->loc);
+                emit_message(msg::ERROR, "CG: dot expression only applicable to userType or array type", dexp->loc);
                 return NULL;
             }
 
-            if(ASTUserType *userty = lhs->getType()->asUserType()){
+            if(ASTUserType *userty = lhs->getType()->asUserType()) {
                 Identifier *id = userty->getDeclaration()->lookup(dexp->rhs);
                 ASTValue *ret = NULL;
 
@@ -1958,7 +1967,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     // this allows for uniform function syntax
                     id = getScope()->lookup(dexp->rhs);
                     if(!id || id->isUndeclared()){
-                        emit_message(msg::ERROR, "no member found in user type", dexp->loc);
+                        emit_message(msg::ERROR, "CG: no member found in user type", dexp->loc);
                         return NULL;
                     }
                 }
@@ -1975,7 +1984,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                     ret->setOwner(lhs);
                     return ret;
                 } else {
-                    emit_message(msg::ERROR, "invalid identifier type in user type", dexp->loc);
+                    emit_message(msg::ERROR, "CG: invalid identifier type in user type", dexp->loc);
                 }
                 return ret;
             }

@@ -739,9 +739,8 @@ ASTValue *IRCodegenContext::createTypeInfo(ASTType *ty) {
 
     UserTypeDeclaration *utdecl = ty->getDeclaration()->userTypeDeclaration();
     if(ClassDeclaration *cldecl = utdecl->classDeclaration()) {
-        for(int i = 0; i < cldecl->vtable.size(); i++){
+        for(int i = 0; i < cldecl->vtable.size(); i++) {
             FunctionDeclaration *fdecl = cldecl->vtable[i];
-            fdecl->setVTableIndex(i);
             if(!fdecl) emit_message(msg::FAILURE, "invalid function identifier");
             FunctionType *fty = (FunctionType*) codegenType(fdecl->getType());
             Constant *func = module->getOrInsertFunction(fdecl->getMangledName(), fty);
@@ -1807,6 +1806,8 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         if(oload->isVirtual()) {
             ASTValue *vtable = getVTable(args[0]);
             std::vector<Value *> gep;
+            if(oload->getVTableIndex() == -1)
+                emit_message(msg::FAILURE, "CG: invalid vtable index (-1)");
             gep.push_back(ConstantInt::get(Type::getInt32Ty(context), oload->getVTableIndex()));
             Value *llval = ir->CreateLoad(ir->CreateGEP(codegenValue(vtable), gep));
             func = new ASTBasicValue(oload->getType(), ir->CreatePointerCast(llval, codegenType(oload->getType())->getPointerTo()));

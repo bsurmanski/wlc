@@ -238,13 +238,17 @@ void ClassDeclaration::populateVTable() {
         for(int i = 0; i < methods.size(); i++) {
             for(int j = 0; j < vtable.size(); j++) {
                 // if overridden method
-                if(methods[i]->getName() == vtable[j]->getName()) {
+                if(methods[i]->getName() == vtable[j]->getName() &&
+                        methods[i]->getType()->coercesTo(vtable[j]->getType())) {
+                    //TODO: double check that function return type can be varient
+                    methods[i]->setVTableIndex(j);
                     vtable[j] = methods[i];
                     goto CONTINUE;
                 }
             }
 
             //not overridden, put at vtable end
+            methods[i]->setVTableIndex(vtable.size());
             vtable.push_back(methods[i]);
 CONTINUE:;
         }

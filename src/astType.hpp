@@ -257,13 +257,32 @@ struct ASTFunctionType : public ASTCompositeType {
 
     ASTType *getReturnType() { return ret; }
 
-    virtual ASTFunctionType *functionType() { return this; }
-
+    /**
+     * functionType can coerce to:
+     * function pointer of itself
+     * OR
+     * a function type with same number of parameters,
+     * where each target parameter is or is base class of source parameter type,
+     * and return type is or is base class of source return type
+     */
     virtual bool coercesTo(ASTType *t) {
-        //XXX second clause: if ty is pointer to function.
-        // might need to be double checked
-        return t->is(this) ||
-            (t->isPointer() && t->getPointerElementTy()->is(this));
+        if(t->is(this)) return true;
+
+        // allow coerce to function pointer of same type
+        if(t->isPointer()) {
+            return t->getPointerElementTy()->is(this);
+        }
+
+        ASTFunctionType *ofty = t->asFunctionType();
+        if(!ofty || length() != ofty->length() || isVararg() != ofty->isVararg()) return false;
+
+        for(int i = 0; i < params.size(); i++) {
+            if(!params[i]->is(ofty->params[i]) && !params[i]->extends(ofty->params[i])) {
+                return false;
+            }
+        }
+
+        return ret->is(ofty->ret) || ret->extends(ofty->ret);
     }
 
     virtual bool is(ASTType *t) {

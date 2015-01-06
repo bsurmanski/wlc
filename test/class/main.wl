@@ -18,9 +18,7 @@ int main(int argc, char^^ argv)
     scl.a = 2
     scl.b = 11
 
-    printf("virtual func\n");
     scl.printCall()
-    printf("virtual func2\n");
     scl.printCall(5)
 
     SomeStruct s

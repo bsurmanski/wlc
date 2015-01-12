@@ -821,7 +821,7 @@ PARSEFUNC:
         std::vector<VariableDeclaration*> parameters;
         ignore(); // lparen
 
-        if(getScope()->owner && getScope()->owner->getDeclaredType()){
+        if(getScope()->owner && getScope()->owner->getDeclaredType()) {
             owner = getScope()->owner;
         }
 
@@ -893,8 +893,8 @@ PARSEFUNC:
         Statement *stmt = parseStatement();
         popScope();
 
-        //ASTType *proto = ASTType::getFunctionTy(type, params, vararg);
-        Declaration *decl = new FunctionDeclaration(id, thisTy, type, parameters, vararg,
+        ASTType *ownty = owner ? owner->getDeclaredType() : NULL;
+        Declaration *decl = new FunctionDeclaration(id, ownty, type, parameters, vararg,
                 funcScope, stmt, idLoc, dqual);
         id->addDeclaration(decl, Identifier::ID_FUNCTION);
         return decl;

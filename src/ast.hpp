@@ -504,7 +504,7 @@ struct FunctionDeclaration : public Declaration
 
     virtual void accept(ASTVisitor *v);
     bool isOverloaded() { return nextoverload; } //XXX will not work for last overload in list; but it should only be used on first overload anyways
-    bool isVirtual() { return owner && owner->isClass(); }
+    bool isVirtual() { return owner && (owner->isClass() || owner->isInterface()); }
     FunctionDeclaration *getNextOverload() { return nextoverload; }
 
     // perhaps a bit of a silly way to do it
@@ -664,6 +664,8 @@ struct InterfaceDeclaration : public UserTypeDeclaration {
     }
 
     virtual InterfaceDeclaration *interfaceDeclaration() { return this; }
+
+    void populateVTable();
 };
 
 struct StructDeclaration : public UserTypeDeclaration {
@@ -717,8 +719,13 @@ struct HeapAllocExpression;
 struct StackAllocExpression;
 struct FunctionExpression;
 
+class CodegenContext;
+
 struct Expression : public Statement
 {
+    ASTValue *value;
+
+    virtual ASTValue *getValue(CodegenContext *ctx); // this just calls 'codegenExpression', but caches value
 
     virtual bool isLValue() { return false; }
     virtual bool isConstant() { return false; }
@@ -729,7 +736,7 @@ struct Expression : public Statement
     virtual bool isValue() { return getType(); }
     virtual bool isScope() { return false; } // do something with this
 
-    Expression(SourceLocation l = SourceLocation()) : Statement(l) {}
+    Expression(SourceLocation l = SourceLocation()) : Statement(l), value(NULL) {}
     virtual Expression *expression() { return this; }
 
     virtual UnaryExpression *unaryExpression() { return NULL; }

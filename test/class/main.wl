@@ -21,9 +21,6 @@ int main(int argc, char^^ argv)
     scl.printCall()
     scl.printCall(5)
 
-    SomeStruct s
-    s.i = 5
-    printf("struct %d\n", s.myfunc())
     return 0
 }
 
@@ -73,9 +70,4 @@ class MyClass
         .a = 0
         .b = 0
     }
-}
-
-struct SomeStruct {
-    int i;
-    int myfunc() return .i
 }

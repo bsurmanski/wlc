@@ -2,6 +2,10 @@
 
 extern undecorated int printf(char ^fmt, ...);
 
+void callFunctions(SomeFace face) {
+    face.func1()
+    face.func2()
+}
 
 int main(int argc, char^^ argv)
 {
@@ -9,10 +13,8 @@ int main(int argc, char^^ argv)
     MySpecialClass scl = new MySpecialClass
     SomeFace face1 = cl
     SomeFace face2 = scl
-    face1.func1()
-    face1.func2()
-    face2.func1()
-    face2.func2()
+    callFunctions(face1)
+    callFunctions(face2)
     cl.func1()
     return 0
 }

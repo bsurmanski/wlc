@@ -246,7 +246,8 @@ void Sema::visitCallExpression(CallExpression *exp) {
                 // this is so that structs literals are passed as 'this' as a pointer
                 if(dexp->lhs->getType()->isInterface()) {
                     //exp->args.push_front(dexp->lhs);
-                    exp->args.push_front(new DotPtrExpression(dexp->lhs, currentLocation()));
+                    //exp->args.push_front(new DotPtrExpression(dexp->lhs, currentLocation()));
+                    exp->args.push_front(dexp->lhs);
                 } else if(dexp->lhs->getType()->isStruct() && dexp->lhs->isLValue()) {
                     // get 'this' pointer for stack struct
                     exp->args.push_front(new UnaryExpression(tok::amp, dexp->lhs, currentLocation()));

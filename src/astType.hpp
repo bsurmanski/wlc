@@ -371,7 +371,8 @@ struct ASTUserType : public ASTCompositeType {
                     (isClass() && ty->isClass() && extends(ty)) ||
                     (isClass() && ty->isBool()) ||
                     (isClass() && ty->isVoidPointer()) ||
-                    (ty->isInterface()); //NOTE: assume we can coerce to interface, double check in sema when putting together vtable
+                    (ty->isInterface()) || //NOTE: assume we can coerce to interface, double check in sema when putting together vtable
+                    (isInterface() && ty->isVoidPointer()); //XXX interface should not coerce to void pointer...
     }
     virtual bool isResolved() { return getDeclaration(); }
 

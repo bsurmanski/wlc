@@ -79,7 +79,7 @@ ASTValue *IRCodegenContext::codegenInterfaceVTable(InterfaceVTable *vt) {
 
     std::vector<Constant *> members; // type info constant members
     std::vector<Constant *> arrayList;
-    ASTType *vfty = ASTType::getVoidFunctionTy()->getPointerTy();
+    ASTType *vfty = ASTType::getVoidFunctionTy()->getPointerTy()->getPointerTy();
 
     for(int i = 0; i < vt->vtable.size(); i++){
         FunctionDeclaration *fdecl = vt->vtable[i];
@@ -106,12 +106,15 @@ ASTValue *IRCodegenContext::codegenInterfaceVTable(InterfaceVTable *vt) {
 }
 
 ASTValue *IRCodegenContext::getInterfaceSelf(ASTValue *iface) {
-    assert(iface->getType()->isInterface());
     Value *v = codegenLValue(iface);
 
-    std::vector<Value *> gep;
-    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-    return new ASTBasicValue(ASTType::getVoidTy()->getPointerTy(), ir->CreateGEP(v, gep), true);
+    return new ASTBasicValue(ASTType::getVoidTy()->getPointerTy(), ir->CreateStructGEP(v, 0), true);
+}
+
+ASTValue *IRCodegenContext::getInterfaceVTable(ASTValue *iface) {
+    Value *v = codegenLValue(iface);
+
+    return new ASTBasicValue(ASTType::getVoidTy()->getPointerTy()->getPointerTy(), ir->CreateStructGEP(v, 1), true);
 }
 
 llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
@@ -156,7 +159,7 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
 
         vector<Type*> members;
         members.push_back(codegenType(ASTType::getVoidTy()->getPointerTy())); //*this*
-        members.push_back(codegenType(ASTType::getVoidFunctionTy()->getPointerTy())); //*vtable*
+        members.push_back(codegenType(ASTType::getVoidFunctionTy()->getPointerTy()->getPointerTy())); //*vtable*
         StructType *sty = StructType::create(context, ty->getMangledName());
         sty->setBody(members);
         return sty; //XXX create debug info
@@ -977,7 +980,7 @@ ASTValue *IRCodegenContext::opPowValue(ASTValue *a, ASTValue *b){ // **
 // or, ||, logical or
 ASTValue *IRCodegenContext::opLOrValue(Expression *a, Expression *b) {
     ASTType *TYPE = ASTType::getBoolTy();
-    ASTValue *aval = promoteType(codegenExpression(a), TYPE);
+    ASTValue *aval = promoteType(a->getValue(this), TYPE);
 
     BasicBlock *beforeblock = ir->GetInsertBlock();
     BasicBlock *ortrue = BasicBlock::Create(context, "orend", ir->GetInsertBlock()->getParent());
@@ -985,7 +988,7 @@ ASTValue *IRCodegenContext::opLOrValue(Expression *a, Expression *b) {
     Value *val = codegenValue(aval);
     ir->CreateCondBr(val, ortrue, orfalse);
     ir->SetInsertPoint(orfalse);
-    ASTValue *bval = promoteType(codegenExpression(b), TYPE);
+    ASTValue *bval = promoteType(b->getValue(this), TYPE);
     Value *falseVal = codegenValue(bval);
     BasicBlock *falsePHIBlock = ir->GetInsertBlock(); //we need to recheck the block we are in because b might be a logical expression that creates a new basic block
     ir->CreateBr(ortrue);
@@ -1002,7 +1005,7 @@ ASTValue *IRCodegenContext::opLOrValue(Expression *a, Expression *b) {
 ASTValue *IRCodegenContext::opLAndValue(Expression *a, Expression *b) {
     // same deal as logical Or above
     ASTType *TYPE = ASTType::getBoolTy();
-    ASTValue *aval = promoteType(codegenExpression(a), TYPE);
+    ASTValue *aval = promoteType(a->getValue(this), TYPE);
 
     BasicBlock *beforeblock = ir->GetInsertBlock();
     BasicBlock *andend = BasicBlock::Create(context, "andend", ir->GetInsertBlock()->getParent());
@@ -1010,7 +1013,7 @@ ASTValue *IRCodegenContext::opLAndValue(Expression *a, Expression *b) {
     Value *val = codegenValue(aval);
     ir->CreateCondBr(val, andtrue, andend);
     ir->SetInsertPoint(andtrue);
-    ASTValue *bval = promoteType(codegenExpression(b), TYPE);
+    ASTValue *bval = promoteType(b->getValue(this), TYPE);
     Value *trueVal = codegenValue(bval);
     BasicBlock *truePHIBlock = ir->GetInsertBlock(); //we need to recheck the block we are in because b might be a logical expression that creates a new basic block
     ir->CreateBr(andend);
@@ -1366,7 +1369,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         return NULL;
     } else if(CastExpression *cexp = exp->castExpression())
     {
-        return promoteType(codegenExpression(cexp->expression), cexp->type, true);
+        return promoteType(cexp->expression->getValue(this), cexp->type, true);
     } else if(TupleExpression *texp = dynamic_cast<TupleExpression*>(exp))
     {
         return codegenTupleExpression(texp);
@@ -1388,7 +1391,7 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         }
     } else if(FunctionExpression *fexp = dynamic_cast<FunctionExpression*>(exp)) {
         emit_message(msg::WARNING, "CG: FunctionExpression should be handled by call CG");
-        if(fexp->fpointer) return codegenExpression(fexp->fpointer);
+        if(fexp->fpointer) return fexp->fpointer->getValue(this);
         if(fexp->overload) {
             if(fexp->overload->isVirtual()) {
                 printf("VIRTUAL FUNC\n");
@@ -1778,7 +1781,6 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 {
     ASTValue *ret = NULL;
     std::vector<ASTValue *> args; //provided arguments
-    //ASTValue *func = codegenExpression(exp->resolvedFunction);
 
     if(!exp->resolvedFunction) {
         emit_message(msg::ERROR, "CG: unknown expression used as function", exp->loc);
@@ -1804,7 +1806,20 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
         // if function is virtual, we need to load the proper value from the vtable
         // of the first argument ('this')
         if(oload->isVirtual()) {
-            ASTValue *vtable = getVTable(args[0]);
+            ASTValue *vtable = NULL;
+            ASTValue *self = NULL;
+
+            // if we are calling an interface method, pass interface *this* instead of interface
+            if(oload->owner->isInterface()) {
+                self = getInterfaceSelf(args[0]);
+                vtable = getInterfaceVTable(args[0]);
+            } else {
+                self = args[0];
+                vtable = getVTable(args[0]);
+            }
+
+            args[0] = self;
+
             std::vector<Value *> gep;
             if(oload->getVTableIndex() == -1)
                 emit_message(msg::FAILURE, "CG: invalid vtable index (-1)");
@@ -1841,7 +1856,7 @@ ASTValue *IRCodegenContext::codegenCallExpression(CallExpression *exp)
 
 ASTValue *IRCodegenContext::codegenUnaryExpression(UnaryExpression *exp)
 {
-    ASTValue *lhs = codegenExpression(exp->lhs); // expression after unary op: eg in !a, lhs=a
+    ASTValue *lhs = exp->lhs->getValue(this); // expression after unary op: eg in !a, lhs=a
 
     ASTValue *val;
     switch(exp->op) {
@@ -1909,14 +1924,14 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
         return codegenCallExpression(cexp);
     } else if(IndexExpression *iexp = exp->indexExpression())
     {
-        ASTValue *arr = codegenExpression(iexp->lhs);
-        ASTValue *ind = codegenExpression(iexp->index);
+        ASTValue *arr = iexp->lhs->getValue(this);
+        ASTValue *ind = iexp->index->getValue(this);
         return opIndex(arr, ind);
     } else if(PostfixOpExpression *e = dynamic_cast<PostfixOpExpression*>(exp))
     {
         ASTValue *old;
         ASTValue *val;
-        ASTValue *lhs = codegenExpression(e->lhs);
+        ASTValue *lhs = e->lhs->getValue(this);
 
         switch(e->op)
         {
@@ -1945,7 +1960,7 @@ ASTValue *IRCodegenContext::codegenPostfixExpression(PostfixExpression *exp)
                 return NULL;
             }
 
-            lhs = codegenExpression(dexp->lhs);
+            lhs = dexp->lhs->getValue(this);
 
             if(lhs->getType()->isPointer()) {
                 lhs = getValueOf(lhs);
@@ -2228,17 +2243,15 @@ ASTValue *IRCodegenContext::promoteType(ASTValue *val, ASTType *toType, bool isE
 
                     Value *interface = ir->CreateAlloca(codegenType(toType));
 
-                    std::vector<Value*> gep;
-                    gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
-                    Value *ifstruct = ir->CreateInBoundsGEP(interface, gep);
-
-                    ir->CreateStore(ptr, ir->CreateStructGEP(ifstruct, 0));
+                    ir->CreateStore(ptr, ir->CreateStructGEP(interface, 0));
                     ir->CreateStore(ir->CreatePointerCast(codegenLValue(vtable),
-                                codegenType(ASTType::getVoidFunctionTy()->getPointerTy())),
-                            ir->CreateStructGEP(ifstruct, 1));
+                                codegenType(ASTType::getVoidFunctionTy()->getPointerTy()->getPointerTy())),
+                            ir->CreateStructGEP(interface, 1));
 
                     ret = new ASTBasicValue(toType, interface, true);
                 }
+            } else if(val->getType()->isInterface()) {
+                return val; //XXX CHEATING HERE
             }
         }
     }
@@ -2337,8 +2350,8 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
         return opLAndValue(exp->lhs, exp->rhs);
     }
 
-    lhs = codegenExpression(exp->lhs);
-    rhs = codegenExpression(exp->rhs);
+    lhs = exp->lhs->getValue(this);
+    rhs = exp->rhs->getValue(this);
     //XXX temp. shortcut to allow LValue tuples
     if(exp->op.kind == tok::equal || exp->op.kind == tok::colonequal)
             return codegenAssign(lhs, rhs, exp->op.kind == tok::colonequal);
@@ -2461,7 +2474,7 @@ ASTValue *IRCodegenContext::codegenBinaryExpression(BinaryExpression *exp)
 void IRCodegenContext::codegenReturnStatement(ReturnStatement *exp)
 {
     if(exp->expression) {
-        ASTValue *value = codegenExpression(exp->expression);
+        ASTValue *value = exp->expression->getValue(this);
         retainObject(value); // retain return value
         ASTValue *v = promoteType(value, currentFunction.retVal->getType());
         storeValue(currentFunction.retVal, v);
@@ -2483,7 +2496,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
     dwarfStopPoint(stmt->loc);
     if(Expression *estmt = dynamic_cast<Expression*>(stmt))
     {
-        codegenExpression(estmt);
+        estmt->getValue(this);
     } else if (Declaration *dstmt = dynamic_cast<Declaration*>(stmt))
     {
         codegenDeclaration(dstmt);
@@ -2504,7 +2517,7 @@ void IRCodegenContext::codegenStatement(Statement *stmt)
         for(int i = 0; i < cstmt->values.size(); i++)
         {
             Expression *value = cstmt->values[i];
-            ASTValue *val = codegenExpression(value);
+            ASTValue *val = value->getValue(this);
             if(!val->isConstant()) {
                 emit_message(msg::ERROR, "case value must be a constant (err, found in codegen)", cstmt->loc);
             }
@@ -2595,7 +2608,7 @@ void IRCodegenContext::codegenVariableDeclaration(VariableDeclaration *vdecl) {
         {
             defaultValue = codegenTupleExpression(texp, dynamic_cast<ASTCompositeType*>(vty));
         } else { // not composite vty
-            defaultValue = codegenExpression(vdecl->value);
+            defaultValue = vdecl->value->getValue(this);
         }
     }
 
@@ -2831,9 +2844,12 @@ void IRCodegenContext::codegenUserTypeDeclaration(UserTypeDeclaration *utdecl) {
         }
     }
 
-    for(ASTScope::iterator it = utdecl->getScope()->begin(); it != end; it++) {
-        if(it->getDeclaration()->functionDeclaration()) {
-            codegenDeclaration(it->getDeclaration());
+    // codegen methods; interfaces should not have methods codegen'd, they are just placeholder declarations
+    if(!utdecl->interfaceDeclaration()) {
+        for(ASTScope::iterator it = utdecl->getScope()->begin(); it != end; it++) {
+            if(it->getDeclaration()->functionDeclaration()) {
+                codegenDeclaration(it->getDeclaration());
+            }
         }
     }
 

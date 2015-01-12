@@ -3,4 +3,3 @@ cl a: 0
 cl a: 5
 SpecialPrint
 printing magic 5
-struct 5

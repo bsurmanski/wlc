@@ -188,6 +188,7 @@ class IRCodegenContext : public CodegenContext
     // interface
     ASTValue *codegenInterfaceVTable(InterfaceVTable *vt);
     ASTValue *getInterfaceSelf(ASTValue *iface);
+    ASTValue *getInterfaceVTable(ASTValue *iface);
 
     // codegen value
     llvm::Value *codegenMethod(MethodValue *method);

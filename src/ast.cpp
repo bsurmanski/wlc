@@ -2,6 +2,7 @@
 #include "validate.hpp"
 #include "sema.hpp"
 #include "lower.hpp"
+#include "codegenContext.hpp"
 
 
 #if defined WIN32
@@ -114,7 +115,8 @@ ASTFunctionType *FunctionDeclaration::getType() {
         std::vector<ASTType *> paramTy;
 
         if(owner) {
-            paramTy.push_back(owner);
+            if(owner->isInterface()) paramTy.push_back(ASTType::getVoidTy()->getPointerTy());
+            else paramTy.push_back(owner);
         }
 
         for(int i = 0; i < parameters.size(); i++) {
@@ -234,25 +236,46 @@ void ClassDeclaration::populateVTable() {
         for(int i = 0; i < bclass->vtable.size(); i++) {
             vtable.push_back(bclass->vtable[i]);
         }
-
-        for(int i = 0; i < methods.size(); i++) {
-            for(int j = 0; j < vtable.size(); j++) {
-                // if overridden method
-                if(methods[i]->getName() == vtable[j]->getName() &&
-                        methods[i]->getType()->coercesTo(vtable[j]->getType())) {
-                    //TODO: double check that function return type can be varient
-                    methods[i]->setVTableIndex(j);
-                    vtable[j] = methods[i];
-                    goto CONTINUE;
-                }
-            }
-
-            //not overridden, put at vtable end
-            methods[i]->setVTableIndex(vtable.size());
-            vtable.push_back(methods[i]);
-CONTINUE:;
-        }
     }
+
+    for(int i = 0; i < methods.size(); i++) {
+        for(int j = 0; j < vtable.size(); j++) {
+            // if overridden method
+            if(methods[i]->getName() == vtable[j]->getName() &&
+                    methods[i]->getType()->coercesTo(vtable[j]->getType())) {
+                //TODO: double check that function return type can be varient
+                methods[i]->setVTableIndex(j);
+                vtable[j] = methods[i];
+                goto CONTINUE;
+            }
+        }
+
+        //not overridden, put at vtable end
+        methods[i]->setVTableIndex(vtable.size());
+        vtable.push_back(methods[i]);
+CONTINUE:;
+    }
+}
+
+// does not actually populate any vtable. each type that gets converted to an
+// interface type will have it's own vtable. BUT this populates the method indices
+// that are constant for every type converted to interface
+void InterfaceDeclaration::populateVTable() {
+    for(int i = 0; i < methods.size(); i++) {
+            methods[i]->setVTableIndex(i);
+    }
+}
+
+//
+// Expression
+//
+
+ASTValue *Expression::getValue(CodegenContext *ctx) {
+    //TODO: do not cache value if global
+    if(!value) {
+        value = ctx->codegenExpression(this);
+    }
+    return value;
 }
 
 Expression *Expression::coerceTo(ASTType *ty) {

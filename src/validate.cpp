@@ -190,6 +190,8 @@ void ValidationVisitor::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
                         idecl->methods[i]->loc);
             }
         }
+
+        idecl->populateVTable(); // this only registers vtable indices
     }
 
     //XXX lower constructor and destructor?

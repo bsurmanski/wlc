@@ -8,6 +8,9 @@ class CodegenContext
 {
     protected:
     CodegenContext(){}
+
+    public:
+    virtual ASTValue *codegenExpression(Expression *exp) = 0;
 };
 
 #endif

@@ -1393,9 +1393,6 @@ ASTValue *IRCodegenContext::codegenExpression(Expression *exp)
         emit_message(msg::WARNING, "CG: FunctionExpression should be handled by call CG");
         if(fexp->fpointer) return fexp->fpointer->getValue(this);
         if(fexp->overload) {
-            if(fexp->overload->isVirtual()) {
-                printf("VIRTUAL FUNC\n");
-            }
             return new FunctionValue(fexp->overload);
         }
     } else if(DotPtrExpression *dpexp = dynamic_cast<DotPtrExpression*>(exp)) {
@@ -1557,7 +1554,15 @@ ASTValue *IRCodegenContext::codegenNewExpression(NewExpression *exp)
                 it++;
             }
 
-            codegenCall(codegenExpression(exp->function), args);
+            if(FunctionExpression *fexp = exp->function->functionExpression()) {
+                if(!fexp->overload) {
+                    emit_message(msg::ERROR, "CG: invalid function in 'new' expression (fpointer?)");
+                }
+
+            codegenCall(new FunctionValue(fexp->overload), args);
+            } else {
+                emit_message(msg::ERROR, "CG: invalid function in 'new' expression");
+            }
         }
     }
 

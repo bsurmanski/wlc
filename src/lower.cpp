@@ -32,7 +32,7 @@ void Lower::visitVariableDeclaration(VariableDeclaration *decl) {
         //XXX if statement is work around:
         // otherwise, on variable declaration of statically-sized arrays with tuple decl, wlc segfault
         // eg: "int[3] vals = [1, 2, 3]"
-        if(!decl->value->getType()->isTuple())
+        if(decl->value &&  decl->value->getType() && !decl->value->getType()->isTuple())
             decl->value = decl->value->coerceTo(decl->getType());
     }
 }

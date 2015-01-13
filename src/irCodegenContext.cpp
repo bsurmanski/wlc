@@ -2752,9 +2752,8 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
 
         Function::arg_iterator AI = func->arg_begin();
         if(fdecl->owner) {
-            // fdecl->owner is already as reference; if method of struct, 'this' is already a pointer
             AI->setName("this");
-            ASTValue *thisval = new ASTBasicValue(fdecl->owner, AI, false, true);
+            ASTValue *thisval = new ASTBasicValue(fdecl->owner->getReferenceTy(), AI, false, true);
             lookupInScope("this")->setValue(thisval);
 #ifndef WIN32 // currently broken on windows
             Instruction *ainst = unit->debug->createVariable("this",

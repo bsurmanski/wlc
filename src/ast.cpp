@@ -116,6 +116,7 @@ ASTFunctionType *FunctionDeclaration::getType() {
 
         if(owner) {
             if(owner->isInterface()) paramTy.push_back(ASTType::getVoidTy()->getPointerTy());
+            else if(owner->isStruct()) paramTy.push_back(owner->getReferenceTy());
             else paramTy.push_back(owner);
         }
 

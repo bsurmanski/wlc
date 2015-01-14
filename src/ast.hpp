@@ -578,12 +578,14 @@ struct UserTypeDeclaration : public TypeDeclaration
     virtual size_t getAlign() const;
     virtual size_t getSize() const = 0;
     virtual long getMemberIndex(std::string member) = 0;
-    virtual long getVTableIndex(std::string method) { return -1; }
     virtual void accept(ASTVisitor *v);
     virtual UserTypeDeclaration *userTypeDeclaration() { return this; }
     void addMethod(FunctionDeclaration *fdecl) {
         methods.push_back(fdecl);
     }
+
+    FunctionDeclaration *getMethod(std::string name, ASTFunctionType *opt_ty=NULL);
+
     void addMember(Declaration *decl) {
         members.push_back(decl);
     }
@@ -622,6 +624,8 @@ struct ClassDeclaration : public UserTypeDeclaration {
         }
         return id;
     }
+
+    FunctionDeclaration *getMethod(std::string name, ASTFunctionType *opt_ty=NULL);
 
     void populateVTable();
     virtual size_t getSize() const;

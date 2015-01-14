@@ -164,6 +164,33 @@ size_t UserTypeDeclaration::getAlign() const {
     return align; //TODO: handle packed
 }
 
+FunctionDeclaration *UserTypeDeclaration::getMethod(std::string name, ASTFunctionType *opt_ty) {
+    for(int i = 0; i < methods.size(); i++) {
+        if(name == methods[i]->getName()) {
+            FunctionDeclaration *fdecl = methods[i];
+            while(fdecl) {
+                //XXX using 'coercesTo' so that first parameter 'this' may convert to proper type
+                if(!opt_ty || opt_ty->is(fdecl->getType())) {
+                    return fdecl;
+                }
+                fdecl = fdecl->getNextOverload();
+            }
+        }
+    }
+    return NULL;
+}
+
+FunctionDeclaration *ClassDeclaration::getMethod(std::string name, ASTFunctionType *opt_ty) {
+    FunctionDeclaration *fdecl = UserTypeDeclaration::getMethod(name, opt_ty);
+    if(!fdecl && base) {
+        UserTypeDeclaration *bdecl = base->getDeclaration()->userTypeDeclaration();
+        assert(bdecl);
+        return bdecl->getMethod(name, opt_ty);
+    }
+
+    return fdecl;
+}
+
 long ClassDeclaration::getMemberIndex(std::string member){
     for(int i = 0; i < members.size(); i++){
         if(members[i]->identifier->getName() == member){

@@ -15,7 +15,6 @@ int main(int argc, char^^ argv)
     SomeFace face2 = scl
     callFunctions(face1)
     callFunctions(face2)
-    cl.func1()
     return 0
 }
 
@@ -23,10 +22,6 @@ class MySpecialClass : MyClass
 {
     void func1() {
         printf("MySpecialClass func1\n")
-    }
-
-    void func2() {
-        printf("TODO: retrieve virtual base methods in interface cast")
     }
 }
 

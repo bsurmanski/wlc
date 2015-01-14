@@ -584,7 +584,7 @@ struct UserTypeDeclaration : public TypeDeclaration
         methods.push_back(fdecl);
     }
 
-    FunctionDeclaration *getMethod(std::string name, ASTFunctionType *opt_ty=NULL);
+    virtual FunctionDeclaration *getMethod(std::string name, ASTFunctionType *opt_ty=NULL);
 
     void addMember(Declaration *decl) {
         members.push_back(decl);
@@ -625,7 +625,7 @@ struct ClassDeclaration : public UserTypeDeclaration {
         return id;
     }
 
-    FunctionDeclaration *getMethod(std::string name, ASTFunctionType *opt_ty=NULL);
+    virtual FunctionDeclaration *getMethod(std::string name, ASTFunctionType *opt_ty=NULL);
 
     void populateVTable();
     virtual size_t getSize() const;

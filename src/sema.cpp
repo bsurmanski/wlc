@@ -333,23 +333,14 @@ void Sema::visitCastExpression(CastExpression *exp) {
         } else if(!iDecl->vtables.count(srcDecl->getMangledName())) {
             InterfaceVTable *vtable = new InterfaceVTable(iDecl, srcDecl);
 
-            // if mangled name is not in iDecl vtable list, validate that type will cast to this interface
-            // if mangled name is in iDecl vtable list, we already checked this
             for(int i = 0; i < iDecl->methods.size(); i++) {
-                //XXX should look in vtable instead of methods
-                // because parent class methods will not be considered for iface, as is
-                for(int j = 0; j < srcDecl->methods.size(); j++) {
-                    if(srcDecl->methods[j]->getName() == iDecl->methods[i]->getName()) {
-                        vtable->addFunction(srcDecl->methods[i]);
-                        //XXX make better test to match function parameters
-                        goto CONTINUE;
-                    }
+                FunctionDeclaration *fdecl = srcDecl->getMethod(iDecl->methods[i]->getName());
+                if(!fdecl) {
+                    emit_message(msg::ERROR, "attempt to cast '" + srcDecl->getName() + "' to interface '" +
+                            iDecl->getName() + "'; missing method '" + iDecl->methods[i]->getName() + "'", exp->loc);
                 }
-                // if we reach here, the method was not found; otherwise we should jump over with goto
-                emit_message(msg::ERROR, "attempt to cast '" + srcDecl->getName() + "' to interface '" +
-                        iDecl->getName() + "'; missing method '" + iDecl->methods[i]->getName() + "'", exp->loc);
-CONTINUE:
-                continue;
+                assert(fdecl);
+                vtable->addFunction(fdecl);
             }
 
             iDecl->setVTable(srcDecl->getMangledName(), vtable);

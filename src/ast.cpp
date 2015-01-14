@@ -170,7 +170,7 @@ FunctionDeclaration *UserTypeDeclaration::getMethod(std::string name, ASTFunctio
             FunctionDeclaration *fdecl = methods[i];
             while(fdecl) {
                 //XXX using 'coercesTo' so that first parameter 'this' may convert to proper type
-                if(!opt_ty || opt_ty->is(fdecl->getType())) {
+                if(!opt_ty || fdecl->getType()->coercesTo(opt_ty)) {
                     return fdecl;
                 }
                 fdecl = fdecl->getNextOverload();

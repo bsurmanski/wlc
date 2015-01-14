@@ -5,6 +5,7 @@ extern undecorated int printf(char ^fmt, ...);
 void callFunctions(SomeFace face) {
     face.func1()
     face.func2()
+    face.func2(2)
 }
 
 int main(int argc, char^^ argv)
@@ -31,12 +32,18 @@ class MyClass
         printf("MyClass func1\n")
     }
 
+    void func2(int i) {
+        printf("magic number %d\n", i)
+    }
+
     void func2() {
         printf("MyClass func2\n")
     }
+
 }
 
 interface SomeFace {
     void func1();
     void func2();
+    void func2(int i);
 }

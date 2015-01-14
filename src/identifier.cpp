@@ -13,7 +13,13 @@ void Identifier::addDeclaration(Declaration *decl, IDType ty)
 {
     FunctionDeclaration *fdeclaration = dynamic_cast<FunctionDeclaration*>(declaration);
     FunctionDeclaration *fdecl = dynamic_cast<FunctionDeclaration*>(decl);
-    if(fdecl && fdeclaration && fdecl->body){
+    if(fdecl && fdeclaration){
+        if(fdecl->getType()->is(fdeclaration->getType())) {
+            if(fdecl->body && fdeclaration->body) {
+                emit_message(msg::ERROR, "redeclaration of function with identical parameters", decl->loc);
+            }
+            return;
+        }
         fdecl->nextoverload = fdeclaration; // push decl into front of overload linked list
         declaration = decl;
         return;

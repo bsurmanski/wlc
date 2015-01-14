@@ -334,7 +334,7 @@ void Sema::visitCastExpression(CastExpression *exp) {
             InterfaceVTable *vtable = new InterfaceVTable(iDecl, srcDecl);
 
             for(int i = 0; i < iDecl->methods.size(); i++) {
-                FunctionDeclaration *fdecl = srcDecl->getMethod(iDecl->methods[i]->getName());
+                FunctionDeclaration *fdecl = srcDecl->getMethod(iDecl->methods[i]->getName(), iDecl->methods[i]->getType());
                 if(!fdecl) {
                     emit_message(msg::ERROR, "attempt to cast '" + srcDecl->getName() + "' to interface '" +
                             iDecl->getName() + "'; missing method '" + iDecl->methods[i]->getName() + "'", exp->loc);

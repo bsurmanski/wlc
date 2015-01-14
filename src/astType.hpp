@@ -435,15 +435,15 @@ struct ASTPointerType : public ASTType {
 
     virtual bool coercesTo(ASTType *ty) {
         if(ty->isInteger()) return true;
+
+        // allow implicit cast from void pointer
+        if(isVoidPointer() && (ty->isPointer() || ty->isClass())) return true;
+
         ASTPointerType *pty = ty->asPointer();
         if(!pty) return false;
 
-        return ptrTo->is(pty->ptrTo) ||
-            // allow implicit cast from void pointer
-            getPointerElementTy()->kind == TYPE_VOID ||
+        return ptrTo->is(pty->ptrTo) || pty->isVoidPointer();
             // allow implicit cast to void pointer
-            (pty->getPointerElementTy() &&
-             pty->getPointerElementTy()->kind == TYPE_VOID);
         //TODO: check if compatible pointer
     }
 };

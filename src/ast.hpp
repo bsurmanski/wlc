@@ -1193,7 +1193,7 @@ struct IdentifierExpression : public PrimaryExpression
 };
 
 struct IdOpExpression : public Expression {
-    IdentifierExpression *expression;
+    Expression *expression;
     enum Type {
         Delete,
         Retain,
@@ -1202,7 +1202,7 @@ struct IdOpExpression : public Expression {
 
     Type type;
 
-    IdOpExpression(IdentifierExpression *e, Type t, SourceLocation l = SourceLocation()) :
+    IdOpExpression(Expression *e, Type t, SourceLocation l = SourceLocation()) :
         Expression(l), expression(e), type(t) {}
     virtual void accept(ASTVisitor *v);
     bool isDelete() { return type == Delete; }

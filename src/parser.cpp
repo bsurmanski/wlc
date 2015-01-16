@@ -1160,8 +1160,8 @@ Expression *ParseContext::parseIdOpExpression() {
         return NULL;
     }
     ignore(); // ignore op
-    IdentifierExpression *ident = (IdentifierExpression*) parseIdentifierExpression();
-    return new IdOpExpression(ident, type, loc);
+    Expression *exp = parseExpression();
+    return new IdOpExpression(exp, type, loc);
 }
 
 Expression *ParseContext::parseNewExpression()

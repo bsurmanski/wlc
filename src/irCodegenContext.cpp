@@ -33,12 +33,13 @@ IRTranslationUnit::IRTranslationUnit(IRCodegenContext *c, ModuleDeclaration *mod
 
 SourceLocation currentLoc;
 
+/*
 void IRCodegenContext::dwarfStopPoint(int ln)
 {
     llvm::DebugLoc loc = llvm::DebugLoc::get(ln, 1, diScope());
     assert_message(!loc.isUnknown(), msg::FAILURE, "unknown debug location", location);
-    ir->SetCurrentDebugLocation(loc);
-}
+    //ir->SetCurrentDebugLocation(loc);
+} */
 
 void IRCodegenContext::dwarfStopPoint(SourceLocation l)
 {
@@ -2730,8 +2731,10 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
     Function *func;
     func = (Function*) module->getOrInsertFunction(fdecl->getMangledName(), fty);
 
-    if(fdecl->body)
-    {
+    if(fdecl->body) {
+        dwarfStopPoint(fdecl->loc);
+        unit->debug->createFunction(fdecl, func);
+
         func->setLinkage(Function::ExternalLinkage);
         BasicBlock *BB = BasicBlock::Create(context, "entry", func);
         BasicBlock *exitBB = BasicBlock::Create(context, "exit", func);
@@ -2747,8 +2750,6 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
         }
 
 
-        dwarfStopPoint(fdecl->loc);
-        unit->debug->createFunction(fdecl, func);
         enterScope(new IRScope(fdecl->scope, fdecl->diSubprogram));
         dwarfStopPoint(fdecl->loc);
 

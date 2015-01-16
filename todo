@@ -31,3 +31,31 @@ static class members should require a 'dot'
     Block[] blocks
     block.ptr = malloc(Block.sizeof)
 """"
+
+"delete .member" does not work
+
+on 'new', check for expected number of arguments
+
+add a syntax for all basic c functionality:
+    memcpy, memset, strlen, strdup, assert, atof, exit... etc
+
+'memcpy' syntax?:
+    dst[] = src[0..10]
+
+'memset'?:
+    dst[0..x] = 0
+    dst[] = 0
+
+'strlen':
+    arr.size
+
+'strdup'?
+
+'assert'?
+
+'atof':
+    tofloat(str)
+    
+'exit':
+    die?
+    throw?

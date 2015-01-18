@@ -45,6 +45,15 @@ Expression* BinaryExpression::lower() {
     return this;
 }
 
+Expression *UnaryExpression::lower() {
+    if(op == tok::minus) {
+        if(lhs->numericExpression()) {
+            return lhs->numericExpression()->negate();
+        }
+    }
+    return this;
+}
+
 Expression *DotExpression::lower() {
     if(rhs == "ptr" && (lhs->getType()->isArray() || lhs->getType()->isInterface())) {
         return new DotPtrExpression(lhs, lhs->loc);

@@ -779,7 +779,7 @@ struct Expression : public Statement
 
     virtual bool coercesTo(ASTType *ty) { return getType()->coercesTo(ty); }
 
-    virtual int asInteger() {
+    virtual int64_t asInteger() {
         emit_message(msg::ERROR, "this value cannot be converted to integer", loc);
         return 0;
     }
@@ -925,7 +925,7 @@ struct CastExpression : public Expression
 
     virtual void accept(ASTVisitor *v);
 
-    virtual int asInteger() {
+    virtual int64_t asInteger() {
         return expression->asInteger();
     }
 
@@ -1120,6 +1120,8 @@ struct UnaryExpression : public Expression
             return o.asString() + lhs->asString();
         }
     }
+
+    virtual Expression *lower();
 };
 
 struct BinaryExpression : public Expression
@@ -1178,7 +1180,7 @@ struct IdentifierExpression : public PrimaryExpression
             id->getDeclaration()->isConstant();
     }
 
-    virtual int asInteger() {
+    virtual int64_t asInteger() {
         if(isConstant()) {
             VariableDeclaration *vdecl = id->getDeclaration()->variableDeclaration();
             if(vdecl && vdecl->value) {
@@ -1275,6 +1277,7 @@ struct NumericExpression : public PrimaryExpression
     NumericExpression(ASTType* ty, SourceLocation l = SourceLocation()) :
         PrimaryExpression(l), astType(ty) {}
 
+    virtual NumericExpression* negate() = 0;
     virtual NumericExpression *numericExpression() { return this; }
     virtual void accept(ASTVisitor *v);
 }; //XXX subclass as bool/char type also?
@@ -1284,6 +1287,10 @@ struct FloatExpression : public NumericExpression {
     FloatExpression(ASTType *ty, double val, SourceLocation l = SourceLocation()) : NumericExpression(ty, l), value(val) {}
     virtual FloatExpression *floatExpression() { return this; }
 
+    FloatExpression* negate() {
+        return new FloatExpression(getType(), -value, loc);
+    }
+
     virtual std::string asString() {
         std::stringstream ss;
         ss << value;
@@ -1292,11 +1299,15 @@ struct FloatExpression : public NumericExpression {
 };
 
 struct IntExpression : public NumericExpression {
-    uint64_t value;
-    IntExpression(ASTType *ty, uint64_t val, SourceLocation l = SourceLocation()) : NumericExpression(ty, l), value(val) {}
+    int64_t value;
+    IntExpression(ASTType *ty, int64_t val, SourceLocation l = SourceLocation()) : NumericExpression(ty, l), value(val) {}
     virtual IntExpression *intExpression() { return this; }
 
-    virtual int asInteger() {
+    IntExpression* negate() {
+        return new IntExpression(getType(), -value, loc);
+    }
+
+    virtual int64_t asInteger() {
             return value;
     }
 

@@ -793,7 +793,8 @@ struct DotPtrExpression : public Expression {
     Expression *lhs; // must be array or interface expression
     DotPtrExpression(Expression *val, SourceLocation l = SourceLocation()) : Expression(l), lhs(val) {}
     virtual ASTType *getType() {
-        return ASTType::getVoidTy()->getPointerTy();
+        //return ASTType::getVoidTy()->getPointerTy();
+        return lhs->getType()->getPointerElementTy()->getPointerTy();
     }
 };
 

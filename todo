@@ -34,6 +34,8 @@ static class members should require a 'dot'
 
 validate target of idOps. (delete, retain, release).
 
+OR on constants promotes to floating point?
+
 on 'new', check for expected number of arguments
 
 add a syntax for all basic c functionality:

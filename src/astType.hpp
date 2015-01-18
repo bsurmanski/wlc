@@ -136,7 +136,7 @@ struct ASTType
     virtual std::string getMangledName();
 
     virtual bool isConst() { return false; }
-    virtual ASTType *getPointerElementTy() const { return NULL; }
+    virtual ASTType *getPointerElementTy() { return NULL; }
     virtual bool isReference() { return false; }
     virtual bool isUnknown() { return false; }
 
@@ -329,6 +329,13 @@ struct ASTUserType : public ASTCompositeType {
     virtual ASTUserType *asUnion();
     virtual ASTUserType *asStruct();
 
+    virtual ASTType *getPointerElementTy() {
+        if(isInterface()) {
+            return ASTType::getVoidTy();
+        }
+        return NULL;
+    }
+
     virtual bool isUnknown() { return !identifier->getDeclaredType(); }
     virtual bool isOpaque();
     virtual size_t length();
@@ -421,7 +428,7 @@ struct ASTTupleType : public ASTCompositeType {
 
 struct ASTPointerType : public ASTType {
     ASTType *ptrTo;
-    virtual ASTType *getPointerElementTy() const { return ptrTo; }
+    virtual ASTType *getPointerElementTy() { return ptrTo; }
     ASTPointerType(ASTType *pto) : ASTType(TYPE_POINTER), ptrTo(pto) {}
     virtual ASTPointerType *asPointer() { return this; }
     virtual std::string getName();
@@ -450,7 +457,7 @@ struct ASTPointerType : public ASTType {
 
 struct ASTArrayType : public ASTCompositeType {
     ASTType *arrayOf;
-    virtual ASTType *getPointerElementTy() const { return arrayOf; }
+    virtual ASTType *getPointerElementTy() { return arrayOf; }
     virtual ASTType *getMemberType(size_t i) { return arrayOf; }
     virtual size_t getSize()= 0;
     virtual size_t getAlign() = 0;

@@ -10,11 +10,19 @@ extern undecorated double sin(double f);
 float tick = 0
 uint gltick
 uint tex
+
+
 void init()
 {
-    SDL_Surface^ surf = SDL_LoadBMP_RW(SDL_RWFromFile("apollo-2pow.bmp", "rb"), 1)
+    SDL_Init(SDL_INIT_VIDEO)
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8)
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8)
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8)
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16)
+    SDL_Surface^ surf = SDL_SetVideoMode(512, 256, 32, SDL_OPENGL)
+    SDL_Surface^ img = SDL_LoadBMP_RW(SDL_RWFromFile("apollo-2pow.bmp", "rb"), 1)
 
-    if(!surf)
+    if(!img)
     {
         printf("ERROR LOADING IMG\n")    
     }
@@ -23,9 +31,9 @@ void init()
     glBindTexture(GL_TEXTURE_2D, tex)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, surf.w, surf.h,
-        0, GL_RGB, GL_UNSIGNED_BYTE, surf.pixels)
-    SDL_FreeSurface(surf)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, img.w, img.h,
+        0, GL_RGB, GL_UNSIGNED_BYTE, img.pixels)
+    SDL_FreeSurface(img)
 
     initShaders()
     glDisable(GL_DEPTH_TEST)
@@ -39,29 +47,11 @@ void init()
     glOrtho(0,512,256,0,-1,1)
 }
 
-char^ fileToString(char^ filenm)
-{
-    void^ file = fopen(filenm, "r")
-    fseek(file, 0, SEEK_END)
-    int filesz = ftell(file)
-    fseek(file, 0, SEEK_SET)
-    char^ str = malloc(filesz + 1)
-    str[filesz] = 0
-    fread(str, filesz, 1, file)
-    return str
-}
-
 void initShaders()
 {
-    char^ vshader = fileToString("shader.vert") 
-    char^ fshader = fileToString("shader.frag") 
+    char^ vshader = pack "shader.vert"
+    char^ fshader = pack "shader.frag"
     
-    if(!vshader or !fshader)
-    {
-        printf("ERROR LOADING SHADERS\n")    
-    }
-
-
     uint vs = glCreateShader(GL_VERTEX_SHADER)
     uint fs = glCreateShader(GL_FRAGMENT_SHADER)
     glShaderSource(vs, 1, &vshader, null)
@@ -117,20 +107,7 @@ void draw()
 
 int main(int argc, char^^ argv)
 {
-    SDL_Init(SDL_INIT_VIDEO)
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8)
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8)
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8)
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16)
-    SDL_Surface^ surf = SDL_SetVideoMode(512, 256, 32, SDL_OPENGL)
     bool spc = false
-
-    switch(5)
-    {
-        case 1
-        case 2
-            printf("hi")
-    }
 
     init()
     while(!spc)

@@ -73,14 +73,19 @@ std::string Operator::asString() {
             return ".";
 
         // binary
+        case plus:
         case add:
             return "+";
+        case minus:
         case sub:
             return "-";
+        case star:
         case mul:
             return "*";
+        case starstar:
         case pow:
             return "**";
+        case slash:
         case div:
             return "/";
         case bor:

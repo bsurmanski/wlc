@@ -868,17 +868,11 @@ ASTValue *IRCodegenContext::getMember(ASTValue *val, std::string member) {
                                     index));
 
         Value *llval;
-        if(mtype->isSArray()) {
-            gep.push_back(ConstantInt::get(Type::getInt32Ty(context),
-                                        0));
-            llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+        if(id->getDeclaration()->isStatic()) {
+            return id->getValue();
         } else {
-            if(id->getDeclaration()->isStatic()) {
-                return id->getValue();
-            } else {
-                llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
-                llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
-            }
+            llval = ir->CreateInBoundsGEP(codegenLValue(val), gep);
+            llval = ir->CreatePointerCast(llval, codegenType(mtype->getPointerTy()));
         }
 
         ASTBasicValue *ret = new ASTBasicValue(mtype, llval, true, mtype->isReference());
@@ -1140,7 +1134,6 @@ ASTValue *IRCodegenContext::opIndexSArray(ASTValue *arr, ASTValue *idx) {
     std::vector<Value*> gep;
     gep.push_back(ConstantInt::get(Type::getInt32Ty(context), 0));
     gep.push_back(codegenValue(idx));
-
     Value *val = ir->CreateInBoundsGEP(codegenLValue(arr), gep);
     return new ASTBasicValue(indexedType, val, true);
 }

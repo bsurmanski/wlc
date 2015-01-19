@@ -124,6 +124,12 @@ void Sema::resolveCallArguments(FunctionExpression *func, std::list<Expression*>
                 emit_message(msg::ERROR, ss.str(), func->loc);
             }
 
+            // XXX if resolvedArg is casted or otherwise changed, we need to
+            // revisit it. this was added specifically so InterfaceVTables
+            // will be initialized on call argument cast; but it may do other things.
+            // should probably find a better way to do that and remove this
+            resolvedArg->accept(this);
+
             resolvedArgs.push_back(resolvedArg);
 
             args++;

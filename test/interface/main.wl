@@ -1,6 +1,8 @@
 //use "implicit_this"
 
-extern undecorated int printf(char ^fmt, ...);
+import "myclass.wl"
+import "someface.wl"
+
 
 void callFunctions(SomeFace face) {
     face.func1()
@@ -17,33 +19,4 @@ int main(int argc, char^^ argv)
     callFunctions(face1)
     callFunctions(face2)
     return 0
-}
-
-class MySpecialClass : MyClass
-{
-    void func1() {
-        printf("MySpecialClass func1\n")
-    }
-}
-
-class MyClass
-{
-    void func1() {
-        printf("MyClass func1\n")
-    }
-
-    void func2(int i) {
-        printf("magic number %d\n", i)
-    }
-
-    void func2() {
-        printf("MyClass func2\n")
-    }
-
-}
-
-interface SomeFace {
-    void func1();
-    void func2();
-    void func2(int i);
 }

@@ -232,10 +232,11 @@ int getPostfixPrecidence(tok::TokenKind tkind)
 {
     switch(tkind)
     {
-        case tok::lparen:
-        case tok::lbracket:
         case tok::plusplus:
         case tok::minusminus:
+            return 12;
+        case tok::lparen:
+        case tok::lbracket:
         case tok::dot:
             return 14;
         default:

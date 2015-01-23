@@ -73,6 +73,19 @@ Expression *DotExpression::lower() {
                 emit_message(msg::ERROR, "invalid 'offsetof' on non-user type", loc);
             }
         }
+
+        //TODO: generalize to member lookup of package, namespace, etc
+        // static member lookup?
+        ASTType *declty = lhs->getDeclaredType();
+        if(declty) {
+            Identifier *id = NULL;
+            if(declty->asUserType())
+                id = declty->asUserType()->getScope()->lookup(rhs);
+            if(id) {
+                //XXX maybe work?
+                return new IdentifierExpression(id, loc);
+            }
+        }
     }
 
     return this;

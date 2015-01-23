@@ -25,6 +25,8 @@ exception if stackAlloc class has refcount > 1 on scope end
 
 static class members should require a 'dot'
 
+static members will sometimes not be validated correctly if member type is declared after use
+
 """"
     the following compiles, but fails in llvm linking:
 
@@ -39,6 +41,10 @@ OR on constants promotes to floating point?
 on 'new', check for expected number of arguments
 
 on binary expression, validate types before codegen
+
+allow pointer arithmatic (void^ + int). (currently fails in llc)
+
+index[] on struct segfaults (found on mat4)
 
 add a syntax for all basic c functionality:
     memcpy, memset, strlen, strdup, assert, atof, exit... etc

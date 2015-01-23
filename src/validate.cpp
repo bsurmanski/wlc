@@ -475,7 +475,8 @@ void ValidationVisitor::visitDotExpression(DotExpression *exp) {
             // i think we're fine
         } else {
             //TODO: look up static members / functions
-            emit_message(msg::UNIMPLEMENTED, "no static members or function lookup availible", currentLocation());
+            //TODO: validate static members
+            //emit_message(msg::UNIMPLEMENTED, "no static members or function lookup availible", currentLocation());
         }
     } else {
         emit_message(msg::FAILURE, "unresolved dot expression", currentLocation());

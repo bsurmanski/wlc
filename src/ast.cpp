@@ -114,7 +114,7 @@ ASTFunctionType *FunctionDeclaration::getType() {
     if(!prototype) {
         std::vector<ASTType *> paramTy;
 
-        if(owner) {
+        if(owner && !isStatic()) {
             if(owner->isInterface()) paramTy.push_back(ASTType::getVoidTy()->getPointerTy());
             else if(owner->isStruct()) paramTy.push_back(owner->getReferenceTy());
             else paramTy.push_back(owner);
@@ -266,6 +266,8 @@ void ClassDeclaration::populateVTable() {
         }
     }
 
+    //XXX static methods are populated in vtable.
+    // I like the idea, but I haven't tested it's validity yet
     for(int i = 0; i < methods.size(); i++) {
         for(int j = 0; j < vtable.size(); j++) {
             // if overridden method

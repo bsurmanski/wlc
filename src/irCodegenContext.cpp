@@ -154,7 +154,6 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
             //codegen interface vtable
             InterfaceVTable *vt = it->second;
             codegenInterfaceVTable(vt);
-            printf("codegen'ing iface %s\n", vt->sourceType->getName().c_str());
             it++;
         }
 
@@ -2750,7 +2749,7 @@ void IRCodegenContext::codegenFunctionDeclaration(FunctionDeclaration *fdecl) {
         int idx = 0;
 
         Function::arg_iterator AI = func->arg_begin();
-        if(fdecl->owner) {
+        if(fdecl->owner && !fdecl->isStatic()) {
             AI->setName("this");
             ASTValue *thisval = new ASTBasicValue(fdecl->owner->getReferenceTy(), AI, false, true);
             lookupInScope("this")->setValue(thisval);

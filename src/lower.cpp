@@ -47,6 +47,10 @@ void Lower::visitUserTypeDeclaration(UserTypeDeclaration *decl) {
         decl->members[i] = decl->members[i]->lower();
     }
 
+    for(int i = 0; i < decl->staticMembers.size(); i++) {
+        decl->staticMembers[i] = decl->staticMembers[i]->lower();
+    }
+
     decl->scope->accept(this);
 }
 

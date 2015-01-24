@@ -239,7 +239,8 @@ size_t UnionDeclaration::getSize() const {
 size_t ClassDeclaration::getSize() const {
     size_t sz = base ? base->getDeclaredType()->getSize() : 0;
     VariableDeclaration *vd;
-    unsigned align; //TODO: padding past base?
+    unsigned align = base ? 8 : 1; //TODO: proper padding past base?
+    if(sz % align) sz += (align - (sz % align));
     for(int i = 0; i < members.size(); i++) {
         vd = members[i]->variableDeclaration();
         if(!vd) continue;

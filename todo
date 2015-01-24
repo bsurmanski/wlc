@@ -31,6 +31,8 @@ static methods only callable if type is undeclared at point of usage
 
 attempting to access members in static function will segfault
 
+check if class base exists (if base is in module not yet imported, it will crash)
+
 function overload on constructor
 
 """"

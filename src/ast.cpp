@@ -359,6 +359,7 @@ ASTType *BinaryExpression::getType() {
         case tok::percent:
         case tok::bar:
         case tok::amp:
+        case tok::caret:
             //TODO: resolve type
             if(lhs->getType()->getPriority() > rhs->getType()->getPriority()) {
                 return lhs->getType();

@@ -496,7 +496,7 @@ IRScope *IRCodegenContext::endScope() {
         ASTScope::iterator it = scope->begin();
         for(; it != scope->end(); it++) {
             Identifier *id = *it;
-            if(id->isVariable() && id->getType()->isReleasable() && !id->getDeclaration()->isWeak()) {
+            if(id->isVariable() && id->getType()->isReleasable() && !id->getDeclaration()->isWeak() && !id->getDeclaration()->isStatic()) {
                 if(id->getName() != "this") { //XXX messy. dont release 'this'
                     releaseObject(codegenIdentifier(id));
                 }

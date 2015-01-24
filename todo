@@ -27,6 +27,12 @@ static class members should require a 'dot'
 
 static members will sometimes not be validated correctly if member type is declared after use
 
+static methods only callable if type is undeclared at point of usage
+
+attempting to access members in static function will segfault
+
+function overload on constructor
+
 """"
     the following compiles, but fails in llvm linking:
 

@@ -2165,6 +2165,10 @@ ASTValue *IRCodegenContext::promoteArray(ASTValue *val, ASTType *toType) {
         if(toType->getKind() == TYPE_POINTER) {
             return indexValue(val, 0);
         }
+        if(toType->getKind() == TYPE_DYNAMIC_ARRAY) {
+            //if(val->getType()->coercesTo(toType))
+            //    return val; //TODO: actually figure out converting between types
+        }
         return NULL;
     }
 

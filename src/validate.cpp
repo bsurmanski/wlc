@@ -335,6 +335,11 @@ void ValidationVisitor::visitIndexExpression(IndexExpression *exp) {
         emit_message(msg::ERROR, "invalid or missing base for index expression", exp->loc);
     }
 
+    ASTType *lhsty = exp->lhs->getType();
+    if(!lhsty->isArray() && !lhsty->isTuple() && !lhsty->isPointer()) {
+        emit_message(msg::ERROR, "attempt to index non-sequence type", exp->loc);
+    }
+
     if(!exp->index) {
         emit_message(msg::ERROR, "invalid or missing index in index expression", exp->loc);
     }

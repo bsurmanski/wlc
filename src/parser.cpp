@@ -440,6 +440,7 @@ Statement *ParseContext::parseStatement()
     {
         case tok::identifier:
             id = getScope()->lookup(peek().toString());
+            if(id && id->isVariable()) goto PARSEEXP;
         case tok::lbracket:
                 pushRecover();
                 declType = parseType();

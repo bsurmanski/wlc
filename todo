@@ -52,7 +52,7 @@ on binary expression, validate types before codegen
 
 allow pointer arithmatic (void^ + int). (currently fails in llc)
 
-index[] on struct segfaults (found on mat4)
+outputing to folder does not work (eg wlc main.wl -o build/output)
 
 add a syntax for all basic c functionality:
     memcpy, memset, strlen, strdup, assert, atof, exit... etc

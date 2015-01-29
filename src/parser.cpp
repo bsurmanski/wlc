@@ -440,8 +440,6 @@ Statement *ParseContext::parseStatement()
     {
         case tok::identifier:
             id = getScope()->lookup(peek().toString());
-            if(!id || id->isUndeclared())
-            {
         case tok::lbracket:
                 pushRecover();
                 declType = parseType();
@@ -454,17 +452,6 @@ Statement *ParseContext::parseStatement()
                     recover();
                     goto PARSEEXP; // this seems to be an expression?
                 }
-            } else if(id->isType()) {
-                if(id->isStruct() || id->isUnion() || id->isClass()) //XXX Class
-                {
-                    // this looks like a stack allocated user type
-                    // eg. the RHS of  "MyClass cl = MyClass()"
-                    if(lookAhead(1).is(tok::lparen)) {
-                        goto PARSEEXP;
-                    }
-                }
-                //FALLTHROUGH TO DECL
-            } else goto PARSEEXP; //IF NOT UNDECLARED OR STRUCT, THIS IS PROBABLY AN EXPRESSION
 
         case tok::kw_extern:
         case tok::kw_implicit: //implicit constructor/conversion

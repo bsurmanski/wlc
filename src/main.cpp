@@ -114,7 +114,7 @@ void compile(WLConfig params)
         ModuleDeclaration *runtime = new ModuleDeclaration(ast->getRootPackage(), rt_id, "runtime.wl");
         rt_id->addDeclaration(runtime, Identifier::ID_MODULE);
         ast->setRuntimeModule(runtime);
-        parser.parseFile(runtime, "runtime.wl");
+        parser.parseFile(runtime, new File("runtime.wl"));
 
         for(int i = 0; i < params.files.size(); i++)
         {
@@ -123,11 +123,10 @@ void compile(WLConfig params)
                 Identifier *mod_id = ast->getRootPackage()->getScope()->getInScope(params.files[i]); //TODO: file basename
                 ModuleDeclaration *module = new ModuleDeclaration(ast->getRootPackage(), mod_id, params.files[i]);
                 mod_id->addDeclaration(module, Identifier::ID_MODULE);
-                std::string filenm = params.files[i];
 
                 module->expl = true;
                 ast->addModule(params.files[i], module);
-                parser.parseFile(module, params.files[i]);
+                parser.parseFile(module, new File(params.files[i]));
             } else
             {
                 ModuleDeclaration *mod = ast->getModule(params.files[i]);

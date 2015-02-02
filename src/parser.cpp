@@ -416,7 +416,7 @@ ImportExpression *ParseContext::parseImport()
                 importedModule = new ModuleDeclaration(ast->getRootPackage(), m_id, sexp->string);
                 m_id->addDeclaration(importedModule, Identifier::ID_MODULE);
                 ast->addModule(sexp->string, importedModule);
-                parser->parseFile(importedModule, sexp->string, loc);
+                parser->parseFile(importedModule, new File(sexp->string), loc);
             }
         }
 
@@ -1479,10 +1479,8 @@ Expression *ParseContext::parseBinaryExpression(int prec)
     return lhs;
 }
 
-void ParseContext::parseModule(ModuleDeclaration *module, const char *unitnm)
+void ParseContext::parseModule(ModuleDeclaration *module)
 {
-    //TranslationUnit *unit = parser->getAST()->getUnit(unitnm);
-    //TranslationUnit *unit = new TranslationUnit(currentPackage()->getScope()->lookup(unitnm)); //TODO: identifier
     this->module = module;
     currentPackage()->addPackage(module);
 
@@ -1495,83 +1493,19 @@ void ParseContext::parseModule(ModuleDeclaration *module, const char *unitnm)
     assert_message(!getScope(), msg::FAILURE, "invalid scope stack!", peek().loc);
 }
 
-/**
- * successively copies each environment variable into buf with each call.
- *
- * buf: a buffer to hold the environment variable
- * env: a pointer to a ';' seperated list of environment variables. will be modified
- * after each call to point to the start of the next environment variable.
- */
-void envitern(char *buf, const char **env, size_t max) {
-    if(!buf || !env || !*env || !max) return;
-
-    const char *start = *env;
-
-    // find occurance of ';' or NULL
-    while(**env && **env != ';') {
-        (*env)++;
-    }
-
-    int n = (*env - start);
-    n = (n >= max ? max : n);
-    if(**env == ';') (*env)++;
-
-    memcpy(buf, start, n);
-    buf[n] = '\0';
-}
-
-#include <sys/stat.h>
-bool fileExists(std::string filenm) {
-    struct stat st;
-    return stat(filenm.c_str(), &st) == 0;
-}
-
-#if defined WIN32
-const char *builtinInclude = "C:/Program Files/WLC/include/;C:/INSTALL/WLC/include/";
-#else
-const char *builtinInclude = "/usr/local/include/wl/;/usr/include/wl/";
-#endif
-
-std::string findFile(std::string filenm) {
-    struct stat st;
-    if(stat(filenm.c_str(), &st) == 0) {
-        return filenm;
-    }
-
-    char buffer[256] = {0};
-    const char *incenv = getenv("WLINCLUDE");
-    if(!incenv) incenv = builtinInclude;
-
-    while(incenv && *incenv) {
-        envitern(buffer, &incenv, 255);
-        if(fileExists(buffer + filenm)) {
-            return buffer + filenm;
-        }
-    }
-
-    return filenm; //cannot find
-}
-
-void Parser::parseFile(ModuleDeclaration *module, std::string filenm, SourceLocation l)
+void Parser::parseFile(ModuleDeclaration *module, File *file, SourceLocation l)
 {
-    std::string absfile = findFile(filenm);
-    ifstream stream(absfile.c_str());
-
     // if we can't open the specified file, check if the file is in the 'lib' dir
     // if we still can't find it; throw a fit
-    if(stream.fail())
+    if(!file->exists())
     {
-        emit_message(msg::ERROR, "unknown file '" + filenm + "'", l);
+        emit_message(msg::ERROR, "unknown file '" + file->getName() + "'", l);
         return;
     }
 
-    Lexer *lexer = new StreamLexer(stream);
-    lexer->setFilename(filenm.c_str());
+    Lexer *lexer = new StreamLexer(file->getStream());
+    lexer->setFilename(file->getName());
     ParseContext context(lexer, this, ast->getRootPackage());
-    context.parseModule(module, filenm.c_str()); //TODO: identifier
+    context.parseModule(module);
     delete lexer;
-
-    //ast->getRootPackage()->addPackage("", unit);
-    //ast->units[filenm] = unit; //TODO: symbol table
-
 }

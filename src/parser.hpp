@@ -9,6 +9,7 @@
 #include "ast.hpp"
 #include "astScope.hpp"
 #include "sourceLocation.hpp"
+#include "file.hpp"
 
 #include <deque>
 #include <vector>
@@ -22,7 +23,7 @@ class Parser
 
     public:
         Parser() { ast = new AST(); }
-        void parseFile(ModuleDeclaration *mod, std::string filenm, SourceLocation l = SourceLocation());
+        void parseFile(ModuleDeclaration *mod, File *file, SourceLocation l = SourceLocation());
         void parseString(const char *str);
         AST *getAST() { return ast; }
 
@@ -119,7 +120,7 @@ class ParseContext
     //Lexer *getLexer() { if(!lexers.empty()) return lexer.top(); return NULL; }
 
     public:
-    void parseModule(ModuleDeclaration *u, const char *unitnm);
+    void parseModule(ModuleDeclaration *u);
     void parseTopLevel(ModuleDeclaration *unit);
     void pushRecover();
     void popRecover();

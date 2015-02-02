@@ -1,4 +1,4 @@
-SRCFILES:=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier.cpp astScope.cpp astType.cpp irDebug.cpp message.cpp parsec.cpp ast.cpp validate.cpp sema.cpp astVisitor.cpp lowering.cpp lower.cpp
+SRCFILES:=main.cpp token.cpp lexer.cpp parser.cpp irCodegenContext.cpp identifier.cpp astScope.cpp astType.cpp irDebug.cpp message.cpp parsec.cpp ast.cpp validate.cpp sema.cpp astVisitor.cpp lowering.cpp lower.cpp file.cpp
 
 # additional clang libraries to build
 llvm_prefix=/usr

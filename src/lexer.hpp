@@ -24,7 +24,7 @@ class Lexer
     public:
     virtual ~Lexer() {}
 
-    void setFilename(const char *fn) { filenm = fn; }
+    void setFilename(std::string str) { filenm = str.c_str(); }
 
     virtual Token peek()
     {

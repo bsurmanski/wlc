@@ -1,5 +1,7 @@
 set member class types and arrays to zero
 
+assert struct/union has at least one member
+
 ? recursive types (types that contain references to each other) crash things
 
 rearange class members largest to smallest (for packing efficiency)

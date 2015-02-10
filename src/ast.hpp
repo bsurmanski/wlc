@@ -533,7 +533,8 @@ struct VariableDeclaration : public Declaration
 
 struct TypeDeclaration : public Declaration
 {
-    TypeDeclaration(Identifier *id, SourceLocation loc, DeclarationQualifier dqual) : Declaration(id, loc, dqual) {}
+    void *cgType;
+    TypeDeclaration(Identifier *id, SourceLocation loc, DeclarationQualifier dqual) : Declaration(id, loc, dqual), cgType(NULL) {}
 
     virtual void accept(ASTVisitor *v);
     virtual ASTType *getType() { return NULL; } // XXX return a 'type' type?

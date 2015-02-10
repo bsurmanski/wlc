@@ -28,6 +28,16 @@ bool ASTFunctionType::coercesTo(ASTType *t) {
 // UserType
 //
 
+llvm::Type *ASTUserType::getLLVMType() {
+    if(!getDeclaration()) return NULL;
+    return (llvm::Type*) getDeclaration()->cgType;
+}
+
+void ASTUserType::setLLVMType(llvm::Type *t) {
+    if(!getDeclaration()) return;
+    getDeclaration()->cgType = t;
+}
+
 ASTType *ASTUserType::getBaseType(){
     Identifier *base = getBaseIdentifier();
     if(base) {

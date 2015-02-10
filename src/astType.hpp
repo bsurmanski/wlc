@@ -61,6 +61,14 @@ struct ASTDynamicArrayType;
 #include <llvm/DebugInfo.h>
 #endif
 
+
+/**
+ * represents a type;
+ *
+ * NOTE: not unique! more than one ASTType may refer to the same typeDeclaration.
+ * This mostly happens if a type is used across modules or in forward declarations and uses.
+ * For a unique representation of a type, use TypeDeclaration
+ */
 struct ASTType
 {
     ASTTypeEnum kind;
@@ -68,13 +76,13 @@ struct ASTType
     ASTType *dynamicArrayTy;
     ASTType *constTy;
 
-    llvm::Type *cgType; //TODO: should not have llvm in here!
+    void *cgType;
     llvm::DIType diType; //TODO: whatever, prototype
 
     std::map<int, ASTType*> arrayTy;
 
     ASTType(enum ASTTypeEnum ty) : kind(ty), pointerTy(0),
-        dynamicArrayTy(0), constTy(0), cgType(0)
+        dynamicArrayTy(0), constTy(0), cgType(NULL)
     {}
 
     ASTType() : kind(TYPE_UNKNOWN), pointerTy(NULL),
@@ -92,6 +100,14 @@ struct ASTType
     ASTType *getArrayTy(unsigned sz);
     ASTType *getArrayTy();
     ASTType *getConstTy();
+
+    virtual llvm::Type *getLLVMType() {
+        return (llvm::Type*) cgType;
+    }
+
+    virtual void setLLVMType(llvm::Type *t) {
+        cgType = (void*) t;
+    }
 
     bool isAggregate() { return getKind() == TYPE_USER; } //XXX kinda...
     bool isBool() { return getKind() == TYPE_BOOL; }
@@ -328,6 +344,9 @@ struct ASTUserType : public ASTCompositeType {
     virtual ASTUserType *asInterface();
     virtual ASTUserType *asUnion();
     virtual ASTUserType *asStruct();
+
+    llvm::Type *getLLVMType();
+    void setLLVMType(llvm::Type *t);
 
     virtual ASTType *getPointerElementTy() {
         if(isInterface()) {

@@ -138,11 +138,6 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
         return sty;
     }
 
-    if(unit->types.count(ty->getMangledName())) {
-        Type *llty = unit->types[ty->getMangledName()];
-        return llty;
-    }
-
     // if interface create an interface struct
     // will still need to populate the interface members though
     // XXX seems a bit messy
@@ -166,8 +161,8 @@ llvm::Type *IRCodegenContext::codegenUserType(ASTType *ty)
     }
 
 
-    StructType *sty = StructType::create(context);
-    sty->setName(ty->getMangledName());
+    StructType *sty = StructType::create(context, ty->getMangledName());
+    //sty->setName(ty->getMangledName());
     unit->types[ty->getMangledName()] = IRType(ty, sty);
 
     std::vector<Type*> structVec;
@@ -211,6 +206,7 @@ llvm::Type *IRCodegenContext::codegenStructType(ASTType *ty) {
 //TODO: fix union types. codegen is incorrect (calls 'codegen usertype')
 llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty) {
     //return codegenUserType(ty);
+    llvm::Type *ret = NULL;
 
     // XXX useless below
     if(!ty->isUnion()) {
@@ -245,12 +241,14 @@ llvm::Type *IRCodegenContext::codegenUnionType(ASTType *ty) {
                         size - alignedType->getSize()));
         StructType *sty = StructType::create(context, userty->identifier->getName());
         sty->setBody(unionVec);
-        ty->cgType = sty;
+        ret = sty;
     }
-    else ty->cgType = Type::getInt8Ty(context); //allow fwd declared types, TODO: cleaner
+    else {
+        ret = Type::getInt8Ty(context); //allow fwd declared types, TODO: cleaner
+    }
 
     unit->debug->createUnionType(ty);
-    return(llvm::Type*) ty->cgType;
+    return ret;
 }
 
 llvm::Type *IRCodegenContext::codegenClassType(ASTType *ty) //TODO: actual codegen
@@ -266,7 +264,7 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
         return NULL;
     }
 
-    if(ty->cgType) return ty->cgType;
+    //if(ty->cgType) return ty->cgType;
 
     if(!tupty->types.size()) {
         emit_message(msg::FAILURE, "CODEGEN: 0-tuple found in codegen", location);
@@ -281,7 +279,7 @@ llvm::Type *IRCodegenContext::codegenTupleType(ASTType *ty)
 
     StructType *tty = StructType::get(context, tupleVec);
     //tty->setBody(tupleVec);
-    ty->cgType = tty;
+    //ty->cgType = tty;
     unit->debug->createType(ty); // TODO
     return tty;
 }
@@ -302,6 +300,10 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
     }
 
     //if(ty->cgType) return ty->cgType;
+    /*
+    if(StructType *sty = module->getTypeByName(ty->getMangledName())) {
+        return sty;
+    }*/
 
     Type *ret = NULL;
     if(arrty->isDynamic())
@@ -313,7 +315,8 @@ llvm::Type *IRCodegenContext::codegenArrayType(ASTType *ty)
         vector<Type*> members;
         members.push_back(codegenType(arrty->arrayOf->getPointerTy()));
         members.push_back(codegenType(ASTType::getLongTy()));
-        StructType *aty = StructType::create(context, ty->getName());
+        StructType *aty = StructType::create(context);
+        //aty->setName(ty->getMangledName());
         aty->setBody(members);
 
         unit->debug->createDynamicArrayType(ty);
@@ -353,7 +356,11 @@ llvm::Type *IRCodegenContext::codegenFunctionType(ASTType *ty) {
 llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
 {
     llvm::Type *llvmty = NULL;
-    if(ty->cgType) return (Type*) ty->cgType;
+    assert(!ty->isUnknown());
+
+    if(ty->getLLVMType()) {
+        return ty->getLLVMType();
+    }
 
     ASTType *tmp;
     switch(ty->getKind())
@@ -412,7 +419,7 @@ llvm::Type *IRCodegenContext::codegenType(ASTType *ty)
             emit_message(msg::FAILURE, "type not handled", currentLoc);
     }
 
-    ty->cgType = llvmty;
+    ty->setLLVMType(llvmty);
 
     return (llvm::Type *) llvmty;
 }

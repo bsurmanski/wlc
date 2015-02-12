@@ -993,11 +993,13 @@ struct CallExpression : public PostfixExpression
                 return args.front()->getType();
         }
 
-        if(!function->getType()) {
-            return function->getDeclaredType();
+        Expression *func = resolvedFunction ? resolvedFunction : function;
+
+        if(!func->getType()) {
+            return func->getDeclaredType();
         }
 
-        ASTFunctionType *fty = function->getType()->asFunctionType();
+        ASTFunctionType *fty = func->getType()->asFunctionType();
         if(!fty) return NULL;
         return fty->getReturnType();
     }

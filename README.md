@@ -87,6 +87,7 @@ If you wish, the name may also stand for 'Objective WL', where WL may stand for
 * switch statements
 * unions
 * classes
+* interfaces
 * uniform function call syntax
 
 ## Planned Functionality
@@ -95,8 +96,6 @@ roughly in order of planned implementation
 * enums
 * vector types
 * generics
-* interfaces
-
 
 ## Features
 
@@ -182,6 +181,64 @@ assignment. This provides a way to prevent cyclic references.
 
     Animal human = new Human()
     weak Animal myAnimal = human // no retain for myAnimal
+
+### Interfaces
+Interfaces allow a convenient way for dynamic method dispatch without
+inheritence. This allows a programmer to create an abstract type that defines a
+behaviour. One or more implementations of this behaviour can be created. When an
+interface is used, the calling code does not need to worry about the
+implementation.
+
+
+    // provide an interface to work with some input
+    inteface InputInterface {
+        long size();
+        long read(void^ buf, long sz, long nmem);
+    }
+
+    // may implicitly cast to InputInterface
+    // represents using a file on disk as an input
+    class File {
+        FILE^ file
+        long sz
+
+        long size() {
+            ...
+        }
+
+        long read(void^ buf, long sz, long nmem) {
+            ...
+        }
+    }
+
+    // may implicitly cast to InputInterface
+    // represents using a string in memory as an input
+    class StringFile {
+        long size() {
+            ...
+        }
+
+        long read() {
+            ...
+        }
+    }
+
+    ...
+
+    Mesh loadMesh(InputInterface io) {
+        // use methods defined in input interface
+        // does not matter if input is from memory or disk
+        ...
+    }
+
+    void main() {
+        // loads file during runtime
+        Mesh a = loadMesh(new File("file.msh"))
+
+        // packs file into memory at compile time
+        // then loads mesh from memory during runtime
+        Mesh b = loadMesh(new StringFile(pack "file.msh"))
+    }
 
 ### Arrays
 arrays have an associated size in OWL. Arrays can either be statically sized, or

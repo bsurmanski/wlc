@@ -81,6 +81,7 @@
     <ClCompile Include="..\src\astScope.cpp" />
     <ClCompile Include="..\src\astType.cpp" />
     <ClCompile Include="..\src\astVisitor.cpp" />
+    <ClCompile Include="..\src\file.cpp" />
     <ClCompile Include="..\src\identifier.cpp" />
     <ClCompile Include="..\src\irCodegenContext.cpp" />
     <ClCompile Include="..\src\irDebug.cpp" />
@@ -134,6 +135,7 @@
     <ClInclude Include="..\src\astVisitor.hpp" />
     <ClInclude Include="..\src\codegenContext.hpp" />
     <ClInclude Include="..\src\config.hpp" />
+    <ClInclude Include="..\src\file.hpp" />
     <ClInclude Include="..\src\identifier.hpp" />
     <ClInclude Include="..\src\irCodegenContext.hpp" />
     <ClInclude Include="..\src\irDebug.hpp" />

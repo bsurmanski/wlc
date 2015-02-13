@@ -263,8 +263,11 @@ void Sema::visitCallExpression(CallExpression *exp) {
 
                 // lower dot expression from dotExpression to identifierExpression
                 if(dexp->lhs->getType()->isUserType()) {
-                    Identifier *fid = dexp->lhs->getType()->asUserType()->getScope()->lookup(dexp->rhs);
+                    Identifier *fid = dexp->lhs->getType()->asUserType()->getDeclaration()->lookup(dexp->rhs);
                     exp->function = new IdentifierExpression(fid, currentLocation());
+                    if(!fid) {
+                        emit_message(msg::FAILURE, "function not found in type: " + dexp->rhs);
+                    }
                 } else if(dexp->lhs->getType()->isUserTypePointer()) {
                     // also lower dot expression where LHS is pointer to user type
                     // XXX should not do this if pointer to class?

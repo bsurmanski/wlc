@@ -42,10 +42,11 @@ class MySpecialClass : MyClass
 
     void printCall(int i) {
         printf("printing magic %d\n", i);
+        .virtualFunc()
     }
 
     int myFunction(int v1, int v2) {
-        return v1 + v2 + .svar
+        return v1 + v2 + .svar + .a
     }
 
     this() {
@@ -64,6 +65,10 @@ class MyClass
 
     void printCall() {
         printf("print\n");
+    }
+
+    void virtualFunc() {
+        printf("do virtual\n")
     }
 
     this() {

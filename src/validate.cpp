@@ -35,6 +35,8 @@ Identifier *ValidationVisitor::resolveIdentifier(Identifier *id) {
         id->getExpression()->accept(this);
     }
 
+    assert(id);
+
     return id;
 }
 

@@ -482,6 +482,8 @@ the libclang source must be availible to compile.
 
 For more information, view the WIN32\_README.md file in the *win32* directory.
 
+A Windows Binary is available for download [here](https://www.amazon.ca/clouddrive/share/KswlO3usuwAQmjlWw_dpz-h_2ccvPuzdcba0FK-BtEU) (commit "dc366a17" Feb 13 2015)
+
 ### OSX
 WLC is likely to compile on OSX using the provided Makefile with minor
 modification. In the past, I have successfully compiled WLC on OSX, and ran a
